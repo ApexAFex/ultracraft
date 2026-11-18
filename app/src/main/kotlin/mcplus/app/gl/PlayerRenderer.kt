@@ -10,8 +10,9 @@ import kotlin.math.sin
 /**
  * Draws players as humanoids with the game's default skin instead of coloured boxes.
  *
- * The geometry lives in [PlayerModel]; this class only uploads it once, uploads the skin
- * texture and draws the same mesh per entity with a model matrix (position + yaw).
+ * The geometry lives in [PlayerModel] as one mesh per body part. Arms and legs are rotated
+ * around their pivots by the walking phase, everything else follows the entity's position and
+ * yaw, so a walking player swings its limbs and a standing one keeps them down.
  */
 class PlayerRenderer(
     private val width: Int,
@@ -19,8 +20,15 @@ class PlayerRenderer(
     private val skin: BufferedImage?,
 ) : Closeable {
 
-    /** One player to draw: where it stands and where it looks, in protocol degrees. */
-    data class Player(val x: Double, val y: Double, val z: Double, val yaw: Float)
+    /** One player to draw: position, facing in protocol degrees, walk phase and speed. */
+    data class Player(
+        val x: Double,
+        val y: Double,
+        val z: Double,
+        val yaw: Float,
+        val walkPhase: Float = 0f,
+        val walkAmount: Float = 0f,
+    )
 
     private val program = createProgram()
     private val viewProjLocation = GL30.glGetUniformLocation(program, "uViewProj")
@@ -31,14 +39,25 @@ class PlayerRenderer(
     private val vbo = GL30.glGenBuffers()
     private val texture = skin?.let { upload(it) } ?: 0
 
+    /** Byte offset of each part inside the shared buffer. */
+    private val offsets: IntArray
     private val model = FloatArray(16)
 
     init {
         GL30.glBindVertexArray(vao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, vbo)
-        val data = PlayerModel.data
-        val buffer = MemoryUtil.memAllocFloat(data.size)
-        buffer.put(data).flip()
+
+        val parts = PlayerModel.parts
+        val total = parts.sumOf { it.data.size }
+        var offset = 0
+        offsets = IntArray(parts.size)
+        val buffer = MemoryUtil.memAllocFloat(total)
+        for ((index, part) in parts.withIndex()) {
+            offsets[index] = offset * Float.SIZE_BYTES
+            buffer.put(part.data)
+            offset += part.data.size
+        }
+        buffer.flip()
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_STATIC_DRAW)
         MemoryUtil.memFree(buffer)
 
@@ -65,25 +84,41 @@ class PlayerRenderer(
         GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
         GL30.glBindVertexArray(vao)
 
+        val parts = PlayerModel.parts
         for (player in players) {
-            // The model's face points along +Z, so the protocol yaw only has to be negated.
-            fillModel(player.x, player.y, player.z, -Math.toRadians(player.yaw.toDouble()).toFloat())
-            GL30.glUniformMatrix4fv(modelLocation, false, model)
-            GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, PlayerModel.vertexCount)
+            fillModel(player)
+            for ((index, part) in parts.withIndex()) {
+                val angle = PlayerModel.limbAngle(part.name, player.walkPhase, player.walkAmount)
+                if (angle == 0f) {
+                    GL30.glUniformMatrix4fv(modelLocation, false, model)
+                } else {
+                    // Rotate the part around its pivot: translate, rotate, translate back.
+                    val pivot = Mat4.translate(part.pivotX, part.pivotY, part.pivotZ)
+                    val back = Mat4.translate(-part.pivotX, -part.pivotY, -part.pivotZ)
+                    val rotated = Mat4.multiply(model, Mat4.multiply(pivot, Mat4.rotateX(angle)))
+                    GL30.glUniformMatrix4fv(modelLocation, false, Mat4.multiply(rotated, back))
+                }
+                GL30.glDrawArrays(GL30.GL_TRIANGLES, offsets[index] / Float.SIZE_BYTES, part.vertexCount)
+            }
         }
 
         GL30.glBindVertexArray(0)
         GL30.glUseProgram(0)
     }
 
-    private fun fillModel(x: Double, y: Double, z: Double, yawRadians: Float) {
+    private fun fillModel(player: Player) {
+        // The model's face points along +Z, so the protocol yaw only has to be negated.
+        val yawRadians = -Math.toRadians(player.yaw.toDouble()).toFloat()
         val c = cos(yawRadians)
         val s = sin(yawRadians)
-        // Column-major: rotation about Y, then translation.
+
         model[0] = c; model[1] = 0f; model[2] = -s; model[3] = 0f
         model[4] = 0f; model[5] = 1f; model[6] = 0f; model[7] = 0f
         model[8] = s; model[9] = 0f; model[10] = c; model[11] = 0f
-        model[12] = x.toFloat(); model[13] = y.toFloat(); model[14] = z.toFloat(); model[15] = 1f
+        model[12] = player.x.toFloat()
+        model[13] = player.y.toFloat()
+        model[14] = player.z.toFloat()
+        model[15] = 1f
     }
 
     override fun close() {

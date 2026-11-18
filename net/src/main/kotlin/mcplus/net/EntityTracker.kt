@@ -39,6 +39,16 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     var movedDistance: Double = 0.0
         private set
 
+    /** Horizontal path length, used as the phase of the walk animation. */
+    @Volatile
+    var walkDistance: Double = 0.0
+        private set
+
+    /** Smoothed horizontal speed in blocks per second, the amplitude of the walk animation. */
+    @Volatile
+    var speed: Double = 0.0
+        private set
+
     /** Facing, in protocol degrees: 0 looks along +Z, 90 along -X. */
     @Volatile
     var yaw: Float = 0f
@@ -69,6 +79,7 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
         targetY += dy
         targetZ += dz
         movedDistance += kotlin.math.abs(dx) + kotlin.math.abs(dy) + kotlin.math.abs(dz)
+        walkDistance += kotlin.math.sqrt(dx * dx + dz * dz)
     }
 
     /** Eases the render position towards the server position. */
@@ -82,13 +93,23 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
             x = targetX
             y = targetY
             z = targetZ
+            speed = 0.0
             return
         }
 
         val factor = (dtSeconds * 10.0).coerceIn(0.0, 1.0)
+        val beforeX = x
+        val beforeZ = z
         x += dx * factor
         y += dy * factor
         z += dz * factor
+
+        // The eased movement per frame is a good enough speed estimate for the limb swing, and
+        // smoothing keeps the legs still when the packets stop arriving.
+        if (dtSeconds > 1e-6) {
+            val step = kotlin.math.sqrt((x - beforeX) * (x - beforeX) + (z - beforeZ) * (z - beforeZ))
+            speed = speed * 0.85 + (step / dtSeconds) * 0.15
+        }
     }
 }
 

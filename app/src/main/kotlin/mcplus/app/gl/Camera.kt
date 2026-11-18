@@ -65,6 +65,36 @@ class Camera(
 /** Minimal column-major 4x4 matrix helpers — no external math library needed. */
 object Mat4 {
 
+    fun identity(): FloatArray = FloatArray(16).also { it[0] = 1f; it[5] = 1f; it[10] = 1f; it[15] = 1f }
+
+    fun translate(x: Float, y: Float, z: Float): FloatArray = identity().also {
+        it[12] = x
+        it[13] = y
+        it[14] = z
+    }
+
+    fun rotateX(radians: Float): FloatArray {
+        val c = cos(radians)
+        val s = sin(radians)
+        return identity().also {
+            it[5] = c
+            it[6] = s
+            it[9] = -s
+            it[10] = c
+        }
+    }
+
+    fun rotateY(radians: Float): FloatArray {
+        val c = cos(radians)
+        val s = sin(radians)
+        return identity().also {
+            it[0] = c
+            it[2] = -s
+            it[8] = s
+            it[10] = c
+        }
+    }
+
     fun perspective(fovY: Float, aspect: Float, near: Float, far: Float): FloatArray {
         val f = (1.0 / tan(fovY / 2.0)).toFloat()
         val result = FloatArray(16)

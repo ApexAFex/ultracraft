@@ -48,6 +48,12 @@ object GlView {
     /** Nicknames further away than this are not drawn — they would be unreadable dots. */
     private const val NAMETAG_RANGE = 64.0
 
+    /** One full arm swing per this many blocks walked (vanilla is about the same). */
+    private const val WALK_PHASE_PER_BLOCK = 3.5
+
+    /** Speed at which the limbs swing at full amplitude. */
+    private const val WALK_SPEED = 4.3
+
     fun run(
         world: World,
         blocks: BlockTable,
@@ -420,7 +426,14 @@ object GlView {
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         for (entity in entities) {
                             if (playerList.nameOf(entity.uuid) != null) {
-                                players += PlayerRenderer.Player(entity.x, entity.y, entity.z, entity.yaw)
+                                players += PlayerRenderer.Player(
+                                    x = entity.x,
+                                    y = entity.y,
+                                    z = entity.z,
+                                    yaw = entity.yaw,
+                                    walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
+                                    walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                )
                             } else {
                                 boxes += entity
                             }
@@ -443,11 +456,13 @@ object GlView {
                         if (demo) {
                             // The self-test needs a tag it can read: the nearest player is usually
                             // many blocks away, where 0.025-block glyphs are a few pixels tall.
+                            // Placed below the crosshair so it never covers the subject.
                             val forward = camera.forward()
+                            val up = camera.up()
                             labels += TextRenderer.Label(
-                                camera.x + forward[0] * 3.0,
-                                camera.y + forward[1] * 3.0,
-                                camera.z + forward[2] * 3.0,
+                                camera.x + forward[0] * 3.0 - up[0] * 0.9,
+                                camera.y + forward[1] * 3.0 - up[1] * 0.9,
+                                camera.z + forward[2] * 3.0 - up[2] * 0.9,
                                 "mcplus demo",
                             )
                         }
@@ -502,6 +517,24 @@ object GlView {
                         rightWasDown = rightDown
 
                         if (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames) {
+                            // Self-test: report what the walk animation saw, so a screenshot can be
+                            // checked against numbers instead of guesswork.
+                            val subject = players.minByOrNull { player ->
+                                val dx = player.x - camera.x; val dz = player.z - camera.z
+                                dx * dx + dz * dz
+                            }
+                            if (subject != null) {
+                                println(
+                                    "Игрок в кадре: %.1f блоков, скорость %.2f, амплитуда шага %.2f".format(
+                                        kotlin.math.sqrt(
+                                            (subject.x - camera.x) * (subject.x - camera.x) +
+                                                (subject.z - camera.z) * (subject.z - camera.z),
+                                        ),
+                                        subject.walkAmount * WALK_SPEED,
+                                        subject.walkAmount,
+                                    ),
+                                )
+                            }
                             GL30.glFinish()
                             captureTo?.let { savePng(it, width, height) }
                             break
