@@ -2,6 +2,7 @@ package mcplus.app
 
 import mcplus.auth.Account
 import mcplus.auth.AccountStore
+import mcplus.auth.AuthConfig
 import mcplus.auth.AuthException
 import mcplus.auth.AuthManager
 import mcplus.auth.MinecraftSession
@@ -200,15 +201,15 @@ private fun chunkDumpCommand(args: List<String>) {
 // ---------------------------------------------------------------- login
 
 private fun loginCommand(args: List<String>) {
-    var clientId: String? = null
+    var clientIdArg: String? = null
     var storePath: String? = null
-    var tenant = System.getenv("MCPLUS_TENANT") ?: "consumers"
+    var tenantArg: String? = null
 
     var index = 0
     while (index < args.size) {
         when (val arg = args[index]) {
-            "--client-id" -> clientId = args.getOrNull(++index) ?: fail("--client-id требует значение")
-            "--tenant" -> tenant = args.getOrNull(++index) ?: fail("--tenant требует значение")
+            "--client-id" -> clientIdArg = args.getOrNull(++index) ?: fail("--client-id требует значение")
+            "--tenant" -> tenantArg = args.getOrNull(++index) ?: fail("--tenant требует значение")
             "--store" -> storePath = args.getOrNull(++index) ?: fail("--store требует путь")
             "--help", "-h" -> { printUsage(); return }
             else -> fail("Лишний аргумент: $arg")
@@ -216,13 +217,26 @@ private fun loginCommand(args: List<String>) {
         index++
     }
 
-    val id = clientId ?: System.getenv("MCPLUS_CLIENT_ID") ?: fail(
-        "Нужен client id приложения Azure.\n" +
-            "Как получить — docs/auth-setup.md, затем задай MCPLUS_CLIENT_ID или флаг --client-id.",
-    )
+    val storeFile = resolveStoreFile(storePath)
+    val store = AccountStore(storeFile)
+    val config = AuthConfig(configFileFor(storeFile))
 
-    val store = AccountStore(resolveStoreFile(storePath))
-    val auth = AuthManager(id, store, tenant, log = { line -> println("  $line") })
+    val clientId = clientIdArg
+        ?: System.getenv("MCPLUS_CLIENT_ID")
+        ?: config.clientId()
+        ?: fail(
+            "Нужен client id приложения Azure.\n" +
+                "Как получить — docs/auth-setup.md, затем задай MCPLUS_CLIENT_ID или флаг --client-id.",
+        )
+    val tenant = tenantArg ?: System.getenv("MCPLUS_TENANT") ?: config.tenant()
+
+    // Remember the id so the next runs need no flags and no environment variables.
+    if (clientIdArg != null || System.getenv("MCPLUS_CLIENT_ID") != null) {
+        config.save(clientId, tenant)
+        println("  client id сохранён в ${config.path}")
+    }
+
+    val auth = AuthManager(clientId, store, tenant, log = { line -> println("  $line") })
 
     val account = try {
         auth.silentLogin() ?: auth.loginWithDeviceCode()
@@ -365,8 +379,13 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session = t
 
 /** Reads the stored account, refreshing the token when needed. */
 private fun loadAccount(): Account {
-    val store = AccountStore(resolveStoreFile(null))
-    val manager = AuthManager(System.getenv("MCPLUS_CLIENT_ID") ?: "", store)
+    val storeFile = resolveStoreFile(null)
+    val store = AccountStore(storeFile)
+    val config = AuthConfig(configFileFor(storeFile))
+
+    val clientId = System.getenv("MCPLUS_CLIENT_ID") ?: config.clientId() ?: ""
+    val tenant = System.getenv("MCPLUS_TENANT") ?: config.tenant()
+    val manager = AuthManager(clientId, store, tenant)
 
     val account = try {
         manager.silentLogin()
@@ -375,6 +394,9 @@ private fun loadAccount(): Account {
     }
     return account ?: fail("Нет сохранённой учётной записи. Сначала выполни: mcplus login")
 }
+
+private fun configFileFor(storeFile: java.io.File): java.io.File =
+    java.io.File(storeFile.parentFile ?: java.io.File("."), "config.json")
 
 private fun printRows(rows: List<Pair<String, String>>) {
     val width = rows.maxOf { it.first.length }
