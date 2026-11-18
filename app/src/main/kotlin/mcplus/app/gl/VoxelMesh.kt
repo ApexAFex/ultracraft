@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockTable
 import mcplus.net.World
@@ -44,16 +44,6 @@ object VoxelMeshBuilder {
 
     private const val FLOATS_PER_VERTEX = 7
 
-    /** Corner order for every quad: two triangles, counter-clockwise from outside. */
-    private val UV = floatArrayOf(
-        0f, 0f,
-        1f, 0f,
-        1f, 1f,
-        0f, 0f,
-        1f, 1f,
-        0f, 1f,
-    )
-
     fun build(
         world: World,
         blocks: BlockTable,
@@ -95,8 +85,16 @@ val layer = atlas.layerFor(name, face.kind).toFloat()
                                 vertexData.add(z + point[2])
                                 vertexData.add(face.shade)
                                 vertexData.add(layer)
-                                vertexData.add(UV[corner * 2])
-                                vertexData.add(UV[corner * 2 + 1])
+                                // UVs follow the block face: top/bottom use x,z; sides use the
+                                // horizontal axis and y, with v flipped so textures read upright.
+                                val u = when {
+                                    face.dy != 0 -> point[0]
+                                    face.dx != 0 -> if (face.dx > 0) point[2] else 1f - point[2]
+                                    else -> if (face.dz > 0) point[0] else 1f - point[0]
+                                }
+                                val v = if (face.dy != 0) 1f - point[2] else 1f - point[1]
+                                vertexData.add(u)
+                                vertexData.add(v)
                             }
                         }
                     }
@@ -196,6 +194,7 @@ class FloatArrayBuilder(initialCapacity: Int) {
 
     fun toArray(): FloatArray = data.copyOf(size)
 }
+
 
 
 

@@ -2,6 +2,8 @@ package mcplus.app.gl
 
 import mcplus.net.BlockTable
 import mcplus.net.World
+import kotlin.math.floor
+import kotlin.math.sqrt
 
 /**
  * Player physics: gravity, jumping and axis-by-axis collision against solid blocks.
@@ -25,16 +27,24 @@ class Player(
     /** Camera sits at eye height above the feet. */
     val eyeY: Double get() = y + EYE_HEIGHT
 
-    fun move(dt: Double, world: World, blocks: BlockTable, forward: Double, strafe: Double, jump: Boolean, descend: Boolean) {
+    fun move(
+        dt: Double,
+        world: World,
+        blocks: BlockTable,
+        forward: Double,
+        strafe: Double,
+        jump: Boolean,
+        descend: Boolean,
+    ) {
         val step = (if (flying) FLY_SPEED else WALK_SPEED) * dt
 
         val sin = kotlin.math.sin(yaw)
         val cos = kotlin.math.cos(yaw)
-        // Forward is (sin(yaw), 0, cos(yaw)); right is perpendicular to it.
-        var dx = (sin * forward + cos * strafe) * step
-        var dz = (cos * forward - sin * strafe) * step
+        // forward = (sin, cos); right = (cos, -sin), so D moves to the player's right.
+        var dx = (sin * forward - cos * strafe) * step
+        var dz = (cos * forward + sin * strafe) * step
 
-        val length = kotlin.math.sqrt(dx * dx + dz * dz)
+        val length = sqrt(dx * dx + dz * dz)
         if (length > step && length > 1e-9) {
             dx = dx / length * step
             dz = dz / length * step
@@ -44,64 +54,73 @@ class Player(
             var dy = 0.0
             if (jump) dy += step
             if (descend) dy -= step
-            moveAxis(0.0, dy, world, blocks)
+            moveVertical(dy, world, blocks)
             velocityY = 0.0
             onGround = false
         } else {
+            if (jump && onGround) velocityY = JUMP_VELOCITY
             velocityY -= GRAVITY * dt
             if (velocityY < -TERMINAL_VELOCITY) velocityY = -TERMINAL_VELOCITY
 
-            if (jump && onGround) {
-                velocityY = JUMP_VELOCITY
-                onGround = false
-            }
             onGround = false
-            moveAxis(0.0, velocityY * dt, world, blocks)
+            moveVertical(velocityY * dt, world, blocks)
         }
 
-        moveAxis(dx, 0.0, world, blocks)
-        moveAxis(0.0, 0.0, world, blocks, dz = dz)
+        moveHorizontal(dx, dz, world, blocks)
     }
 
-    private fun moveAxis(dx: Double, dy: Double, world: World, blocks: BlockTable, dz: Double = 0.0) {
+    private fun moveHorizontal(dx: Double, dz: Double, world: World, blocks: BlockTable) {
         if (dx != 0.0) {
-            x += dx
+            val moved = x + dx
+            x = moved
             if (collides(world, blocks)) {
-                x -= dx
-                if (dx > 0) x = kotlin.math.floor(x + HALF_WIDTH).toDouble() - HALF_WIDTH - 1e-4
-                else x = kotlin.math.floor(x - HALF_WIDTH).toDouble() + 1.0 + HALF_WIDTH + 1e-4
+                // Snap to the face of the block we ran into, measured from the position we
+                // actually tried to occupy — otherwise standing flush against a wall would
+                // push the player a full block away.
+                x = if (dx > 0) {
+                    floor(moved + HALF_WIDTH) - HALF_WIDTH - EPSILON
+                } else {
+                    floor(moved - HALF_WIDTH) + 1.0 + HALF_WIDTH + EPSILON
+                }
             }
         }
         if (dz != 0.0) {
-            z += dz
+            val moved = z + dz
+            z = moved
             if (collides(world, blocks)) {
-                z -= dz
-                if (dz > 0) z = kotlin.math.floor(z + HALF_WIDTH).toDouble() - HALF_WIDTH - 1e-4
-                else z = kotlin.math.floor(z - HALF_WIDTH).toDouble() + 1.0 + HALF_WIDTH + 1e-4
-            }
-        }
-        if (dy != 0.0) {
-            y += dy
-            if (collides(world, blocks)) {
-                y -= dy
-                if (dy < 0) {
-                    y = kotlin.math.floor(y).toDouble() + 1.0
-                    onGround = true
+                z = if (dz > 0) {
+                    floor(moved + HALF_WIDTH) - HALF_WIDTH - EPSILON
                 } else {
-                    y = kotlin.math.floor(y + HEIGHT).toDouble() - HEIGHT - 1e-4
+                    floor(moved - HALF_WIDTH) + 1.0 + HALF_WIDTH + EPSILON
                 }
-                velocityY = 0.0
             }
         }
     }
 
+    private fun moveVertical(dy: Double, world: World, blocks: BlockTable) {
+        if (dy == 0.0) return
+        val moved = y + dy
+        y = moved
+        if (!collides(world, blocks)) return
+
+        if (dy < 0) {
+            // Feet land on top of the block they entered; using the moved position avoids
+            // the "bouncing" you get when snapping from the un-moved one.
+            y = floor(moved) + 1.0
+            onGround = true
+        } else {
+            y = floor(moved + HEIGHT) - HEIGHT - EPSILON
+        }
+        velocityY = 0.0
+    }
+
     private fun collides(world: World, blocks: BlockTable): Boolean {
-        val minX = kotlin.math.floor(x - HALF_WIDTH).toInt()
-        val maxX = kotlin.math.floor(x + HALF_WIDTH).toInt()
-        val minY = kotlin.math.floor(y).toInt()
-        val maxY = kotlin.math.floor(y + HEIGHT).toInt()
-        val minZ = kotlin.math.floor(z - HALF_WIDTH).toInt()
-        val maxZ = kotlin.math.floor(z + HALF_WIDTH).toInt()
+        val minX = floor(x - HALF_WIDTH).toInt()
+        val maxX = floor(x + HALF_WIDTH).toInt()
+        val minY = floor(y + EPSILON).toInt()
+        val maxY = floor(y + HEIGHT - EPSILON).toInt()
+        val minZ = floor(z - HALF_WIDTH).toInt()
+        val maxZ = floor(z + HALF_WIDTH).toInt()
 
         for (blockX in minX..maxX) {
             for (blockY in minY..maxY) {
@@ -119,6 +138,7 @@ class Player(
         const val HALF_WIDTH = 0.3
         const val HEIGHT = 1.8
         const val EYE_HEIGHT = 1.62
+        private const val EPSILON = 1e-4
 
         private const val WALK_SPEED = 4.317
         private const val FLY_SPEED = 14.0
@@ -126,7 +146,10 @@ class Player(
         private const val JUMP_VELOCITY = 8.2
         private const val TERMINAL_VELOCITY = 60.0
 
-        private val NON_SOLID = setOf("air", "cave_air", "void_air", "water", "lava", "short_grass", "tall_grass", "fern")
+        private val NON_SOLID = setOf(
+            "air", "cave_air", "void_air", "water", "lava",
+            "short_grass", "tall_grass", "fern", "large_fern", "dead_bush",
+        )
 
         fun isSolid(blockName: String): Boolean = blockName !in NON_SOLID
 
@@ -141,4 +164,3 @@ class Player(
         }
     }
 }
-

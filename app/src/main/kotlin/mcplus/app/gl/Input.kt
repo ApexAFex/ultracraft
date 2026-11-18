@@ -41,7 +41,7 @@ class Input(private val window: Long, private val camera: Camera) {
         lastX = x
         lastY = y
 
-        camera.yaw += dx * SENSITIVITY
+        camera.yaw -= dx * SENSITIVITY
         camera.pitch = (camera.pitch - dy * SENSITIVITY).coerceIn(-1.55f, 1.55f)
     }
 
