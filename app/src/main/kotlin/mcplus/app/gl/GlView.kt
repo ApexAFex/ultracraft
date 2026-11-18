@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -106,6 +106,7 @@ object GlView {
             // Counted on the reader thread: shows whether the server accepts our edits or
             // quietly puts the world back.
             val blockUpdates = java.util.concurrent.atomic.AtomicInteger()
+            val chunkFailures = java.util.concurrent.atomic.AtomicInteger()
 
             /**
              * A chunk's mesh depends on its four neighbours too, but only at the border:
@@ -136,6 +137,8 @@ object GlView {
                     return@startReading
                 }
                 if (packet.id == Protocol777.Play.CHUNK_DATA) {
+                    // A chunk that fails to parse is a hole in the world, so say so instead of
+                    // swallowing the exception: silent holes are impossible to diagnose.
                     runCatching {
                         val column = world.addChunk(packet.body, sectionCount)
                         // Faces towards an unloaded chunk are drawn (see MeshBuilder), so the
@@ -143,6 +146,11 @@ object GlView {
                         // duplicate faces are coplanar and invisible.
                         pipeline.request(column.x, column.z)
                         streamed++
+                    }.onFailure { error ->
+                        chunkFailures.incrementAndGet()
+                        if (chunkFailures.get() <= 3) {
+                            println("Чанк не разобран: ${error.message ?: error::class.simpleName}")
+                        }
                     }
                 }
             }
@@ -422,7 +430,7 @@ object GlView {
                     entityRenderer.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
-                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}")
+                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, чанков не разобрано ${chunkFailures.get()}")
                 }
             }
         } finally {
