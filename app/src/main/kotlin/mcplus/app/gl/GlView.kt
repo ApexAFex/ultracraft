@@ -42,8 +42,11 @@ object GlView {
     /** Demo mode asks for flight at this frame: a survival server must refuse, not kick. */
     private const val DEMO_FLY_ATTEMPT = 40
 
-    /** Ticks between pressing and releasing the mouse on a block (vanilla sends them apart). */
-    private const val BREAK_HOLD_TICKS = 2L
+    /** Demo mode looks at the ground from here on, to test the mining progress. */
+    private const val DEMO_MINE_FROM = 700
+
+    /** A block change the server told us about; the mining code waits for these. */
+    private class BlockChange(val x: Int, val y: Int, val z: Int, val state: Int)
 
     /** Nicknames further away than this are not drawn — they would be unreadable dots. */
     private const val NAMETAG_RANGE = 64.0
@@ -126,6 +129,7 @@ object GlView {
             // quietly puts the world back.
             val blockUpdates = java.util.concurrent.atomic.AtomicInteger()
             val chunkFailures = java.util.concurrent.atomic.AtomicInteger()
+            val blockChanges = java.util.concurrent.ConcurrentLinkedQueue<BlockChange>()
 
             /**
              * A chunk's mesh depends on its four neighbours too, but only at the border:
@@ -152,8 +156,12 @@ object GlView {
                     runCatching {
                         val reader = mcplus.protocol.ByteReader(packet.body)
                         val position = reader.readPosition()
+                        val state = reader.readVarInt()
                         world.applyBlockUpdate(packet.body)
                         remeshAround(position.x, position.y, position.z)
+                        // The mining code learns from this: the block coming back means the server
+                        // rejected our release and the time has to grow.
+                        blockChanges.add(BlockChange(position.x, position.y, position.z, state))
                     }
                     return
                 }
@@ -238,29 +246,83 @@ object GlView {
                     )
                     println("WASD — идти, пробел — прыжок, F — полёт, ЛКМ — сломать, ПКМ — поставить, Esc — выход")
 
-                    // Breaking is two packets: the server pairs them, and a release sent in the
-                    // same frame as the press lands as one action and is answered with
-                    // "Mismatch in destroy block pos" instead of a destroyed block. So the
-                    // release waits a couple of ticks — the same shape the hold-to-break
-                    // progress will take later.
-                    var breakFinish: Packet? = null
-                    var breakFinishAtTick = 0L
+                    // Breaking takes time: press once, hold, release when the progress is full.
+                    // The server recomputes the progress itself and only accepts the release
+                    // when its own counter reached one, so pressing and releasing in the same
+                    // tick is answered with "Mismatch in destroy block pos".
+                    var miningX = 0
+                    var miningY = 0
+                    var miningZ = 0
+                    var miningFace = 0
+                    var miningTicks = 0
+                    var miningNeeded = 0
+                    var miningState = 0
+                    var mining = false
 
-                    fun startBreak(hit: Raycast.Hit) {
-                        world.setBlock(hit.x, hit.y, hit.z, 0)
-                        pipeline.request(hit.x shr 4, hit.z shr 4)
+                    /** Release sent, waiting to see whether the server agrees or puts the block back. */
+                    var pendingBreak: BlockChange? = null
+
+                    /** Set by the frame loop, consumed by the tick: one mining step per tick. */
+                    var holdRequested = false
+                    var aimTarget: Raycast.Hit? = null
+
+                    fun beginMining(hit: Raycast.Hit) {
+                        val name = blocks.nameOf(world.blockAt(hit.x, hit.y, hit.z))
+                        val needed = BreakProgress.ticksFor(name)
+                        if (needed == 0) return // never breakable
+
                         session?.send(
                             BlockInteraction.playerAction(
                                 BlockInteraction.START_DESTROY_BLOCK,
                                 hit.x, hit.y, hit.z, hit.face, sequence++,
                             ),
                         )
-                        breakFinish = BlockInteraction.playerAction(
-                            BlockInteraction.STOP_DESTROY_BLOCK,
-                            hit.x, hit.y, hit.z, hit.face, sequence++,
+                        mining = true
+                        miningX = hit.x
+                        miningY = hit.y
+                        miningZ = hit.z
+                        miningFace = hit.face
+                        miningTicks = 0
+                        miningNeeded = needed
+                        miningState = world.blockAt(hit.x, hit.y, hit.z)
+                    }
+
+                    fun cancelMining() {
+                        if (!mining) return
+                        session?.send(
+                            BlockInteraction.playerAction(
+                                BlockInteraction.ABORT_DESTROY_BLOCK,
+                                miningX, miningY, miningZ, miningFace, sequence++,
+                            ),
                         )
-                        breakFinishAtTick = tickCount + BREAK_HOLD_TICKS
-                        println("Сломан блок: ${hit.x}, ${hit.y}, ${hit.z}")
+                        mining = false
+                    }
+
+                    fun finishMining() {
+                        if (!mining) return
+                        // An instant block (grass blades, flowers, torches) is gone on the server as
+                        // soon as the press arrives: vanilla sends no release for those, and sending
+                        // one only makes the server complain that nothing was being dug.
+                        //
+                        // For timed blocks the release has to come *after* the server's own counter
+                        // reached one, otherwise the digging is cancelled and the block returns.
+                        // My table is an estimate, so a rejected attempt teaches the client the real
+                        // time (see the block-change handler) and the break is retried.
+                        if (miningNeeded > 1) {
+                            session?.send(
+                                BlockInteraction.playerAction(
+                                    BlockInteraction.STOP_DESTROY_BLOCK,
+                                    miningX, miningY, miningZ, miningFace, sequence++,
+                                ),
+                            )
+                            pendingBreak = BlockChange(miningX, miningY, miningZ, miningState)
+                        }
+                        // The prediction: the server confirms with a Block Update or sends the
+                        // block back, both of which we handle.
+                        world.setBlock(miningX, miningY, miningZ, 0)
+                        pipeline.request(miningX shr 4, miningZ shr 4)
+                        println("Сломан блок: $miningX, $miningY, $miningZ (${blocks.nameOf(miningState)}) за $miningTicks тиков")
+                        mining = false
                     }
 
                     fun demoPlace(hit: Raycast.Hit) {
@@ -325,10 +387,40 @@ object GlView {
                                 moveSender?.reset()
                             }
 
-                            // Finish a break that was pressed a couple of ticks ago.
-                            if (breakFinish != null && tickCount >= breakFinishAtTick) {
-                                session?.send(breakFinish!!)
-                                breakFinish = null
+                            // Mining advances on server ticks, like vanilla: pick the block under
+                            // the crosshair, one damage step per tick, release when it is done.
+                            while (true) {
+                                val change = blockChanges.poll() ?: break
+                                val pending = pendingBreak ?: continue
+                                if (change.x != pending.x || change.y != pending.y || change.z != pending.z) continue
+                                val name = blocks.nameOf(pending.state)
+                                if (change.state == 0) {
+                                    println("Сервер подтвердил слом: $name")
+                                } else {
+                                    val was = BreakProgress.ticksFor(name)
+                                    BreakProgress.recordFailure(name)
+                                    println(
+                                        "Сервер вернул $name: время слома $was → " +
+                                            "${BreakProgress.ticksFor(name)} тиков",
+                                    )
+                                }
+                                pendingBreak = null
+                            }
+
+                            val aim = aimTarget
+                            if (!holdRequested || aim == null) {
+                                cancelMining()
+                            } else {
+                                val sameBlock = mining &&
+                                    aim.x == miningX && aim.y == miningY && aim.z == miningZ
+                                if (!sameBlock) {
+                                    cancelMining()
+                                    beginMining(aim)
+                                }
+                            }
+                            if (mining) {
+                                miningTicks++
+                                if (miningTicks >= miningNeeded) finishMining()
                             }
 
                             previousX = player.x
@@ -403,6 +495,18 @@ object GlView {
                             camera.x, camera.y, camera.z,
                             forward[0].toDouble(), forward[1].toDouble(), forward[2].toDouble(),
                         )
+                        // The self-test needs a block that actually takes time: grass blades and
+                        // flowers break in one tick and would never exercise the progress.
+                        val miningTarget = if (!demo) {
+                            target
+                        } else {
+                            Raycast.cast(
+                                world, blocks,
+                                camera.x, camera.y, camera.z,
+                                forward[0].toDouble(), forward[1].toDouble(), forward[2].toDouble(),
+                                skip = { BreakProgress.ticksFor(it) <= 1 },
+                            ) ?: target
+                        }
 
                         GL30.glViewport(0, 0, width, height)
                         GL30.glClearColor(0.56f, 0.75f, 0.91f, 1f)
@@ -469,12 +573,22 @@ object GlView {
                         textRenderer?.draw(camera, labels)
                         if (target != null) renderer.drawOutline(camera, target.x, target.y, target.z)
 
+                        // Cracks on the block being mined: ten stages, like vanilla.
+                        if (mining) {
+                            val stage = ((miningTicks * 10) / miningNeeded).coerceIn(0, 9)
+                            val layer = atlas.layerFor("destroy_stage_$stage", TextureAtlas.Kind.SIDE)
+                            renderer.drawCracks(camera, miningX, miningY, miningZ, layer.toFloat())
+                        }
+
                         val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
                         val rightDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS
+                        // The demo "holds" the button so the self-test also exercises the progress.
+                        // The state machine itself runs in the tick loop: doing it per frame sent
+                        // a press and an abort dozens of times per tick while walking.
+                        holdRequested = leftDown || (demo && frame >= 5 && frame < 900)
+                        aimTarget = miningTarget
 
-                        if (leftDown && !leftWasDown && target != null) startBreak(target)
                         if (rightDown && !rightWasDown && target != null) demoPlace(target)
-                        if (demo && frame == 5 && target != null) startBreak(target)
                         if (demo && frame == DEMO_AIM_AT) {
                             // Aim at the closest **player** first: nicknames and player models are
                             // what a screenshot needs to check, and a passing mob would hide them.
@@ -512,6 +626,10 @@ object GlView {
                             }
                         }
                         if (demo && frame == 15 && target != null) demoPlace(target)
+
+                        // Late in the demo, look at the ground: the mining self-test needs a solid
+                        // block in front of the crosshair, and looking up at a mob gives it none.
+                        if (demo && frame >= DEMO_MINE_FROM) camera.pitch = -1.1f
 
                         leftWasDown = leftDown
                         rightWasDown = rightDown

@@ -28,6 +28,8 @@ object Raycast {
         dirY: Double,
         dirZ: Double,
         maxDistance: Double = 6.0,
+        /** Blocks to look through, e.g. for a self-test that needs a solid one. */
+        skip: (String) -> Boolean = { false },
     ): Hit? {
         var x = floor(originX).toInt()
         var y = floor(originY).toInt()
@@ -50,7 +52,9 @@ object Raycast {
 
         while (travelled <= maxDistance) {
             val state = world.blockAt(x, y, z)
-            if (state != World.UNKNOWN && state != 0 && !blocks.isAir(state)) {
+            if (state != World.UNKNOWN && state != 0 && !blocks.isAir(state) &&
+                !skip(blocks.nameOf(state))
+            ) {
                 val hitX = originX + dirX * travelled
                 val hitY = originY + dirY * travelled
                 val hitZ = originZ + dirZ * travelled

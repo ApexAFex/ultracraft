@@ -7,6 +7,7 @@ import mcplus.auth.AuthConfig
 import mcplus.auth.AuthException
 import mcplus.auth.AuthManager
 import mcplus.auth.MinecraftSession
+import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
 import mcplus.net.EncryptionRequiredException
 import mcplus.net.JoinResult
@@ -16,6 +17,7 @@ import mcplus.net.ServerDisconnectException
 import mcplus.net.ServerStatus
 import mcplus.net.Session
 import mcplus.net.StatusClient
+import mcplus.net.World
 import mcplus.net.WorldCollector
 import kotlin.math.floor
 import kotlin.system.exitProcess
@@ -42,6 +44,7 @@ private fun dispatch(args: List<String>) {
         args[0] == "view" -> viewCommand(args.drop(1))
         args[0] == "window" -> windowCommand(args.drop(1))
         args[0] == "watch" -> watchCommand(args.drop(1))
+        args[0] == "mine" -> mineCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
         args[0] == "logout" -> logoutCommand(args.drop(1))
@@ -181,6 +184,12 @@ private fun worldCommand(args: List<String>) {
         println()
         println(AsciiMap.render(world, blocks, centerChunkX, centerChunkZ, size))
         println(AsciiMap.legend())
+
+        options.at?.let { (x, y, z) ->
+            val state = world.blockAt(x, y, z)
+            val name = if (state == World.UNKNOWN) "чанк не загружен" else "${blocks.nameOf(state)} ($state)"
+            println("Блок $x, $y, $z по данным сервера: $name")
+        }
     }
 }
 
@@ -298,6 +307,80 @@ private fun watchCommand(args: List<String>) {
                     .format(entity.x, entity.y, entity.z, entity.movedDistance),
             )
         }
+    }
+}
+
+// ---------------------------------------------------------------- mine
+
+/**
+ * Protocol experiment: dig one block and report what the server did about it.
+ *
+ * Breaking is a conversation the server never explains, so this command holds the block for a
+ * given number of ticks, releases, and prints whether a block update came back and what the
+ * server thinks is there now.
+ */
+private fun mineCommand(args: List<String>) {
+    val options = parseLoginArgs(args) ?: return
+    val hold = options.seconds.coerceAtLeast(1) * 20
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+    val blocks = findBlockTable(options.blocks)
+
+    val session = connect(host, port, options)
+
+    session.use { open ->
+        val world = WorldCollector(open).collect(maxChunks = 25, durationMs = 2_000)
+        val standing = open.playerPosition
+        val (x, y, z) = options.at ?: run {
+            // By default dig the block under the player: it is always within reach.
+            val px = kotlin.math.floor(standing?.x ?: 0.0).toInt()
+            val py = kotlin.math.floor(standing?.y ?: 0.0).toInt() - 1
+            val pz = kotlin.math.floor(standing?.z ?: 0.0).toInt()
+            Triple(px, py, pz)
+        }
+        val start = world.blockAt(x, y, z)
+        println("Игрок в ${standing?.let { "%.1f, %.1f, %.1f".format(it.x, it.y, it.z) }}")
+        println("Блок $x, $y, $z до копания: ${blocks.nameOf(start)}")
+
+        // The server only starts ticking a joining player after it has seen enough client ticks
+        // (its own fallback is 60), and actions sent before that are ignored.
+        println("Жду загрузки игрока на сервере: 70 тиков…")
+        repeat(70) {
+            Thread.sleep(50)
+            open.send(mcplus.net.PlayerMovement.tickEnd())
+        }
+
+        var sequence = 0
+        open.send(BlockInteraction.playerAction(BlockInteraction.START_DESTROY_BLOCK, x, y, z, 1, sequence++))
+        println("Держу $hold тиков (${hold * 50} мс)…")
+        // The server applies actions per client tick, so the tick delimiter has to run while
+        // the button is held. The rotation goes along too: the server looks at the block with
+        // its own copy of our head direction.
+        val lookDown = mcplus.net.PlayerMovement.positionRotation(
+            standing?.x ?: 0.0, standing?.y ?: 0.0, standing?.z ?: 0.0,
+            0f, 1.5f, mcplus.net.PlayerMovement.ON_GROUND,
+        )
+        repeat(hold) {
+            Thread.sleep(50)
+            open.send(lookDown)
+            open.send(mcplus.net.PlayerMovement.tickEnd())
+        }
+        open.send(BlockInteraction.playerAction(BlockInteraction.STOP_DESTROY_BLOCK, x, y, z, 1, sequence++))
+        open.send(mcplus.net.PlayerMovement.tickEnd())
+
+        val deadline = System.currentTimeMillis() + 2_000
+        var answered = false
+        while (System.currentTimeMillis() < deadline) {
+            val packet = open.receive()
+            if (packet.id != mcplus.net.proto.Protocol777.Play.BLOCK_UPDATE) continue
+            val reader = mcplus.protocol.ByteReader(packet.body)
+            val changed = reader.readPosition()
+            val state = reader.readVarInt()
+            if (changed.x != x || changed.y != y || changed.z != z) continue
+            println("Сервер прислал Block Update: ${blocks.nameOf(state)}")
+            answered = true
+            break
+        }
+        if (!answered) println("Сервер ничего не прислал: скорее всего блок сломан")
     }
 }
 
@@ -468,6 +551,8 @@ private class LoginOptions(
     val demo: Boolean,
     val threads: Int,
     val seconds: Int,
+    /** (world) position to report the server's block at. */
+    val at: Triple<Int, Int, Int>?,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -485,6 +570,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var demo = false
     var threads = 0
     var seconds = 20
+    var at: Triple<Int, Int, Int>? = null
 
     var index = 0
     while (index < args.size) {
@@ -500,6 +586,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--demo" -> demo = true
             "--threads" -> threads = args.getOrNull(++index)?.toIntOrNull() ?: fail("--threads требует число")
             "--seconds" -> seconds = args.getOrNull(++index)?.toIntOrNull() ?: fail("--seconds требует число")
+            "--at" -> at = parsePosition(args.getOrNull(++index) ?: fail("--at требует x,y,z"))
             "--online" -> online = true
             "--verbose" -> verbose = true
             "--help", "-h" -> { printUsage(); return null }
@@ -509,8 +596,15 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     }
     return LoginOptions(
         target, name, protocol, verbose, chunks, blocks, online, output,
-        frames, hidden, minecraft, demo, threads, seconds,
+        frames, hidden, minecraft, demo, threads, seconds, at,
     )
+}
+
+/** Parses `x,y,z` for `--at`. */
+private fun parsePosition(text: String): Triple<Int, Int, Int> {
+    val parts = text.split(',').map { it.trim().toIntOrNull() }
+    if (parts.size != 3 || parts.any { it == null }) fail("--at ждёт три числа: x,y,z")
+    return Triple(parts[0]!!, parts[1]!!, parts[2]!!)
 }
 
 /**

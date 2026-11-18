@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
@@ -25,6 +25,11 @@ class Renderer(
     private val outlineVbo = GL30.glGenBuffers()
     private val outlineData = FloatArray(24 * 3)
 
+    /** Crack overlay buffers: same vertex layout as the block shader. */
+    private val crackVao = GL30.glGenVertexArrays()
+    private val crackVbo = GL30.glGenBuffers()
+    private val crackData = FloatArray(6 * 6 * 7)
+
     private class Part(val vao: Int, val vbo: Int) {
         var count: Int = 0
     }
@@ -37,6 +42,20 @@ class Renderer(
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, 24L * 3 * Float.SIZE_BYTES, GL30.GL_DYNAMIC_DRAW)
         GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, 0, 0L)
         GL30.glEnableVertexAttribArray(0)
+        GL30.glBindVertexArray(0)
+
+        GL30.glBindVertexArray(crackVao)
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, crackVbo)
+        GL30.glBufferData(GL30.GL_ARRAY_BUFFER, crackData.size.toLong() * Float.SIZE_BYTES, GL30.GL_DYNAMIC_DRAW)
+        val crackStride = 7 * Float.SIZE_BYTES
+        GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, crackStride, 0L)
+        GL30.glEnableVertexAttribArray(0)
+        GL30.glVertexAttribPointer(1, 1, GL30.GL_FLOAT, false, crackStride, 3L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(1)
+        GL30.glVertexAttribPointer(2, 1, GL30.GL_FLOAT, false, crackStride, 4L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(2)
+        GL30.glVertexAttribPointer(3, 2, GL30.GL_FLOAT, false, crackStride, 5L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(3)
         GL30.glBindVertexArray(0)
 
         GL30.glEnable(GL30.GL_DEPTH_TEST)
@@ -102,6 +121,53 @@ class Renderer(
         GL30.glUseProgram(0)
     }
 
+    /**
+     * Draws the crack overlay of the block being mined.
+     *
+     * Ten stages come from the game's own `destroy_stage_N` textures. The cube is inflated by a
+     * hair so it does not fight with the block itself in the depth buffer.
+     */
+    fun drawCracks(camera: Camera, blockX: Int, blockY: Int, blockZ: Int, layer: Float) {
+        var offset = 0
+        val low = -CRACK_INFLATE
+        val high = 1f + CRACK_INFLATE
+        for (face in CRACK_FACES) {
+            for (corner in face.corners) {
+                crackData[offset++] = blockX + corner[0] * (if (corner[0] > 0.5f) high else low)
+                crackData[offset++] = blockY + corner[1] * (if (corner[1] > 0.5f) high else low)
+                crackData[offset++] = blockZ + corner[2] * (if (corner[2] > 0.5f) high else low)
+                crackData[offset++] = 1f            // shade
+                crackData[offset++] = layer
+                crackData[offset++] = corner[3]     // u
+                crackData[offset++] = corner[4]     // v
+            }
+        }
+
+        val buffer = MemoryUtil.memAllocFloat(crackData.size)
+        buffer.put(crackData).flip()
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, crackVbo)
+        GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_DYNAMIC_DRAW)
+        MemoryUtil.memFree(buffer)
+
+        GL30.glUseProgram(program)
+        textures.bind(0)
+        GL30.glUniform1i(atlasLocation, 0)
+        GL30.glUniformMatrix4fv(
+            viewProjLocation, false,
+            camera.viewProjection(width.toFloat() / height.toFloat()),
+        )
+        GL30.glBindVertexArray(crackVao)
+        GL30.glEnable(GL30.GL_BLEND)
+        GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+        // Cracks must not hide the block itself from the next frame's depth test.
+        GL30.glDepthMask(false)
+        GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, 36)
+        GL30.glDepthMask(true)
+        GL30.glDisable(GL30.GL_BLEND)
+        GL30.glBindVertexArray(0)
+        GL30.glUseProgram(0)
+    }
+
     /** Wireframe cube around the targeted block. */
     fun drawOutline(camera: Camera, blockX: Int, blockY: Int, blockZ: Int) {
         var offset = 0
@@ -139,6 +205,8 @@ class Renderer(
         }
         GL30.glDeleteBuffers(outlineVbo)
         GL30.glDeleteVertexArrays(outlineVao)
+        GL30.glDeleteBuffers(crackVbo)
+        GL30.glDeleteVertexArrays(crackVao)
         GL30.glDeleteProgram(program)
         GL30.glDeleteProgram(outlineProgram)
     }
@@ -171,6 +239,47 @@ class Renderer(
     }
 
     private companion object {
+        /** The crack cube is a hair larger than the block, so both surfaces stay visible. */
+        const val CRACK_INFLATE = 0.002f
+
+        /** The six faces of a unit cube: corners with their texture coordinates. */
+        class CrackFace(val corners: List<FloatArray>)
+
+        fun face(vararg corners: FloatArray) = CrackFace(corners.toList())
+
+        val CRACK_FACES = listOf(
+            face(
+                floatArrayOf(0f, 1f, 0f, 0f, 0f), floatArrayOf(1f, 1f, 0f, 1f, 0f),
+                floatArrayOf(1f, 1f, 1f, 1f, 1f), floatArrayOf(0f, 1f, 0f, 0f, 0f),
+                floatArrayOf(1f, 1f, 1f, 1f, 1f), floatArrayOf(0f, 1f, 1f, 0f, 1f),
+            ),
+            face(
+                floatArrayOf(0f, 0f, 1f, 0f, 0f), floatArrayOf(1f, 0f, 1f, 1f, 0f),
+                floatArrayOf(1f, 0f, 0f, 1f, 1f), floatArrayOf(0f, 0f, 1f, 0f, 0f),
+                floatArrayOf(1f, 0f, 0f, 1f, 1f), floatArrayOf(0f, 0f, 0f, 0f, 1f),
+            ),
+            face(
+                floatArrayOf(1f, 0f, 0f, 0f, 1f), floatArrayOf(1f, 1f, 0f, 0f, 0f),
+                floatArrayOf(1f, 1f, 1f, 1f, 0f), floatArrayOf(1f, 0f, 0f, 0f, 1f),
+                floatArrayOf(1f, 1f, 1f, 1f, 0f), floatArrayOf(1f, 0f, 1f, 1f, 1f),
+            ),
+            face(
+                floatArrayOf(0f, 0f, 1f, 1f, 1f), floatArrayOf(0f, 1f, 1f, 1f, 0f),
+                floatArrayOf(0f, 1f, 0f, 0f, 0f), floatArrayOf(0f, 0f, 1f, 1f, 1f),
+                floatArrayOf(0f, 1f, 0f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 0f, 1f),
+            ),
+            face(
+                floatArrayOf(0f, 0f, 1f, 0f, 1f), floatArrayOf(1f, 0f, 1f, 1f, 1f),
+                floatArrayOf(1f, 1f, 1f, 1f, 0f), floatArrayOf(0f, 0f, 1f, 0f, 1f),
+                floatArrayOf(1f, 1f, 1f, 1f, 0f), floatArrayOf(0f, 1f, 1f, 0f, 0f),
+            ),
+            face(
+                floatArrayOf(1f, 0f, 0f, 1f, 1f), floatArrayOf(0f, 0f, 0f, 0f, 1f),
+                floatArrayOf(0f, 1f, 0f, 0f, 0f), floatArrayOf(1f, 0f, 0f, 1f, 1f),
+                floatArrayOf(0f, 1f, 0f, 0f, 0f), floatArrayOf(1f, 1f, 0f, 1f, 0f),
+            ),
+        )
+
         fun key(chunkX: Int, chunkZ: Int): Long =
             (chunkX.toLong() shl 32) or (chunkZ.toLong() and 0xFFFF_FFFFL)
 
