@@ -1,4 +1,4 @@
-package mcplus.net
+﻿package mcplus.net
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -78,6 +78,13 @@ class World(val minY: Int) {
 
     fun isLoaded(chunkX: Int, chunkZ: Int): Boolean = chunks.containsKey(key(chunkX, chunkZ))
 
+    /** Parses a `Chunk Data` packet straight into the world — used by the streaming reader. */
+    fun addChunk(body: ByteArray, sectionCount: Int): ChunkColumn {
+        val column = readChunkColumn(body, sectionCount)
+        add(column)
+        return column
+    }
+
     /** Applies a block change coming from the player or from a Block Update packet. */
     @Synchronized
 
@@ -103,6 +110,7 @@ class World(val minY: Int) {
         fun chunkOfZ(key: Long): Int = key.toInt()
     }
 }
+
 
 
 

@@ -3,6 +3,7 @@
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
 import mcplus.net.EntityTracker
+import mcplus.net.proto.Protocol777
 import mcplus.net.Session
 import mcplus.net.World
 import org.lwjgl.glfw.GLFW
@@ -74,7 +75,23 @@ object GlView {
             println("Меши в очереди: $requested, потоков: ${pipeline.workerCount}")
 
             val tracker = EntityTracker()
-            session?.startReading { packet -> tracker.onPacket(packet) }
+            val sectionCount = session?.joinResult?.let { join ->
+                join.registries.dimensionType(join.joinGame.dimensionTypeId)?.sectionCount
+            } ?: 24
+            var streamed = 0
+
+            // The window is already open: chunks keep arriving and are meshed in the
+            // background instead of blocking the start.
+            session?.startReading { packet ->
+                if (tracker.onPacket(packet)) return@startReading
+                if (packet.id == Protocol777.Play.CHUNK_DATA) {
+                    runCatching {
+                        val column = world.addChunk(packet.body, sectionCount)
+                        pipeline.request(column.x, column.z)
+                        streamed++
+                    }
+                }
+            }
 
             val placeState = blocks.firstStateOf(placeBlockName) ?: 1
             var sequence = 0
@@ -222,7 +239,7 @@ object GlView {
                     }
                     entityRenderer.close()
                     pipeline.close()
-                    println("Итого чанков в сцене: ${renderer.chunkCount}")
+                    println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed")
                 }
             }
         } finally {
@@ -263,6 +280,7 @@ object GlView {
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
+
 
 
 

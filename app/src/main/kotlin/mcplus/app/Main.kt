@@ -183,7 +183,8 @@ private fun viewCommand(args: List<String>) {
     val session = connect(host, port, options)
 
     session.use {
-        val world = WorldCollector(it).collect(maxChunks = size * size)
+        // Only a small area is awaited; the rest streams in while the window is open.
+        val world = WorldCollector(it).collect(maxChunks = 25, durationMs = 1_500)
         if (world.chunkCount == 0) fail("Сервер не прислал ни одного чанка за отведённое время")
 
         val position = it.playerPosition
@@ -348,7 +349,8 @@ private fun windowCommand(args: List<String>) {
     val session = connect(host, port, options)
 
     session.use {
-        val world = WorldCollector(it).collect(maxChunks = size * size)
+        // Only a small area is awaited; the rest streams in while the window is open.
+        val world = WorldCollector(it).collect(maxChunks = 25, durationMs = 1_500)
         if (world.chunkCount == 0) fail("Сервер не прислал ни одного чанка за отведённое время")
 
         val position = it.playerPosition
@@ -558,6 +560,7 @@ private fun fail(message: String): Nothing {
     System.err.println(message)
     exitProcess(1)
 }
+
 
 
 
