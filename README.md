@@ -58,6 +58,25 @@
 .\gradlew.bat :app:run --args="window --chunks 11" # окно OpenGL: WASD, мышь, Esc
 ```
 
+## Сборка exe
+
+```
+.\gradlew.bat :app:packageExe
+```
+
+Результат — `dist\ultracraft\ultracraft.exe`: приложение с собственным рантаймом Java,
+запускается без установленной Java. Внутри папки `dist\ultracraft` лежит всё нужное,
+её можно переносить целиком.
+
+```
+dist\ultracraft\ultracraft.exe window           # окно: WASD, пробел, F — полёт, Esc — выход
+dist\ultracraft\ultracraft.exe world            # карта текстом
+dist\ultracraft\ultracraft.exe ping mc.hypixel.net
+```
+
+Если игра установлена в нестандартном месте, путь к ней задаётся явно:
+`window --minecraft "D:\games\.minecraft"`.
+
 ## Локальный сервер (оракул протокола)
 
 Ванильный сервер 26.3 — эталон, с которым сверяется клиент.

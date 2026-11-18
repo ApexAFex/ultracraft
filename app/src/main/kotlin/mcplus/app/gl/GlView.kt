@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.BlockTable
 import mcplus.net.World
@@ -29,6 +29,7 @@ object GlView {
         width: Int = 1280,
         height: Int = 720,
         hidden: Boolean = false,
+        minecraftDirectory: File? = null,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -50,10 +51,14 @@ object GlView {
             println("OpenGL ${GL30.glGetString(GL30.GL_VERSION)}")
             println("Видеокарта ${GL30.glGetString(GL30.GL_RENDERER)}")
 
-            val minecraftDirectory = TextureAtlas.findMinecraftDirectory()
-            val atlas = minecraftDirectory?.let { TextureAtlas.load(it) }
+            val directory = minecraftDirectory ?: TextureAtlas.findMinecraftDirectory()
+            println("Minecraft: ${directory?.path ?: "не найден"} (версий: ${directory?.let { File(it, "versions").listFiles()?.count { f -> f.isDirectory } } ?: 0})")
+            val atlas = directory?.let { TextureAtlas.load(it) }
                 ?: TextureAtlas.colored(blocks.allNames())
             println("Текстуры: ${atlas.size} слоёв, источник: ${atlas.source}")
+            if (directory == null) {
+                println("  установка Minecraft не найдена; APPDATA=${System.getenv("APPDATA")}")
+            }
 
             val mesh = VoxelMeshBuilder.build(world, blocks, atlas, centerChunkX, centerChunkZ, radiusChunks)
             println("Граней: ${mesh.quadCount}, вершин: ${mesh.vertexCount}")
@@ -63,9 +68,30 @@ object GlView {
                     val camera = mesh.defaultCamera()
                     val input = Input(window, camera)
 
+                    val spawnX = centerChunkX * 16 + 8
+                    val spawnZ = centerChunkZ * 16 + 8
+                    val spawnY = Player.spawnAbove(world, blocks, spawnX, spawnZ, world.minY + 383)
+                    val player = Player(spawnX + 0.5, spawnY, spawnZ + 0.5, camera.yaw, camera.pitch)
+                    camera.x = player.x
+                    camera.y = player.eyeY
+                    camera.z = player.z
+                    println("Спавн: ${"%.1f".format(player.x)}, ${"%.1f".format(player.y)}, ${"%.1f".format(player.z)}")
+                    println("WASD — идти, пробел — прыжок, F — полёт, Esc — выход")
+
                     var frame = 0
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
+
+                        if (input.flyToggleRequested) player.flying = !player.flying
+                        player.yaw = camera.yaw
+                        player.pitch = camera.pitch
+                        player.move(
+                            input.deltaSeconds, world, blocks,
+                            input.forward, input.strafe, input.jump, input.descend,
+                        )
+                        camera.x = player.x
+                        camera.y = player.eyeY
+                        camera.z = player.z
 
                         GL30.glViewport(0, 0, width, height)
                         GL30.glClearColor(0.56f, 0.75f, 0.91f, 1f)
@@ -110,3 +136,7 @@ object GlView {
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
+
+
+
+

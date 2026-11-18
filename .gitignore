@@ -1,4 +1,4 @@
-.gradle/
+﻿.gradle/
 build/
 out/
 *.class
@@ -13,3 +13,4 @@ registry-dump/
 .mcplus/
 screenshots/
 app/screenshots/
+dist/

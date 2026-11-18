@@ -1,4 +1,4 @@
-package mcplus.app
+﻿package mcplus.app
 
 import mcplus.app.gl.GlView
 import mcplus.auth.Account
@@ -364,6 +364,7 @@ private fun windowCommand(args: List<String>) {
             captureAfterFrames = options.frames,
             captureTo = options.output?.let { java.io.File(it) },
             hidden = options.hidden,
+            minecraftDirectory = options.minecraft?.let { java.io.File(it) },
         )
     }
 }
@@ -381,6 +382,7 @@ private class LoginOptions(
     val output: String?,
     val frames: Int,
     val hidden: Boolean,
+    val minecraft: String?,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -394,6 +396,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var output: String? = null
     var frames = 0
     var hidden = false
+    var minecraft: String? = null
 
     var index = 0
     while (index < args.size) {
@@ -405,6 +408,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--out" -> output = args.getOrNull(++index) ?: fail("--out требует путь")
             "--frames" -> frames = args.getOrNull(++index)?.toIntOrNull() ?: fail("--frames требует число")
             "--hidden" -> hidden = true
+            "--minecraft" -> minecraft = args.getOrNull(++index) ?: fail("--minecraft требует путь")
             "--online" -> online = true
             "--verbose" -> verbose = true
             "--help", "-h" -> { printUsage(); return null }
@@ -412,7 +416,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
         }
         index++
     }
-    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output, frames, hidden)
+    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output, frames, hidden, minecraft)
 }
 
 /**
@@ -545,3 +549,4 @@ private fun fail(message: String): Nothing {
     System.err.println(message)
     exitProcess(1)
 }
+

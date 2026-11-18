@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -24,19 +24,8 @@ class TextureAtlas(
     val source: String,
     val namesByLayer: List<String> = emptyList(),
 ) {
-    /** Biome tint approximated by a fixed colour, or null when the texture needs none. */
-    fun tintOf(layer: Int): Int? {
-        val name = namesByLayer.getOrNull(layer) ?: return null
-        return when {
-            name == "grass_block_top" || name == "grass_block_side_overlay" -> 0x79C05A
-            name == "vine" || name.endsWith("_leaves") -> 0x59AE30
-            name == "water_still" || name == "water_flow" || name == "water_overlay" -> 0x3F76E4
-            else -> null
-        }
-    }
-    val size: Int get() = images.size
 
-    fun layerOf(name: String): Int = layers[name] ?: missingLayer
+    val size: Int get() = images.size
 
     fun layerFor(blockName: String, kind: Kind): Int {
         val candidates = ArrayList<String>(6)
@@ -64,6 +53,20 @@ class TextureAtlas(
         return missingLayer
     }
 
+    /**
+     * Biome tint approximated by a fixed colour, or null when the texture needs none.
+     * Applied once per layer when the atlas is uploaded.
+     */
+    fun tintOf(layer: Int): Int? {
+        val name = namesByLayer.getOrNull(layer) ?: return null
+        return when {
+            name == "grass_block_top" || name == "grass_block_side_overlay" -> 0x79C05A
+            name == "vine" || name.endsWith("_leaves") -> 0x59AE30
+            name == "water_still" || name == "water_flow" || name == "water_overlay" -> 0x3F76E4
+            else -> null
+        }
+    }
+
     enum class Kind { TOP, BOTTOM, SIDE }
 
     private val missingLayer: Int = layers["missing"] ?: 0
@@ -86,6 +89,10 @@ class TextureAtlas(
          * carries fonts, panoramas and other loose files.
          */
         private fun fromVersionJar(directory: File): TextureAtlas? {
+            // ImageIO would otherwise spill to a cache file in java.io.tmpdir, which a packaged
+            // application may not be allowed to create ("Can't create cache file!").
+            ImageIO.setUseCache(false)
+
             val versionsDirectory = File(directory, "versions")
             val jars = versionsDirectory.listFiles { file -> file.isDirectory }
                 ?.mapNotNull { versionDir -> File(versionDir, "${versionDir.name}.jar").takeIf { it.isFile } }
@@ -96,17 +103,20 @@ class TextureAtlas(
                 val images = ArrayList<BufferedImage>(1024)
                 val layers = HashMap<String, Int>(1024)
 
-                runCatching {
+                try {
                     ZipFile(jar).use { zip ->
                         for (entry in zip.entries()) {
                             if (!entry.name.startsWith(BLOCK_TEXTURES) || !entry.name.endsWith(".png")) continue
                             val bytes = zip.getInputStream(entry).readBytes()
-                            val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull() ?: continue
+                            val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
+                                ?: continue
                             val name = entry.name.removePrefix(BLOCK_TEXTURES).removeSuffix(".png")
                             layers[name] = images.size
-                            images += firstFrame(applyTint(image, name))
+                            images += firstFrame(image)
                         }
                     }
+                } catch (e: Throwable) {
+                    System.err.println("не удалось прочитать ${jar.name}: ${e::class.simpleName}: ${e.message}")
                 }
 
                 if (images.isNotEmpty()) {
@@ -119,6 +129,8 @@ class TextureAtlas(
         }
 
         private fun fromAssetObjects(minecraftDirectory: File): TextureAtlas? {
+            ImageIO.setUseCache(false)
+
             val indexFile = File(minecraftDirectory, "assets/indexes")
                 .listFiles { file -> file.extension == "json" }
                 ?.maxByOrNull { it.lastModified() }
@@ -144,7 +156,7 @@ class TextureAtlas(
                 val image = runCatching { ImageIO.read(file) }.getOrNull() ?: continue
                 val name = key.removePrefix("minecraft/textures/block/").removeSuffix(".png")
                 layers[name] = images.size
-                images += firstFrame(applyTint(image, name))
+                images += firstFrame(image)
             }
 
             if (images.isEmpty()) return null
@@ -158,9 +170,11 @@ class TextureAtlas(
         fun colored(blockNames: Collection<String>): TextureAtlas {
             val images = ArrayList<BufferedImage>(blockNames.size + 1)
             val layers = HashMap<String, Int>(blockNames.size + 1)
+            val names = ArrayList<String>(blockNames.size + 1)
 
             for (name in blockNames.sorted()) {
                 layers[name] = images.size
+                names += name
                 val color = Colors.of(name)
                 val tile = BufferedImage(TILE, TILE, BufferedImage.TYPE_INT_ARGB)
                 for (y in 0 until TILE) {
@@ -170,8 +184,9 @@ class TextureAtlas(
             }
 
             layers["missing"] = images.size
+            names += "missing"
             images += missingTile()
-            return TextureAtlas(layers, images, "сгенерирован (игра не найдена)", namesByLayer(images.size, layers))
+            return TextureAtlas(layers, images, "сгенерирован (игра не найдена)", names)
         }
 
         private fun namesByLayer(count: Int, layers: Map<String, Int>): List<String> {
@@ -181,36 +196,7 @@ class TextureAtlas(
         }
 
         /** Animated textures are vertical strips; only the first frame is used. */
-        /**
-         * Modern Minecraft ships grass and leaves as greyscale masks and tints them per biome
-         * at runtime. A fixed tint is enough for a first look.
-         */
-        private fun applyTint(image: BufferedImage, name: String): BufferedImage {
-            val tint = when {
-                name == "grass_block_top" -> 0x79C05A
-                name.endsWith("_leaves") -> 0x59AE30
-                name == "grass_block_side_overlay" -> 0x79C05A
-                name == "vine" -> 0x59AE30
-                else -> return image
-            }
-            val r = ((tint shr 16) and 0xFF) / 255f
-            val g = ((tint shr 8) and 0xFF) / 255f
-            val b = (tint and 0xFF) / 255f
-            for (y in 0 until image.height) {
-                for (x in 0 until image.width) {
-                    val argb = image.getRGB(x, y)
-                    val a = (argb ushr 24) and 0xFF
-                    val nr = (((argb shr 16) and 0xFF) * r).toInt().coerceIn(0, 255)
-                    val ng = (((argb shr 8) and 0xFF) * g).toInt().coerceIn(0, 255)
-                    val nb = ((argb and 0xFF) * b).toInt().coerceIn(0, 255)
-                    image.setRGB(x, y, (a shl 24) or (nr shl 16) or (ng shl 8) or nb)
-                }
-            }
-            return image
-        }
-
         private fun firstFrame(image: BufferedImage): BufferedImage {
-
             val side = minOf(image.width, image.height)
             val cropped = image.getSubimage(0, 0, side, side)
             if (side == TILE) return cropped
@@ -236,10 +222,3 @@ class TextureAtlas(
         }
     }
 }
-
-
-
-
-
-
-

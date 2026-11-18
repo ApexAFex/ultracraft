@@ -3,13 +3,32 @@ package mcplus.app.gl
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.glfw.GLFWCursorPosCallbackI
 
-/** Free-fly controls: WASD, Space/Shift for altitude, mouse to look, Escape to quit. */
+/**
+ * Controls: WASD to walk, Space to jump (or rise when flying), Shift to descend,
+ * F toggles flying, mouse looks around, Escape quits.
+ */
 class Input(private val window: Long, private val camera: Camera) {
+
+    var forward: Double = 0.0
+        private set
+    var strafe: Double = 0.0
+        private set
+    var jump: Boolean = false
+        private set
+    var descend: Boolean = false
+        private set
+    var deltaSeconds: Double = 0.0
+        private set
 
     private var lastX = 0.0
     private var lastY = 0.0
     private var firstMouse = true
     private var lastTime = System.nanoTime()
+    private var flyPressed = false
+
+    /** Set once when F is pressed, consumed by the caller to toggle the fly mode. */
+    var flyToggleRequested: Boolean = false
+        private set
 
     private val cursorCallback = GLFWCursorPosCallbackI { _, x, y ->
         if (firstMouse) {
@@ -33,31 +52,32 @@ class Input(private val window: Long, private val camera: Camera) {
 
     fun update() {
         val now = System.nanoTime()
-        val delta = ((now - lastTime) / 1_000_000_000.0).coerceAtMost(0.1)
+        deltaSeconds = ((now - lastTime) / 1_000_000_000.0).coerceAtMost(0.1)
         lastTime = now
 
-        val step = SPEED * delta
-        var forward = 0.0
-        var right = 0.0
-        var up = 0.0
+        forward = when {
+            pressed(GLFW.GLFW_KEY_W) -> 1.0
+            pressed(GLFW.GLFW_KEY_S) -> -1.0
+            else -> 0.0
+        }
+        strafe = when {
+            pressed(GLFW.GLFW_KEY_D) -> 1.0
+            pressed(GLFW.GLFW_KEY_A) -> -1.0
+            else -> 0.0
+        }
+        jump = pressed(GLFW.GLFW_KEY_SPACE)
+        descend = pressed(GLFW.GLFW_KEY_LEFT_SHIFT)
 
-        if (pressed(GLFW.GLFW_KEY_W)) forward += step
-        if (pressed(GLFW.GLFW_KEY_S)) forward -= step
-        if (pressed(GLFW.GLFW_KEY_D)) right += step
-        if (pressed(GLFW.GLFW_KEY_A)) right -= step
-        if (pressed(GLFW.GLFW_KEY_SPACE)) up += step
-        if (pressed(GLFW.GLFW_KEY_LEFT_SHIFT)) up -= step
-
-        if (forward != 0.0 || right != 0.0 || up != 0.0) camera.move(forward, right, up)
+        val fly = pressed(GLFW.GLFW_KEY_F)
+        flyToggleRequested = fly && !flyPressed
+        flyPressed = fly
 
         if (pressed(GLFW.GLFW_KEY_ESCAPE)) GLFW.glfwSetWindowShouldClose(window, true)
     }
 
-    private fun pressed(key: Int): Boolean =
-        GLFW.glfwGetKey(window, key) == GLFW.GLFW_PRESS
+    private fun pressed(key: Int): Boolean = GLFW.glfwGetKey(window, key) == GLFW.GLFW_PRESS
 
     private companion object {
         const val SENSITIVITY = 0.0025f
-        const val SPEED = 40.0
     }
 }
