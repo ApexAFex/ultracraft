@@ -31,32 +31,37 @@ access the application '74658136-14ec-4630-ad9b-26e160ff0fc6' (ADIbizaUX)…
 
 ---
 
-## Три способа получить client id
+## Как получить тенант (и client id)
 
-### Способ 1 — твой рабочий/учебный аккаунт (самый быстрый)
+### Вариант 1 — рабочий/учебный аккаунт
 
 Если есть аккаунт от работы, вуза или школы (`you@company.com`, `you@university.edu`) —
-заходи им:
+это самый быстрый путь. Дальше: <https://entra.microsoft.com> → **App registrations** →
+**New registration** → тип «Accounts in any organizational directory and personal Microsoft
+accounts» → **Register** → скопировать **Application (client) ID** →
+**Authentication** → **Allow public client flows** = Yes → Save.
 
-1. <https://entra.microsoft.com> → **App registrations** → **New registration**.
-2. Name — `mcplus`.
-3. Supported account types — **Accounts in any organizational directory and personal
-   Microsoft accounts** (важно: именно этот вариант, иначе личный аккаунт Minecraft не пустят).
-4. Redirect URI — пусто → **Register**.
-5. Скопировать **Application (client) ID**.
-6. **Authentication** → **Allow public client flows** → **Yes** → **Save**.
+### Вариант 2 — создать свой тенант
 
-### Способ 2 — бесплатный тенант Microsoft 365 Developer Program
+Два способа, оба бесплатные:
 
-Даёт собственный рабочий аккаунт вида `ты@твойтенант.onmicrosoft.com`.
-Условия программы Microsoft периодически меняет — если регистрация недоступна,
-используй способ 3. После получения аккаунта — те же шаги, что в способе 1.
+- **Azure free account** (<https://azure.microsoft.com/free>): регистрация создаёт настоящий
+  каталог Entra ID и рабочий аккаунт вида `admin@твойтенант.onmicrosoft.com`.
+  Требуется банковская карта для проверки личности; на бесплатном тарифе списаний нет,
+  ресурсы можно не создавать вообще — нужен только каталог.
+- **«Create a tenant»** в <https://entra.microsoft.com>: иногда доступно личному аккаунту
+  без карты, но у части пользователей вход в портал блокируется ошибкой `AADSTS50020`.
 
-### Способ 3 — попросить того, у кого рабочий аккаунт есть
+После появления тенанта — те же шаги регистрации приложения.
 
-Client id публичен, поэтому его спокойно можно передать: приложение принадлежит тому,
-кто его зарегистрировал, но идентификатор ничего не раскрывает. Достаточно, чтобы в
-приложении был включён вариант «… and personal Microsoft accounts» и public client flows.
+### Вариант 3 — Microsoft 365 Developer Program: больше не подходит
+
+Раньше эта программа давала бесплатный тенант E5 любому желающему. Сейчас доступ только по
+квалификации: Visual Studio Professional/Enterprise, участие в ISV Success / MAICPP,
+либо Premier/Unified Support. Кроме того, при создании песочницы теперь обязательно
+привязывается биллинговый аккаунт с активной подпиской Azure. Для частного лица
+с личным аккаунтом путь фактически закрыт —
+см. [официальный FAQ](https://learn.microsoft.com/en-us/office/developer-program/microsoft-365-developer-program-faq).
 
 ---
 
