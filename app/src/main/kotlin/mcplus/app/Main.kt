@@ -23,6 +23,18 @@ import kotlin.system.exitProcess
 private const val DEFAULT_TARGET = "127.0.0.1:25565"
 
 fun main(args: Array<String>) {
+    CrashReport.install()
+    try {
+        dispatch(args.toList())
+    } catch (e: ServerDisconnectException) {
+        // Kicked while waiting for chunks, or anywhere outside the game loop.
+        CrashReport.report("Сервер закрыл соединение", e.message ?: "без причины")
+    }
+}
+
+private fun dispatch(args: List<String>) {
+    // A self-test must not stop on a dialog nobody will click.
+    CrashReport.showDialogs = "--demo" !in args
     when {
         args.isEmpty() -> windowCommand(emptyList())
         args[0] == "join" -> joinCommand(args.drop(1))
@@ -422,6 +434,14 @@ private fun windowCommand(args: List<String>) {
             demo = options.demo,
             meshThreads = options.threads,
         )
+
+        // The window is gone by now; if the server kicked us, say so instead of ending
+        // silently — a bare console window closing looks exactly like a crash.
+        val closedByServer = it.closedByServer
+        val reason = it.closeReason
+        if (closedByServer && reason != null) {
+            CrashReport.report("Соединение с сервером прервано", reason)
+        }
     }
 }
 

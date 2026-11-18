@@ -77,6 +77,11 @@ class Input(private val window: Long, private val camera: Camera) {
 
     private fun pressed(key: Int): Boolean = GLFW.glfwGetKey(window, key) == GLFW.GLFW_PRESS
 
+    /** Asks for one fly toggle, as if F had been pressed — used by the self-test. */
+    fun requestFlyToggle() {
+        flyToggleRequested = true
+    }
+
     private companion object {
         const val SENSITIVITY = 0.0025f
     }

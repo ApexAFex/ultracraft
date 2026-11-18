@@ -57,7 +57,7 @@
 Нужен **JDK 21** для сборки (проверено на Temurin 21.0.13). Gradle ставится сам через wrapper.
 
 ```
-.\gradlew.bat build                          # компиляция + 45 тестов
+.\gradlew.bat build                          # компиляция + 52 теста
 .\gradlew.bat :app:run --args="mc.hypixel.net"   # список игроков
 .\gradlew.bat :app:run --args="join"             # войти на сервер
 .\gradlew.bat :app:run --args="world --chunks 5" # карта мира текстом
@@ -78,7 +78,7 @@
 её можно переносить целиком.
 
 ```
-dist\ultracraft\ultracraft.exe window           # окно: WASD, пробел, F — полёт, Esc — выход
+dist\ultracraft\ultracraft.exe window           # окно: WASD, пробел, F — полёт (если сервер разрешает), Esc — выход
 dist\ultracraft\ultracraft.exe world            # карта текстом
 dist\ultracraft\ultracraft.exe ping mc.hypixel.net
 ```

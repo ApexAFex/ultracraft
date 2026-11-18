@@ -145,8 +145,14 @@ internal fun readJoinGame(reader: ByteReader): JoinGame {
 /**
  * Disconnect reasons are text components, but the encoding differs by state:
  * login uses a JSON string, configuration and play use NBT. Try JSON first, then NBT.
+ *
+ * Vanilla usually sends a translation key instead of text (`multiplayer.disconnect.flying`),
+ * and expects the client to translate it. We have no language files, so the keys that
+ * actually happen are spelled out in [DISCONNECT_REASONS].
  */
-internal fun decodeReason(packetBody: ByteArray): String {
+internal fun decodeReason(packetBody: ByteArray): String = translateReason(rawReason(packetBody))
+
+private fun rawReason(packetBody: ByteArray): String {
     runCatching {
         val reader = ByteReader(packetBody)
         val json = reader.readString()
@@ -160,6 +166,37 @@ internal fun decodeReason(packetBody: ByteArray): String {
     }
     return "причина не читается (${packetBody.size} байт)"
 }
+
+/** Turns the common kick keys into something a player can act on. */
+internal fun translateReason(text: String): String {
+    val key = text.trim()
+    DISCONNECT_REASONS[key]?.let { return it }
+    return if (key.startsWith("multiplayer.disconnect.") || key.startsWith("disconnect.")) {
+        "сервер разорвал соединение ($key)"
+    } else {
+        text
+    }
+}
+
+private val DISCONNECT_REASONS = mapOf(
+    "multiplayer.disconnect.flying" to "сервер запрещает полёт — здесь работает выживание",
+    "multiplayer.disconnect.invalid_player_movement" to "сервер не согласился с нашим движением",
+    "multiplayer.disconnect.invalid_vehicle_movement" to "сервер не согласился с движением транспорта",
+    "multiplayer.disconnect.duplicate_login" to "этот игрок уже в игре — вход с другого места",
+    "multiplayer.disconnect.idling" to "слишком долго без движения",
+    "multiplayer.disconnect.kicked" to "вас исключили с сервера",
+    "multiplayer.disconnect.server_shutdown" to "сервер выключился",
+    "multiplayer.disconnect.server_full" to "сервер заполнен",
+    "multiplayer.disconnect.not_whitelisted" to "вас нет в белом списке сервера",
+    "multiplayer.disconnect.banned" to "вы забанены на этом сервере",
+    "multiplayer.disconnect.banned_ip" to "ваш адрес забанен на этом сервере",
+    "multiplayer.disconnect.outdated_client" to "версия клиента устарела",
+    "multiplayer.disconnect.outdated_server" to "сервер старее клиента",
+    "multiplayer.disconnect.incompatible" to "несовместимая версия игры",
+    "multiplayer.disconnect.generic" to "сервер разорвал соединение",
+    "multiplayer.disconnect.invalid_packet" to "сервер не понял пакет",
+    "multiplayer.disconnect.too_many_pending_chats" to "слишком много неподтверждённых сообщений",
+)
 
 private fun nbtText(tag: NbtTag): String = when (tag) {
     is NbtString -> tag.value

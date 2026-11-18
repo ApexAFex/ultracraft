@@ -74,6 +74,7 @@ object Protocol777 {
         const val ACKNOWLEDGE_BLOCK_CHANGE: Int = 0x04
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32
+        const val ABILITIES: Int = 0x41
         const val SYNCHRONIZE_POSITION: Int = 0x49
 
         // serverbound

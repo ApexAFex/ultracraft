@@ -5,6 +5,7 @@ import mcplus.protocol.ByteReader
 import mcplus.protocol.ByteWriter
 import mcplus.protocol.Packet
 import java.io.Closeable
+import java.io.EOFException
 
 /** Player position from the last teleport request. */
 data class PlayerPosition(val x: Double, val y: Double, val z: Double)
@@ -14,6 +15,11 @@ data class PlayerPosition(val x: Double, val y: Double, val z: Double)
  *
  * [receive] transparently answers the packets a client must acknowledge (keep-alive,
  * teleport confirmation, chunk batch flow control) and returns everything else.
+ *
+ * The connection can end at any time — a kick, a network error, the server shutting down —
+ * and every send may then fail. Instead of throwing into the render loop, [send] records the
+ * reason in [closeReason] and goes quiet, so the game can stop in an orderly way and tell the
+ * player what happened.
  */
 class Session internal constructor(
     private val connection: Connection,
@@ -23,6 +29,23 @@ class Session internal constructor(
 
     var playerPosition: PlayerPosition? = null
         private set
+
+    /** Latest `Player Abilities`: whether the server lets us fly, and at what speed. */
+    @Volatile
+    var abilities: PlayerAbilities? = null
+        private set
+
+    /** Why the connection ended, or null while it is alive. */
+    @Volatile
+    var closeReason: String? = null
+        private set
+
+    /** True when the far side hung up; false when we closed it ourselves. */
+    @Volatile
+    var closedByServer: Boolean = false
+        private set
+
+    val isClosed: Boolean get() = closeReason != null
 
     /**
      * Teleports the server performed behind our back (spawn, `/tp`, "you moved wrongly").
@@ -56,6 +79,10 @@ class Session internal constructor(
                         ),
                     )
 
+                Protocol777.Play.ABILITIES ->
+                    runCatching { PlayerAbilities.parse(packet.body) }
+                        .onSuccess { abilities = it }
+
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 
                 Protocol777.Play.DISCONNECT ->
@@ -66,20 +93,33 @@ class Session internal constructor(
         }
     }
 
-    fun send(packet: Packet) = connection.send(packet)
+    /** Sends a packet, or remembers why it could not be sent. Never throws. */
+    fun send(packet: Packet) {
+        if (isClosed) return
+        try {
+            connection.send(packet)
+        } catch (e: Exception) {
+            markClosed("не удалось отправить пакет: ${e.message ?: e::class.simpleName}", byServer = true)
+        }
+    }
 
     /**
      * Reads packets on a daemon thread and hands them to [handler].
      *
      * The render loop must not block on the socket, otherwise the client freezes whenever
-     * the server is quiet.
+     * the server is quiet. When the stream ends for any reason the cause lands in
+     * [closeReason] instead of being swallowed.
      */
     fun startReading(handler: (Packet) -> Unit): Thread {
         val thread = Thread {
             try {
                 while (true) handler(receive())
-            } catch (_: Throwable) {
-                // Connection closed or the server disconnected us: nothing left to read.
+            } catch (e: ServerDisconnectException) {
+                markClosed(e.message ?: "сервер закрыл соединение", byServer = true)
+            } catch (_: EOFException) {
+                markClosed("сервер закрыл соединение", byServer = true)
+            } catch (e: Throwable) {
+                markClosed(e.message ?: e::class.simpleName ?: "ошибка сети", byServer = true)
             }
         }
         thread.isDaemon = true
@@ -88,7 +128,16 @@ class Session internal constructor(
         return thread
     }
 
-    override fun close() = connection.close()
+    override fun close() {
+        markClosed("соединение закрыто клиентом", byServer = false)
+        connection.close()
+    }
+
+    private fun markClosed(reason: String, byServer: Boolean) {
+        if (closeReason != null) return
+        closeReason = reason
+        closedByServer = byServer
+    }
 
     private fun confirmTeleport(packet: Packet) {
         val reader = ByteReader(packet.body)
@@ -122,4 +171,3 @@ class Session internal constructor(
         const val CHUNKS_PER_TICK = 64f
     }
 }
-

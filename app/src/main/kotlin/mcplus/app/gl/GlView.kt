@@ -8,6 +8,7 @@ import mcplus.net.PlayerMovement
 import mcplus.net.proto.Protocol777
 import mcplus.net.Session
 import mcplus.net.World
+import mcplus.protocol.Packet
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL30
@@ -31,6 +32,12 @@ object GlView {
     /** Demo mode walks forward between these frame numbers, so movement lands in the log. */
     private const val DEMO_WALK_FROM = 30
     private const val DEMO_WALK_TO = 230
+
+    /** Demo mode asks for flight at this frame: a survival server must refuse, not kick. */
+    private const val DEMO_FLY_ATTEMPT = 40
+
+    /** Ticks between pressing and releasing the mouse on a block (vanilla sends them apart). */
+    private const val BREAK_HOLD_TICKS = 2L
 
     fun run(
         world: World,
@@ -157,25 +164,37 @@ object GlView {
                         player.x, player.y, player.z,
                         if (serverSpawn != null) "позиция сервера" else "подбор по рельефу",
                     ))
+                    println(
+                        "Полёт: " + when (session?.abilities?.mayFly) {
+                            true -> "разрешён сервером (F)"
+                            false -> "сервер не разрешает (выживание)"
+                            null -> "неизвестно, сервер не сообщил"
+                        },
+                    )
                     println("WASD — идти, пробел — прыжок, F — полёт, ЛКМ — сломать, ПКМ — поставить, Esc — выход")
 
-                    fun demoBreak(hit: Raycast.Hit) {
+                    // Breaking is two packets: the server pairs them, and a release sent in the
+                    // same frame as the press lands as one action and is answered with
+                    // "Mismatch in destroy block pos" instead of a destroyed block. So the
+                    // release waits a couple of ticks — the same shape the hold-to-break
+                    // progress will take later.
+                    var breakFinish: Packet? = null
+                    var breakFinishAtTick = 0L
+
+                    fun startBreak(hit: Raycast.Hit) {
                         world.setBlock(hit.x, hit.y, hit.z, 0)
                         pipeline.request(hit.x shr 4, hit.z shr 4)
-                        // The server pairs the release with the press that started it: a release
-                        // on its own is logged as "Mismatch in destroy block pos" and does nothing.
                         session?.send(
                             BlockInteraction.playerAction(
                                 BlockInteraction.START_DESTROY_BLOCK,
                                 hit.x, hit.y, hit.z, hit.face, sequence++,
                             ),
                         )
-                        session?.send(
-                            BlockInteraction.playerAction(
-                                BlockInteraction.STOP_DESTROY_BLOCK,
-                                hit.x, hit.y, hit.z, hit.face, sequence++,
-                            ),
+                        breakFinish = BlockInteraction.playerAction(
+                            BlockInteraction.STOP_DESTROY_BLOCK,
+                            hit.x, hit.y, hit.z, hit.face, sequence++,
                         )
+                        breakFinishAtTick = tickCount + BREAK_HOLD_TICKS
                         println("Сломан блок: ${hit.x}, ${hit.y}, ${hit.z}")
                     }
 
@@ -203,8 +222,27 @@ object GlView {
                     var frame = 0
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
+                        if (demo && frame == DEMO_FLY_ATTEMPT) input.requestFlyToggle()
 
-                        if (input.flyToggleRequested) player.flying = !player.flying
+                        // A kick or a network error must end the game on purpose: continuing to
+                        // draw a world nobody is talking to is how the client used to "just close".
+                        if (session?.isClosed == true) {
+                            println("Соединение закрыто: ${session.closeReason}")
+                            break
+                        }
+
+                        if (input.flyToggleRequested) {
+                            if (session?.abilities?.mayFly ?: true) {
+                                player.flying = !player.flying
+                            } else {
+                                println("Полёт недоступен: сервер его не разрешает (режим выживания)")
+                            }
+                        }
+                        // Creative mode can be taken away mid-game; flying after that is a kick.
+                        if (player.flying && session?.abilities?.mayFly == false) {
+                            player.flying = false
+                            println("Полёт выключен: сервер его больше не разрешает")
+                        }
                         player.yaw = camera.yaw
                         player.pitch = camera.pitch
 
@@ -220,6 +258,12 @@ object GlView {
                                 println("Телепорт от сервера: %.2f, %.2f, %.2f".format(teleport.x, teleport.y, teleport.z))
                                 player.teleport(teleport.x, teleport.y, teleport.z)
                                 moveSender?.reset()
+                            }
+
+                            // Finish a break that was pressed a couple of ticks ago.
+                            if (breakFinish != null && tickCount >= breakFinishAtTick) {
+                                session?.send(breakFinish!!)
+                                breakFinish = null
                             }
 
                             previousX = player.x
@@ -246,7 +290,15 @@ object GlView {
                                 println("Отправлено Player Loaded")
                             }
 
-                            moveSender?.tick(player.x, player.y, player.z, player.yaw, player.pitch, player.onGround)
+                            // The camera measures yaw as "0 = +Z, 90 = +X" and pitch as
+                            // "positive = up"; the protocol wants "0 = +Z, 90 = -X" and
+                            // "positive = down". Sending our values unchanged made the server
+                            // believe we were looking at a different block, which is why every
+                            // block action of ours came back as "Mismatch in destroy block pos".
+                            moveSender?.tick(
+                                player.x, player.y, player.z,
+                                -player.yaw, -player.pitch, player.onGround,
+                            )
                             tickCount++
                             steps++
                             tickAccumulator -= TICK_SECONDS
@@ -310,9 +362,9 @@ object GlView {
                         val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
                         val rightDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS
 
-                        if (leftDown && !leftWasDown && target != null) demoBreak(target)
+                        if (leftDown && !leftWasDown && target != null) startBreak(target)
                         if (rightDown && !rightWasDown && target != null) demoPlace(target)
-                        if (demo && frame == 5 && target != null) demoBreak(target)
+                        if (demo && frame == 5 && target != null) startBreak(target)
                         if (demo && frame == 6) {
                             // Aim at the nearest entity so the screenshot shows it.
                             val nearest = tracker.snapshot().minByOrNull { entity ->
