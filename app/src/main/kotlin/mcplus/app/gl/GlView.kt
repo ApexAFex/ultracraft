@@ -33,6 +33,7 @@ object GlView {
         session: Session? = null,
         placeBlockName: String = "stone",
         demo: Boolean = false,
+        meshThreads: Int = 0,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -58,13 +59,19 @@ object GlView {
             val atlas = directory?.let { TextureAtlas.load(it) } ?: TextureAtlas.colored(blocks.allNames())
             println("Текстуры: ${atlas.size} слоёв, источник: ${atlas.source}")
 
-            val meshes = ArrayList<ChunkMesh>()
+            val pipeline = if (meshThreads > 0) {
+                MeshPipeline(world, blocks, atlas, meshThreads)
+            } else {
+                MeshPipeline(world, blocks, atlas)
+            }
+            var requested = 0
             for (chunkX in centerChunkX - radiusChunks..centerChunkX + radiusChunks) {
                 for (chunkZ in centerChunkZ - radiusChunks..centerChunkZ + radiusChunks) {
-                    meshes += MeshBuilder.build(world, blocks, atlas, chunkX, chunkZ)
+                    pipeline.request(chunkX, chunkZ)
+                    requested++
                 }
             }
-            println("Чанков в меше: ${meshes.size}, граней: ${meshes.sumOf { it.quadCount }}")
+            println("Меши в очереди: $requested, потоков: ${pipeline.workerCount}")
 
             val tracker = EntityTracker()
             session?.startReading { packet -> tracker.onPacket(packet) }
@@ -75,7 +82,7 @@ object GlView {
             var rightWasDown = false
 
             GlTextures(atlas).use { textures ->
-                Renderer(meshes, textures, width, height).use { renderer ->
+                Renderer(textures, width, height).use { renderer ->
                     val entityRenderer = EntityRenderer(width, height)
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     val input = Input(window, camera)
@@ -93,7 +100,7 @@ object GlView {
 
                     fun demoBreak(hit: Raycast.Hit) {
                         world.setBlock(hit.x, hit.y, hit.z, 0)
-                        renderer.update(MeshBuilder.build(world, blocks, atlas, hit.x shr 4, hit.z shr 4))
+                        pipeline.request(hit.x shr 4, hit.z shr 4)
                         session?.send(
                             BlockInteraction.playerAction(
                                 BlockInteraction.STOP_DESTROY_BLOCK,
@@ -110,7 +117,7 @@ object GlView {
                         val nextZ = hit.z + offsetZ
                         if (world.blockAt(nextX, nextY, nextZ) != 0) return
                         world.setBlock(nextX, nextY, nextZ, placeState)
-                        renderer.update(MeshBuilder.build(world, blocks, atlas, nextX shr 4, nextZ shr 4))
+                        pipeline.request(nextX shr 4, nextZ shr 4)
                         session?.send(
                             BlockInteraction.useItemOn(
                                 hit.x, hit.y, hit.z, hit.face,
@@ -120,6 +127,9 @@ object GlView {
                         println("Поставлен блок: $nextX, $nextY, $nextZ")
                     }
 
+                    var uploaded = 0
+                    var allUploaded = false
+                    val startedAt = System.currentTimeMillis()
                     var lastEntityCount = -1
                     var frame = 0
                     while (!GLFW.glfwWindowShouldClose(window)) {
@@ -135,6 +145,18 @@ object GlView {
                         camera.x = player.x
                         camera.y = player.eyeY
                         camera.z = player.z
+
+                        // Upload at most a few finished meshes per frame: the GL calls
+                        // themselves cost time, and a burst would be just another stutter.
+                        repeat(16) {
+                            val ready = pipeline.poll() ?: return@repeat
+                            renderer.update(ready)
+                            uploaded++
+                        }
+                        if (!allUploaded && uploaded >= requested) {
+                            allUploaded = true
+                            println("Все меши готовы: $uploaded чанков за ${System.currentTimeMillis() - startedAt} мс")
+                        }
 
                         val forward = camera.forward()
                         val target = Raycast.cast(
@@ -199,6 +221,8 @@ object GlView {
                         frame++
                     }
                     entityRenderer.close()
+                    pipeline.close()
+                    println("Итого чанков в сцене: ${renderer.chunkCount}")
                 }
             }
         } finally {
@@ -239,6 +263,10 @@ object GlView {
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
+
+
+
+
 
 
 

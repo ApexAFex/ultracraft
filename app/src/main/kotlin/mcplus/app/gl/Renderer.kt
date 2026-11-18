@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
@@ -10,7 +10,6 @@ import java.io.Closeable
  * Also draws a wireframe box around the targeted block and samples the texture atlas.
  */
 class Renderer(
-    chunks: List<ChunkMesh>,
     private val textures: GlTextures,
     private val width: Int,
     private val height: Int,
@@ -33,13 +32,6 @@ class Renderer(
     private val parts = LinkedHashMap<Long, Part>()
 
     init {
-        for (chunk in chunks) {
-            val part = Part(GL30.glGenVertexArrays(), GL30.glGenBuffers())
-            parts[key(chunk.chunkX, chunk.chunkZ)] = part
-            configure(part)
-            upload(part, chunk)
-        }
-
         GL30.glBindVertexArray(outlineVao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, outlineVbo)
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, 24L * 3 * Float.SIZE_BYTES, GL30.GL_DYNAMIC_DRAW)
@@ -69,11 +61,18 @@ class Renderer(
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, 0)
     }
 
-    /** Re-uploads one chunk after a block change. */
+    /**
+     * Uploads one finished chunk mesh. Parts are created on first use, so a chunk appears
+     * as soon as its worker finishes — no upfront cost on the render thread.
+     */
     fun update(mesh: ChunkMesh) {
-        val part = parts[key(mesh.chunkX, mesh.chunkZ)] ?: return
+        val part = parts.getOrPut(key(mesh.chunkX, mesh.chunkZ)) {
+            Part(GL30.glGenVertexArrays(), GL30.glGenBuffers()).also { configure(it) }
+        }
         upload(part, mesh)
     }
+
+    val chunkCount: Int get() = parts.size
 
     private fun upload(part: Part, mesh: ChunkMesh) {
         if (mesh.data.isEmpty()) {
@@ -233,3 +232,4 @@ class Renderer(
         """
     }
 }
+
