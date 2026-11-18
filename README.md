@@ -16,8 +16,8 @@
 - **E4 — вход через Microsoft**: device-code вход, Xbox Live, Minecraft services, шифрование
   соединения (AES/CFB8) и подтверждение сессии. Ждёт одобрения приложения Mojang —
   см. [docs/auth-setup.md](docs/auth-setup.md).
-- **E5 (частично) — картинка**: мир рендерится в PNG процессором (перспективная камера,
-  z-буфер, отсечение невидимых граней). Окно на GPU — следующий шаг.
+- **E5 — картинка**: мир рендерится в PNG процессором (z-буфер) и в окне на видеокарте
+  (OpenGL 3.3 через LWJGL, свободная камера). Текстур пока нет — цвета по типу блока.
 
 ```
 > .\gradlew.bat :app:run --args="world --chunks 4"
@@ -54,6 +54,7 @@
 .\gradlew.bat :app:run --args="join"             # войти на сервер
 .\gradlew.bat :app:run --args="world --chunks 5" # карта мира текстом
 .\gradlew.bat :app:run --args="view --chunks 11" # мир картинкой в screenshots/world.png
+.\gradlew.bat :app:run --args="window --chunks 11" # окно OpenGL: WASD, мышь, Esc
 ```
 
 ## Локальный сервер (оракул протокола)

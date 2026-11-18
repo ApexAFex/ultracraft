@@ -1,5 +1,6 @@
 package mcplus.app
 
+import mcplus.app.gl.GlView
 import mcplus.auth.Account
 import mcplus.auth.AccountStore
 import mcplus.auth.AuthConfig
@@ -27,6 +28,7 @@ fun main(args: Array<String>) {
         args[0] == "join" -> joinCommand(args.drop(1))
         args[0] == "world" -> worldCommand(args.drop(1))
         args[0] == "view" -> viewCommand(args.drop(1))
+        args[0] == "window" -> windowCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
         args[0] == "logout" -> logoutCommand(args.drop(1))
@@ -334,6 +336,38 @@ private fun resolveStoreFile(explicit: String?): java.io.File {
     return java.io.File(".mcplus/account.json").absoluteFile
 }
 
+// ---------------------------------------------------------------- window
+
+private fun windowCommand(args: List<String>) {
+    val options = parseLoginArgs(args) ?: return
+    val size = options.chunks.coerceIn(3, 21)
+    val radius = (size - 1) / 2
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+    val blocks = findBlockTable(options.blocks)
+
+    val session = connect(host, port, options)
+
+    session.use {
+        val world = WorldCollector(it).collect(maxChunks = size * size)
+        if (world.chunkCount == 0) fail("Сервер не прислал ни одного чанка за отведённое время")
+
+        val position = it.playerPosition
+        val centerChunkX = if (position != null) floor(position.x / 16.0).toInt() else 0
+        val centerChunkZ = if (position != null) floor(position.z / 16.0).toInt() else 0
+
+        GlView.run(
+            world = world,
+            blocks = blocks,
+            centerChunkX = centerChunkX,
+            centerChunkZ = centerChunkZ,
+            radiusChunks = radius,
+            captureAfterFrames = options.frames,
+            captureTo = options.output?.let { java.io.File(it) },
+            hidden = options.hidden,
+        )
+    }
+}
+
 // ---------------------------------------------------------------- shared
 
 private class LoginOptions(
@@ -345,6 +379,8 @@ private class LoginOptions(
     val blocks: String?,
     val online: Boolean,
     val output: String?,
+    val frames: Int,
+    val hidden: Boolean,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -356,6 +392,8 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var blocks: String? = null
     var online = false
     var output: String? = null
+    var frames = 0
+    var hidden = false
 
     var index = 0
     while (index < args.size) {
@@ -365,6 +403,8 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--chunks" -> chunks = args.getOrNull(++index)?.toIntOrNull() ?: fail("--chunks требует число")
             "--blocks" -> blocks = args.getOrNull(++index) ?: fail("--blocks требует путь")
             "--out" -> output = args.getOrNull(++index) ?: fail("--out требует путь")
+            "--frames" -> frames = args.getOrNull(++index)?.toIntOrNull() ?: fail("--frames требует число")
+            "--hidden" -> hidden = true
             "--online" -> online = true
             "--verbose" -> verbose = true
             "--help", "-h" -> { printUsage(); return null }
@@ -372,7 +412,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
         }
         index++
     }
-    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output)
+    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output, frames, hidden)
 }
 
 /**
