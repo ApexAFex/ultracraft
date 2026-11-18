@@ -1,6 +1,7 @@
 ﻿package mcplus.net
 
 import java.util.concurrent.ConcurrentHashMap
+import mcplus.protocol.ByteReader
 
 /** One 16x16x16 section; index = y * 256 + z * 16 + x. */
 class ChunkSection(val blocks: IntArray) {
@@ -78,6 +79,19 @@ class World(val minY: Int) {
 
     fun isLoaded(chunkX: Int, chunkZ: Int): Boolean = chunks.containsKey(key(chunkX, chunkZ))
 
+    /**
+     * Applies a `Block Update` packet (position + state id).
+     *
+     * @return chunk key of the changed column, or null when the change was outside loaded chunks.
+     */
+    fun applyBlockUpdate(body: ByteArray): Long? {
+        val reader = ByteReader(body)
+        val position = reader.readPosition()
+        val state = reader.readVarInt()
+        if (!setBlock(position.x, position.y, position.z, state)) return null
+        return key(position.x shr 4, position.z shr 4)
+    }
+
     /** Parses a `Chunk Data` packet straight into the world — used by the streaming reader. */
     fun addChunk(body: ByteArray, sectionCount: Int): ChunkColumn {
         val column = readChunkColumn(body, sectionCount)
@@ -110,6 +124,7 @@ class World(val minY: Int) {
         fun chunkOfZ(key: Long): Int = key.toInt()
     }
 }
+
 
 
 

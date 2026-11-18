@@ -84,6 +84,12 @@ object GlView {
             // background instead of blocking the start.
             session?.startReading { packet ->
                 if (tracker.onPacket(packet)) return@startReading
+                if (packet.id == Protocol777.Play.BLOCK_UPDATE) {
+                    world.applyBlockUpdate(packet.body)?.let { key ->
+                        pipeline.request(World.chunkOfX(key), World.chunkOfZ(key))
+                    }
+                    return@startReading
+                }
                 if (packet.id == Protocol777.Play.CHUNK_DATA) {
                     runCatching {
                         val column = world.addChunk(packet.body, sectionCount)
@@ -187,6 +193,7 @@ object GlView {
                         GL30.glClear(GL30.GL_COLOR_BUFFER_BIT or GL30.GL_DEPTH_BUFFER_BIT)
 
                         renderer.draw(camera)
+                        tracker.tick(input.deltaSeconds)
                         val entities = tracker.snapshot()
                         if (entities.size != lastEntityCount) {
                             val nearest = entities.minByOrNull {
@@ -239,7 +246,7 @@ object GlView {
                     }
                     entityRenderer.close()
                     pipeline.close()
-                    println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed")
+                    println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
                 }
             }
         } finally {
@@ -280,6 +287,7 @@ object GlView {
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
+
 
 
 
