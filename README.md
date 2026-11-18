@@ -126,6 +126,8 @@ node tools/build-block-table.js
 
 ## Документы
 
+- [PROJECT.md](PROJECT.md) — память проекта: что сделано, почему именно так, что дальше
+
 - [docs/START-HERE.md](docs/START-HERE.md) — с чего начать, план, ловушки
 - [docs/protocol-notes.md](docs/protocol-notes.md) — грабли протокола 777, найденные на практике
 - [docs/adr/0001-product-client.md](docs/adr/0001-product-client.md) — почему клиент, а не сервер
@@ -136,4 +138,5 @@ node tools/build-block-table.js
 
 Полноценный рендер (E5): воксельная геометрия из секций, текстуры из установки игрока,
 окно на LWJGL. Либо сначала E4 — вход через Microsoft для официальных серверов.
+
 
