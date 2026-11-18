@@ -2,6 +2,9 @@ package mcplus.net
 
 import mcplus.protocol.ByteReader
 import mcplus.protocol.ByteWriter
+import mcplus.protocol.nbt.TYPE_COMPOUND
+import mcplus.protocol.nbt.TYPE_END
+import mcplus.protocol.nbt.TYPE_INT
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -109,13 +112,37 @@ class JoinGameParsingTest {
     }
 
     @Test
-    fun `summarises a registry packet header`() {
+    fun `reads dimension types from registry data`() {
         val body = ByteWriter()
-            .writeString("minecraft:worldgen/biome")
-            .writeVarInt(64)
+            .writeString("minecraft:dimension_type")
+            .writeVarInt(1)
+            .writeString("minecraft:overworld")
+            .writeBoolean(true)
+            .writeBytes(dimensionNbt(minY = -64, height = 384))
             .toByteArray()
-        val summary = readRegistrySummary(ByteReader(body), body.size)
-        assertEquals("minecraft:worldgen/biome", summary.id)
-        assertEquals(body.size, summary.payloadBytes)
+
+        val registries = Registries()
+        readRegistryData(body, registries)
+
+        val type = registries.dimensionType(0)!!
+        assertEquals("overworld", type.name)
+        assertEquals(-64, type.minY)
+        assertEquals(384, type.height)
+        assertEquals(24, type.sectionCount)
+        assertEquals(1, registries.dimensionTypeCount)
+    }
+
+    /** Network NBT: no root name, just type and payload. */
+    private fun dimensionNbt(minY: Int, height: Int): ByteArray = ByteWriter()
+        .writeByte(TYPE_COMPOUND)
+        .writeByte(TYPE_INT).nbtName("min_y").writeInt(minY)
+        .writeByte(TYPE_INT).nbtName("height").writeInt(height)
+        .writeByte(TYPE_END)
+        .toByteArray()
+
+    private fun ByteWriter.nbtName(name: String): ByteWriter {
+        val bytes = name.toByteArray(Charsets.UTF_8)
+        writeShort(bytes.size)
+        return writeBytes(bytes)
     }
 }

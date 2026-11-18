@@ -2,6 +2,13 @@ package mcplus.net
 
 import mcplus.protocol.ByteReader
 import mcplus.protocol.ProtocolException
+import mcplus.protocol.nbt.NbtCompound
+import mcplus.protocol.nbt.NbtList
+import mcplus.protocol.nbt.NbtReader
+import mcplus.protocol.nbt.NbtString
+import mcplus.protocol.nbt.NbtTag
+import mcplus.protocol.nbt.list
+import mcplus.protocol.nbt.string
 import kotlinx.serialization.json.Json
 import java.util.UUID
 
@@ -11,8 +18,8 @@ data class GameProfile(val uuid: UUID, val name: String)
 /**
  * One synchronized registry announced during configuration.
  *
- * Only the header is decoded for now: counting entries needs NBT parsing of every entry,
- * which arrives together with chunk decoding (E3).
+ * Only the header is decoded eagerly: counting entries needs NBT parsing of every entry,
+ * which happens on demand for the block registry only.
  */
 data class RegistrySummary(val id: String, val payloadBytes: Int)
 
@@ -20,7 +27,7 @@ data class RegistrySummary(val id: String, val payloadBytes: Int)
 data class JoinResult(
     val protocolVersion: Int,
     val profile: GameProfile,
-    val registries: List<RegistrySummary>,
+    val registries: Registries,
     val featureFlags: List<String>,
     val joinGame: JoinGame,
 )
@@ -70,11 +77,6 @@ internal fun readGameProfile(reader: ByteReader): GameProfile {
         if (reader.readBoolean()) reader.readString(1024)    // signature
     }
     return GameProfile(uuid, name)
-}
-
-internal fun readRegistrySummary(reader: ByteReader, payloadBytes: Int): RegistrySummary {
-    val id = reader.readString()
-    return RegistrySummary(id, payloadBytes)
 }
 
 internal fun readFeatureFlags(reader: ByteReader): List<String> {
@@ -142,8 +144,7 @@ internal fun readJoinGame(reader: ByteReader): JoinGame {
 
 /**
  * Disconnect reasons are text components, but the encoding differs by state:
- * login uses a JSON string, configuration and play use NBT. Try JSON first,
- * then the common NBT string-tag form, then a hex-free fallback.
+ * login uses a JSON string, configuration and play use NBT. Try JSON first, then NBT.
  */
 internal fun decodeReason(packetBody: ByteArray): String {
     runCatching {
@@ -153,19 +154,22 @@ internal fun decodeReason(packetBody: ByteArray): String {
             return flattenComponent(Json.parseToJsonElement(json)).trim().ifBlank { json }
         }
     }
-    return nbtPreview(packetBody)
-}
-
-private fun nbtPreview(packetBody: ByteArray): String {
     runCatching {
-        val reader = ByteReader(packetBody)
-        val tagType = reader.readUnsignedByte()
-        if (tagType == NBT_STRING) {
-            readNbtShortString(reader) // tag name, usually empty
-            if (reader.remaining >= 2) return readNbtShortString(reader)
-        }
+        val text = nbtText(NbtReader.read(ByteReader(packetBody))).trim()
+        if (text.isNotEmpty()) return text
     }
     return "причина не читается (${packetBody.size} байт)"
+}
+
+private fun nbtText(tag: NbtTag): String = when (tag) {
+    is NbtString -> tag.value
+    is NbtCompound -> buildString {
+        tag.string("text")?.let { append(it) }
+        (tag["translate"] as? NbtString)?.let { append(it.value) }
+        tag.list("extra")?.forEach { append(nbtText(it)) }
+    }
+    is NbtList -> tag.items.joinToString("") { nbtText(it) }
+    else -> ""
 }
 
 private const val NBT_STRING = 0x08

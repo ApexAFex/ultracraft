@@ -58,11 +58,16 @@ object Protocol777 {
 
     object Play {
         // clientbound
+        const val CHUNK_BATCH_FINISHED: Int = 0x0B
         const val DISCONNECT: Int = 0x20
+        const val CHUNK_DATA: Int = 0x2E
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32
+        const val SYNCHRONIZE_POSITION: Int = 0x49
 
         // serverbound
+        const val CONFIRM_TELEPORT: Int = 0x00
+        const val CHUNK_BATCH_RECEIVED: Int = 0x0B
         const val KEEP_ALIVE_SERVERBOUND: Int = 0x1C
         const val CLIENT_INFORMATION: Int = 0x0E
     }
