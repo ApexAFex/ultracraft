@@ -53,6 +53,25 @@ access the application '74658136-14ec-4630-ad9b-26e160ff0fc6' (ADIbizaUX)…
 accounts» → **Register** → скопировать **Application (client) ID** →
 **Authentication** → **Allow public client flows** = Yes → Save.
 
+#### Названия в русском интерфейсе
+
+| Английский интерфейс | Русский интерфейс |
+|---|---|
+| Microsoft Entra ID → App registrations | «Удостоверение» → **«Регистрация приложений»** |
+| New registration | **«+ Новая регистрация»** |
+| Name | **«Имя»** |
+| Supported account types | **«Поддерживаемые типы учетных записей»** |
+| Accounts in any organizational directory and personal Microsoft accounts | **«Учетные записи в любом каталоге организации и личные учетные записи Майкрософт»** (третий пункт) |
+| Redirect URI | **«URI перенаправления»** — оставить пустым |
+| Register | **«Зарегистрировать»** |
+| Overview | **«Обзор»** |
+| Application (client) ID | **«Идентификатор приложения (клиента)»** ← нужен именно он |
+| Directory (tenant) ID | «Идентификатор каталога (клиента)» — **не** он |
+| Object ID | «Идентификатор объекта» — **не** он |
+| Authentication | **«Проверка подлинности»** |
+| Allow public client flows | **«Разрешить потоки общедоступного клиента»** → **«Да»** |
+| Save | **«Сохранить»** |
+
 ### Вариант 2 — создать свой тенант
 
 Два способа, оба бесплатные:
@@ -89,9 +108,23 @@ $env:MCPLUS_CLIENT_ID = "<скопированный id>"
 
 ## Ограничение Mojang
 
-Mojang ограничивает доступ к `api.minecraftservices.com`: новым приложениям нужно
-запросить разрешение через форму <https://aka.ms/mce-reviewappid>. До одобрения шаг
-`login_with_xbox` может вернуть `403`, хотя вход в Microsoft и Xbox Live уже пройдут.
+Mojang ограничивает доступ к `api.minecraftservices.com`: приложение должно быть одобрено
+вручную. До одобрения шаг `login_with_xbox` отвечает:
+
+```
+HTTP 403: Invalid app registration, see https://aka.ms/AppRegInfo
+```
+
+При этом вход в Microsoft, Xbox Live и XSTS проходят успешно — упирается только последний шаг.
+Это подтверждают независимые реализации: у сторонних лаунчеров та же стена до одобрения
+([lighty-launcher](https://github.com/lighty-launcher/lightylauncherlib/blob/ca8c8c1bac47e20756e9fb875ecc245b9d6162c9/crates/auth/docs/microsoft.md),
+[horizon](https://github.com/horizon-rust/horizon/blob/92b0ee1347b82d80e8a8faf6fe2206ad52fcd5d6/docs/microsoft-account.md)).
+
+Что делать: заполнить заявку <https://aka.ms/mce-reviewappid>. По сообщениям разработчиков
+одобрение занимает от нескольких недель; часть заявок остаётся без ответа. Даже регистрация
+в Xbox Developer Program не заменяет эту заявку.
+
+Пока заявка не одобрена, работают offline-серверы: `mcplus world` без флага `--online`.
 
 ## Где лежат токены
 

@@ -24,7 +24,11 @@ class MicrosoftOAuth(private val clientId: String, private val tenant: String = 
     private val scope: String = "XboxLive.signin offline_access"
 
     fun requestDeviceCode(): DeviceCode {
-        val json = Http.postForm("$base/devicecode", mapOf("client_id" to clientId, "scope" to scope))
+        val json = try {
+            Http.postForm("$base/devicecode", mapOf("client_id" to clientId, "scope" to scope))
+        } catch (e: AuthException) {
+            throw AuthException(explainDeviceCodeError(e.message ?: "", e.code), e.code)
+        }
         return DeviceCode(
             deviceCode = json.str("device_code"),
             userCode = json.str("user_code"),
@@ -33,6 +37,17 @@ class MicrosoftOAuth(private val clientId: String, private val tenant: String = 
             interval = json.int("interval", 5),
             message = json.strOrNull("message") ?: "",
         )
+    }
+
+    private fun explainDeviceCodeError(message: String, code: String?): String = when {
+        message.contains("AADSTS70002") ->
+            "Приложение не помечено как публичный клиент.\n" +
+                "В портале: приложение → «Проверка подлинности» → " +
+                "«Разрешить потоки общедоступного клиента» = Да → «Сохранить»."
+        message.contains("AADSTS700016") ->
+            "Microsoft не знает такого client id — проверь, что скопирован именно " +
+                "«Идентификатор приложения (клиента)»."
+        else -> message
     }
 
     fun awaitToken(code: DeviceCode, onProgress: (String) -> Unit = {}): Tokens {
