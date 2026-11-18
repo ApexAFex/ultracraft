@@ -24,7 +24,7 @@ private const val DEFAULT_TARGET = "127.0.0.1:25565"
 
 fun main(args: Array<String>) {
     when {
-        args.isEmpty() -> pingCommand(emptyList())
+        args.isEmpty() -> windowCommand(emptyList())
         args[0] == "join" -> joinCommand(args.drop(1))
         args[0] == "world" -> worldCommand(args.drop(1))
         args[0] == "view" -> viewCommand(args.drop(1))
@@ -549,4 +549,5 @@ private fun fail(message: String): Nothing {
     System.err.println(message)
     exitProcess(1)
 }
+
 
