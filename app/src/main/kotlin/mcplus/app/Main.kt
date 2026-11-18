@@ -1,4 +1,4 @@
-﻿package mcplus.app
+package mcplus.app
 
 import mcplus.app.gl.GlView
 import mcplus.auth.Account
@@ -29,6 +29,7 @@ fun main(args: Array<String>) {
         args[0] == "world" -> worldCommand(args.drop(1))
         args[0] == "view" -> viewCommand(args.drop(1))
         args[0] == "window" -> windowCommand(args.drop(1))
+        args[0] == "watch" -> watchCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
         args[0] == "logout" -> logoutCommand(args.drop(1))
@@ -240,6 +241,54 @@ private fun chunkDumpCommand(args: List<String>) {
     }
 }
 
+// ---------------------------------------------------------------- watch
+
+/**
+ * Debug tool: watches the world for a few seconds and reports which entities moved.
+ *
+ * This is how "others see us walk" gets verified without a second human: run it next to a
+ * moving client and look for a player entity carrying that client's UUID whose travelled
+ * distance is not zero.
+ */
+private fun watchCommand(args: List<String>) {
+    val options = parseLoginArgs(args) ?: return
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+
+    val session = connect(host, port, options)
+
+    session.use {
+        val tracker = mcplus.net.EntityTracker()
+        it.startReading { packet -> tracker.onPacket(packet) }
+
+        printRows(
+            listOf(
+                "Сервер" to "$host:$port",
+                "Наблюдаю" to "${options.seconds} с",
+                "Профиль" to it.joinResult.profile.name,
+            ),
+        )
+
+        // Entities are remembered after they leave: a short visit (someone joins, walks past,
+        // logs out) would otherwise vanish from the report.
+        val seen = LinkedHashMap<Int, mcplus.net.TrackedEntity>()
+        val deadline = System.currentTimeMillis() + options.seconds * 1000L
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(250)
+            tracker.tick(1.0) // snap every position instead of easing towards it
+            for (entity in tracker.snapshot()) seen[entity.id] = entity
+        }
+
+        val entities = seen.values.sortedByDescending { entity -> entity.movedDistance }
+        println("Сущностей сейчас: ${tracker.count}, за сеанс видно: ${entities.size}, пакетов движения: ${tracker.movementPackets}")
+        for (entity in entities.take(200)) {
+            println(
+                "  id=${entity.id} type=${entity.type} ${entity.uuid} (%.1f, %.1f, %.1f) прошло %.1f блоков"
+                    .format(entity.x, entity.y, entity.z, entity.movedDistance),
+            )
+        }
+    }
+}
+
 // ---------------------------------------------------------------- login
 
 private fun loginCommand(args: List<String>) {
@@ -357,6 +406,8 @@ private fun windowCommand(args: List<String>) {
         val centerChunkX = if (position != null) floor(position.x / 16.0).toInt() else 0
         val centerChunkZ = if (position != null) floor(position.z / 16.0).toInt() else 0
 
+        println("Профиль: ${it.joinResult.profile.name} (${it.joinResult.profile.uuid})")
+
         GlView.run(
             world = world,
             blocks = blocks,
@@ -390,6 +441,7 @@ private class LoginOptions(
     val minecraft: String?,
     val demo: Boolean,
     val threads: Int,
+    val seconds: Int,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -406,6 +458,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var minecraft: String? = null
     var demo = false
     var threads = 0
+    var seconds = 20
 
     var index = 0
     while (index < args.size) {
@@ -420,6 +473,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--minecraft" -> minecraft = args.getOrNull(++index) ?: fail("--minecraft требует путь")
             "--demo" -> demo = true
             "--threads" -> threads = args.getOrNull(++index)?.toIntOrNull() ?: fail("--threads требует число")
+            "--seconds" -> seconds = args.getOrNull(++index)?.toIntOrNull() ?: fail("--seconds требует число")
             "--online" -> online = true
             "--verbose" -> verbose = true
             "--help", "-h" -> { printUsage(); return null }
@@ -427,7 +481,10 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
         }
         index++
     }
-    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output, frames, hidden, minecraft, demo, threads)
+    return LoginOptions(
+        target, name, protocol, verbose, chunks, blocks, online, output,
+        frames, hidden, minecraft, demo, threads, seconds,
+    )
 }
 
 /**
@@ -535,13 +592,22 @@ private fun printUsage() {
           mcplus world [host[:port]] [--chunks N]   нарисовать карту мира текстом
           mcplus view [host[:port]] [--chunks N]    нарисовать мир картинкой (PNG)
           mcplus login [--client-id ID]             войти через Microsoft
-          mcplus logout                             забыть сохранённую учётную запись          mcplus ping [host[:port]] [--json]        то же, что и без команды
+          mcplus logout                             забыть сохранённую учётную запись
+          mcplus ping [host[:port]] [--json]        то же, что и без команды
+          mcplus window [host[:port]]               открыть окно и играть
+          mcplus watch [host[:port]] [--seconds N]  наблюдать, какие сущности двигаются
+          mcplus chunkdump [host[:port]]            сохранить сырые пакеты чанков
 
         Флаги:
           --protocol N   версия протокола, по умолчанию 777
           --name Имя     имя игрока для offline-входа, по умолчанию mcplus
           --online       войти с учётной записью Microsoft (нужен mcplus login)
           --chunks N     размер карты в чанках, по умолчанию 3 (48 блоков)
+          --threads N    потоков на сборку мешей, по умолчанию все ядра минус одно
+          --hidden       окно без рамки (для снимков)
+          --frames N     выйти после N кадров, сохранив снимок в --out
+          --demo         самопроверка: ломает и ставит блок, идёт вперёд
+          --seconds N    (watch) сколько секунд наблюдать, по умолчанию 20
           --verbose      печатать каждый принятый пакет
           --json         (ping) вывести сырой JSON сервера
 

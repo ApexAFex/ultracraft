@@ -63,6 +63,14 @@ class Connection(private val socket: Socket) : Closeable {
         encrypted = true
     }
 
+    /**
+     * Frames and writes one packet.
+     *
+     * Synchronized because the reader thread answers keep-alives and teleports while the game
+     * thread sends movement: two threads writing into the same buffer would interleave bytes
+     * and corrupt the stream.
+     */
+    @Synchronized
     fun send(packet: Packet) {
         output.write(FrameCodec.encode(packet, compressionThreshold))
         output.flush()

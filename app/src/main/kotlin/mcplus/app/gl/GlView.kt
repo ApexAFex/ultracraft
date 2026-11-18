@@ -1,8 +1,10 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
 import mcplus.net.EntityTracker
+import mcplus.net.MoveSender
+import mcplus.net.PlayerMovement
 import mcplus.net.proto.Protocol777
 import mcplus.net.Session
 import mcplus.net.World
@@ -13,11 +15,22 @@ import org.lwjgl.system.MemoryUtil
 import java.io.File
 import java.nio.ByteBuffer
 import javax.imageio.ImageIO
+import kotlin.math.floor
 
 /**
  * The playable client: GLFW window, OpenGL 3.3 renderer, player physics and block editing.
  */
 object GlView {
+
+    /** One server tick: 20 per second. Physics and movement packets both run on it. */
+    private const val TICK_SECONDS = 1.0 / 20.0
+
+    /** Catch-up limit for one frame — beyond this the backlog is dropped, not simulated. */
+    private const val MAX_TICKS_PER_FRAME = 5
+
+    /** Demo mode walks forward between these frame numbers, so movement lands in the log. */
+    private const val DEMO_WALK_FROM = 30
+    private const val DEMO_WALK_TO = 230
 
     fun run(
         world: World,
@@ -79,12 +92,16 @@ object GlView {
                 join.registries.dimensionType(join.joinGame.dimensionTypeId)?.sectionCount
             } ?: 24
             var streamed = 0
+            // Counted on the reader thread: shows whether the server accepts our edits or
+            // quietly puts the world back.
+            val blockUpdates = java.util.concurrent.atomic.AtomicInteger()
 
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
             session?.startReading { packet ->
                 if (tracker.onPacket(packet)) return@startReading
                 if (packet.id == Protocol777.Play.BLOCK_UPDATE) {
+                    blockUpdates.incrementAndGet()
                     world.applyBlockUpdate(packet.body)?.let { key ->
                         pipeline.request(World.chunkOfX(key), World.chunkOfZ(key))
                     }
@@ -112,18 +129,47 @@ object GlView {
 
                     val spawnX = centerChunkX * 16 + 8
                     val spawnZ = centerChunkZ * 16 + 8
+                    // The server already told us where we stand; guessing from the terrain puts
+                    // the player half a block off and every move then gets corrected.
+                    val serverSpawn = session?.playerPosition
                     val spawnY = Player.spawnAbove(world, blocks, spawnX, spawnZ, world.minY + 383)
-                    val player = Player(spawnX + 0.5, spawnY, spawnZ + 0.5, camera.yaw, camera.pitch)
+                    val player = if (serverSpawn != null) {
+                        Player(serverSpawn.x, serverSpawn.y, serverSpawn.z, camera.yaw, camera.pitch)
+                    } else {
+                        Player(spawnX + 0.5, spawnY, spawnZ + 0.5, camera.yaw, camera.pitch)
+                    }
                     camera.x = player.x
                     camera.y = player.eyeY
                     camera.z = player.z
 
-                    println("Спавн: %.1f, %.1f, %.1f".format(player.x, player.y, player.z))
+                    // Movement goes out at the server's tick rate, not at the frame rate: the
+                    // server accepts one movement packet per client tick.
+                    val moveSender = session?.let { MoveSender(it::send) }
+                    moveSender?.begin()
+                    var tickAccumulator = 0.0
+                    var tickCount = 0L
+                    var previousX = player.x
+                    var previousY = player.y
+                    var previousZ = player.z
+                    var playerLoadedSent = false
+
+                    println("Спавн: %.1f, %.1f, %.1f (%s)".format(
+                        player.x, player.y, player.z,
+                        if (serverSpawn != null) "позиция сервера" else "подбор по рельефу",
+                    ))
                     println("WASD — идти, пробел — прыжок, F — полёт, ЛКМ — сломать, ПКМ — поставить, Esc — выход")
 
                     fun demoBreak(hit: Raycast.Hit) {
                         world.setBlock(hit.x, hit.y, hit.z, 0)
                         pipeline.request(hit.x shr 4, hit.z shr 4)
+                        // The server pairs the release with the press that started it: a release
+                        // on its own is logged as "Mismatch in destroy block pos" and does nothing.
+                        session?.send(
+                            BlockInteraction.playerAction(
+                                BlockInteraction.START_DESTROY_BLOCK,
+                                hit.x, hit.y, hit.z, hit.face, sequence++,
+                            ),
+                        )
                         session?.send(
                             BlockInteraction.playerAction(
                                 BlockInteraction.STOP_DESTROY_BLOCK,
@@ -161,13 +207,66 @@ object GlView {
                         if (input.flyToggleRequested) player.flying = !player.flying
                         player.yaw = camera.yaw
                         player.pitch = camera.pitch
-                        player.move(
-                            input.deltaSeconds, world, blocks,
-                            input.forward, input.strafe, input.jump, input.descend,
-                        )
-                        camera.x = player.x
-                        camera.y = player.eyeY
-                        camera.z = player.z
+
+                        // Demo mode walks forward on its own so the movement packets show up
+                        // in the log without anyone holding a key.
+                        val demoWalking = demo && frame in DEMO_WALK_FROM until DEMO_WALK_TO
+                        val forwardInput = if (demoWalking) 1.0 else input.forward
+
+                        tickAccumulator += input.deltaSeconds
+                        var steps = 0
+                        while (tickAccumulator >= TICK_SECONDS && steps < MAX_TICKS_PER_FRAME) {
+                            session?.pollTeleport()?.let { teleport ->
+                                println("Телепорт от сервера: %.2f, %.2f, %.2f".format(teleport.x, teleport.y, teleport.z))
+                                player.teleport(teleport.x, teleport.y, teleport.z)
+                                moveSender?.reset()
+                            }
+
+                            previousX = player.x
+                            previousY = player.y
+                            previousZ = player.z
+
+                            // No physics over unloaded terrain: the world answers "unknown"
+                            // for every block there and the player would fall through it.
+                            val ready = world.isLoaded(
+                                floor(player.x).toInt() shr 4,
+                                floor(player.z).toInt() shr 4,
+                            )
+                            if (ready) {
+                                player.move(
+                                    TICK_SECONDS, world, blocks,
+                                    forwardInput, input.strafe, input.jump, input.descend,
+                                )
+                            }
+                            if (ready && !playerLoadedSent) {
+                                // "My terrain is up" — lets the server start ticking us now
+                                // instead of waiting out its 60-tick grace period.
+                                session?.send(PlayerMovement.playerLoaded())
+                                playerLoadedSent = true
+                                println("Отправлено Player Loaded")
+                            }
+
+                            moveSender?.tick(player.x, player.y, player.z, player.yaw, player.pitch, player.onGround)
+                            tickCount++
+                            steps++
+                            tickAccumulator -= TICK_SECONDS
+
+                            if (demo && tickCount % 20L == 0L) {
+                                println("Тик $tickCount: %.2f, %.2f, %.2f — пакетов движения ${moveSender?.movementPackets ?: 0}".format(
+                                    player.x, player.y, player.z,
+                                ))
+                            }
+                        }
+                        // A long stall (window drag, breakpoint) must not turn into a burst of
+                        // hundreds of catch-up ticks; dropping the backlog is what vanilla does.
+                        if (steps == MAX_TICKS_PER_FRAME) tickAccumulator = 0.0
+
+                        // Render between ticks: the camera slides from the previous tick
+                        // position to the current one, otherwise movement looks like 20 fps.
+                        val alpha = (tickAccumulator / TICK_SECONDS).coerceIn(0.0, 1.0)
+                        camera.x = previousX + (player.x - previousX) * alpha
+                        camera.y = previousY + (player.y - previousY) * alpha + Player.EYE_HEIGHT
+                        camera.z = previousZ + (player.z - previousZ) * alpha
 
                         // Upload at most a few finished meshes per frame: the GL calls
                         // themselves cost time, and a burst would be just another stutter.
@@ -247,6 +346,7 @@ object GlView {
                     entityRenderer.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
+                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}")
                 }
             }
         } finally {

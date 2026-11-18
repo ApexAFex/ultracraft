@@ -1,4 +1,4 @@
-﻿package mcplus.net
+package mcplus.net
 
 import mcplus.net.proto.Protocol777
 import mcplus.protocol.ByteReader
@@ -23,6 +23,21 @@ class Session internal constructor(
 
     var playerPosition: PlayerPosition? = null
         private set
+
+    /**
+     * Teleports the server performed behind our back (spawn, `/tp`, "you moved wrongly").
+     *
+     * Written by the reader thread, drained by the game thread. Only the newest one matters:
+     * a queue of stale corrections would drag the player back through a chain of old spots.
+     */
+    private val teleports = java.util.ArrayDeque<PlayerPosition>()
+
+    /** @return the newest teleport the server asked for since the last call, or null. */
+    fun pollTeleport(): PlayerPosition? = synchronized(teleports) {
+        val newest = teleports.peekLast()
+        teleports.clear()
+        newest
+    }
 
     fun receive(): Packet {
         while (true) {
@@ -88,6 +103,7 @@ class Session internal constructor(
         val pitch = reader.readFloat()
 
         playerPosition = PlayerPosition(x, y, z)
+        synchronized(teleports) { teleports.addLast(PlayerPosition(x, y, z)) }
 
         // Since 1.21.2 the acknowledgement echoes the accepted position and rotation.
         val body = ByteWriter()

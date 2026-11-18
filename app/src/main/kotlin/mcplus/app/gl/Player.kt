@@ -27,6 +27,20 @@ class Player(
     /** Camera sits at eye height above the feet. */
     val eyeY: Double get() = y + EYE_HEIGHT
 
+    /**
+     * Places the player where the server said they are, dropping the local velocity.
+     *
+     * Used for the spawn teleport and for corrections: after this the next tick reports the
+     * new position as if we had just started, so the server sees a full packet, not a delta.
+     */
+    fun teleport(newX: Double, newY: Double, newZ: Double) {
+        x = newX
+        y = newY
+        z = newZ
+        velocityY = 0.0
+        onGround = false
+    }
+
     fun move(
         dt: Double,
         world: World,
