@@ -202,11 +202,13 @@ private fun chunkDumpCommand(args: List<String>) {
 private fun loginCommand(args: List<String>) {
     var clientId: String? = null
     var storePath: String? = null
+    var tenant = System.getenv("MCPLUS_TENANT") ?: "consumers"
 
     var index = 0
     while (index < args.size) {
         when (val arg = args[index]) {
             "--client-id" -> clientId = args.getOrNull(++index) ?: fail("--client-id требует значение")
+            "--tenant" -> tenant = args.getOrNull(++index) ?: fail("--tenant требует значение")
             "--store" -> storePath = args.getOrNull(++index) ?: fail("--store требует путь")
             "--help", "-h" -> { printUsage(); return }
             else -> fail("Лишний аргумент: $arg")
@@ -220,7 +222,7 @@ private fun loginCommand(args: List<String>) {
     )
 
     val store = AccountStore(resolveStoreFile(storePath))
-    val auth = AuthManager(id, store, log = { line -> println("  $line") })
+    val auth = AuthManager(id, store, tenant, log = { line -> println("  $line") })
 
     val account = try {
         auth.silentLogin() ?: auth.loginWithDeviceCode()
@@ -413,8 +415,7 @@ private fun printUsage() {
           mcplus join [host[:port]] [--name Имя]    войти на сервер (offline-mode)
           mcplus world [host[:port]] [--chunks N]   нарисовать карту мира текстом
           mcplus login [--client-id ID]             войти через Microsoft
-          mcplus logout                             забыть сохранённую учётную запись
-          mcplus ping [host[:port]] [--json]        то же, что и без команды
+          mcplus logout                             забыть сохранённую учётную запись          mcplus ping [host[:port]] [--json]        то же, что и без команды
 
         Флаги:
           --protocol N   версия протокола, по умолчанию 777

@@ -68,6 +68,7 @@ class AccountStore(private val file: File) {
 class AuthManager(
     private val clientId: String,
     private val store: AccountStore,
+    private val tenant: String = "consumers",
     private val log: (String) -> Unit = {},
 ) {
 
@@ -75,7 +76,7 @@ class AuthManager(
 
     /** Full interactive sign-in with the device code flow. */
     fun loginWithDeviceCode(): Account {
-        val oauth = MicrosoftOAuth(clientId)
+        val oauth = MicrosoftOAuth(clientId, tenant)
         val code = oauth.requestDeviceCode()
 
         log("Открой ${code.verificationUri} и введи код: ${code.userCode}")
@@ -95,7 +96,7 @@ class AuthManager(
         val refreshToken = current.refreshToken
         if (refreshToken.isNullOrBlank()) return null
 
-        val tokens = MicrosoftOAuth(clientId).refresh(refreshToken)
+        val tokens = MicrosoftOAuth(clientId, tenant).refresh(refreshToken)
         val account = complete(tokens, fallbackRefreshToken = refreshToken)
         store.save(account)
         return account
