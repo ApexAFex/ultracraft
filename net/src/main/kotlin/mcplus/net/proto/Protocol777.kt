@@ -68,6 +68,8 @@ object Protocol777 {
         const val SPAWN_ENTITY: Int = 0x01
         const val REMOVE_ENTITIES: Int = 0x4E
         const val UPDATE_ENTITY_POSITION: Int = 0x36
+        const val UPDATE_ENTITY_POSITION_ROTATION: Int = 0x37
+        const val UPDATE_ENTITY_ROTATION: Int = 0x39
         const val TELEPORT_ENTITY: Int = 0x23
         const val CHUNK_DATA: Int = 0x2E
         const val BLOCK_UPDATE: Int = 0x08

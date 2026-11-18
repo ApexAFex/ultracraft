@@ -39,6 +39,23 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     var movedDistance: Double = 0.0
         private set
 
+    /** Facing, in protocol degrees: 0 looks along +Z, 90 along -X. */
+    @Volatile
+    var yaw: Float = 0f
+        private set
+
+    @Volatile
+    var pitch: Float = 0f
+        private set
+
+    fun look(newYaw: Float, newPitch: Float) {
+        // Byte-encoded rotations come in 1/256 turns; anything wildly out of range is a parse
+        // mistake and would throw the model to a random direction.
+        if (newYaw.isNaN() || newPitch.isNaN()) return
+        yaw = newYaw
+        pitch = newPitch
+    }
+
     fun place(nx: Double, ny: Double, nz: Double) {
         targetX = nx
         targetY = ny
@@ -126,6 +143,11 @@ class EntityTracker {
                 return true
             }
 
+            Protocol777.Play.UPDATE_ENTITY_ROTATION -> {
+                runCatching { readRotation(packet.body) }
+                return true
+            }
+
             Protocol777.Play.TELEPORT_ENTITY -> {
                 runCatching { readTeleport(packet.body) }
                 return true
@@ -166,7 +188,7 @@ class EntityTracker {
         movementPackets++
     }
 
-    /** `entity_position_sync`: path type 0 carries an absolute position. */
+    /** `entity_position_sync`: path type 0 carries an absolute position and rotation. */
     private fun readTeleport(body: ByteArray) {
         val reader = ByteReader(body)
         val id = reader.readVarInt()
@@ -176,7 +198,32 @@ class EntityTracker {
         val x = reader.readDouble()
         val y = reader.readDouble()
         val z = reader.readDouble()
-        entities[id]?.place(x, y, z)
+        reader.readDouble() // velocity X
+        reader.readDouble() // velocity Y
+        reader.readDouble() // velocity Z
+        val yaw = reader.readFloat()
+        val pitch = reader.readFloat()
+
+        entities[id]?.apply {
+            place(x, y, z)
+            look(yaw, pitch)
+        }
         movementPackets++
+    }
+
+    /** `entity_look`: only the facing changed, angles are 1/256 of a turn. */
+    private fun readRotation(body: ByteArray) {
+        val reader = ByteReader(body)
+        val id = reader.readVarInt()
+        val yaw = reader.readByte() * TURN / 256f
+        val pitch = reader.readByte() * TURN / 256f
+
+        entities[id]?.look(yaw, pitch)
+        movementPackets++
+    }
+
+    private companion object {
+        /** Byte-encoded angles are parts of a full turn. */
+        const val TURN = 360f
     }
 }

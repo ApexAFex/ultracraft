@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -64,6 +64,8 @@ object GlView {
         placeBlockName: String = "stone",
         demo: Boolean = false,
         meshThreads: Int = 0,
+        /** Packets read while the first chunks were awaited; replayed before the loop starts. */
+        replay: List<mcplus.protocol.Packet> = emptyList(),
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -135,10 +137,10 @@ object GlView {
 
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
-            session?.startReading { packet ->
+            fun handle(packet: mcplus.protocol.Packet) {
                 // The tab list is the only source of other players' names, so it goes first.
-                if (playerList.onPacket(packet.id, packet.body)) return@startReading
-                if (tracker.onPacket(packet)) return@startReading
+                if (playerList.onPacket(packet.id, packet.body)) return
+                if (tracker.onPacket(packet)) return
                 if (packet.id == Protocol777.Play.BLOCK_UPDATE) {
                     blockUpdates.incrementAndGet()
                     runCatching {
@@ -147,7 +149,7 @@ object GlView {
                         world.applyBlockUpdate(packet.body)
                         remeshAround(position.x, position.y, position.z)
                     }
-                    return@startReading
+                    return
                 }
                 if (packet.id == Protocol777.Play.CHUNK_DATA) {
                     // A chunk that fails to parse is a hole in the world, so say so instead of
@@ -168,6 +170,12 @@ object GlView {
                 }
             }
 
+            // Entities and names were announced once, while the first chunks were awaited.
+            for (packet in replay) handle(packet)
+            if (replay.isNotEmpty()) println("Восстановлено пакетов до открытия окна: ${replay.size}")
+
+            session?.startReading { packet -> handle(packet) }
+
             val placeState = blocks.firstStateOf(placeBlockName) ?: 1
             var sequence = 0
             var leftWasDown = false
@@ -176,6 +184,9 @@ object GlView {
             GlTextures(atlas).use { textures ->
                 Renderer(textures, width, height).use { renderer ->
                     val entityRenderer = EntityRenderer(width, height)
+                    val skin = GameFiles.readPng(directory, "assets/minecraft/textures/entity/player/wide/steve.png")
+                    val playerRenderer = PlayerRenderer(width, height, skin)
+                    if (skin == null) println("Скин игрока не найден: игроки рисуются коробками")
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -404,7 +415,18 @@ object GlView {
                             } ?: "нет"))
                             lastEntityCount = entities.size
                         }
-                        entityRenderer.draw(camera, entities)
+                        // Players get a humanoid with a skin, everything else stays a box.
+                        val players = ArrayList<PlayerRenderer.Player>()
+                        val boxes = ArrayList<mcplus.net.TrackedEntity>()
+                        for (entity in entities) {
+                            if (playerList.nameOf(entity.uuid) != null) {
+                                players += PlayerRenderer.Player(entity.x, entity.y, entity.z, entity.yaw)
+                            } else {
+                                boxes += entity
+                            }
+                        }
+                        playerRenderer.draw(camera, players)
+                        entityRenderer.draw(camera, boxes)
                         // Only players are in the tab list, so only they get a nametag.
                         val labels = entities.mapNotNull { entity ->
                             val name = playerList.nameOf(entity.uuid) ?: return@mapNotNull null
@@ -490,6 +512,7 @@ object GlView {
                         frame++
                     }
                     entityRenderer.close()
+                    playerRenderer.close()
                     textRenderer?.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")

@@ -20,7 +20,16 @@ class WorldCollector(private val session: Session) {
 
     val minY: Int = dimension?.minY ?: -64
 
-    fun collect(maxChunks: Int = 441, durationMs: Long = 6_000): World {
+    /**
+     * @param onPacket everything except chunk data, in arrival order. The server announces
+     *        entities and the player list **once**, so packets read while waiting for the first
+     *        chunks must not be dropped: the caller replays them into its trackers.
+     */
+    fun collect(
+        maxChunks: Int = 441,
+        durationMs: Long = 6_000,
+        onPacket: (mcplus.protocol.Packet) -> Unit = {},
+    ): World {
         val world = World(minY)
         val startedAt = System.currentTimeMillis()
         var deadline = startedAt + durationMs
@@ -30,12 +39,15 @@ class WorldCollector(private val session: Session) {
             val packet = session.receive()
             if (packet.id == Protocol777.Play.CHUNK_DATA) {
                 world.add(readChunkColumn(packet.body, sectionCount))
-            } else if (!askedForRespawn && world.chunkCount == 0 &&
-                System.currentTimeMillis() - startedAt > durationMs / 3
-            ) {
-                session.requestRespawn()
-                askedForRespawn = true
-                deadline = System.currentTimeMillis() + durationMs
+            } else {
+                onPacket(packet)
+                if (!askedForRespawn && world.chunkCount == 0 &&
+                    System.currentTimeMillis() - startedAt > durationMs / 3
+                ) {
+                    session.requestRespawn()
+                    askedForRespawn = true
+                    deadline = System.currentTimeMillis() + durationMs
+                }
             }
         }
         return world

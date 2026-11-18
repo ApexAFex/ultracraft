@@ -411,7 +411,12 @@ private fun windowCommand(args: List<String>) {
 
     session.use {
         // Only a small area is awaited; the rest streams in while the window is open.
-        val world = WorldCollector(it).collect(maxChunks = 25, durationMs = 1_500)
+        // Everything else read meanwhile is replayed into the client: the server announces
+        // entities and the player list once, and those packets must not be thrown away.
+        val replay = ArrayList<mcplus.protocol.Packet>()
+        val world = WorldCollector(it).collect(maxChunks = 25, durationMs = 1_500) { packet ->
+            replay += packet
+        }
         if (world.chunkCount == 0) fail("Сервер не прислал ни одного чанка за отведённое время")
 
         val position = it.playerPosition
@@ -433,6 +438,7 @@ private fun windowCommand(args: List<String>) {
             session = it,
             demo = options.demo,
             meshThreads = options.threads,
+            replay = replay,
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
