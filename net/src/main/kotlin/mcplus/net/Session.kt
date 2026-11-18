@@ -65,7 +65,7 @@ class Session internal constructor(
     fun receive(): Packet {
         while (true) {
             val packet = connection.receive()
-            log("<- PLAY 0x${packet.id.toString(16)} (${packet.body.size} байт)")
+            log("<- PLAY 0x${packet.id.toString(16)} (${packet.body.size} байт)" + packet.body.hexIfSmall())
 
             when (packet.id) {
                 Protocol777.Play.KEEP_ALIVE ->
@@ -101,6 +101,17 @@ class Session internal constructor(
         } catch (e: Exception) {
             markClosed("не удалось отправить пакет: ${e.message ?: e::class.simpleName}", byServer = true)
         }
+    }
+
+    /**
+     * Sends `Client Status: perform respawn`.
+     *
+     * A player who died in an earlier session is still dead after reconnecting, and a dead
+     * player gets **no chunks at all** — the server only tracks chunks for the living. For a
+     * living player the server ignores this request.
+     */
+    fun requestRespawn() {
+        send(Packet(Protocol777.Play.CLIENT_STATUS, ByteWriter().writeVarInt(RESPAWN).toByteArray()))
     }
 
     /**
@@ -169,5 +180,15 @@ class Session internal constructor(
     private companion object {
         /** How many chunks per tick the client is willing to take; vanilla uses 7.5–64. */
         const val CHUNKS_PER_TICK = 64f
+
+        /** `Client Status` action: "I died, put me back in the world". */
+        const val RESPAWN = 0
     }
 }
+
+/**
+ * Small packets are dumped as hex when `--verbose` is on: that is how the unknown ones
+ * (health, status, events) get identified without a decompiler.
+ */
+private fun ByteArray.hexIfSmall(): String =
+    if (size in 1..24) " [" + joinToString(" ") { "%02x".format(it) } + "]" else ""

@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -64,6 +64,9 @@ object GlView {
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, if (hidden) GLFW.GLFW_FALSE else GLFW.GLFW_TRUE)
+        // Without this the driver may hand out a 16-bit depth buffer, and at a hundred blocks
+        // the precision is a few blocks — the world tears into floating fragments.
+        GLFW.glfwWindowHint(GLFW.GLFW_DEPTH_BITS, 24)
 
         val window = GLFW.glfwCreateWindow(width, height, "ultracraft — mcplus", MemoryUtil.NULL, MemoryUtil.NULL)
             ?: error("Не удалось создать окно OpenGL (нет доступного дисплея?)")
@@ -75,6 +78,7 @@ object GlView {
 
             println("OpenGL ${GL30.glGetString(GL30.GL_VERSION)}")
             println("Видеокарта ${GL30.glGetString(GL30.GL_RENDERER)}")
+            println("Буфер глубины: ${GL30.glGetInteger(GL30.GL_DEPTH_BITS)} бит")
 
             val directory = minecraftDirectory ?: TextureAtlas.findMinecraftDirectory()
             val atlas = directory?.let { TextureAtlas.load(it) } ?: TextureAtlas.colored(blocks.allNames())
@@ -103,20 +107,40 @@ object GlView {
             // quietly puts the world back.
             val blockUpdates = java.util.concurrent.atomic.AtomicInteger()
 
+            /**
+             * A chunk's mesh depends on its four neighbours too, but only at the border:
+             * a block changed on column 0 or 15 is also a neighbour's business.
+             */
+            fun remeshAround(x: Int, y: Int, z: Int) {
+                val chunkX = x shr 4
+                val chunkZ = z shr 4
+                pipeline.request(chunkX, chunkZ)
+                if (x and 15 == 0) pipeline.request(chunkX - 1, chunkZ)
+                if (x and 15 == 15) pipeline.request(chunkX + 1, chunkZ)
+                if (z and 15 == 0) pipeline.request(chunkX, chunkZ - 1)
+                if (z and 15 == 15) pipeline.request(chunkX, chunkZ + 1)
+            }
+
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
             session?.startReading { packet ->
                 if (tracker.onPacket(packet)) return@startReading
                 if (packet.id == Protocol777.Play.BLOCK_UPDATE) {
                     blockUpdates.incrementAndGet()
-                    world.applyBlockUpdate(packet.body)?.let { key ->
-                        pipeline.request(World.chunkOfX(key), World.chunkOfZ(key))
+                    runCatching {
+                        val reader = mcplus.protocol.ByteReader(packet.body)
+                        val position = reader.readPosition()
+                        world.applyBlockUpdate(packet.body)
+                        remeshAround(position.x, position.y, position.z)
                     }
                     return@startReading
                 }
                 if (packet.id == Protocol777.Play.CHUNK_DATA) {
                     runCatching {
                         val column = world.addChunk(packet.body, sectionCount)
+                        // Faces towards an unloaded chunk are drawn (see MeshBuilder), so the
+                        // neighbours do not have to be re-meshed when a chunk arrives; the
+                        // duplicate faces are coplanar and invisible.
                         pipeline.request(column.x, column.z)
                         streamed++
                     }

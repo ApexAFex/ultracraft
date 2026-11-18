@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.BlockTable
 import mcplus.net.World
@@ -74,9 +74,16 @@ object MeshBuilder {
         return ChunkMesh(chunkX, chunkZ, data, data.size / FLOATS_PER_VERTEX)
     }
 
-    /** A face is drawn when its neighbour is air; unmeshed plants count as air too. */
+    /**
+     * A face is drawn when its neighbour lets light through; unmeshed plants count as air too.
+     *
+     * A neighbour in an **unloaded** chunk counts as air, not as a wall. The opposite choice
+     * looks cheaper but leaves a one-block strip of missing faces along every chunk border:
+     * chunks are meshed as they stream in, so their neighbours usually are not there yet, and
+     * a border with no faces is a hole straight into the sky.
+     */
     private fun isTransparent(state: Int, blocks: BlockTable): Boolean {
-        if (state == World.UNKNOWN) return false
+        if (state == World.UNKNOWN) return true
         if (state == 0) return true
         if (blocks.isAir(state)) return true
         return blocks.nameOf(state) in PLANTS

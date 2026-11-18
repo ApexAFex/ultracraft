@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockTable
 import mcplus.net.World
@@ -29,6 +29,7 @@ class MeshPipeline(
 
     private val results = ConcurrentLinkedQueue<ChunkMesh>()
     private val inFlight = ConcurrentHashMap.newKeySet<Long>()
+    private val again = ConcurrentHashMap.newKeySet<Long>()
     private val queued = AtomicInteger()
 
     val workerCount: Int get() = threads
@@ -36,9 +37,19 @@ class MeshPipeline(
     /** Number of chunks waiting for a mesh (queued or being built). */
     val pending: Int get() = queued.get()
 
+    /**
+     * Queues a chunk for meshing.
+     *
+     * A chunk can be asked for while a build of it is already running — that happens when a
+     * neighbour arrives during the build. The second request is remembered and repeated after
+     * the first build finishes, otherwise the chunk would keep a mesh built from stale data.
+     */
     fun request(chunkX: Int, chunkZ: Int) {
         val key = key(chunkX, chunkZ)
-        if (!inFlight.add(key)) return
+        if (!inFlight.add(key)) {
+            again.add(key)
+            return
+        }
 
         queued.incrementAndGet()
         executor.execute {
@@ -47,6 +58,7 @@ class MeshPipeline(
             } finally {
                 inFlight.remove(key)
                 queued.decrementAndGet()
+                if (again.remove(key)) request(chunkX, chunkZ)
             }
         }
     }

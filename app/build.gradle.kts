@@ -1,4 +1,4 @@
-﻿import java.util.zip.ZipFile
+import java.util.zip.ZipFile
 
 plugins {
     kotlin("jvm")
@@ -24,6 +24,15 @@ dependencies {
     runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjglVersion:$lwjglNatives")
     runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:$lwjglNatives")
+
+    // The mesher is pure geometry and must be testable without a GPU.
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 application {
