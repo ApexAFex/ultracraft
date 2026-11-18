@@ -5,7 +5,12 @@
 
 **Решение зафиксировано (2026-11-18):** вариант **A — совместимый клиент**, стек **Kotlin 2.1 / JDK 21**.
 См. [ADR-0001](adr/0001-product-client.md) и [ADR-0002](adr/0002-stack-kotlin-jvm.md).
-Первый этап (E1) уже в коде: `protocol` + `net` + `app` с рабочим Server List Ping.
+
+**Прогресс:**
+
+- ✅ **E1** — Server List Ping против живого сервера.
+- ✅ **E2** — вход: login → configuration → `Join Game` разобран, сервер пишет «joined the game».
+- ⬜ **E3** — чанки и блоки (следующий шаг).
 
 ---
 
