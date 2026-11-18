@@ -26,6 +26,7 @@ fun main(args: Array<String>) {
         args.isEmpty() -> pingCommand(emptyList())
         args[0] == "join" -> joinCommand(args.drop(1))
         args[0] == "world" -> worldCommand(args.drop(1))
+        args[0] == "view" -> viewCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
         args[0] == "logout" -> logoutCommand(args.drop(1))
@@ -144,8 +145,8 @@ private fun worldCommand(args: List<String>) {
     val session = connect(host, port, options)
 
     session.use {
-        val chunks = WorldCollector(it, blocks).collect(maxChunks = maxOf(81, size * size * 4))
-        if (chunks.isEmpty()) fail("Сервер не прислал ни одного чанка за отведённое время")
+        val world = WorldCollector(it).collect(maxChunks = maxOf(81, size * size * 4))
+        if (world.chunkCount == 0) fail("Сервер не прислал ни одного чанка за отведённое время")
 
         val position = it.playerPosition
         val centerChunkX = if (position != null) floor(position.x / 16.0).toInt() else 0
@@ -158,13 +159,51 @@ private fun worldCommand(args: List<String>) {
                 "Мир" to it.joinResult.joinGame.dimensionName,
                 "Точка" to (position?.let { p -> "%.1f, %.1f, %.1f".format(p.x, p.y, p.z) } ?: "неизвестна"),
                 "Центр" to "чанк ($centerChunkX, $centerChunkZ)",
-                "Чанков" to "${chunks.size} (рисуем ${size}x$size)",
+                "Чанков" to "${world.chunkCount} (рисуем ${size}x$size)",
                 "Состояний" to blocks.stateCount.toString(),
             ),
         )
         println()
-        println(AsciiMap.render(chunks, blocks, centerChunkX, centerChunkZ, size))
+        println(AsciiMap.render(world, blocks, centerChunkX, centerChunkZ, size))
         println(AsciiMap.legend())
+    }
+}
+
+// ---------------------------------------------------------------- view
+
+private fun viewCommand(args: List<String>) {
+    val options = parseLoginArgs(args) ?: return
+    val size = options.chunks.coerceIn(3, 15)
+    val radius = (size - 1) / 2
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+    val blocks = findBlockTable(options.blocks)
+
+    val session = connect(host, port, options)
+
+    session.use {
+        val world = WorldCollector(it).collect(maxChunks = size * size)
+        if (world.chunkCount == 0) fail("Сервер не прислал ни одного чанка за отведённое время")
+
+        val position = it.playerPosition
+        val centerChunkX = if (position != null) floor(position.x / 16.0).toInt() else 0
+        val centerChunkZ = if (position != null) floor(position.z / 16.0).toInt() else 0
+
+        val output = java.io.File(options.output ?: "screenshots/world.png")
+        val started = System.currentTimeMillis()
+        WorldRenderer.render(world, blocks, centerChunkX, centerChunkZ, radius, output)
+        val elapsed = System.currentTimeMillis() - started
+
+        printRows(
+            listOf(
+                "Сервер" to "$host:$port",
+                "Мир" to it.joinResult.joinGame.dimensionName,
+                "Центр" to "чанк ($centerChunkX, $centerChunkZ)",
+                "Чанков" to world.chunkCount.toString(),
+                "Область" to "${size}x$size чанков (${size * 16} блоков)",
+                "Рендер" to "$elapsed мс",
+                "Файл" to output.absolutePath,
+            ),
+        )
     }
 }
 
@@ -305,6 +344,7 @@ private class LoginOptions(
     val chunks: Int,
     val blocks: String?,
     val online: Boolean,
+    val output: String?,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -315,6 +355,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var chunks = 3
     var blocks: String? = null
     var online = false
+    var output: String? = null
 
     var index = 0
     while (index < args.size) {
@@ -323,6 +364,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--protocol" -> protocol = args.getOrNull(++index)?.toIntOrNull() ?: fail("--protocol требует число")
             "--chunks" -> chunks = args.getOrNull(++index)?.toIntOrNull() ?: fail("--chunks требует число")
             "--blocks" -> blocks = args.getOrNull(++index) ?: fail("--blocks требует путь")
+            "--out" -> output = args.getOrNull(++index) ?: fail("--out требует путь")
             "--online" -> online = true
             "--verbose" -> verbose = true
             "--help", "-h" -> { printUsage(); return null }
@@ -330,7 +372,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
         }
         index++
     }
-    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online)
+    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output)
 }
 
 /**
@@ -436,6 +478,7 @@ private fun printUsage() {
           mcplus [host[:port]]                      список игроков (Server List Ping)
           mcplus join [host[:port]] [--name Имя]    войти на сервер (offline-mode)
           mcplus world [host[:port]] [--chunks N]   нарисовать карту мира текстом
+          mcplus view [host[:port]] [--chunks N]    нарисовать мир картинкой (PNG)
           mcplus login [--client-id ID]             войти через Microsoft
           mcplus logout                             забыть сохранённую учётную запись          mcplus ping [host[:port]] [--json]        то же, что и без команды
 

@@ -1,0 +1,88 @@
+package mcplus.net
+
+/** One 16x16x16 section; index = y * 256 + z * 16 + x. */
+class ChunkSection(val blocks: IntArray) {
+    init {
+        require(blocks.size == 4096) { "Секция должна содержать 4096 блоков" }
+    }
+}
+
+/**
+ * A chunk column: 24 sections for the overworld, bottom to top.
+ *
+ * Keeps every block state, not just the surface — the 3D view needs the whole volume.
+ */
+class ChunkColumn(val x: Int, val z: Int, val sections: List<ChunkSection>) {
+
+    /** Topmost non-air state of every column, indexed by `z * 16 + x`. */
+    val topStates: IntArray by lazy {
+        val tops = IntArray(256)
+        val filled = BooleanArray(256)
+        var remaining = 256
+        for (sectionIndex in sections.indices.reversed()) {
+            val blocks = sections[sectionIndex].blocks
+            for (index in 4095 downTo 0) {
+                val column = index and 0xFF
+                if (filled[column]) continue
+                val state = blocks[index]
+                if (state == AIR) continue
+                tops[column] = state
+                filled[column] = true
+                remaining--
+            }
+            if (remaining == 0) break
+        }
+        tops
+    }
+
+    fun stateAt(localX: Int, localZ: Int): Int = topStates[localZ * 16 + localX]
+
+    companion object {
+        const val AIR = 0
+        const val SECTION_BLOCKS = 4096
+    }
+}
+
+/**
+ * A set of loaded chunk columns with absolute block lookup.
+ *
+ * `blockAt` returns [UNKNOWN] outside the loaded area so a renderer can tell "nothing here"
+ * from "air here" — that difference decides whether a face on the border is drawn.
+ */
+class World(val minY: Int) {
+
+    private val chunks = HashMap<Long, ChunkColumn>()
+
+    val chunkCount: Int get() = chunks.size
+
+    fun add(column: ChunkColumn) {
+        chunks[key(column.x, column.z)] = column
+    }
+
+    fun column(chunkX: Int, chunkZ: Int): ChunkColumn? = chunks[key(chunkX, chunkZ)]
+
+    fun chunks(): Collection<ChunkColumn> = chunks.values
+
+    fun blockAt(x: Int, y: Int, z: Int): Int {
+        val column = chunks[key(x shr 4, z shr 4)] ?: return UNKNOWN
+        val sectionIndex = (y - minY) / 16
+        if (sectionIndex !in column.sections.indices) return ChunkColumn.AIR
+        val localY = (y - minY) % 16
+        if (localY < 0) return ChunkColumn.AIR
+        val index = (localY shl 8) or ((z and 15) shl 4) or (x and 15)
+        return column.sections[sectionIndex].blocks[index]
+    }
+
+    fun isLoaded(chunkX: Int, chunkZ: Int): Boolean = chunks.containsKey(key(chunkX, chunkZ))
+
+    companion object {
+        const val UNKNOWN = -1
+
+        fun key(chunkX: Int, chunkZ: Int): Long =
+            (chunkX.toLong() shl 32) or (chunkZ.toLong() and 0xFFFF_FFFFL)
+
+        fun chunkOfX(key: Long): Int = (key shr 32).toInt()
+
+        fun chunkOfZ(key: Long): Int = key.toInt()
+    }
+}

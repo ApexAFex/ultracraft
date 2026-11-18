@@ -1,14 +1,13 @@
 package mcplus.app
 
 import mcplus.net.BlockTable
-import mcplus.net.ChunkColumn
-import mcplus.net.WorldCollector
+import mcplus.net.World
 
 /** Renders the surface of a chunk grid as plain text: one character per block column. */
 object AsciiMap {
 
     fun render(
-        chunks: Map<Long, ChunkColumn>,
+        world: World,
         blocks: BlockTable,
         centerChunkX: Int,
         centerChunkZ: Int,
@@ -29,12 +28,12 @@ object AsciiMap {
             for (z in 0 until 16) {
                 builder.append("   ")
                 for (chunkX in 0 until sizeInChunks) {
-                    val chunk = chunks[WorldCollector.key(firstChunkX + chunkX, firstChunkZ + chunkZ)]
-                    if (chunk == null) {
+                    val column = world.column(firstChunkX + chunkX, firstChunkZ + chunkZ)
+                    if (column == null) {
                         repeat(16) { builder.append(' ') }
                     } else {
                         for (x in 0 until 16) {
-                            builder.append(charFor(blocks.nameOf(chunk.stateAt(x, z))))
+                            builder.append(charFor(blocks.nameOf(column.stateAt(x, z))))
                         }
                     }
                 }

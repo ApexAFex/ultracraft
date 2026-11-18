@@ -2,37 +2,27 @@ package mcplus.net
 
 import mcplus.net.proto.Protocol777
 
-/** Collects chunk columns from an open session, keyed by chunk coordinates. */
-class WorldCollector(
-    private val session: Session,
-    private val blocks: BlockTable,
-) {
+/** Collects chunks from an open session into a [World]. */
+class WorldCollector(private val session: Session) {
 
-    private val sectionCount: Int = run {
-        val join = session.joinResult
-        join.registries.dimensionType(join.joinGame.dimensionTypeId)?.sectionCount ?: 24
+    private val dimension = session.joinResult.joinGame.let { join ->
+        session.joinResult.registries.dimensionType(join.dimensionTypeId)
     }
 
-    fun collect(maxChunks: Int = 81, durationMs: Long = 4_000): Map<Long, ChunkColumn> {
-        val chunks = LinkedHashMap<Long, ChunkColumn>()
+    private val sectionCount: Int = dimension?.sectionCount ?: 24
+
+    val minY: Int = dimension?.minY ?: -64
+
+    fun collect(maxChunks: Int = 441, durationMs: Long = 6_000): World {
+        val world = World(minY)
         val deadline = System.currentTimeMillis() + durationMs
 
-        while (chunks.size < maxChunks && System.currentTimeMillis() < deadline) {
+        while (world.chunkCount < maxChunks && System.currentTimeMillis() < deadline) {
             val packet = session.receive()
             if (packet.id == Protocol777.Play.CHUNK_DATA) {
-                val column = readChunkColumn(packet.body, blocks, sectionCount)
-                chunks[key(column.x, column.z)] = column
+                world.add(readChunkColumn(packet.body, sectionCount))
             }
         }
-        return chunks
-    }
-
-    companion object {
-        fun key(chunkX: Int, chunkZ: Int): Long =
-            (chunkX.toLong() shl 32) or (chunkZ.toLong() and 0xFFFF_FFFFL)
-
-        fun chunkOfX(chunkKey: Long): Int = (chunkKey shr 32).toInt()
-
-        fun chunkOfZ(chunkKey: Long): Int = chunkKey.toInt()
+        return world
     }
 }

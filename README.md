@@ -14,8 +14,10 @@
 - **E2 — вход на сервер**: handshake → login → configuration → play, `Join Game` разобран.
 - **E3 — мир**: `Chunk Data` → палитровые секции → блоки → ASCII-карта местности.
 - **E4 — вход через Microsoft**: device-code вход, Xbox Live, Minecraft services, шифрование
-  соединения (AES/CFB8) и подтверждение сессии. Нужен client id приложения Azure —
+  соединения (AES/CFB8) и подтверждение сессии. Ждёт одобрения приложения Mojang —
   см. [docs/auth-setup.md](docs/auth-setup.md).
+- **E5 (частично) — картинка**: мир рендерится в PNG процессором (перспективная камера,
+  z-буфер, отсечение невидимых граней). Окно на GPU — следующий шаг.
 
 ```
 > .\gradlew.bat :app:run --args="world --chunks 4"
@@ -47,10 +49,11 @@
 Нужен **JDK 21** для сборки (проверено на Temurin 21.0.13). Gradle ставится сам через wrapper.
 
 ```
-.\gradlew.bat build                          # компиляция + 31 тест
+.\gradlew.bat build                          # компиляция + 36 тестов
 .\gradlew.bat :app:run --args="mc.hypixel.net"   # список игроков
 .\gradlew.bat :app:run --args="join"             # войти на сервер
 .\gradlew.bat :app:run --args="world --chunks 5" # карта мира текстом
+.\gradlew.bat :app:run --args="view --chunks 11" # мир картинкой в screenshots/world.png
 ```
 
 ## Локальный сервер (оракул протокола)
