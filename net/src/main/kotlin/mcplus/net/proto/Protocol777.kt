@@ -1,4 +1,4 @@
-package mcplus.net.proto
+﻿package mcplus.net.proto
 
 /**
  * Packet ids for Java Edition 26.3 (protocol 777).
@@ -61,6 +61,8 @@ object Protocol777 {
         const val CHUNK_BATCH_FINISHED: Int = 0x0B
         const val DISCONNECT: Int = 0x20
         const val CHUNK_DATA: Int = 0x2E
+        const val BLOCK_UPDATE: Int = 0x08
+        const val ACKNOWLEDGE_BLOCK_CHANGE: Int = 0x04
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32
         const val SYNCHRONIZE_POSITION: Int = 0x49
@@ -68,7 +70,10 @@ object Protocol777 {
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00
         const val CHUNK_BATCH_RECEIVED: Int = 0x0B
+        const val PLAYER_ACTION: Int = 0x29
+        const val USE_ITEM_ON: Int = 0x42
         const val KEEP_ALIVE_SERVERBOUND: Int = 0x1C
         const val CLIENT_INFORMATION: Int = 0x0E
     }
 }
+

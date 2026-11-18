@@ -4,9 +4,13 @@ import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
 import java.io.Closeable
 
-/** One shader program, one VAO/VBO, one draw call for the whole world. */
+/**
+ * Draws one mesh per chunk column, so editing a block rebuilds only that chunk.
+ *
+ * Also draws a wireframe box around the targeted block and samples the texture atlas.
+ */
 class Renderer(
-    private val mesh: VoxelMesh,
+    chunks: List<ChunkMesh>,
     private val textures: GlTextures,
     private val width: Int,
     private val height: Int,
@@ -16,17 +20,40 @@ class Renderer(
     private val viewProjLocation = GL30.glGetUniformLocation(program, "uViewProj")
     private val atlasLocation = GL30.glGetUniformLocation(program, "uAtlas")
 
-    private val vao = GL30.glGenVertexArrays()
-    private val vbo = GL30.glGenBuffers()
+    private val outlineProgram = createProgram(OUTLINE_VERTEX_SHADER, OUTLINE_FRAGMENT_SHADER)
+    private val outlineViewProjLocation = GL30.glGetUniformLocation(outlineProgram, "uViewProj")
+    private val outlineVao = GL30.glGenVertexArrays()
+    private val outlineVbo = GL30.glGenBuffers()
+    private val outlineData = FloatArray(24 * 3)
+
+    private class Part(val vao: Int, val vbo: Int) {
+        var count: Int = 0
+    }
+
+    private val parts = LinkedHashMap<Long, Part>()
 
     init {
-        GL30.glBindVertexArray(vao)
-        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, vbo)
+        for (chunk in chunks) {
+            val part = Part(GL30.glGenVertexArrays(), GL30.glGenBuffers())
+            parts[key(chunk.chunkX, chunk.chunkZ)] = part
+            configure(part)
+            upload(part, chunk)
+        }
 
-        val buffer = MemoryUtil.memAllocFloat(mesh.data.size)
-        buffer.put(mesh.data).flip()
-        GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_STATIC_DRAW)
-        MemoryUtil.memFree(buffer)
+        GL30.glBindVertexArray(outlineVao)
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, outlineVbo)
+        GL30.glBufferData(GL30.GL_ARRAY_BUFFER, 24L * 3 * Float.SIZE_BYTES, GL30.GL_DYNAMIC_DRAW)
+        GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, 0, 0L)
+        GL30.glEnableVertexAttribArray(0)
+        GL30.glBindVertexArray(0)
+
+        GL30.glEnable(GL30.GL_DEPTH_TEST)
+        GL30.glDisable(GL30.GL_CULL_FACE)
+    }
+
+    private fun configure(part: Part) {
+        GL30.glBindVertexArray(part.vao)
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, part.vbo)
 
         val stride = 7 * Float.SIZE_BYTES
         GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, stride, 0L)
@@ -38,32 +65,83 @@ class Renderer(
         GL30.glVertexAttribPointer(3, 2, GL30.GL_FLOAT, false, stride, 5L * Float.SIZE_BYTES)
         GL30.glEnableVertexAttribArray(3)
 
-        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, 0)
         GL30.glBindVertexArray(0)
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, 0)
+    }
 
-        GL30.glEnable(GL30.GL_DEPTH_TEST)
-        GL30.glDisable(GL30.GL_CULL_FACE)
+    /** Re-uploads one chunk after a block change. */
+    fun update(mesh: ChunkMesh) {
+        val part = parts[key(mesh.chunkX, mesh.chunkZ)] ?: return
+        upload(part, mesh)
+    }
+
+    private fun upload(part: Part, mesh: ChunkMesh) {
+        if (mesh.data.isEmpty()) {
+            part.count = 0
+            return
+        }
+        val buffer = MemoryUtil.memAllocFloat(mesh.data.size)
+        buffer.put(mesh.data).flip()
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, part.vbo)
+        GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_DYNAMIC_DRAW)
+        MemoryUtil.memFree(buffer)
+        part.count = mesh.vertexCount
     }
 
     fun draw(camera: Camera) {
         GL30.glUseProgram(program)
-
         textures.bind(0)
         GL30.glUniform1i(atlasLocation, 0)
+        GL30.glUniformMatrix4fv(viewProjLocation, false, camera.viewProjection(width.toFloat() / height.toFloat()))
 
-        val matrix = camera.viewProjection(width.toFloat() / height.toFloat())
-        GL30.glUniformMatrix4fv(viewProjLocation, false, matrix)
+        for (part in parts.values) {
+            if (part.count == 0) continue
+            GL30.glBindVertexArray(part.vao)
+            GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, part.count)
+        }
+        GL30.glBindVertexArray(0)
+        GL30.glUseProgram(0)
+    }
 
-        GL30.glBindVertexArray(vao)
-        GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, mesh.vertexCount)
+    /** Wireframe cube around the targeted block. */
+    fun drawOutline(camera: Camera, blockX: Int, blockY: Int, blockZ: Int) {
+        var offset = 0
+        for ((start, end) in EDGES) {
+            outlineData[offset++] = blockX + start[0]
+            outlineData[offset++] = blockY + start[1]
+            outlineData[offset++] = blockZ + start[2]
+            outlineData[offset++] = blockX + end[0]
+            outlineData[offset++] = blockY + end[1]
+            outlineData[offset++] = blockZ + end[2]
+        }
+
+        val buffer = MemoryUtil.memAllocFloat(outlineData.size)
+        buffer.put(outlineData).flip()
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, outlineVbo)
+        GL30.glBufferSubData(GL30.GL_ARRAY_BUFFER, 0, buffer)
+        MemoryUtil.memFree(buffer)
+
+        GL30.glUseProgram(outlineProgram)
+        GL30.glUniformMatrix4fv(
+            outlineViewProjLocation,
+            false,
+            camera.viewProjection(width.toFloat() / height.toFloat()),
+        )
+        GL30.glBindVertexArray(outlineVao)
+        GL30.glDrawArrays(GL30.GL_LINES, 0, 24)
         GL30.glBindVertexArray(0)
         GL30.glUseProgram(0)
     }
 
     override fun close() {
-        GL30.glDeleteBuffers(vbo)
-        GL30.glDeleteVertexArrays(vao)
+        for (part in parts.values) {
+            GL30.glDeleteBuffers(part.vbo)
+            GL30.glDeleteVertexArrays(part.vao)
+        }
+        GL30.glDeleteBuffers(outlineVbo)
+        GL30.glDeleteVertexArrays(outlineVao)
         GL30.glDeleteProgram(program)
+        GL30.glDeleteProgram(outlineProgram)
     }
 
     private fun createProgram(vertexSource: String, fragmentSource: String): Int {
@@ -94,6 +172,20 @@ class Renderer(
     }
 
     private companion object {
+        fun key(chunkX: Int, chunkZ: Int): Long =
+            (chunkX.toLong() shl 32) or (chunkZ.toLong() and 0xFFFF_FFFFL)
+
+        val EDGES: List<Pair<FloatArray, FloatArray>> = run {
+            val corners = listOf(
+                floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 0f, 0f),
+                floatArrayOf(1f, 1f, 0f), floatArrayOf(0f, 1f, 0f),
+                floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 0f, 1f),
+                floatArrayOf(1f, 1f, 1f), floatArrayOf(0f, 1f, 1f),
+            )
+            val pairs = listOf(0 to 1, 1 to 2, 2 to 3, 3 to 0, 4 to 5, 5 to 6, 6 to 7, 7 to 4, 0 to 4, 1 to 5, 2 to 6, 3 to 7)
+            pairs.map { (a, b) -> corners[a] to corners[b] }
+        }
+
         const val VERTEX_SHADER = """
             #version 330 core
             layout(location = 0) in vec3 aPos;
@@ -120,6 +212,23 @@ class Renderer(
                 vec4 texel = texture(uAtlas, vUv);
                 if (texel.a < 0.5) discard;
                 FragColor = vec4(texel.rgb * vShade, 1.0);
+            }
+        """
+
+        const val OUTLINE_VERTEX_SHADER = """
+            #version 330 core
+            layout(location = 0) in vec3 aPos;
+            uniform mat4 uViewProj;
+            void main() {
+                gl_Position = uViewProj * vec4(aPos, 1.0);
+            }
+        """
+
+        const val OUTLINE_FRAGMENT_SHADER = """
+            #version 330 core
+            out vec4 FragColor;
+            void main() {
+                FragColor = vec4(0.0, 0.0, 0.0, 1.0);
             }
         """
     }

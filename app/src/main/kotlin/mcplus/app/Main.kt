@@ -365,6 +365,8 @@ private fun windowCommand(args: List<String>) {
             captureTo = options.output?.let { java.io.File(it) },
             hidden = options.hidden,
             minecraftDirectory = options.minecraft?.let { java.io.File(it) },
+            session = it,
+            demo = options.demo,
         )
     }
 }
@@ -383,6 +385,7 @@ private class LoginOptions(
     val frames: Int,
     val hidden: Boolean,
     val minecraft: String?,
+    val demo: Boolean,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -397,6 +400,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var frames = 0
     var hidden = false
     var minecraft: String? = null
+    var demo = false
 
     var index = 0
     while (index < args.size) {
@@ -409,6 +413,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--frames" -> frames = args.getOrNull(++index)?.toIntOrNull() ?: fail("--frames требует число")
             "--hidden" -> hidden = true
             "--minecraft" -> minecraft = args.getOrNull(++index) ?: fail("--minecraft требует путь")
+            "--demo" -> demo = true
             "--online" -> online = true
             "--verbose" -> verbose = true
             "--help", "-h" -> { printUsage(); return null }
@@ -416,7 +421,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
         }
         index++
     }
-    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output, frames, hidden, minecraft)
+    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online, output, frames, hidden, minecraft, demo)
 }
 
 /**
@@ -549,5 +554,7 @@ private fun fail(message: String): Nothing {
     System.err.println(message)
     exitProcess(1)
 }
+
+
 
 

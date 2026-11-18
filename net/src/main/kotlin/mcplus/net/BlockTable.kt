@@ -1,4 +1,4 @@
-package mcplus.net
+﻿package mcplus.net
 
 import java.io.File
 
@@ -18,6 +18,12 @@ class BlockTable private constructor(
     fun isAir(stateId: Int): Boolean = stateId in air.indices && air[stateId]
 
     val stateCount: Int get() = names.count { it.isNotEmpty() }
+
+    /** State id of the first state of a block, or null when the block is unknown. */
+    fun firstStateOf(blockName: String): Int? {
+        for (index in names.indices) if (names[index] == blockName) return index
+        return null
+    }
 
     /** Distinct block names in this table. */
     fun allNames(): List<String> = names.filter { it.isNotEmpty() }.distinct()
@@ -51,3 +57,4 @@ class BlockTable private constructor(
         }
     }
 }
+

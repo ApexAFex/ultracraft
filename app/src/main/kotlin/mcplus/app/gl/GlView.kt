@@ -1,6 +1,8 @@
 ﻿package mcplus.app.gl
 
+import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
+import mcplus.net.Session
 import mcplus.net.World
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
@@ -11,10 +13,7 @@ import java.nio.ByteBuffer
 import javax.imageio.ImageIO
 
 /**
- * GPU view of the parsed world: a GLFW window and an OpenGL 3.3 core renderer.
- *
- * Textures come from the player's own game installation; the mesh is uploaded once and drawn
- * with a single shader, a free-fly camera keeps it interactive.
+ * The playable client: GLFW window, OpenGL 3.3 renderer, player physics and block editing.
  */
 object GlView {
 
@@ -30,6 +29,9 @@ object GlView {
         height: Int = 720,
         hidden: Boolean = false,
         minecraftDirectory: File? = null,
+        session: Session? = null,
+        placeBlockName: String = "stone",
+        demo: Boolean = false,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -52,20 +54,25 @@ object GlView {
             println("Видеокарта ${GL30.glGetString(GL30.GL_RENDERER)}")
 
             val directory = minecraftDirectory ?: TextureAtlas.findMinecraftDirectory()
-            println("Minecraft: ${directory?.path ?: "не найден"} (версий: ${directory?.let { File(it, "versions").listFiles()?.count { f -> f.isDirectory } } ?: 0})")
-            val atlas = directory?.let { TextureAtlas.load(it) }
-                ?: TextureAtlas.colored(blocks.allNames())
+            val atlas = directory?.let { TextureAtlas.load(it) } ?: TextureAtlas.colored(blocks.allNames())
             println("Текстуры: ${atlas.size} слоёв, источник: ${atlas.source}")
-            if (directory == null) {
-                println("  установка Minecraft не найдена; APPDATA=${System.getenv("APPDATA")}")
-            }
 
-            val mesh = VoxelMeshBuilder.build(world, blocks, atlas, centerChunkX, centerChunkZ, radiusChunks)
-            println("Граней: ${mesh.quadCount}, вершин: ${mesh.vertexCount}")
+            val meshes = ArrayList<ChunkMesh>()
+            for (chunkX in centerChunkX - radiusChunks..centerChunkX + radiusChunks) {
+                for (chunkZ in centerChunkZ - radiusChunks..centerChunkZ + radiusChunks) {
+                    meshes += MeshBuilder.build(world, blocks, atlas, chunkX, chunkZ)
+                }
+            }
+            println("Чанков в меше: ${meshes.size}, граней: ${meshes.sumOf { it.quadCount }}")
+
+            val placeState = blocks.firstStateOf(placeBlockName) ?: 1
+            var sequence = 0
+            var leftWasDown = false
+            var rightWasDown = false
 
             GlTextures(atlas).use { textures ->
-                Renderer(mesh, textures, width, height).use { renderer ->
-                    val camera = mesh.defaultCamera()
+                Renderer(meshes, textures, width, height).use { renderer ->
+                    val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     val input = Input(window, camera)
 
                     val spawnX = centerChunkX * 16 + 8
@@ -75,8 +82,38 @@ object GlView {
                     camera.x = player.x
                     camera.y = player.eyeY
                     camera.z = player.z
-                    println("Спавн: ${"%.1f".format(player.x)}, ${"%.1f".format(player.y)}, ${"%.1f".format(player.z)}")
-                    println("WASD — идти, пробел — прыжок, F — полёт, Esc — выход")
+
+                    println("Спавн: %.1f, %.1f, %.1f".format(player.x, player.y, player.z))
+                    println("WASD — идти, пробел — прыжок, F — полёт, ЛКМ — сломать, ПКМ — поставить, Esc — выход")
+
+                    fun demoBreak(hit: Raycast.Hit) {
+                        world.setBlock(hit.x, hit.y, hit.z, 0)
+                        renderer.update(MeshBuilder.build(world, blocks, atlas, hit.x shr 4, hit.z shr 4))
+                        session?.send(
+                            BlockInteraction.playerAction(
+                                BlockInteraction.STOP_DESTROY_BLOCK,
+                                hit.x, hit.y, hit.z, hit.face, sequence++,
+                            ),
+                        )
+                        println("Сломан блок: ${hit.x}, ${hit.y}, ${hit.z}")
+                    }
+
+                    fun demoPlace(hit: Raycast.Hit) {
+                        val (offsetX, offsetY, offsetZ) = Raycast.offset(hit.face)
+                        val nextX = hit.x + offsetX
+                        val nextY = hit.y + offsetY
+                        val nextZ = hit.z + offsetZ
+                        if (world.blockAt(nextX, nextY, nextZ) != 0) return
+                        world.setBlock(nextX, nextY, nextZ, placeState)
+                        renderer.update(MeshBuilder.build(world, blocks, atlas, nextX shr 4, nextZ shr 4))
+                        session?.send(
+                            BlockInteraction.useItemOn(
+                                hit.x, hit.y, hit.z, hit.face,
+                                hit.cursorX, hit.cursorY, hit.cursorZ, sequence++,
+                            ),
+                        )
+                        println("Поставлен блок: $nextX, $nextY, $nextZ")
+                    }
 
                     var frame = 0
                     while (!GLFW.glfwWindowShouldClose(window)) {
@@ -93,11 +130,30 @@ object GlView {
                         camera.y = player.eyeY
                         camera.z = player.z
 
+                        val forward = camera.forward()
+                        val target = Raycast.cast(
+                            world, blocks,
+                            camera.x, camera.y, camera.z,
+                            forward[0].toDouble(), forward[1].toDouble(), forward[2].toDouble(),
+                        )
+
                         GL30.glViewport(0, 0, width, height)
                         GL30.glClearColor(0.56f, 0.75f, 0.91f, 1f)
                         GL30.glClear(GL30.GL_COLOR_BUFFER_BIT or GL30.GL_DEPTH_BUFFER_BIT)
 
                         renderer.draw(camera)
+                        if (target != null) renderer.drawOutline(camera, target.x, target.y, target.z)
+
+                        val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
+                        val rightDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS
+
+                        if (leftDown && !leftWasDown && target != null) demoBreak(target)
+                        if (rightDown && !rightWasDown && target != null) demoPlace(target)
+                        if (demo && frame == 5 && target != null) demoBreak(target)
+                        if (demo && frame == 15 && target != null) demoPlace(target)
+
+                        leftWasDown = leftDown
+                        rightWasDown = rightDown
 
                         if (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames) {
                             GL30.glFinish()
@@ -115,6 +171,19 @@ object GlView {
             GLFW.glfwDestroyWindow(window)
             GLFW.glfwTerminate()
         }
+    }
+
+    /** Starting orientation; the position is replaced by the player spawn right away. */
+    private fun defaultCamera(world: World, centerChunkX: Int, centerChunkZ: Int): Camera {
+        val centerX = centerChunkX * 16 + 8.0
+        val centerZ = centerChunkZ * 16 + 8.0
+        return Camera(
+            x = centerX + 45.0,
+            y = world.minY + 80.0,
+            z = centerZ + 45.0,
+            yaw = Math.toRadians(225.0).toFloat(),
+            pitch = Math.toRadians(-25.0).toFloat(),
+        )
     }
 
     private fun savePng(file: File, width: Int, height: Int) {
@@ -136,9 +205,4 @@ object GlView {
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
-
-
-
-
-
 

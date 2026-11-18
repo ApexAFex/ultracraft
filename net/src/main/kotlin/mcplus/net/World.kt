@@ -1,4 +1,4 @@
-package mcplus.net
+﻿package mcplus.net
 
 /** One 16x16x16 section; index = y * 256 + z * 16 + x. */
 class ChunkSection(val blocks: IntArray) {
@@ -75,6 +75,18 @@ class World(val minY: Int) {
 
     fun isLoaded(chunkX: Int, chunkZ: Int): Boolean = chunks.containsKey(key(chunkX, chunkZ))
 
+    /** Applies a block change coming from the player or from a Block Update packet. */
+    fun setBlock(x: Int, y: Int, z: Int, state: Int): Boolean {
+        val column = chunks[key(x shr 4, z shr 4)] ?: return false
+        val sectionIndex = (y - minY) / 16
+        if (sectionIndex !in column.sections.indices) return false
+        val localY = (y - minY) % 16
+        if (localY < 0) return false
+        val index = (localY shl 8) or ((z and 15) shl 4) or (x and 15)
+        column.sections[sectionIndex].blocks[index] = state
+        return true
+    }
+
     companion object {
         const val UNKNOWN = -1
 
@@ -86,3 +98,4 @@ class World(val minY: Int) {
         fun chunkOfZ(key: Long): Int = key.toInt()
     }
 }
+
