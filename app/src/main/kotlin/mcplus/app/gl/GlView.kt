@@ -2,6 +2,7 @@
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
+import mcplus.net.EntityTracker
 import mcplus.net.Session
 import mcplus.net.World
 import org.lwjgl.glfw.GLFW
@@ -65,6 +66,9 @@ object GlView {
             }
             println("Чанков в меше: ${meshes.size}, граней: ${meshes.sumOf { it.quadCount }}")
 
+            val tracker = EntityTracker()
+            session?.startReading { packet -> tracker.onPacket(packet) }
+
             val placeState = blocks.firstStateOf(placeBlockName) ?: 1
             var sequence = 0
             var leftWasDown = false
@@ -72,6 +76,7 @@ object GlView {
 
             GlTextures(atlas).use { textures ->
                 Renderer(meshes, textures, width, height).use { renderer ->
+                    val entityRenderer = EntityRenderer(width, height)
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     val input = Input(window, camera)
 
@@ -115,6 +120,7 @@ object GlView {
                         println("Поставлен блок: $nextX, $nextY, $nextZ")
                     }
 
+                    var lastEntityCount = -1
                     var frame = 0
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
@@ -142,6 +148,18 @@ object GlView {
                         GL30.glClear(GL30.GL_COLOR_BUFFER_BIT or GL30.GL_DEPTH_BUFFER_BIT)
 
                         renderer.draw(camera)
+                        val entities = tracker.snapshot()
+                        if (entities.size != lastEntityCount) {
+                            val nearest = entities.minByOrNull {
+                                val dx = it.x - player.x; val dy = it.y - player.y; val dz = it.z - player.z
+                                dx * dx + dy * dy + dz * dz
+                            }
+                            println("Сущностей: ${entities.size}, ближайшая: " + (nearest?.let {
+                                "id=${it.id} type=${it.type} (%.1f, %.1f, %.1f)".format(it.x, it.y, it.z)
+                            } ?: "нет"))
+                            lastEntityCount = entities.size
+                        }
+                        entityRenderer.draw(camera, entities)
                         if (target != null) renderer.drawOutline(camera, target.x, target.y, target.z)
 
                         val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
@@ -150,6 +168,21 @@ object GlView {
                         if (leftDown && !leftWasDown && target != null) demoBreak(target)
                         if (rightDown && !rightWasDown && target != null) demoPlace(target)
                         if (demo && frame == 5 && target != null) demoBreak(target)
+                        if (demo && frame == 6) {
+                            // Aim at the nearest entity so the screenshot shows it.
+                            val nearest = tracker.snapshot().minByOrNull { entity ->
+                                val dx = entity.x - camera.x; val dy = entity.y + 0.9 - camera.y; val dz = entity.z - camera.z
+                                dx * dx + dy * dy + dz * dz
+                            }
+                            if (nearest != null) {
+                                val dx = nearest.x - camera.x
+                                val dy = nearest.y + 0.9 - camera.y
+                                val dz = nearest.z - camera.z
+                                camera.yaw = kotlin.math.atan2(dx, dz).toFloat()
+                                camera.pitch = kotlin.math.atan2(dy, kotlin.math.sqrt(dx * dx + dz * dz)).toFloat()
+                                println("Камера на сущность id=${nearest.id}")
+                            }
+                        }
                         if (demo && frame == 15 && target != null) demoPlace(target)
 
                         leftWasDown = leftDown
@@ -165,6 +198,7 @@ object GlView {
                         GLFW.glfwPollEvents()
                         frame++
                     }
+                    entityRenderer.close()
                 }
             }
         } finally {
@@ -205,4 +239,9 @@ object GlView {
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
+
+
+
+
+
 

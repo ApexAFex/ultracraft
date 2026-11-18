@@ -60,6 +60,8 @@ object Protocol777 {
         // clientbound
         const val CHUNK_BATCH_FINISHED: Int = 0x0B
         const val DISCONNECT: Int = 0x20
+        const val SPAWN_ENTITY: Int = 0x01
+        const val REMOVE_ENTITIES: Int = 0x4E
         const val CHUNK_DATA: Int = 0x2E
         const val BLOCK_UPDATE: Int = 0x08
         const val ACKNOWLEDGE_BLOCK_CHANGE: Int = 0x04
@@ -76,4 +78,5 @@ object Protocol777 {
         const val CLIENT_INFORMATION: Int = 0x0E
     }
 }
+
 

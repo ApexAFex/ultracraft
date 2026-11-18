@@ -1,4 +1,4 @@
-package mcplus.net
+﻿package mcplus.net
 
 import mcplus.net.proto.Protocol777
 import mcplus.protocol.ByteReader
@@ -53,6 +53,26 @@ class Session internal constructor(
 
     fun send(packet: Packet) = connection.send(packet)
 
+    /**
+     * Reads packets on a daemon thread and hands them to [handler].
+     *
+     * The render loop must not block on the socket, otherwise the client freezes whenever
+     * the server is quiet.
+     */
+    fun startReading(handler: (Packet) -> Unit): Thread {
+        val thread = Thread {
+            try {
+                while (true) handler(receive())
+            } catch (_: Throwable) {
+                // Connection closed or the server disconnected us: nothing left to read.
+            }
+        }
+        thread.isDaemon = true
+        thread.name = "mcplus-reader"
+        thread.start()
+        return thread
+    }
+
     override fun close() = connection.close()
 
     private fun confirmTeleport(packet: Packet) {
@@ -86,3 +106,4 @@ class Session internal constructor(
         const val CHUNKS_PER_TICK = 64f
     }
 }
+
