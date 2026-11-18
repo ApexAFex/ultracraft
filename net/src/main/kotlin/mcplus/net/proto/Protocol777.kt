@@ -75,6 +75,8 @@ object Protocol777 {
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32
         const val ABILITIES: Int = 0x41
+        const val PLAYER_REMOVE: Int = 0x46
+        const val PLAYER_INFO: Int = 0x47
         const val SYNCHRONIZE_POSITION: Int = 0x49
 
         // serverbound

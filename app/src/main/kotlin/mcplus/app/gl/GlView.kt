@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -30,14 +30,23 @@ object GlView {
     private const val MAX_TICKS_PER_FRAME = 5
 
     /** Demo mode walks forward between these frame numbers, so movement lands in the log. */
-    private const val DEMO_WALK_FROM = 30
-    private const val DEMO_WALK_TO = 230
+    private const val DEMO_WALK_FROM = 40
+    private const val DEMO_WALK_TO = 280
+
+    /**
+     * Demo mode looks at the closest player here. Not at the very first frames: entities stream
+     * in after the window opens, and at frame five nobody is known yet.
+     */
+    private const val DEMO_AIM_AT = 20
 
     /** Demo mode asks for flight at this frame: a survival server must refuse, not kick. */
     private const val DEMO_FLY_ATTEMPT = 40
 
     /** Ticks between pressing and releasing the mouse on a block (vanilla sends them apart). */
     private const val BREAK_HOLD_TICKS = 2L
+
+    /** Nicknames further away than this are not drawn — they would be unreadable dots. */
+    private const val NAMETAG_RANGE = 64.0
 
     fun run(
         world: World,
@@ -99,6 +108,8 @@ object GlView {
             println("Меши в очереди: $requested, потоков: ${pipeline.workerCount}")
 
             val tracker = EntityTracker()
+            // Names come from the session: the tab list arrives during the initial chunk wait.
+            val playerList = session?.players ?: mcplus.net.PlayerList()
             val sectionCount = session?.joinResult?.let { join ->
                 join.registries.dimensionType(join.joinGame.dimensionTypeId)?.sectionCount
             } ?: 24
@@ -125,6 +136,8 @@ object GlView {
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
             session?.startReading { packet ->
+                // The tab list is the only source of other players' names, so it goes first.
+                if (playerList.onPacket(packet.id, packet.body)) return@startReading
                 if (tracker.onPacket(packet)) return@startReading
                 if (packet.id == Protocol777.Play.BLOCK_UPDATE) {
                     blockUpdates.incrementAndGet()
@@ -163,6 +176,9 @@ object GlView {
             GlTextures(atlas).use { textures ->
                 Renderer(textures, width, height).use { renderer ->
                     val entityRenderer = EntityRenderer(width, height)
+                    val font = Font.load(directory)
+                    val textRenderer = font?.let { TextRenderer(it, width, height) }
+                    if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     val input = Input(window, camera)
 
@@ -389,6 +405,31 @@ object GlView {
                             lastEntityCount = entities.size
                         }
                         entityRenderer.draw(camera, entities)
+                        // Only players are in the tab list, so only they get a nametag.
+                        val labels = entities.mapNotNull { entity ->
+                            val name = playerList.nameOf(entity.uuid) ?: return@mapNotNull null
+                            val dx = entity.x - camera.x
+                            val dy = entity.y - camera.y
+                            val dz = entity.z - camera.z
+                            if (dx * dx + dy * dy + dz * dz > NAMETAG_RANGE * NAMETAG_RANGE) {
+                                null
+                            } else {
+                                TextRenderer.Label(entity.x, entity.y + 2.0, entity.z, name)
+                            }
+                        }.toMutableList()
+
+                        if (demo) {
+                            // The self-test needs a tag it can read: the nearest player is usually
+                            // many blocks away, where 0.025-block glyphs are a few pixels tall.
+                            val forward = camera.forward()
+                            labels += TextRenderer.Label(
+                                camera.x + forward[0] * 3.0,
+                                camera.y + forward[1] * 3.0,
+                                camera.z + forward[2] * 3.0,
+                                "mcplus demo",
+                            )
+                        }
+                        textRenderer?.draw(camera, labels)
                         if (target != null) renderer.drawOutline(camera, target.x, target.y, target.z)
 
                         val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
@@ -397,9 +438,11 @@ object GlView {
                         if (leftDown && !leftWasDown && target != null) startBreak(target)
                         if (rightDown && !rightWasDown && target != null) demoPlace(target)
                         if (demo && frame == 5 && target != null) startBreak(target)
-                        if (demo && frame == 6) {
-                            // Aim at the nearest entity so the screenshot shows it.
-                            val nearest = tracker.snapshot().minByOrNull { entity ->
+                        if (demo && frame == DEMO_AIM_AT) {
+                            // Aim at the closest **player** first: nicknames and player models are
+                            // what a screenshot needs to check, and a passing mob would hide them.
+                            val players = tracker.snapshot().filter { playerList.nameOf(it.uuid) != null }
+                            val nearest = (players.ifEmpty { tracker.snapshot() }).minByOrNull { entity ->
                                 val dx = entity.x - camera.x; val dy = entity.y + 0.9 - camera.y; val dz = entity.z - camera.z
                                 dx * dx + dy * dy + dz * dz
                             }
@@ -409,7 +452,26 @@ object GlView {
                                 val dz = nearest.z - camera.z
                                 camera.yaw = kotlin.math.atan2(dx, dz).toFloat()
                                 camera.pitch = kotlin.math.atan2(dy, kotlin.math.sqrt(dx * dx + dz * dz)).toFloat()
-                                println("Камера на сущность id=${nearest.id}")
+                                val name = playerList.nameOf(nearest.uuid)
+                                println("Камера на ${if (name != null) "игрока $name" else "сущность"} id=${nearest.id}")
+                            }
+                        }
+
+                        // While the demo walks, keep the other player in the centre of the frame:
+                        // that is the only way to photograph a nametag without a human at the wheel.
+                        if (demo && demoWalking) {
+                            val other = tracker.snapshot()
+                                .filter { playerList.nameOf(it.uuid) != null }
+                                .minByOrNull { entity ->
+                                    val dx = entity.x - camera.x; val dz = entity.z - camera.z
+                                    dx * dx + dz * dz
+                                }
+                            if (other != null) {
+                                val dx = other.x - camera.x
+                                val dy = other.y + 1.0 - camera.y
+                                val dz = other.z - camera.z
+                                camera.yaw = kotlin.math.atan2(dx, dz).toFloat()
+                                camera.pitch = kotlin.math.atan2(dy, kotlin.math.sqrt(dx * dx + dz * dz)).toFloat()
                             }
                         }
                         if (demo && frame == 15 && target != null) demoPlace(target)
@@ -428,9 +490,11 @@ object GlView {
                         frame++
                     }
                     entityRenderer.close()
+                    textRenderer?.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
                     println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, чанков не разобрано ${chunkFailures.get()}")
+                    println("Игроков в списке: ${playerList.size}")
                 }
             }
         } finally {

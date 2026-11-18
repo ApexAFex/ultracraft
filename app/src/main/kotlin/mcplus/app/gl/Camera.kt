@@ -19,6 +19,30 @@ class Camera(
         return floatArrayOf(sin(yaw) * cp, sin(pitch), cos(yaw) * cp)
     }
 
+    /**
+     * Screen-right in world coordinates, for billboards.
+     *
+     * This is the `s` axis of `Mat4.lookAt`: a plane built from it and [up] faces the camera,
+     * so text reads left to right and its glyphs are not mirrored.
+     */
+    fun right(): FloatArray {
+        val f = forward()
+        val length = sqrt(f[0] * f[0] + f[2] * f[2])
+        val safe = if (length > 1e-6f) length else 1f
+        return floatArrayOf(-f[2] / safe, 0f, f[0] / safe)
+    }
+
+    /** Screen-up in world coordinates, perpendicular to forward and [right]. */
+    fun up(): FloatArray {
+        val f = forward()
+        val r = right()
+        return floatArrayOf(
+            r[1] * f[2] - r[2] * f[1],
+            r[2] * f[0] - r[0] * f[2],
+            r[0] * f[1] - r[1] * f[0],
+        )
+    }
+
     fun move(forwardAmount: Double, rightAmount: Double, upAmount: Double) {
         val f = forward()
         val rightX = f[2]

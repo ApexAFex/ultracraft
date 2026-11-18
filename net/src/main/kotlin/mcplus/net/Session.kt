@@ -35,6 +35,15 @@ class Session internal constructor(
     var abilities: PlayerAbilities? = null
         private set
 
+    /**
+     * Names from the tab list.
+     *
+     * Lives here, not in the renderer: the server sends the list **once**, right after the
+     * join, and commands read packets directly during that phase — a name learned there must
+     * not be thrown away.
+     */
+    val players: PlayerList = PlayerList()
+
     /** Why the connection ended, or null while it is alive. */
     @Volatile
     var closeReason: String? = null
@@ -82,6 +91,9 @@ class Session internal constructor(
                 Protocol777.Play.ABILITIES ->
                     runCatching { PlayerAbilities.parse(packet.body) }
                         .onSuccess { abilities = it }
+
+                Protocol777.Play.PLAYER_INFO, Protocol777.Play.PLAYER_REMOVE ->
+                    players.onPacket(packet.id, packet.body)
 
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 
