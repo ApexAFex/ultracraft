@@ -10,3 +10,4 @@ tools/server/
 tools/wiki/
 data/
 registry-dump/
+.mcplus/

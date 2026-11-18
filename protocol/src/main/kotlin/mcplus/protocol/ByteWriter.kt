@@ -94,6 +94,9 @@ class ByteWriter(initialCapacity: Int = 256) {
     fun writeUuid(uuid: UUID): ByteWriter =
         writeLong(uuid.mostSignificantBits).writeLong(uuid.leastSignificantBits)
 
+    /** Length-prefixed byte array ("Prefixed Array of Byte" in the protocol docs). */
+    fun writeByteArray(bytes: ByteArray): ByteWriter = writeVarInt(bytes.size).writeBytes(bytes)
+
     /** 1.14+ block position: x(26) | z(26) | y(12), x in the high bits. */
     fun writePosition(x: Int, y: Int, z: Int): ByteWriter {
         val packed = ((x.toLong() and 0x3FFFFFF) shl 38) or

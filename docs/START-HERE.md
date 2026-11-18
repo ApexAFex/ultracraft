@@ -11,7 +11,8 @@
 - ✅ **E1** — Server List Ping против живого сервера.
 - ✅ **E2** — вход: login → configuration → `Join Game` разобран, сервер пишет «joined the game».
 - ✅ **E3** — мир: чанки, палитровые секции, таблица блоков, ASCII-карта местности.
-- ⬜ **E4** — вход через Microsoft (online-mode серверы).
+- 🟡 **E4** — вход через Microsoft: код готов (device code, Xbox Live, шифрование),
+  для живого входа нужен client id приложения Azure.
 - ⬜ **E5** — окно и рендер.
 
 ---

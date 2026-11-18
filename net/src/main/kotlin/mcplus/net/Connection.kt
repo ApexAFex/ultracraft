@@ -10,24 +10,57 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.EOFException
 import java.net.Socket
+import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.CipherOutputStream
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * A single Minecraft TCP connection.
  *
- * Owns framing and (later) compression/encryption; knows nothing about game state.
- * Not thread safe: one reader and one writer thread must be coordinated by the caller.
+ * Owns framing, compression and the optional AES/CFB8 encryption that starts after the
+ * login handshake. Knows nothing about game state.
  */
 class Connection(private val socket: Socket) : Closeable {
 
-    private val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
-    private val output = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
+    private val rawInput = BufferedInputStream(socket.getInputStream())
+    private val rawOutput = BufferedOutputStream(socket.getOutputStream())
+
+    private var input = DataInputStream(rawInput)
+    private var output = DataOutputStream(rawOutput)
 
     /** -1 until the server sends Set Compression. */
     var compressionThreshold: Int = FrameCodec.NO_COMPRESSION
         private set
 
+    var encrypted: Boolean = false
+        private set
+
     fun enableCompression(threshold: Int) {
         compressionThreshold = threshold
+    }
+
+    /**
+     * Switches the stream to AES/CFB8 with key = IV = the shared secret.
+     *
+     * Everything sent after the Encryption Response — length field included — is encrypted,
+     * and both ciphers keep running state across packets.
+     */
+    fun enableEncryption(sharedSecret: ByteArray) {
+        val keySpec = SecretKeySpec(sharedSecret, "AES")
+        val ivSpec = IvParameterSpec(sharedSecret)
+
+        val encryptCipher = Cipher.getInstance("AES/CFB8/NoPadding").apply {
+            init(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
+        }
+        val decryptCipher = Cipher.getInstance("AES/CFB8/NoPadding").apply {
+            init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+        }
+
+        input = DataInputStream(CipherInputStream(rawInput, decryptCipher))
+        output = DataOutputStream(CipherOutputStream(rawOutput, encryptCipher))
+        encrypted = true
     }
 
     fun send(packet: Packet) {

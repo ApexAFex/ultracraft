@@ -1,9 +1,15 @@
 package mcplus.app
 
+import mcplus.auth.Account
+import mcplus.auth.AccountStore
+import mcplus.auth.AuthException
+import mcplus.auth.AuthManager
+import mcplus.auth.MinecraftSession
 import mcplus.net.BlockTable
 import mcplus.net.EncryptionRequiredException
 import mcplus.net.JoinResult
 import mcplus.net.MinecraftClient
+import mcplus.net.ServerAuthenticator
 import mcplus.net.ServerDisconnectException
 import mcplus.net.ServerStatus
 import mcplus.net.Session
@@ -20,6 +26,8 @@ fun main(args: Array<String>) {
         args[0] == "join" -> joinCommand(args.drop(1))
         args[0] == "world" -> worldCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
+        args[0] == "login" -> loginCommand(args.drop(1))
+        args[0] == "logout" -> logoutCommand(args.drop(1))
         args[0] == "ping" -> pingCommand(args.drop(1))
         args[0] == "--help" || args[0] == "-h" || args[0] == "help" -> printUsage()
         else -> pingCommand(args.toList())
@@ -189,6 +197,88 @@ private fun chunkDumpCommand(args: List<String>) {
     }
 }
 
+// ---------------------------------------------------------------- login
+
+private fun loginCommand(args: List<String>) {
+    var clientId: String? = null
+    var storePath: String? = null
+
+    var index = 0
+    while (index < args.size) {
+        when (val arg = args[index]) {
+            "--client-id" -> clientId = args.getOrNull(++index) ?: fail("--client-id требует значение")
+            "--store" -> storePath = args.getOrNull(++index) ?: fail("--store требует путь")
+            "--help", "-h" -> { printUsage(); return }
+            else -> fail("Лишний аргумент: $arg")
+        }
+        index++
+    }
+
+    val id = clientId ?: System.getenv("MCPLUS_CLIENT_ID") ?: fail(
+        "Нужен client id приложения Azure.\n" +
+            "Как получить — docs/auth-setup.md, затем задай MCPLUS_CLIENT_ID или флаг --client-id.",
+    )
+
+    val store = AccountStore(resolveStoreFile(storePath))
+    val auth = AuthManager(id, store, log = { line -> println("  $line") })
+
+    val account = try {
+        auth.silentLogin() ?: auth.loginWithDeviceCode()
+    } catch (e: AuthException) {
+        fail(e.message ?: "Не удалось войти через Microsoft")
+    }
+
+    printAccount(account, store)
+}
+
+private fun printAccount(account: Account, store: AccountStore) {
+    val expires = java.time.Instant.ofEpochSecond(account.accessTokenExpiresAt)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+    printRows(
+        listOf(
+            "Профиль" to "${account.name} (${account.uuid})",
+            "Java Edition" to if (account.ownsMinecraft) "есть" else "НЕ найдена",
+            "Токен" to "действует до $expires",
+            "Файл" to store.path,
+        ),
+    )
+}
+
+private fun logoutCommand(args: List<String>) {
+    var storePath: String? = null
+    var index = 0
+    while (index < args.size) {
+        when (val arg = args[index]) {
+            "--store" -> storePath = args.getOrNull(++index) ?: fail("--store требует путь")
+            "--help", "-h" -> { printUsage(); return }
+            else -> fail("Лишний аргумент: $arg")
+        }
+        index++
+    }
+
+    val file = resolveStoreFile(storePath)
+    if (file.isFile) {
+        file.delete()
+        println("Учётная запись удалена: ${file.absolutePath}")
+    } else {
+        println("Сохранённой учётной записи нет")
+    }
+}
+
+/** Keeps `.mcplus/account.json` next to `settings.gradle.kts`, wherever the process was started. */
+private fun resolveStoreFile(explicit: String?): java.io.File {
+    if (explicit != null) return java.io.File(explicit)
+    var dir: java.io.File? = java.io.File(".").absoluteFile
+    while (dir != null) {
+        if (java.io.File(dir, "settings.gradle.kts").isFile) {
+            return java.io.File(dir, ".mcplus/account.json")
+        }
+        dir = dir.parentFile
+    }
+    return java.io.File(".mcplus/account.json").absoluteFile
+}
+
 // ---------------------------------------------------------------- shared
 
 private class LoginOptions(
@@ -198,6 +288,7 @@ private class LoginOptions(
     val verbose: Boolean,
     val chunks: Int,
     val blocks: String?,
+    val online: Boolean,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -207,6 +298,7 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var verbose = false
     var chunks = 3
     var blocks: String? = null
+    var online = false
 
     var index = 0
     while (index < args.size) {
@@ -215,13 +307,14 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--protocol" -> protocol = args.getOrNull(++index)?.toIntOrNull() ?: fail("--protocol требует число")
             "--chunks" -> chunks = args.getOrNull(++index)?.toIntOrNull() ?: fail("--chunks требует число")
             "--blocks" -> blocks = args.getOrNull(++index) ?: fail("--blocks требует путь")
+            "--online" -> online = true
             "--verbose" -> verbose = true
             "--help", "-h" -> { printUsage(); return null }
             else -> if (target == null) target = arg else fail("Лишний аргумент: $arg")
         }
         index++
     }
-    return LoginOptions(target, name, protocol, verbose, chunks, blocks)
+    return LoginOptions(target, name, protocol, verbose, chunks, blocks, online)
 }
 
 /**
@@ -245,10 +338,18 @@ private fun findBlockTable(explicit: String?): BlockTable {
 }
 
 private fun connect(host: String, port: Int, options: LoginOptions): Session = try {
+    val account = if (options.online) loadAccount() else null
+
     MinecraftClient(
         host = host,
         port = port,
-        username = options.name,
+        username = account?.name ?: options.name,
+        playerUuid = account?.uuid?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() },
+        authenticator = account?.let { acc ->
+            ServerAuthenticator { serverHash ->
+                MinecraftSession.join(acc.accessToken, acc.undashedUuid, serverHash)
+            }
+        },
         protocolVersion = options.protocol,
         log = if (options.verbose) { line -> println("  $line") } else { _ -> },
     ).join()
@@ -258,6 +359,19 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session = t
     fail(e.message ?: "Требуется вход через Microsoft")
 } catch (e: Exception) {
     fail("Не удалось войти на $host:$port — ${e.message ?: e::class.simpleName}")
+}
+
+/** Reads the stored account, refreshing the token when needed. */
+private fun loadAccount(): Account {
+    val store = AccountStore(resolveStoreFile(null))
+    val manager = AuthManager(System.getenv("MCPLUS_CLIENT_ID") ?: "", store)
+
+    val account = try {
+        manager.silentLogin()
+    } catch (e: AuthException) {
+        fail("Не удалось обновить сессию: ${e.message}\nВыполни \u00ABmcplus login\u00BB заново.")
+    }
+    return account ?: fail("Нет сохранённой учётной записи. Сначала выполни: mcplus login")
 }
 
 private fun printRows(rows: List<Pair<String, String>>) {
@@ -298,11 +412,14 @@ private fun printUsage() {
           mcplus [host[:port]]                      список игроков (Server List Ping)
           mcplus join [host[:port]] [--name Имя]    войти на сервер (offline-mode)
           mcplus world [host[:port]] [--chunks N]   нарисовать карту мира текстом
+          mcplus login [--client-id ID]             войти через Microsoft
+          mcplus logout                             забыть сохранённую учётную запись
           mcplus ping [host[:port]] [--json]        то же, что и без команды
 
         Флаги:
           --protocol N   версия протокола, по умолчанию 777
-          --name Имя     имя игрока для входа, по умолчанию mcplus
+          --name Имя     имя игрока для offline-входа, по умолчанию mcplus
+          --online       войти с учётной записью Microsoft (нужен mcplus login)
           --chunks N     размер карты в чанках, по умолчанию 3 (48 блоков)
           --verbose      печатать каждый принятый пакет
           --json         (ping) вывести сырой JSON сервера
@@ -311,8 +428,9 @@ private fun printUsage() {
           mcplus
           mcplus mc.hypixel.net
           mcplus join
-          mcplus world
-          mcplus world 127.0.0.1:25565 --chunks 5 --verbose
+          mcplus login
+          mcplus world --chunks 5
+          mcplus world play.example.com --online
         """.trimIndent(),
     )
 }

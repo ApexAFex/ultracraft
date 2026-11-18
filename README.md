@@ -13,6 +13,9 @@
 - **E1 — Server List Ping**: handshake → status → ping/pong.
 - **E2 — вход на сервер**: handshake → login → configuration → play, `Join Game` разобран.
 - **E3 — мир**: `Chunk Data` → палитровые секции → блоки → ASCII-карта местности.
+- **E4 — вход через Microsoft**: device-code вход, Xbox Live, Minecraft services, шифрование
+  соединения (AES/CFB8) и подтверждение сессии. Нужен client id приложения Azure —
+  см. [docs/auth-setup.md](docs/auth-setup.md).
 
 ```
 > .\gradlew.bat :app:run --args="world --chunks 4"
@@ -61,6 +64,17 @@
 находит JDK 25 и ждёт готовности. Каталог `tools/server/` в git не попадает.
 
 **Важно:** сервер 26.3 требует **JDK 25**, а `white-list` у него по умолчанию включён.
+
+## Вход через Microsoft (для online-серверов)
+
+```powershell
+$env:MCPLUS_CLIENT_ID = "<id приложения Azure>"
+.\gradlew.bat :app:run --args="login"                      # один раз: код в браузере
+.\gradlew.bat :app:run --args="world play.example.com --online"
+```
+
+Профиль и токены сохраняются в `.mcplus/account.json` (в git не попадает), повторный вход
+не требуется. Требуется client id: [docs/auth-setup.md](docs/auth-setup.md).
 
 ## Таблица блоков
 

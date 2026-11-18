@@ -9,6 +9,7 @@ kotlin {
 
 dependencies {
     implementation(project(":net"))
+    implementation(project(":auth"))
 }
 
 application {

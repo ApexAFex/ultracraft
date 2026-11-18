@@ -7,6 +7,7 @@ import mcplus.protocol.Packet
 import mcplus.protocol.ProtocolException
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.security.SecureRandom
 import java.util.UUID
 
 /** The server asked for an authenticated (Microsoft) session, which is a later milestone. */
@@ -14,6 +15,14 @@ class EncryptionRequiredException(message: String) : RuntimeException(message)
 
 /** The server refused the session and told us why. */
 class ServerDisconnectException(val reason: String) : RuntimeException("Сервер закрыл соединение: $reason")
+
+/**
+ * Tells the session server that this client is joining; must be performed with the
+ * account's access token before the Encryption Response is sent.
+ */
+fun interface ServerAuthenticator {
+    fun joinServer(serverHash: String)
+}
 
 /**
  * Drives one connection from handshake to entering the world:
@@ -26,6 +35,8 @@ class MinecraftClient(
     private val host: String,
     private val port: Int = 25565,
     private val username: String = "mcplus",
+    private val playerUuid: UUID? = null,
+    private val authenticator: ServerAuthenticator? = null,
     private val protocolVersion: Int = Protocol777.PROTOCOL_VERSION,
     private val timeoutMs: Int = 15_000,
     private val log: (String) -> Unit = {},
@@ -68,10 +79,8 @@ class MinecraftClient(
                     Protocol777.Login.DISCONNECT ->
                         throw ServerDisconnectException(decodeReason(packet.body))
 
-                    Protocol777.Login.ENCRYPTION_REQUEST -> throw EncryptionRequiredException(
-                        "Сервер требует вход через Microsoft (online-mode). " +
-                            "Это следующий этап (E4), он ещё не реализован.",
-                    )
+                    Protocol777.Login.ENCRYPTION_REQUEST ->
+                        handleEncryptionRequest(connection, packet)
 
                     Protocol777.Login.SET_COMPRESSION -> {
                         val threshold = ByteReader(packet.body).readVarInt()
@@ -166,11 +175,46 @@ class MinecraftClient(
 
     private fun loginStart(): ByteArray {
         // Vanilla offline servers derive the same UUID from "OfflinePlayer:<name>".
-        val offlineUuid = UUID.nameUUIDFromBytes("OfflinePlayer:$username".toByteArray(Charsets.UTF_8))
+        val uuid = playerUuid
+            ?: UUID.nameUUIDFromBytes("OfflinePlayer:$username".toByteArray(Charsets.UTF_8))
         return ByteWriter()
             .writeString(username)
-            .writeUuid(offlineUuid)
+            .writeUuid(uuid)
             .toByteArray()
+    }
+
+    /**
+     * Online-mode handshake: generate a shared secret, tell the session server we are joining,
+     * then send the secret and verify token encrypted with the server's RSA key.
+     */
+    private fun handleEncryptionRequest(connection: Connection, packet: Packet) {
+        val reader = ByteReader(packet.body)
+        val serverId = reader.readString(20)
+        val publicKey = reader.readBytes(reader.readVarInt())
+        val verifyToken = reader.readBytes(reader.readVarInt())
+        val shouldAuthenticate = reader.readBoolean()
+
+        val sharedSecret = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val serverHash = MinecraftHash.serverHash(serverId, sharedSecret, publicKey)
+
+        if (shouldAuthenticate) {
+            val authenticator = authenticator ?: throw EncryptionRequiredException(
+                "Сервер требует вход через Microsoft (online-mode). " +
+                    "Выполни \u00ABmcplus login\u00BB и запусти с флагом --online.",
+            )
+            authenticator.joinServer(serverHash)
+            log("сессия подтверждена на сервере сессий")
+        }
+
+        val response = ByteWriter()
+            .writeByteArray(Rsa.encrypt(publicKey, sharedSecret))
+            .writeByteArray(Rsa.encrypt(publicKey, verifyToken))
+            .toByteArray()
+
+        // The response itself is still plaintext; encryption starts right after it.
+        connection.send(Packet(Protocol777.Login.ENCRYPTION_RESPONSE, response))
+        connection.enableEncryption(sharedSecret)
+        log("шифрование включено")
     }
 
     private fun clientInformation(): ByteArray = ByteWriter()
