@@ -13,8 +13,8 @@ import javax.imageio.ImageIO
 /**
  * GPU view of the parsed world: a GLFW window and an OpenGL 3.3 core renderer.
  *
- * The same vertex data that the CPU renderer consumes is uploaded once and drawn with a
- * single shader; a free-fly camera keeps it interactive.
+ * Textures come from the player's own game installation; the mesh is uploaded once and drawn
+ * with a single shader, a free-fly camera keeps it interactive.
  */
 object GlView {
 
@@ -50,31 +50,39 @@ object GlView {
             println("OpenGL ${GL30.glGetString(GL30.GL_VERSION)}")
             println("Видеокарта ${GL30.glGetString(GL30.GL_RENDERER)}")
 
-            val mesh = VoxelMeshBuilder.build(world, blocks, centerChunkX, centerChunkZ, radiusChunks)
+            val minecraftDirectory = TextureAtlas.findMinecraftDirectory()
+            val atlas = minecraftDirectory?.let { TextureAtlas.load(it) }
+                ?: TextureAtlas.colored(blocks.allNames())
+            println("Текстуры: ${atlas.size} слоёв, источник: ${atlas.source}")
+
+            val mesh = VoxelMeshBuilder.build(world, blocks, atlas, centerChunkX, centerChunkZ, radiusChunks)
             println("Граней: ${mesh.quadCount}, вершин: ${mesh.vertexCount}")
 
-            Renderer(mesh, width, height).use { renderer ->
-                val camera = mesh.defaultCamera()
-                val input = Input(window, camera)
+            GlTextures(atlas).use { textures ->
+                Renderer(mesh, textures, width, height).use { renderer ->
+                    val camera = mesh.defaultCamera()
+                    val input = Input(window, camera)
 
-                var frame = 0
-                while (!GLFW.glfwWindowShouldClose(window)) {
-                    input.update()
+                    var frame = 0
+                    while (!GLFW.glfwWindowShouldClose(window)) {
+                        input.update()
 
-                    GL30.glViewport(0, 0, width, height)
-                    GL30.glClearColor(0.56f, 0.75f, 0.91f, 1f)
-                    GL30.glClear(GL30.GL_COLOR_BUFFER_BIT or GL30.GL_DEPTH_BUFFER_BIT)
+                        GL30.glViewport(0, 0, width, height)
+                        GL30.glClearColor(0.56f, 0.75f, 0.91f, 1f)
+                        GL30.glClear(GL30.GL_COLOR_BUFFER_BIT or GL30.GL_DEPTH_BUFFER_BIT)
 
-                    renderer.draw(camera)
+                        renderer.draw(camera)
 
-                    if (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames) {
-                        captureTo?.let { savePng(it, width, height) }
-                        break
+                        if (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames) {
+                            GL30.glFinish()
+                            captureTo?.let { savePng(it, width, height) }
+                            break
+                        }
+
+                        GLFW.glfwSwapBuffers(window)
+                        GLFW.glfwPollEvents()
+                        frame++
                     }
-
-                    GLFW.glfwSwapBuffers(window)
-                    GLFW.glfwPollEvents()
-                    frame++
                 }
             }
         } finally {

@@ -19,6 +19,9 @@ class BlockTable private constructor(
 
     val stateCount: Int get() = names.count { it.isNotEmpty() }
 
+    /** Distinct block names in this table. */
+    fun allNames(): List<String> = names.filter { it.isNotEmpty() }.distinct()
+
     companion object {
         private val AIR_NAMES = setOf("air", "cave_air", "void_air")
 

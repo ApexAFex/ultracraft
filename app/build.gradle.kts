@@ -13,6 +13,7 @@ val lwjglNatives = "natives-windows"
 dependencies {
     implementation(project(":net"))
     implementation(project(":auth"))
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
     implementation("org.lwjgl:lwjgl")

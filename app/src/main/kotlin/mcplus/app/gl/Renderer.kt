@@ -5,10 +5,16 @@ import org.lwjgl.system.MemoryUtil
 import java.io.Closeable
 
 /** One shader program, one VAO/VBO, one draw call for the whole world. */
-class Renderer(private val mesh: VoxelMesh, private val width: Int, private val height: Int) : Closeable {
+class Renderer(
+    private val mesh: VoxelMesh,
+    private val textures: GlTextures,
+    private val width: Int,
+    private val height: Int,
+) : Closeable {
 
     private val program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
     private val viewProjLocation = GL30.glGetUniformLocation(program, "uViewProj")
+    private val atlasLocation = GL30.glGetUniformLocation(program, "uAtlas")
 
     private val vao = GL30.glGenVertexArrays()
     private val vbo = GL30.glGenBuffers()
@@ -27,8 +33,10 @@ class Renderer(private val mesh: VoxelMesh, private val width: Int, private val 
         GL30.glEnableVertexAttribArray(0)
         GL30.glVertexAttribPointer(1, 1, GL30.GL_FLOAT, false, stride, 3L * Float.SIZE_BYTES)
         GL30.glEnableVertexAttribArray(1)
-        GL30.glVertexAttribPointer(2, 3, GL30.GL_FLOAT, false, stride, 4L * Float.SIZE_BYTES)
+        GL30.glVertexAttribPointer(2, 1, GL30.GL_FLOAT, false, stride, 4L * Float.SIZE_BYTES)
         GL30.glEnableVertexAttribArray(2)
+        GL30.glVertexAttribPointer(3, 2, GL30.GL_FLOAT, false, stride, 5L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(3)
 
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, 0)
         GL30.glBindVertexArray(0)
@@ -39,6 +47,10 @@ class Renderer(private val mesh: VoxelMesh, private val width: Int, private val 
 
     fun draw(camera: Camera) {
         GL30.glUseProgram(program)
+
+        textures.bind(0)
+        GL30.glUniform1i(atlasLocation, 0)
+
         val matrix = camera.viewProjection(width.toFloat() / height.toFloat())
         GL30.glUniformMatrix4fv(viewProjLocation, false, matrix)
 
@@ -86,13 +98,14 @@ class Renderer(private val mesh: VoxelMesh, private val width: Int, private val 
             #version 330 core
             layout(location = 0) in vec3 aPos;
             layout(location = 1) in float aShade;
-            layout(location = 2) in vec3 aColor;
+            layout(location = 2) in float aLayer;
+            layout(location = 3) in vec2 aUv;
             uniform mat4 uViewProj;
             out float vShade;
-            out vec3 vColor;
+            out vec3 vUv;
             void main() {
                 vShade = aShade;
-                vColor = aColor;
+                vUv = vec3(aUv, aLayer);
                 gl_Position = uViewProj * vec4(aPos, 1.0);
             }
         """
@@ -100,10 +113,13 @@ class Renderer(private val mesh: VoxelMesh, private val width: Int, private val 
         const val FRAGMENT_SHADER = """
             #version 330 core
             in float vShade;
-            in vec3 vColor;
+            in vec3 vUv;
+            uniform sampler2DArray uAtlas;
             out vec4 FragColor;
             void main() {
-                FragColor = vec4(vColor * vShade, 1.0);
+                vec4 texel = texture(uAtlas, vUv);
+                if (texel.a < 0.5) discard;
+                FragColor = vec4(texel.rgb * vShade, 1.0);
             }
         """
     }

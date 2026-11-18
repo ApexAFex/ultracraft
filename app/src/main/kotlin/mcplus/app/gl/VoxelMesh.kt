@@ -7,7 +7,7 @@ import kotlin.math.sqrt
 
 /**
  * Interleaved vertex data for the whole visible world:
- * `x, y, z, shade, r, g, b` — six vertices per quad, world-space coordinates.
+ * `x, y, z, shade, layer, u, v` — six vertices per quad, world-space coordinates.
  */
 class VoxelMesh(
     val data: FloatArray,
@@ -44,9 +44,20 @@ object VoxelMeshBuilder {
 
     private const val FLOATS_PER_VERTEX = 7
 
+    /** Corner order for every quad: two triangles, counter-clockwise from outside. */
+    private val UV = floatArrayOf(
+        0f, 0f,
+        1f, 0f,
+        1f, 1f,
+        0f, 0f,
+        1f, 1f,
+        0f, 1f,
+    )
+
     fun build(
         world: World,
         blocks: BlockTable,
+        atlas: TextureAtlas,
         centerChunkX: Int,
         centerChunkZ: Int,
         radiusChunks: Int,
@@ -72,30 +83,26 @@ object VoxelMeshBuilder {
                         val name = blocks.nameOf(state)
                         if (name in PLANTS) continue
 
-                        val rgb = Colors.of(name)
-                        val r = ((rgb shr 16) and 0xFF) / 255f
-                        val g = ((rgb shr 8) and 0xFF) / 255f
-                        val b = (rgb and 0xFF) / 255f
-
                         for (face in FACES) {
                             val neighbour = world.blockAt(x + face.dx, y + face.dy, z + face.dz)
                             if (!isTransparent(neighbour, blocks)) continue
 
-                            for (corner in face.quad) {
-                                vertexData.add(x + corner[0])
-                                vertexData.add(y + corner[1])
-                                vertexData.add(z + corner[2])
+val layer = atlas.layerFor(name, face.kind).toFloat()
+                            for (corner in face.quad.indices) {
+                                val point = face.quad[corner]
+                                vertexData.add(x + point[0])
+                                vertexData.add(y + point[1])
+                                vertexData.add(z + point[2])
                                 vertexData.add(face.shade)
-                                vertexData.add(r)
-                                vertexData.add(g)
-                                vertexData.add(b)
+                                vertexData.add(layer)
+                                vertexData.add(UV[corner * 2])
+                                vertexData.add(UV[corner * 2 + 1])
                             }
                         }
                     }
                 }
             }
         }
-
         val data = vertexData.toArray()
         return VoxelMesh(
             data = data,
@@ -106,59 +113,8 @@ object VoxelMeshBuilder {
         )
     }
 
-    private class Face(
-        val dx: Int,
-        val dy: Int,
-        val dz: Int,
-        val shade: Float,
-        /** Six corners: two triangles, counter-clockwise seen from outside. */
-        val quad: Array<FloatArray>,
-    )
-
-    private fun face(dx: Int, dy: Int, dz: Int, shade: Float, vararg corners: FloatArray) =
-        Face(dx, dy, dz, shade, arrayOf(*corners))
-
-    private val FACES = arrayOf(
-        // top
-        face(
-            0, 1, 0, 1.0f,
-            floatArrayOf(0f, 1f, 1f), floatArrayOf(1f, 1f, 1f), floatArrayOf(1f, 1f, 0f),
-            floatArrayOf(0f, 1f, 1f), floatArrayOf(1f, 1f, 0f), floatArrayOf(0f, 1f, 0f),
-        ),
-        // bottom
-        face(
-            0, -1, 0, 0.45f,
-            floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 0f, 1f),
-            floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 0f, 1f), floatArrayOf(0f, 0f, 1f),
-        ),
-        // +X
-        face(
-            1, 0, 0, 0.78f,
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 1f, 0f), floatArrayOf(1f, 1f, 1f),
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 1f, 1f), floatArrayOf(1f, 0f, 1f),
-        ),
-        // -X
-        face(
-            -1, 0, 0, 0.78f,
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(0f, 1f, 1f), floatArrayOf(0f, 1f, 0f),
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(0f, 1f, 0f), floatArrayOf(0f, 0f, 0f),
-        ),
-        // +Z
-        face(
-            0, 0, 1, 0.62f,
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 0f, 1f), floatArrayOf(1f, 1f, 1f),
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 1f, 1f), floatArrayOf(0f, 1f, 1f),
-        ),
-        // -Z
-        face(
-            0, 0, -1, 0.62f,
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 1f, 0f),
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f, 0f), floatArrayOf(1f, 1f, 0f),
-        ),
-    )
-
     /**
-     * A face is drawn when its neighbour is air. plants are not meshed, so they must count
+     * A face is drawn when its neighbour is air. Plants are not meshed, so they must count
      * as air here too — otherwise every grass block under a tuft of grass loses its top face.
      */
     private fun isTransparent(state: Int, blocks: BlockTable): Boolean {
@@ -167,7 +123,60 @@ object VoxelMeshBuilder {
         if (blocks.isAir(state)) return true
         return blocks.nameOf(state) in PLANTS
     }
-    private val PLANTS = setOf(        "short_grass", "tall_grass", "fern", "large_fern", "dead_bush", "seagrass",
+
+    private class Face(
+        val dx: Int,
+        val dy: Int,
+        val dz: Int,
+        val shade: Float,
+        val kind: TextureAtlas.Kind,
+        val quad: Array<FloatArray>,
+    )
+
+    private fun face(
+        dx: Int,
+        dy: Int,
+        dz: Int,
+        shade: Float,
+        kind: TextureAtlas.Kind,
+        vararg corners: FloatArray,
+    ) = Face(dx, dy, dz, shade, kind, arrayOf(*corners))
+
+    private val FACES = arrayOf(
+        face(
+            0, 1, 0, 1.0f, TextureAtlas.Kind.TOP,
+            floatArrayOf(0f, 1f, 1f), floatArrayOf(1f, 1f, 1f), floatArrayOf(1f, 1f, 0f),
+            floatArrayOf(0f, 1f, 1f), floatArrayOf(1f, 1f, 0f), floatArrayOf(0f, 1f, 0f),
+        ),
+        face(
+            0, -1, 0, 0.45f, TextureAtlas.Kind.BOTTOM,
+            floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 0f, 1f),
+            floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 0f, 1f), floatArrayOf(0f, 0f, 1f),
+        ),
+        face(
+            1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE,
+            floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 1f, 0f), floatArrayOf(1f, 1f, 1f),
+            floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 1f, 1f), floatArrayOf(1f, 0f, 1f),
+        ),
+        face(
+            -1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE,
+            floatArrayOf(0f, 0f, 1f), floatArrayOf(0f, 1f, 1f), floatArrayOf(0f, 1f, 0f),
+            floatArrayOf(0f, 0f, 1f), floatArrayOf(0f, 1f, 0f), floatArrayOf(0f, 0f, 0f),
+        ),
+        face(
+            0, 0, 1, 0.62f, TextureAtlas.Kind.SIDE,
+            floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 0f, 1f), floatArrayOf(1f, 1f, 1f),
+            floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 1f, 1f), floatArrayOf(0f, 1f, 1f),
+        ),
+        face(
+            0, 0, -1, 0.62f, TextureAtlas.Kind.SIDE,
+            floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 1f, 0f),
+            floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f, 0f), floatArrayOf(1f, 1f, 0f),
+        ),
+    )
+
+    private val PLANTS = setOf(
+        "short_grass", "tall_grass", "fern", "large_fern", "dead_bush", "seagrass",
         "tall_seagrass", "kelp", "kelp_plant", "sugar_cane", "bush", "firefly_bush",
         "dandelion", "poppy", "blue_orchid", "allium", "azure_bluet", "oxeye_daisy",
         "cornflower", "lily_of_the_valley", "torchflower", "wheat", "carrots", "potatoes",
@@ -175,7 +184,7 @@ object VoxelMeshBuilder {
     )
 }
 
-/** Growable float array — avoids boxing while building tens of thousands of vertices. */
+/** Growable float array — avoids boxing while building hundreds of thousands of vertices. */
 class FloatArrayBuilder(initialCapacity: Int) {
     private var data = FloatArray(initialCapacity)
     private var size = 0
@@ -187,4 +196,7 @@ class FloatArrayBuilder(initialCapacity: Int) {
 
     fun toArray(): FloatArray = data.copyOf(size)
 }
+
+
+
 
