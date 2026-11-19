@@ -29,6 +29,8 @@ object GlView {
     /** Гуманоидные мобы, которых рисуем моделью человека с их текстурой. */
     private val ZOMBIE_TYPES = setOf("zombie", "husk", "drowned", "zombie_villager", "zombified_piglin")
     private val SKELETON_TYPES = setOf("skeleton", "stray", "bogged")
+    private val ENDERMAN_TYPES = setOf("enderman")
+    private val PIGLIN_TYPES = setOf("piglin", "zombified_piglin", "piglin_brute")
 
     /** Блок, который только что стал воздухом: из него сыплются кусочки. */
     private class PendingBreak(val x: Int, val y: Int, val z: Int, val state: Int)
@@ -331,6 +333,15 @@ object GlView {
                         GameFiles.readPng(directory, "assets/minecraft/textures/entity/skeleton/skeleton.png"),
                         classic = true,
                     )
+                    val endermanRenderer = PlayerRenderer(
+                        width, height,
+                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/enderman/enderman.png"),
+                        classic = true,
+                    )
+                    val piglinRenderer = PlayerRenderer(
+                        width, height,
+                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/piglin/piglin.png"),
+                    )
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
                     val stepTimer = StepSoundTimer()
@@ -541,6 +552,14 @@ object GlView {
                             ),
                         )
                         println("Поставлен блок: $nextX, $nextY, $nextZ")
+                        repeat(4) {
+                            pendingParticles += mcplus.net.ParticleSpawn(
+                                nextX + 0.2 + Math.random() * 0.6,
+                                nextY + 0.2 + Math.random() * 0.6,
+                                nextZ + 0.2 + Math.random() * 0.6,
+                                "smoke",
+                            )
+                        }
                         val (placeSound, placeFallback) = placeEvent(blocks.nameOf(state))
                         sound.play(placeSound, nextX + 0.5, nextY + 0.5, nextZ + 0.5, placeFallback)
                         session?.send(mcplus.net.PlayerMovement.swingArm())
@@ -589,6 +608,7 @@ object GlView {
                     var windowedHeight = height
                     var boundsSaved = false
                     var lastItemTotal = -1
+                    var sprintDustNanos = 0L
 
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
@@ -1098,6 +1118,8 @@ object GlView {
                             )
                             if (ready && !paused) {
                                 // Пока открыта строка чата, буквы — это текст, а не движение.
+                                val velocityBefore = player.velocityY
+                                val wasOnGround = player.onGround
                                 player.move(
                                     TICK_SECONDS, world, blocks,
                                     if (chat.open) 0.0 else forwardInput * inputScale,
@@ -1106,6 +1128,35 @@ object GlView {
                                     if (chat.open) false else input.descend,
                                     sneak = sneakHeld,
                                 )
+                                // Приземление после падения: пыль под ногами и звук шага.
+                                if (!wasOnGround && player.onGround && velocityBefore < -0.4) {
+                                    val ground = blockUnderName(blocks, world, player.x, player.y, player.z)
+                                    sound.play(
+                                        stepEvent(ground),
+                                        player.x, player.y, player.z,
+                                        "block.stone.step",
+                                    )
+                                    repeat(5) {
+                                        pendingParticles += mcplus.net.ParticleSpawn(
+                                            player.x + (Math.random() - 0.5) * 0.6,
+                                            player.y + 0.05,
+                                            player.z + (Math.random() - 0.5) * 0.6,
+                                            "generic",
+                                        )
+                                    }
+                                }
+                                // Пыль из-под ног на бегу.
+                                if (sprintHeld && player.onGround &&
+                                    System.nanoTime() - sprintDustNanos > 150_000_000L
+                                ) {
+                                    sprintDustNanos = System.nanoTime()
+                                    pendingParticles += mcplus.net.ParticleSpawn(
+                                        player.x + (Math.random() - 0.5) * 0.3,
+                                        player.y + 0.05,
+                                        player.z + (Math.random() - 0.5) * 0.3,
+                                        "generic",
+                                    )
+                                }
                             }
                             if (ready && !playerLoadedSent) {
                                 // "My terrain is up" — lets the server start ticking us now
@@ -1425,6 +1476,8 @@ object GlView {
                         val players = ArrayList<PlayerRenderer.Player>()
                         val zombies = ArrayList<PlayerRenderer.Player>()
                         val skeletons = ArrayList<PlayerRenderer.Player>()
+                        val endermen = ArrayList<PlayerRenderer.Player>()
+                        val piglins = ArrayList<PlayerRenderer.Player>()
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
@@ -1456,6 +1509,8 @@ object GlView {
                                 when {
                                     name in ZOMBIE_TYPES -> zombies += humanoid
                                     name in SKELETON_TYPES -> skeletons += humanoid
+                                    name in ENDERMAN_TYPES -> endermen += humanoid
+                                    name in PIGLIN_TYPES -> piglins += humanoid
                                     name == "item" -> {
                                         // Выпавший предмет: мини-куб блока, если это блок.
                                         val stack = entity.droppedItem
@@ -1499,6 +1554,18 @@ object GlView {
                                         )
                                     }
 
+                                    name == "item_frame" || name == "glow_item_frame" -> {
+                                        val stack = entity.droppedItem
+                                        val itemName = stack?.takeIf { it.itemId >= 0 }
+                                            ?.let { itemTable.nameOf(it.itemId) }
+                                        if (itemName != null) {
+                                            worldIcons += Renderer.WorldIcon(
+                                                entity.x, entity.y + 0.5, entity.z, 0.5f,
+                                                atlas.layerForItem(itemName),
+                                            )
+                                        }
+                                    }
+
                                     family == MobFamily.NONE -> boxes += entity
                                     else -> mobs += MobRenderer.Mob(
                                         x = entity.x,
@@ -1517,6 +1584,8 @@ object GlView {
                         playerRenderer.draw(camera, players)
                         zombieRenderer.draw(camera, zombies)
                         skeletonRenderer.draw(camera, skeletons)
+                        endermanRenderer.draw(camera, endermen)
+                        piglinRenderer.draw(camera, piglins)
                         mobRenderer.draw(camera, mobs)
                         entityRenderer.draw(camera, boxes)
                         if (debris.isNotEmpty()) {
@@ -1953,6 +2022,8 @@ object GlView {
                     particleRenderer.close()
                     zombieRenderer.close()
                     skeletonRenderer.close()
+                    endermanRenderer.close()
+                    piglinRenderer.close()
                     playerRenderer.close()
                     skyRenderer.close()
                     hud.close()
