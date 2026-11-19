@@ -39,8 +39,8 @@ sealed interface BlockShape {
         val shape: StairShape,
     ) : BlockShape
 
-    /** Дверь: тонкая панель у стороны [facing], нижняя или верхняя половина. */
-    data class Door(val facing: ShapeDirection, val upper: Boolean) : BlockShape
+    /** Дверь: тонкая панель у стороны [facing]; открытая повёрнута на 90°. */
+    data class Door(val facing: ShapeDirection, val upper: Boolean, val open: Boolean = false) : BlockShape
 
     /** Забор: столб и перекладины к соседям, заданные свойствами состояния. */
     data class Fence(
@@ -49,6 +49,36 @@ sealed interface BlockShape {
         val east: Boolean,
         val west: Boolean,
     ) : BlockShape
+
+    /**
+     * Растение крестом: две диагональные плоскости. [texture] — имя файла текстуры
+     * (у высоких растений верх и низ разные), [tinted] — красится ли биомом.
+     */
+    data class Cross(val texture: String, val tinted: Boolean) : BlockShape
+
+    /** Факел: [wall] — сторона, на которой он висит, или null для стоящего на полу. */
+    data class Torch(val wall: ShapeDirection? = null) : BlockShape
+
+    /** Ковёр: слой в 1/16 клетки. */
+    data object Carpet : BlockShape
+
+    /** Снежный слой: [layers] от 1 до 8, каждый по 2/16 высоты. */
+    data class SnowLayers(val layers: Int) : BlockShape
+
+    /** Люк: закрытый — тонкая плита снизу или сверху, открытый — панель у стороны [facing]. */
+    data class Trapdoor(val facing: ShapeDirection, val half: SlabHalf, val open: Boolean) : BlockShape
+
+    /** Стена: столб и связи-«плечи» высотой [side]. */
+    data class Wall(
+        val north: WallSide,
+        val south: WallSide,
+        val east: WallSide,
+        val west: WallSide,
+        val up: Boolean,
+    ) : BlockShape
+
+    /** Высота связи стены: нет, низкая (14/16) или в полный рост. */
+    enum class WallSide { NONE, LOW, TALL }
 
     companion object {
         /**
@@ -80,7 +110,7 @@ sealed interface BlockShape {
 
                 name.endsWith("_door") -> {
                     val facing = ShapeDirection.byName(values["facing"]) ?: return null
-                    Door(facing, upper = values["half"] == "upper")
+                    Door(facing, upper = values["half"] == "upper", open = values["open"] == "true")
                 }
 
                 name.endsWith("_fence") -> Fence(
@@ -90,8 +120,62 @@ sealed interface BlockShape {
                     west = values["west"] == "true",
                 )
 
+                name.endsWith("_trapdoor") -> {
+                    val facing = ShapeDirection.byName(values["facing"]) ?: return null
+                    Trapdoor(
+                        facing,
+                        half = if (values["half"] == "top") SlabHalf.TOP else SlabHalf.BOTTOM,
+                        open = values["open"] == "true",
+                    )
+                }
+
+                name.endsWith("_wall") -> Wall(
+                    north = side(values["north"]),
+                    south = side(values["south"]),
+                    east = side(values["east"]),
+                    west = side(values["west"]),
+                    up = values["up"] != "false",
+                )
+
+                name.endsWith("_carpet") || name == "moss_carpet" -> Carpet
+
+                name == "snow" -> SnowLayers((values["layers"]?.toIntOrNull() ?: 1).coerceIn(1, 8))
+
+                name == "torch" || name == "soul_torch" || name == "redstone_torch" -> Torch()
+                name == "wall_torch" || name == "soul_wall_torch" || name == "redstone_wall_torch" ->
+                    Torch(ShapeDirection.byName(values["facing"]) ?: ShapeDirection.NORTH)
+
+                name in CROSS_PLANTS -> Cross(crossTexture(name, values["half"]), name in TINTED_PLANTS)
+
                 else -> null
             }
+        }
+
+        /** Растения, которые рисуются крестом: у всех есть одноимённый файл текстуры. */
+        val CROSS_PLANTS = setOf(
+            "short_grass", "tall_grass", "fern", "large_fern", "dead_bush", "seagrass",
+            "tall_seagrass", "kelp", "kelp_plant", "sugar_cane", "bush", "firefly_bush",
+            "dandelion", "poppy", "blue_orchid", "allium", "azure_bluet", "oxeye_daisy",
+            "cornflower", "lily_of_the_valley", "torchflower",
+            "oak_sapling", "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
+        )
+
+        /** Растения, которым биом меняет цвет. */
+        private val TINTED_PLANTS = setOf(
+            "short_grass", "tall_grass", "fern", "large_fern", "sugar_cane",
+        )
+
+        /** У высоких растений верх и низ — разные текстуры. */
+        private fun crossTexture(name: String, half: String?): String = when {
+            name == "tall_grass" -> if (half == "upper") "tall_grass_top" else "tall_grass_bottom"
+            name == "large_fern" -> if (half == "upper") "large_fern_top" else "large_fern_bottom"
+            else -> name
+        }
+
+        private fun side(value: String?): WallSide = when (value) {
+            "low" -> WallSide.LOW
+            "tall" -> WallSide.TALL
+            else -> WallSide.NONE
         }
 
         private fun parseProperties(text: String): Map<String, String> {

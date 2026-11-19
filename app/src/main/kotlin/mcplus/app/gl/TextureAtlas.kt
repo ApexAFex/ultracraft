@@ -66,10 +66,16 @@ class TextureAtlas(
      * Biome tint approximated by a fixed colour, or null when the texture needs none.
      * Applied once per layer when the atlas is uploaded.
      */
+    /** Слой по точному имени текстуры (без `block/`), без подбора по суффиксам. */
+    fun layerOf(textureName: String): Int = layers[textureName] ?: missingLayer
+
     fun tintOf(layer: Int): Int? {
         val name = namesByLayer.getOrNull(layer) ?: return null
         return when {
             name == "grass_block_top" || name == "grass_block_side_overlay" -> TINT_GRASS
+            // Трава и папоротники — серые текстуры, цвет им даёт биом.
+            name == "short_grass" || name == "tall_grass_top" || name == "tall_grass_bottom" ||
+                name == "fern" || name == "large_fern_top" || name == "large_fern_bottom" -> TINT_GRASS
             name == "vine" || name.endsWith("_leaves") -> TINT_FOLIAGE
             name == "water_still" || name == "water_flow" || name == "water_overlay" -> TINT_WATER
             else -> null

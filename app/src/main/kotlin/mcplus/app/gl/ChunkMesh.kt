@@ -59,11 +59,15 @@ object MeshBuilder {
                 val y = world.minY + sectionIndex * 16 + (index shr 8)
 
                 val name = blocks.nameOf(state)
-                if (name in PLANTS) continue
+                if (name in UNMESHED) continue
+
+                val shape = blocks.shapeOf(state)
 
                 // Цвет травы, листвы и воды зависит от биома. Биом в секции — сетка 4×4×4,
                 // поэтому его номер берётся прямо из массива секции без обращения к миру.
-                val biomeId = if (biomes != null && (name in TINTED || name.endsWith("_leaves"))) {
+                val tinted = name in TINTED || name.endsWith("_leaves") ||
+                    (shape is BlockShape.Cross && shape.tinted)
+                val biomeId = if (biomes != null && tinted) {
                     val cell = (((index shr 8) shr 2) shl 4) or
                         ((((index shr 4) and 15) shr 2) shl 2) or ((index and 15) shr 2)
                     biomes[cell]
@@ -72,7 +76,7 @@ object MeshBuilder {
                 }
                 val tint = if (biomeId >= 0) {
                     when {
-                        name == "grass_block" -> tints.ratio(BiomeTints.GRASS, biomeId)
+                        name == "grass_block" || shape is BlockShape.Cross -> tints.ratio(BiomeTints.GRASS, biomeId)
                         name == "water" -> tints.ratio(BiomeTints.WATER, biomeId)
                         else -> tints.ratio(BiomeTints.FOLIAGE, biomeId)
                     }
@@ -83,11 +87,14 @@ object MeshBuilder {
                 // Вода и лёд уходят в отдельный буфер: их надо рисовать с прозрачностью
                 // и без записи в глубину, иначе за ними не видно дна.
                 val target = if (name in TRANSLUCENT) translucentData else vertexData
-                val shape = blocks.shapeOf(state)
-                if (shape == null) {
-                    emitBox(target, world, blocks, atlas, x, y, z, FULL_CUBE, name, null, tint)
-                } else {
-                    for (box in boxesOf(shape)) {
+                when {
+                    shape is BlockShape.Cross ->
+                        emitCross(target, world, blocks, atlas, x, y, z, shape, tint)
+
+                    shape == null ->
+                        emitBox(target, world, blocks, atlas, x, y, z, FULL_CUBE, name, null, tint)
+
+                    else -> for (box in boxesOf(shape)) {
                         emitBox(target, world, blocks, atlas, x, y, z, box, name, shape, tint)
                     }
                 }
@@ -136,14 +143,39 @@ object MeshBuilder {
         }
 
         is BlockShape.Door -> {
-            // Панель толщиной 3/16 у той стороны, в которую смотрит дверь.
-            val thickness = 3f / 16f
-            when (shape.facing) {
-                ShapeDirection.NORTH -> listOf(Box(0f, 0f, 0f, 1f, 1f, thickness))
-                ShapeDirection.SOUTH -> listOf(Box(0f, 0f, 1f - thickness, 1f, 1f, 1f))
-                ShapeDirection.WEST -> listOf(Box(0f, 0f, 0f, thickness, 1f, 1f))
-                ShapeDirection.EAST -> listOf(Box(1f - thickness, 0f, 0f, 1f, 1f, 1f))
+            // Открытая дверь повёрнута на 90°: панель уходит на соседнюю сторону.
+            val facing = if (shape.open) rotateClockwise(shape.facing) else shape.facing
+            listOf(panel(facing))
+        }
+
+        is BlockShape.Trapdoor -> {
+            if (shape.open) {
+                listOf(panel(shape.facing))
+            } else if (shape.half == SlabHalf.TOP) {
+                listOf(Box(0f, 13f / 16f, 0f, 1f, 1f, 1f))
+            } else {
+                listOf(Box(0f, 0f, 0f, 1f, 3f / 16f, 1f))
             }
+        }
+
+        BlockShape.Carpet -> listOf(Box(0f, 0f, 0f, 1f, 1f / 16f, 1f))
+
+        is BlockShape.SnowLayers -> {
+            val height = (shape.layers * 2f / 16f).coerceAtMost(1f)
+            listOf(Box(0f, 0f, 0f, 1f, height, 1f))
+        }
+
+        is BlockShape.Torch -> listOf(torchBox(shape.wall))
+
+        is BlockShape.Wall -> {
+            val boxes = ArrayList<Box>(5)
+            val top = if (shape.up) 1f else 14f / 16f
+            boxes += Box(0.25f, 0f, 0.25f, 0.75f, top, 0.75f)
+            addWall(boxes, shape.east, Box(0.75f, 0f, 0.25f, 1f, 0f, 0.75f))
+            addWall(boxes, shape.west, Box(0f, 0f, 0.25f, 0.25f, 0f, 0.75f))
+            addWall(boxes, shape.north, Box(0.25f, 0f, 0f, 0.75f, 0f, 0.25f))
+            addWall(boxes, shape.south, Box(0.25f, 0f, 0.75f, 0.75f, 0f, 1f))
+            boxes
         }
 
         is BlockShape.Fence -> {
@@ -160,6 +192,92 @@ object MeshBuilder {
                 if (shape.south) boxes += Box(0.4375f, y0, 0.625f, 0.5625f, y1, 1f)
             }
             boxes
+        }
+
+        is BlockShape.Cross -> emptyList()
+    }
+
+    /**
+     * Растение крестом: две диагональные плоскости во всю клетку.
+     *
+     * Свет берётся из клетки растения, а не из углов: у креста нет граней, по которым
+     * считалось бы усреднение. Отбраковка по альфе в шейдере уже есть, поэтому листья и
+     * стебли вырезаются как надо.
+     */
+    private fun emitCross(
+        data: FloatArrayBuilder,
+        world: World,
+        blocks: BlockTable,
+        atlas: TextureAtlas,
+        x: Int,
+        y: Int,
+        z: Int,
+        shape: BlockShape.Cross,
+        tint: FloatArray?,
+    ) {
+        val layer = atlas.layerOf(shape.texture).toFloat()
+        val light = world.lightAt(x, y, z).toFloat()
+        val red = tint?.get(0) ?: 1f
+        val green = tint?.get(1) ?: 1f
+        val blue = tint?.get(2) ?: 1f
+        val lo = 0.146f
+        val hi = 1f - lo
+
+        fun vertex(px: Float, py: Float, pz: Float, u: Float, v: Float) {
+            data.add(x + px)
+            data.add(y + py)
+            data.add(z + pz)
+            data.add(1f)
+            data.add(light)
+            data.add(layer)
+            data.add(u)
+            data.add(v)
+            data.add(red)
+            data.add(green)
+            data.add(blue)
+        }
+
+        // Плоскость A и плоскость B идут по диагоналям клетки; отсечения граней нет,
+        // поэтому каждая видна с обеих сторон.
+        vertex(lo, 0f, lo, 0f, 1f); vertex(hi, 0f, hi, 1f, 1f); vertex(hi, 1f, hi, 1f, 0f)
+        vertex(lo, 0f, lo, 0f, 1f); vertex(hi, 1f, hi, 1f, 0f); vertex(lo, 1f, lo, 0f, 0f)
+
+        vertex(lo, 0f, hi, 0f, 1f); vertex(hi, 0f, lo, 1f, 1f); vertex(hi, 1f, lo, 1f, 0f)
+        vertex(lo, 0f, hi, 0f, 1f); vertex(hi, 1f, lo, 1f, 0f); vertex(lo, 1f, hi, 0f, 0f)
+    }
+
+    private fun addWall(boxes: MutableList<Box>, side: BlockShape.WallSide, base: Box) {
+        if (side == BlockShape.WallSide.NONE) return
+        val height = if (side == BlockShape.WallSide.TALL) 1f else 14f / 16f
+        boxes += base.copy(y1 = height)
+    }
+
+    /** Панель двери или открытого люка: толщина 3/16 у стороны [facing]. */
+    private fun panel(facing: ShapeDirection): Box {
+        val thickness = 3f / 16f
+        return when (facing) {
+            ShapeDirection.NORTH -> Box(0f, 0f, 0f, 1f, 1f, thickness)
+            ShapeDirection.SOUTH -> Box(0f, 0f, 1f - thickness, 1f, 1f, 1f)
+            ShapeDirection.WEST -> Box(0f, 0f, 0f, thickness, 1f, 1f)
+            ShapeDirection.EAST -> Box(1f - thickness, 0f, 0f, 1f, 1f, 1f)
+        }
+    }
+
+    private fun rotateClockwise(facing: ShapeDirection): ShapeDirection = when (facing) {
+        ShapeDirection.NORTH -> ShapeDirection.EAST
+        ShapeDirection.EAST -> ShapeDirection.SOUTH
+        ShapeDirection.SOUTH -> ShapeDirection.WEST
+        ShapeDirection.WEST -> ShapeDirection.NORTH
+    }
+
+    private fun torchBox(wall: ShapeDirection?): Box {
+        val width = 1f / 16f
+        return when (wall) {
+            null -> Box(0.5f - width, 0f, 0.5f - width, 0.5f + width, 10f / 16f, 0.5f + width)
+            ShapeDirection.NORTH -> Box(0.5f - width, 3f / 16f, 0f, 0.5f + width, 13f / 16f, 2f / 16f)
+            ShapeDirection.SOUTH -> Box(0.5f - width, 3f / 16f, 14f / 16f, 0.5f + width, 13f / 16f, 1f)
+            ShapeDirection.WEST -> Box(0f, 3f / 16f, 0.5f - width, 2f / 16f, 13f / 16f, 0.5f + width)
+            ShapeDirection.EAST -> Box(14f / 16f, 3f / 16f, 0.5f - width, 1f, 13f / 16f, 0.5f + width)
         }
     }
 
@@ -412,7 +530,8 @@ object MeshBuilder {
         if (state == World.UNKNOWN) return true
         if (state == 0) return true
         if (blocks.isAir(state)) return true
-        return blocks.nameOf(state) in PLANTS
+        // Растения крестом не закрывают грань соседа и не должны её отбраковывать.
+        return blocks.shapeOf(state) is BlockShape.Cross
     }
 
     private class Face(
@@ -443,12 +562,13 @@ object MeshBuilder {
         face(FACE_NORTH, 0, 0, -1, 0.62f, TextureAtlas.Kind.SIDE),
     )
 
-    private val PLANTS = setOf(
-        "short_grass", "tall_grass", "fern", "large_fern", "dead_bush", "seagrass",
-        "tall_seagrass", "kelp", "kelp_plant", "sugar_cane", "bush", "firefly_bush",
-        "dandelion", "poppy", "blue_orchid", "allium", "azure_bluet", "oxeye_daisy",
-        "cornflower", "lily_of_the_valley", "torchflower", "wheat", "carrots", "potatoes",
-        "oak_sapling", "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
+    /**
+     * Что не рисуем вовсе: посевы. У них текстуры по стадиям (`wheat_stage0`…), а не по
+     * имени блока, поэтому крест получился бы клетчатым.
+     */
+    private val UNMESHED = setOf(
+        "wheat", "carrots", "potatoes", "beetroots", "torchflower_crop", "pitcher_crop",
+        "melon_stem", "pumpkin_stem", "nether_wart", "cave_vines", "cave_vines_plant",
     )
 
     /**

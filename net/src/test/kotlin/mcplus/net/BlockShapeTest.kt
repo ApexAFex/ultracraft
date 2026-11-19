@@ -47,6 +47,63 @@ class BlockShapeTest {
     }
 
     @Test
+    fun `wall reads three connection heights`() {
+        val wall = BlockShape.parse(
+            "cobblestone_wall",
+            "east=tall,north=none,south=low,up=true,waterlogged=false,west=none",
+        )
+        assertEquals(
+            BlockShape.Wall(
+                north = BlockShape.WallSide.NONE,
+                south = BlockShape.WallSide.LOW,
+                east = BlockShape.WallSide.TALL,
+                west = BlockShape.WallSide.NONE,
+                up = true,
+            ),
+            wall,
+        )
+    }
+
+    @Test
+    fun `trapdoor and open door keep their state`() {
+        assertEquals(
+            BlockShape.Trapdoor(ShapeDirection.SOUTH, SlabHalf.TOP, open = true),
+            BlockShape.parse("oak_trapdoor", "facing=south,half=top,open=true,powered=false"),
+        )
+        assertEquals(
+            BlockShape.Door(ShapeDirection.EAST, upper = false, open = true),
+            BlockShape.parse("oak_door", "facing=east,half=lower,hinge=left,open=true"),
+        )
+    }
+
+    @Test
+    fun `carpet snow and torch have their own shapes`() {
+        assertEquals(BlockShape.Carpet, BlockShape.parse("white_carpet", ""))
+        assertEquals(BlockShape.SnowLayers(3), BlockShape.parse("snow", "layers=3"))
+        assertEquals(BlockShape.Torch(), BlockShape.parse("torch", ""))
+        assertEquals(
+            BlockShape.Torch(ShapeDirection.WEST),
+            BlockShape.parse("wall_torch", "facing=west"),
+        )
+    }
+
+    @Test
+    fun `tall plants use different textures for the halves`() {
+        assertEquals(
+            BlockShape.Cross("tall_grass_top", tinted = true),
+            BlockShape.parse("tall_grass", "half=upper"),
+        )
+        assertEquals(
+            BlockShape.Cross("tall_grass_bottom", tinted = true),
+            BlockShape.parse("tall_grass", "half=lower"),
+        )
+        assertEquals(
+            BlockShape.Cross("poppy", tinted = false),
+            BlockShape.parse("poppy", ""),
+        )
+    }
+
+    @Test
     fun `ordinary blocks and fence gates stay cubes`() {
         assertNull(BlockShape.parse("stone", ""))
         assertNull(BlockShape.parse("oak_fence_gate", "facing=north"))

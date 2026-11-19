@@ -114,12 +114,12 @@ class MeshBuilderTest {
     }
 
     @Test
-    fun `plants do not occlude the block below them`() {
+    fun `plants are drawn as a cross and do not occlude the block below them`() {
         val world = world()
         world.add(chunkWith(intArrayOf(0, 48, 0) to 1, intArrayOf(0, 49, 0) to 3))
 
-        // The stone keeps its top face, the plant itself is not meshed: 6 faces.
-        assertEquals(6 * 2 * 3, mesh(world).vertexCount)
+        // Камень сохраняет верхнюю грань (6 граней), растение — две диагональные плоскости.
+        assertEquals((6 + 2) * 2 * 3, mesh(world).vertexCount)
     }
 
     @Test
@@ -204,13 +204,22 @@ class MeshBuilderTest {
                     "3\toak_slab\ttype=top\n" +
                     "4\toak_stairs\tfacing=east,half=bottom,shape=straight\n" +
                     "5\toak_fence\teast=false,north=false,south=false,west=false\n" +
-                    "6\toak_door\tfacing=west,half=lower,hinge=left,open=false\n",
+                    "6\toak_door\tfacing=west,half=lower,hinge=left,open=false\n" +
+                    "7\ttorch\t\n" +
+                    "8\toak_trapdoor\tfacing=north,half=bottom,open=false\n" +
+                    "9\twhite_carpet\t\n" +
+                    "10\tsnow\tlayers=3\n" +
+                    "11\tcobblestone_wall\teast=tall,north=none,south=low,up=true,west=none\n" +
+                    "12\tshort_grass\t\n",
             )
         },
     )
 
     private val shapeAtlas = TextureAtlas.colored(
-        listOf("air", "stone", "oak_slab", "oak_stairs", "oak_fence", "oak_door"),
+        listOf(
+            "air", "stone", "oak_slab", "oak_stairs", "oak_fence", "oak_door",
+            "torch", "oak_trapdoor", "white_carpet", "snow", "cobblestone_wall", "short_grass",
+        ),
     )
 
     private fun shapeMesh(world: World): ChunkMesh = MeshBuilder.build(world, shapes, shapeAtlas, 0, 0)
@@ -305,6 +314,61 @@ class MeshBuilderTest {
         // У камня остаются все шесть граней (плита закрывает лишь половину), у плиты боковая
         // грань к камню скрыта: 6 + 5 = 11 граней.
         assertEquals(11 * 2 * 3, shapeMesh(world).vertexCount)
+    }
+
+    @Test
+    fun `carpet is one sixteenth high`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 9))
+
+        val ys = axisValues(shapeMesh(world), 1)
+        assertEquals(48f, ys.min(), 0.001f)
+        assertEquals(48f + 1f / 16f, ys.max(), 0.001f)
+    }
+
+    @Test
+    fun `snow layer height follows the layer count`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 10))
+
+        val ys = axisValues(shapeMesh(world), 1)
+        assertEquals(48f + 6f / 16f, ys.max(), 0.001f)
+    }
+
+    @Test
+    fun `torch is a thin post`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 7))
+
+        val mesh = shapeMesh(world)
+        val xs = axisValues(mesh, 0)
+        val ys = axisValues(mesh, 1)
+        assertTrue(xs.all { it in 0.4375f..0.5625f }, "факел шире 2/16: $xs")
+        assertEquals(48f + 10f / 16f, ys.max(), 0.001f)
+    }
+
+    @Test
+    fun `wall has a post and shoulders only where connected`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 11))
+
+        val mesh = shapeMesh(world)
+        val xs = axisValues(mesh, 0)
+        val zs = axisValues(mesh, 2)
+        // Плечо на восток доходит до края клетки, на север — нет (none).
+        assertEquals(1f, xs.max(), 0.001f)
+        assertTrue(zs.all { it >= 0.25f }, "на севере не должно быть плеча: $zs")
+    }
+
+    @Test
+    fun `cross plant is two planes and does not become a cube`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 12))
+
+        val mesh = shapeMesh(world)
+        assertEquals(2 * 2 * 3, mesh.vertexCount)
+        assertEquals(48f, axisValues(mesh, 1).min(), 0.001f)
+        assertEquals(49f, axisValues(mesh, 1).max(), 0.001f)
     }
 }
 
