@@ -268,6 +268,9 @@ private val CHAT_TRANSLATIONS = mapOf(
     "commands.message.display.incoming" to "%s whispers to you: %s",
     "commands.message.display.outgoing" to "You whisper to %s: %s",
     "commands.list.players" to "There are %s of a max of %s players online: %s",
+    // Имена боссов приходят ключами перевода; без них полоса дракона подписана сырым ключом.
+    "entity.minecraft.ender_dragon" to "Ender Dragon",
+    "entity.minecraft.wither" to "Wither",
 )
 
 private const val NBT_STRING = 0x08

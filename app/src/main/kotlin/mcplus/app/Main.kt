@@ -514,6 +514,47 @@ private fun hudCommand(args: List<String>) {
         // разбирает сам Session. Ждём, пока придут обновления.
         open.drain(seconds * 1_000L)
         printVitals(open.vitals)
+        printBossBars(open)
+    }
+}
+
+/**
+ * Полосы босса — то, что HUD рисует сверху. Имена, доли и оформление приходят от сервера:
+ * дракон и wither заводят полосу сами, `/bossbar` — вручную (её и используют в проверке).
+ */
+private fun printBossBars(session: Session) {
+    val bars = session.bossBars.snapshot()
+    if (bars.isEmpty()) {
+        println("Полосы босса: нет")
+        return
+    }
+    println("Полосы босса: ${bars.size}")
+    for (bar in bars) {
+        val color = when (bar.color.name) {
+            "PINK" -> "розовая"
+            "BLUE" -> "синяя"
+            "RED" -> "красная"
+            "GREEN" -> "зелёная"
+            "YELLOW" -> "жёлтая"
+            "PURPLE" -> "фиолетовая"
+            else -> "белая"
+        }
+        val overlay = when (bar.overlay.name) {
+            "PROGRESS" -> "сплошная"
+            "NOTCHED_6" -> "насечки 6"
+            "NOTCHED_10" -> "насечки 10"
+            "NOTCHED_12" -> "насечки 12"
+            else -> "насечки 20"
+        }
+        println(
+            "  «${bar.name.ifEmpty { "без имени" }}» — %.0f%%, %s, %s, затемнение %s, музыка %s, туман %s"
+                .format(
+                    bar.progress * 100f, color, overlay,
+                    if (bar.darkenScreen) "да" else "нет",
+                    if (bar.playMusic) "да" else "нет",
+                    if (bar.createWorldFog) "да" else "нет",
+                ),
+        )
     }
 }
 

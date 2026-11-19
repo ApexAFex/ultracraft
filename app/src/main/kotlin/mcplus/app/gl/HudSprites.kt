@@ -22,22 +22,35 @@ class HudSprites(val sheet: SpriteSheet) {
         /** Путь внутри jar: `assets/minecraft/textures/gui/sprites/` + имя файла. */
         private const val ROOT = "assets/minecraft/textures/gui/sprites/"
 
-        private val FILES = listOf(
-            "hotbar" to "hud/hotbar.png",
-            "hotbar_selection" to "hud/hotbar_selection.png",
-            "crosshair" to "hud/crosshair.png",
-            "heart_container" to "hud/heart/container.png",
-            "heart_full" to "hud/heart/full.png",
-            "heart_half" to "hud/heart/half.png",
-            "food_empty" to "hud/food_empty.png",
-            "food_half" to "hud/food_half.png",
-            "food_full" to "hud/food_full.png",
-            "armor_empty" to "hud/armor_empty.png",
-            "armor_half" to "hud/armor_half.png",
-            "armor_full" to "hud/armor_full.png",
-            "xp_background" to "hud/experience_bar_background.png",
-            "xp_progress" to "hud/experience_bar_progress.png",
-        )
+        private val BOSS_COLORS = listOf("pink", "blue", "red", "green", "yellow", "purple", "white")
+        private val BOSS_OVERLAYS = listOf("notched_6", "notched_10", "notched_12", "notched_20")
+
+        internal val FILES: List<Pair<String, String>> = buildList {
+            add("hotbar" to "hud/hotbar.png")
+            add("hotbar_selection" to "hud/hotbar_selection.png")
+            add("crosshair" to "hud/crosshair.png")
+            add("heart_container" to "hud/heart/container.png")
+            add("heart_full" to "hud/heart/full.png")
+            add("heart_half" to "hud/heart/half.png")
+            add("food_empty" to "hud/food_empty.png")
+            add("food_half" to "hud/food_half.png")
+            add("food_full" to "hud/food_full.png")
+            add("armor_empty" to "hud/armor_empty.png")
+            add("armor_half" to "hud/armor_half.png")
+            add("armor_full" to "hud/armor_full.png")
+            add("xp_background" to "hud/experience_bar_background.png")
+            add("xp_progress" to "hud/experience_bar_progress.png")
+            // Полосы босса: семь цветов и четыре вида с насечками. Имена файлов берутся
+            // из того же каталога `gui/sprites/boss_bar`, что и в ванили.
+            for (color in BOSS_COLORS) {
+                add("boss_${color}_background" to "boss_bar/${color}_background.png")
+                add("boss_${color}_progress" to "boss_bar/${color}_progress.png")
+            }
+            for (overlay in BOSS_OVERLAYS) {
+                add("boss_${overlay}_background" to "boss_bar/${overlay}_background.png")
+                add("boss_${overlay}_progress" to "boss_bar/${overlay}_progress.png")
+            }
+        }
 
         /**
          * @return атлас или null, если игра не найдена — тогда HUD рисует простые прямоугольники.

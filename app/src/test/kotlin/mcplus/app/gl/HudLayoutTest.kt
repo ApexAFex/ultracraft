@@ -75,4 +75,18 @@ class HudLayoutTest {
         assertTrue(button.contains(button.centreX.toDouble(), button.centreY.toDouble()))
         assertFalse(button.contains(0.0, 0.0))
     }
+
+    @Test
+    fun `boss bars are centred at the top and do not overlap`() {
+        val first = HudLayout.bossBar(0, 1280, 720)
+        val second = HudLayout.bossBar(1, 1280, 720)
+
+        assertEquals(1280f, first.x * 2f + first.width, 0.01f)
+        assertTrue(first.y >= 0f && first.y < 60f, "полоса не у верхнего края: ${first.y}")
+        assertTrue(second.y > first.bottom, "полосы босса налезли друг на друга")
+
+        // Имя рисуется над полосой, а не поверх неё.
+        val (_, nameTop) = HudLayout.bossBarNameAnchor(0, 1280, 720)
+        assertTrue(nameTop < first.y, "имя босса попало на полосу")
+    }
 }

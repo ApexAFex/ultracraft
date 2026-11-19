@@ -306,6 +306,9 @@ object GlView {
                     // вразы быстрее секунд), чтобы самопроверку можно было прогнать без рук.
                     var deathNanos = 0L
 
+                    /** Сколько полос босса было в прошлом кадре — чтобы напечатать их один раз. */
+                    var knownBossBars = -1
+
                     fun requestRespawn() {
                         session?.requestRespawn()
                         session?.vitals?.respawned()
@@ -455,6 +458,15 @@ object GlView {
                         // it is open, otherwise the same motion would turn the view.
                         val vitals = session?.vitals
                         val dead = vitals?.dead == true
+                        val bossBars = session?.bossBars?.snapshot() ?: emptyList()
+                        if (bossBars.size != knownBossBars) {
+                            knownBossBars = bossBars.size
+                            if (bossBars.isNotEmpty()) {
+                                println("Полосы босса: " + bossBars.joinToString { bar ->
+                                    "%s %.0f%%".format(bar.name.ifEmpty { "без имени" }, bar.progress * 100f)
+                                })
+                            }
+                        }
 
                         if (input.inventoryToggleRequested && !dead && !chat.open) {
                             inventoryOpen = !inventoryOpen
@@ -914,7 +926,7 @@ object GlView {
                                 hud.drawChat(chatLines, System.nanoTime())
                                 hud.drawChatInput(chat.text)
                             } else {
-                                hud.draw(inventory, vitals, itemName, itemNameAlpha)
+                                hud.draw(inventory, vitals, bossBars, itemName, itemNameAlpha)
                                 hud.drawChat(chatLines, System.nanoTime())
                             }
                         }

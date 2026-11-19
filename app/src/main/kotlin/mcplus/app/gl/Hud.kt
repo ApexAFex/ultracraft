@@ -1,9 +1,11 @@
 package mcplus.app.gl
 
+import mcplus.net.BossBar
 import mcplus.net.ChatLine
 import mcplus.net.Inventory
 import mcplus.net.Vitals
 import java.io.Closeable
+import kotlin.math.floor
 
 /**
  * HUD поверх сцены: хотбар, здоровье, голод, опыт, прицел и экран смерти.
@@ -23,6 +25,7 @@ class Hud(
     fun draw(
         inventory: Inventory?,
         vitals: Vitals?,
+        bossBars: List<BossBar>,
         itemName: String?,
         itemNameAlpha: Float,
     ) {
@@ -30,6 +33,7 @@ class Hud(
         renderer.begin()
 
         drawHotbar(inventory, s)
+        drawBossBars(bossBars)
         if (vitals != null) {
             drawHearts(vitals)
             drawFood(vitals)
@@ -38,9 +42,10 @@ class Hud(
         drawCrosshair(s)
         renderer.draw()
 
-        val labels = ArrayList<TextRenderer.ScreenLabel>(12)
+        val labels = ArrayList<TextRenderer.ScreenLabel>(12 + bossBars.size)
         if (inventory != null) appendCounts(labels, inventory, s)
         if (vitals != null && vitals.level > 0) appendLevel(labels, vitals, s)
+        appendBossBarNames(labels, bossBars, s)
         if (labels.isNotEmpty()) text?.drawScreen(labels)
 
         if (itemName != null && itemNameAlpha > 0.01f) {
@@ -248,6 +253,51 @@ class Hud(
         val length = 7f * s
         renderer.rect(rect.centreX - length / 2f, rect.centreY - thickness / 2f, length, thickness, 0xFFFFFF, 0.85f)
         renderer.rect(rect.centreX - thickness / 2f, rect.centreY - length / 2f, thickness, length, 0xFFFFFF, 0.85f)
+    }
+
+    /**
+     * Полосы босса: фон, заполнение по доле здоровья и имя над полосой.
+     *
+     * Доля округляется до целого пикселя, как `Mth.lerpDiscrete` в ванили: иначе у почти
+     * пустой полосы оставался бы светящийся хвост меньше пикселя, а на 182 пикселях он
+     * заметен. Без спрайтов игры полоса рисуется прямоугольниками цвета полосы.
+     */
+    private fun drawBossBars(bars: List<BossBar>) {
+        for ((index, bar) in bars.withIndex()) {
+            val rect = HudLayout.bossBar(index, width, height)
+            if (!renderer.sprite(BossBarStyle.background(bar.color), rect)) {
+                renderer.rect(rect, 0x200000, 0.75f)
+            }
+            BossBarStyle.overlayBackground(bar.overlay)?.let { renderer.sprite(it, rect) }
+
+            val pixels = floor(bar.progress * HudLayout.BOSS_BAR_WIDTH) / HudLayout.BOSS_BAR_WIDTH
+            if (pixels <= 0f) continue
+            val filled = HudRect(rect.x, rect.y, rect.width * pixels, rect.height)
+            if (!renderer.sprite(BossBarStyle.progress(bar.color), filled, uTo = pixels)) {
+                renderer.rect(filled, BossBarStyle.fallbackColor(bar.color), 0.95f)
+            }
+            BossBarStyle.overlayProgress(bar.overlay)?.let {
+                renderer.sprite(it, filled, uTo = pixels)
+            }
+        }
+    }
+
+    private fun appendBossBarNames(
+        labels: MutableList<TextRenderer.ScreenLabel>,
+        bars: List<BossBar>,
+        s: Float,
+    ) {
+        val text = this.text ?: return
+        for ((index, bar) in bars.withIndex()) {
+            if (bar.name.isEmpty()) continue
+            val (centreX, top) = HudLayout.bossBarNameAnchor(index, width, height)
+            labels += TextRenderer.ScreenLabel(
+                x = centreX - text.textWidth(bar.name, s) / 2f,
+                y = top,
+                text = bar.name,
+                scale = s,
+            )
+        }
     }
 
     private fun appendCounts(labels: MutableList<TextRenderer.ScreenLabel>, inventory: Inventory, s: Float) {

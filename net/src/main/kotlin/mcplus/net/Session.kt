@@ -57,6 +57,13 @@ class Session internal constructor(
     /** Time of day and weather: the client only displays them. */
     val sky: SkyState = SkyState()
 
+    /**
+     * Полосы босса: дракон и wither заводят их сами, `/bossbar` — вручную.
+     *
+     * Клиент их не считает: сервер присылает имена, доли и оформление.
+     */
+    val bossBars: BossBars = BossBars()
+
     /** Why the connection ended, or null while it is alive. */
     @Volatile
     var closeReason: String? = null
@@ -131,6 +138,8 @@ class Session internal constructor(
 
                 Protocol777.Play.SET_TIME, Protocol777.Play.GAME_EVENT ->
                     sky.onPacket(packet.id, packet.body) { joinResult.registries.worldClock(it) }
+
+                Protocol777.Play.BOSS_EVENT -> bossBars.onPacket(packet.body)
 
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 

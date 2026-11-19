@@ -28,6 +28,10 @@ object HudLayout {
     const val HEART_STEP = 8f
     const val HEARTS = 10
     const val XP_HEIGHT = 5f
+    const val BOSS_BAR_WIDTH = 182f
+    const val BOSS_BAR_HEIGHT = 5f
+    const val BOSS_BAR_STEP = 19f
+    const val BOSS_BAR_TOP = 12f
 
     /** Ванильный «GUI scale»: 2 на маленьком окне, до 4 на большом. */
     fun scale(height: Int): Int = (height / VIRTUAL_HEIGHT).toInt().coerceIn(2, 4)
@@ -116,5 +120,26 @@ object HudLayout {
     fun respawnButton(width: Int, height: Int): HudRect {
         val s = scale(height).toFloat()
         return HudRect((width - 200f * s) / 2f, height * 0.55f, 200f * s, 20f * s)
+    }
+
+    /**
+     * Полоса босса: по центру сверху, 182×5, шаг между полосами 19 — числа из ванильного
+     * `BossHealthOverlay` (первая полоса на высоте 12).
+     */
+    fun bossBar(index: Int, width: Int, height: Int): HudRect {
+        val s = scale(height).toFloat()
+        return HudRect(
+            x = (width - BOSS_BAR_WIDTH * s) / 2f,
+            y = (BOSS_BAR_TOP + index * BOSS_BAR_STEP) * s,
+            width = BOSS_BAR_WIDTH * s,
+            height = BOSS_BAR_HEIGHT * s,
+        )
+    }
+
+    /** Имя босса — над полосой, по центру. */
+    fun bossBarNameAnchor(index: Int, width: Int, height: Int): Pair<Float, Float> {
+        val s = scale(height).toFloat()
+        val bar = bossBar(index, width, height)
+        return bar.centreX to bar.y - 9f * s
     }
 }

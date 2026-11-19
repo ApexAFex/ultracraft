@@ -63,6 +63,7 @@ object Protocol777 {
 
     object Play {
         // clientbound
+        const val BOSS_EVENT: Int = 0x09
         const val CHUNK_BATCH_FINISHED: Int = 0x0B
         const val DISCONNECT: Int = 0x20
         const val SPAWN_ENTITY: Int = 0x01
