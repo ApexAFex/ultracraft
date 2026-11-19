@@ -667,6 +667,10 @@ object GlView {
                         if (input.hudToggleRequested && !chat.open) {
                             hudHidden = !hudHidden
                         }
+                        if (!chat.open && !inventoryOpen && openContainer == null) {
+                            if (input.dropRequested) session?.send(mcplus.net.PlayerMovement.drop(all = false))
+                            if (input.dropStackRequested) session?.send(mcplus.net.PlayerMovement.drop(all = true))
+                        }
                         if (input.escapeRequested) {
                             when {
                                 chat.open -> chat.close()
@@ -1443,6 +1447,13 @@ object GlView {
                             }
                         }.toMutableList()
 
+                        // Имена мобов из метаданных — над их головами, как у игроков.
+                        for (entity in entities) {
+                            val custom = entity.customName ?: continue
+                            val (_, boxHeight, _) = EntityRay.boxOf(entityTypes.nameOf(entity.type))
+                            labels += TextRenderer.Label(entity.x, entity.y + boxHeight + 0.35, entity.z, custom)
+                        }
+
                         if (demo) {
                             // The self-test needs a tag it can read: the nearest player is usually
                             // many blocks away, where 0.025-block glyphs are a few pixels tall.
@@ -1553,6 +1564,15 @@ object GlView {
                                     "Координаты: %.2f, %.2f, %.2f".format(player.x, player.y, player.z),
                                     "Чанк: ${kotlin.math.floor(player.x).toInt() shr 4}, ${kotlin.math.floor(player.z).toInt() shr 4}",
                                     "Сущностей: ${entities.size}, чанков: ${renderer.chunkCount}",
+                                    "Биом: " + (
+                                        biomeNames.getOrNull(
+                                            world.biomeAt(
+                                                kotlin.math.floor(player.x).toInt(),
+                                                kotlin.math.floor(player.y).toInt(),
+                                                kotlin.math.floor(player.z).toInt(),
+                                            ),
+                                        ) ?: "?"
+                                        ),
                                     "Наклон: %.0f, поворот: %.0f".format(camera.pitch, camera.yaw),
                                 ),
                             )
@@ -1576,6 +1596,45 @@ object GlView {
                         // With the inventory open the same button drags items, so it must not mine.
                         holdRequested = !inventoryOpen && openContainer == null && !dead && !chat.open &&
                             (leftDown || (demo && frame >= 5 && frame < 900))
+
+                        // Удар по сущности: если под прицелом моб ближе блока — бьём его.
+                        if (input.clickRequested && !inventoryOpen && openContainer == null &&
+                            !dead && !chat.open && !demo
+                        ) {
+                            val direction = camera.forward()
+                            var hitId = -1
+                            var hitDistance = 3.5
+                            for (entity in entities) {
+                                val name = entityTypes.nameOf(entity.type)
+                                if (!EntityRay.isLiving(name)) continue
+                                val (boxWidth, boxHeight, boxDepth) = EntityRay.boxOf(name)
+                                val halfW = boxWidth / 2.0
+                                val halfD = boxDepth / 2.0
+                                val distance = EntityRay.distance(
+                                    camera.x, camera.y, camera.z,
+                                    direction[0].toDouble(), direction[1].toDouble(), direction[2].toDouble(),
+                                    entity.x - halfW, entity.y, entity.z - halfD,
+                                    entity.x + halfW, entity.y + boxHeight, entity.z + halfD,
+                                ) ?: continue
+                                if (distance in 0.0..hitDistance) {
+                                    hitDistance = distance
+                                    hitId = entity.id
+                                }
+                            }
+                            val blockDistance = target?.let {
+                                kotlin.math.sqrt(
+                                    (it.x + 0.5 - camera.x) * (it.x + 0.5 - camera.x) +
+                                        (it.y + 0.5 - camera.y) * (it.y + 0.5 - camera.y) +
+                                        (it.z + 0.5 - camera.z) * (it.z + 0.5 - camera.z),
+                                )
+                            } ?: Double.MAX_VALUE
+                            if (hitId >= 0 && hitDistance < blockDistance) {
+                                session?.attack(hitId)
+                                println("Удар по сущности id=$hitId (%.2f блока)".format(hitDistance))
+                                swingNanos = System.nanoTime()
+                                holdRequested = false
+                            }
+                        }
                         aimTarget = if (inventoryOpen || openContainer != null || dead || chat.open) null else miningTarget
 
                         if (!inventoryOpen && openContainer == null && !dead && !chat.open &&
@@ -1584,8 +1643,26 @@ object GlView {
                             demoPlace(target)
                         }
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
-                        if (demo && frame == DEMO_AIM_AT) {
-                            // Aim at the closest **player** first: nicknames and player models are
+                        // Демо бьёт ближайшую сущность, если она в пределах руки.
+                        if (demo && frame == 25) {
+                            val nearest = tracker.snapshot().minByOrNull { entity ->
+                                val dx = entity.x - camera.x
+                                val dy = entity.y + 0.9 - camera.y
+                                val dz = entity.z - camera.z
+                                dx * dx + dy * dy + dz * dz
+                            }
+                            if (nearest != null && EntityRay.isLiving(entityTypes.nameOf(nearest.type))) {
+                                val dx = nearest.x - camera.x
+                                val dy = nearest.y + 0.9 - camera.y
+                                val dz = nearest.z - camera.z
+                                if (dx * dx + dy * dy + dz * dz <= 12.25) {
+                                    session?.attack(nearest.id)
+                                    println("Демо: удар по сущности id=${nearest.id} ${entityTypes.nameOf(nearest.type)}")
+                                }
+                            }
+                        }
+
+                        if (demo && frame == DEMO_AIM_AT) {                            // Aim at the closest **player** first: nicknames and player models are
                             // what a screenshot needs to check, and a passing mob would hide them.
                             val players = tracker.snapshot().filter { playerList.nameOf(it.uuid) != null }
                             val nearest = (players.ifEmpty { tracker.snapshot() }).minByOrNull { entity ->

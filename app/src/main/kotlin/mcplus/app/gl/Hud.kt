@@ -76,9 +76,9 @@ class Hud(
         renderer.draw()
 
         val titleScale = s * 3f
-        val title = "YOU DIED"
-        val hint = "R or click to respawn"
-        val respawn = "RESPAWN"
+        val title = "Вы умерли"
+        val hint = "R или клик — возродиться"
+        val respawn = "Возродиться"
         val labels = listOf(
             TextRenderer.ScreenLabel(
                 (width - (text?.textWidth(title, titleScale) ?: 0f)) / 2f,

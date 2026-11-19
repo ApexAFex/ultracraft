@@ -114,6 +114,8 @@ object Protocol777 {
         const val CONTAINER_CLOSE_SERVERBOUND: Int = 0x13
         /** Взмах рукой в 26.3 — это действие `STAB` пакета `player_action`. */
         const val SWING_ACTION: Int = 8
+        /** Атака сущности: отдельный пакет с одним номером сущности. */
+        const val ATTACK_SERVERBOUND: Int = 0x01
         const val CHUNK_BATCH_RECEIVED: Int = 0x0B
         const val CLIENT_STATUS: Int = 0x0C
         const val CLIENT_TICK_END: Int = 0x0D

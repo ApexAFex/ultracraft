@@ -51,6 +51,7 @@ class Input(private val window: Long, private val camera: Camera) {
     private var hudKeyPressed = false
     private var forwardPressed = false
     private var lastForwardNanos = 0L
+    private var dropPressed = false
     private var mouseWasDown = false
 
     /** Символы, набранные с клавиатуры с прошлого кадра (то, что печатает человек). */
@@ -110,6 +111,13 @@ class Input(private val window: Long, private val camera: Camera) {
 
     /** Двойное нажатие W включает бег до отпускания клавиши. */
     var sprintDoubleTap: Boolean = false
+        private set
+
+    /** Q выбрасывает один предмет, Ctrl+Q — всю стопку. */
+    var dropRequested: Boolean = false
+        private set
+
+    var dropStackRequested: Boolean = false
         private set
 
     /** Set once when the left mouse button goes down inside the inventory screen. */
@@ -245,6 +253,12 @@ class Input(private val window: Long, private val camera: Camera) {
         val hudKey = pressed(GLFW.GLFW_KEY_F1)
         hudToggleRequested = hudKey && !hudKeyPressed
         hudKeyPressed = hudKey
+
+        val drop = pressed(GLFW.GLFW_KEY_Q)
+        val control = pressed(GLFW.GLFW_KEY_LEFT_CONTROL) || pressed(GLFW.GLFW_KEY_RIGHT_CONTROL)
+        dropRequested = drop && !dropPressed && !control
+        dropStackRequested = drop && !dropPressed && control
+        dropPressed = drop
 
         // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
         // a frame-by-frame repeat would send a packet per frame.

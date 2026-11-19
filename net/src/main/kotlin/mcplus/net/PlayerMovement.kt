@@ -19,6 +19,10 @@ object PlayerMovement {
     /** Bit 1: bumped into a wall horizontally (the server uses it for step sounds). */
     const val HORIZONTAL_COLLISION: Int = 0x02
 
+    /** Действия `player_action`: выброс всей стопки и одного предмета. */
+    const val DROP_ALL_ITEMS: Int = 4
+    const val DROP_ITEM: Int = 5
+
     /** `Set Player Position` — moved, did not turn. */
     fun position(x: Double, y: Double, z: Double, flags: Int): Packet {
         val body = ByteWriter(32)
@@ -74,6 +78,17 @@ object PlayerMovement {
      * behind by up to 60 ticks.
      */
     fun playerLoaded(): Packet = Packet(Protocol777.Play.PLAYER_LOADED, EMPTY)
+
+    /** Выброс предмета: `all` — вся стопка, иначе один. */
+    fun drop(all: Boolean): Packet = Packet(
+        Protocol777.Play.PLAYER_ACTION,
+        mcplus.protocol.ByteWriter()
+            .writeVarInt(if (all) DROP_ALL_ITEMS else DROP_ITEM)
+            .writePosition(0, 0, 0)
+            .writeByte(0)
+            .writeVarInt(0)
+            .toByteArray(),
+    )
 
     /** Взмах рукой: в 26.3 это `player_action` с действием `STAB`. */
     fun swingArm(): Packet = Packet(

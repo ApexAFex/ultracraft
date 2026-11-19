@@ -297,6 +297,17 @@ class Session internal constructor(
     /** Таблица предметов (прочность, броня) для HUD и экранов. */
     val itemStatsTable: ItemStats get() = itemStats
 
+    /** Удар по сущности: сервер применяет урон и отбрасывание. */
+    fun attack(entityId: Int) {
+        send(
+            mcplus.protocol.Packet(
+                Protocol777.Play.ATTACK_SERVERBOUND,
+                mcplus.protocol.ByteWriter().writeVarInt(entityId).toByteArray(),
+            ),
+        )
+        send(PlayerMovement.swingArm())
+    }
+
     /** Остаток и максимум прочности предмета в руке, если он изношен. */
     fun heldDurability(): Pair<Int, Int>? {
         val stack = inventory.held() ?: return null
