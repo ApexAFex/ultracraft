@@ -73,6 +73,9 @@ object GlView {
     private const val DEMO_TYPE_AT = 1300
     private const val DEMO_SUBMIT_AT = 1340
 
+    /** Демо поворачивает камеру на солнце или луну: иначе светила не попадают в кадр. */
+    private const val DEMO_SKY_AT = 450
+
     /**
      * How long a dig may take before the client gives up on it, in ticks beyond its estimate.
      * The server keeps its own progress and breaks the block when it reaches one, so the
@@ -253,6 +256,16 @@ object GlView {
                         HudRenderer(hudSprites, textures, width, height),
                         textRenderer, atlas, width, height,
                     )
+                    // Небо: своя маленькая текстура (солнце, фазы луны, облака).
+                    val skyTextures = SkyTextures.load(directory)
+                    if (skyTextures == null) {
+                        println("Текстуры неба не найдены: солнце, луна и облака не рисуются")
+                    } else {
+                        println("Небо: ${skyTextures.sheet.sprites.size} спрайтов")
+                    }
+                    val skyRenderer = SkyRenderer(skyTextures, width, height)
+                    val dimension = session?.joinResult?.joinGame?.dimensionName
+                        ?.substringAfterLast(':') ?: "overworld"
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     val input = Input(window, camera)
                     val chat = ChatInput()
@@ -568,9 +581,20 @@ object GlView {
                             println("Демо: отправлена команда /list")
                         }
 
+                        // Демо смотрит на солнце или луну: иначе они не попадают в кадр.
+                        if (demo && frame == DEMO_SKY_AT) {
+                            val ticks = session?.sky?.dayTicks ?: 6_000L
+                            val angle = 2.0 * Math.PI * Math.floorMod(ticks, 24_000L) / 24_000.0
+                            val sunUp = kotlin.math.sin(angle) >= 0.0
+                            val dx = if (sunUp) kotlin.math.cos(angle) else -kotlin.math.cos(angle)
+                            val dy = if (sunUp) kotlin.math.sin(angle) else -kotlin.math.sin(angle)
+                            camera.yaw = kotlin.math.atan2(dx, 0.0).toFloat()
+                            camera.pitch = kotlin.math.asin(dy).toFloat()
+                            println("Демо: камера на ${if (sunUp) "солнце" else "луну"}")
+                        }
+
                         // Демо переключает слот: HUD должен показать название предмета.
-                        if (demo && frame == DEMO_SELECT_AT) {
-                            session?.selectSlot(1)
+                        if (demo && frame == DEMO_SELECT_AT) {                            session?.selectSlot(1)
                             println("Демо: выбран слот 2 (${session?.inventory?.heldName() ?: "пусто"})")
                         }
 
@@ -777,9 +801,9 @@ object GlView {
                             sky?.rain ?: 0f,
                             sky?.thunder ?: 0f,
                         )
-                        val skyColor = Daylight.skyColor(daylightFraction, sky?.rain ?: 0f)
+                        val skyColor = Daylight.skyColor(dimension, daylightFraction, sky?.rain ?: 0f)
                         renderer.daylight = light
-                        renderer.fogColor = Daylight.fogColor(skyColor)
+                        renderer.fogColor = Daylight.fogColor(dimension, daylightFraction, sky?.rain ?: 0f)
                         renderer.fogStart = 90f
                         renderer.fogEnd = 170f
 
@@ -791,7 +815,22 @@ object GlView {
                         )
                         GL30.glClear(GL30.GL_COLOR_BUFFER_BIT or GL30.GL_DEPTH_BUFFER_BIT)
 
+                        // Небо до мира: любой блок закрывает звёзды и солнце сам собой.
+                        skyRenderer.drawCelestial(
+                            camera,
+                            sky?.dayTicks ?: 6_000L,
+                            light,
+                            dimension,
+                        )
                         renderer.draw(camera)
+                        // Облака после мира: они выше земли и не должны её перекрывать.
+                        skyRenderer.drawClouds(
+                            camera,
+                            sky?.totalTicks ?: 0L,
+                            daylightFraction,
+                            sky?.rain ?: 0f,
+                            dimension,
+                        )
                         tracker.tick(input.deltaSeconds)
                         val entities = tracker.snapshot()
                         if (entities.size != lastEntityCount) {
@@ -974,6 +1013,7 @@ object GlView {
                     }
                     entityRenderer.close()
                     playerRenderer.close()
+                    skyRenderer.close()
                     hud.close()
                     textRenderer?.close()
                     pipeline.close()
@@ -1020,6 +1060,8 @@ object GlView {
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
+
+
 
 
 

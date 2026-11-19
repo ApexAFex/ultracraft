@@ -210,7 +210,7 @@ class HudRenderer(
         icons = icons.copyOf(icons.size * 2)
     }
 
-    private fun uvOf(sprite: HudSprites.Sprite): FloatArray {
+    private fun uvOf(sprite: SpriteSheet.Sprite): FloatArray {
         val width = image.width.toFloat()
         val height = image.height.toFloat()
         return floatArrayOf(

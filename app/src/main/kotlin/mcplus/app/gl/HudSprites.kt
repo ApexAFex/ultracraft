@@ -10,12 +10,13 @@ import java.io.File
  * `versions/<id>/<id>.jar` при запуске. Все картинки пакуются в один атлас, чтобы HUD
  * рисовался одним вызовом отрисовки.
  */
-class HudSprites(val image: BufferedImage, val sprites: Map<String, Sprite>) {
+class HudSprites(val sheet: SpriteSheet) {
 
-    /** Прямоугольник спрайта внутри атласа, в пикселях. */
-    data class Sprite(val x: Int, val y: Int, val width: Int, val height: Int)
+    val image: BufferedImage get() = sheet.image
 
-    operator fun get(name: String): Sprite? = sprites[name]
+    val sprites: Map<String, SpriteSheet.Sprite> get() = sheet.sprites
+
+    operator fun get(name: String): SpriteSheet.Sprite? = sheet.sprites[name]
 
     companion object {
         /** Путь внутри jar: `assets/minecraft/textures/gui/sprites/` + имя файла. */
@@ -51,48 +52,12 @@ class HudSprites(val image: BufferedImage, val sprites: Map<String, Sprite>) {
             if (images.isEmpty()) return null
             // Белый квадрат: им рисуются сплошные полосы и подложки одним проходом со спрайтами.
             images += "white" to BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB).apply {
-                setRGB(0, 0, 0xFFFFFFFF.toInt())
-                setRGB(1, 0, 0xFFFFFFFF.toInt())
-                setRGB(0, 1, 0xFFFFFFFF.toInt())
-                setRGB(1, 1, 0xFFFFFFFF.toInt())
+                for (y in 0 until 2) for (x in 0 until 2) setRGB(x, y, 0xFFFFFFFF.toInt())
             }
             return pack(images)
         }
 
-        /** Полочная упаковка: картинки ставятся в ряд, ряд переносится, когда не влезает. */
-        internal fun pack(images: List<Pair<String, BufferedImage>>, padding: Int = 1): HudSprites {
-            require(images.isNotEmpty()) { "нечего упаковывать" }
-
-            var width = 64
-            for ((_, image) in images) width = maxOf(width, image.width + padding * 2)
-
-            var x = padding
-            var y = padding
-            var shelfHeight = 0
-            val placed = ArrayList<Pair<String, IntArray>>(images.size)
-            for ((name, image) in images) {
-                if (x + image.width + padding > width) {
-                    x = padding
-                    y += shelfHeight + padding
-                    shelfHeight = 0
-                }
-                placed += name to intArrayOf(x, y)
-                x += image.width + padding
-                shelfHeight = maxOf(shelfHeight, image.height)
-            }
-
-            val height = y + shelfHeight + padding
-            val atlas = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
-            val graphics = atlas.createGraphics()
-            val sprites = LinkedHashMap<String, Sprite>()
-            for (index in placed.indices) {
-                val (name, position) = placed[index]
-                val image = images[index].second
-                graphics.drawImage(image, position[0], position[1], null)
-                sprites[name] = Sprite(position[0], position[1], image.width, image.height)
-            }
-            graphics.dispose()
-            return HudSprites(atlas, sprites)
-        }
+        internal fun pack(images: List<Pair<String, BufferedImage>>, padding: Int = 1): HudSprites =
+            HudSprites(SpriteSheet.pack(images, padding))
     }
 }

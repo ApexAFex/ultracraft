@@ -30,6 +30,22 @@ object Daylight {
     /** Туман чуть светлее неба, иначе горизонт выглядит провалом в пустоту. */
     fun fogColor(sky: Int): Int = lerpColor(sky, 0xFFFFFF, 0.12f)
 
+    /**
+     * Небо по измерению: в аду и энде нет солнца, поэтому цвет постоянный.
+     * Названия приходят из `Join Game` без префикса `minecraft:`.
+     */
+    fun skyColor(dimension: String, factor: Float, rain: Float): Int = when (dimension) {
+        "the_nether" -> 0x3A0A0A
+        "the_end" -> 0x0A0812
+        else -> skyColor(factor, rain)
+    }
+
+    fun fogColor(dimension: String, factor: Float, rain: Float): Int = when (dimension) {
+        "the_nether" -> 0x330808
+        "the_end" -> 0x120C1C
+        else -> fogColor(skyColor(factor, rain))
+    }
+
     /** Свет неба для шейдера: дождь и гроза гасят его сильнее, чем облака. */
     fun effectiveLight(factor: Float, rain: Float, thunder: Float): Float {
         val dim = (

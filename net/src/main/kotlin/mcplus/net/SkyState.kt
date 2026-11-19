@@ -12,6 +12,10 @@ import mcplus.protocol.ByteReader
  */
 class SkyState {
 
+    /** Всего тиков по часам `overworld`: по ним плывут облака. */
+    var totalTicks: Long = 0L
+        private set
+
     /** Время суток в тиках 0..23999: 0 — рассвет, 6000 — полдень, 18000 — полночь. */
     var dayTicks: Long = 0L
         private set
@@ -60,6 +64,7 @@ class SkyState {
         }
 
         val entry = overworld ?: first ?: return
+        totalTicks = entry.first
         dayTicks = Math.floorMod(entry.first, TICKS_PER_DAY)
         partialTick = entry.second
         rate = entry.third
