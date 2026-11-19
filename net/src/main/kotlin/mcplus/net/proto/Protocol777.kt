@@ -95,6 +95,8 @@ object Protocol777 {
         const val PLAYER_CHAT: Int = 0x42
         const val SET_TIME: Int = 0x73
         const val LIGHT_UPDATE: Int = 0x31
+        const val UPDATE_MOB_EFFECT: Int = 0x87
+        const val REMOVE_MOB_EFFECT: Int = 0x4F
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00

@@ -515,6 +515,36 @@ private fun hudCommand(args: List<String>) {
         open.drain(seconds * 1_000L)
         printVitals(open.vitals)
         printBossBars(open)
+        printEffects(open)
+    }
+}
+
+/**
+ * Эффекты на игроке — то, что HUD рисует иконками справа сверху.
+ *
+ * Длительность переводится в секунды условно (20 тиков = секунда): она уменьшается на сервере,
+ * и клиент только показывает присланное число.
+ */
+private fun printEffects(session: Session) {
+    val effects = session.effects.snapshot()
+    if (effects.isEmpty()) {
+        println("Эффекты: нет")
+        return
+    }
+    println("Эффекты: ${effects.size}")
+    for (effect in effects) {
+        val kind = when (effect.category) {
+            mcplus.net.EffectCategory.BENEFICIAL -> "полезный"
+            mcplus.net.EffectCategory.HARMFUL -> "вредный"
+            mcplus.net.EffectCategory.NEUTRAL -> "нейтральный"
+        }
+        println(
+            "  %s %d — %.1f с, %s%s%s".format(
+                effect.name, effect.amplifier + 1, effect.durationTicks / 20.0,
+                kind, if (effect.ambient) ", фоновый" else "",
+                if (effect.showIcon) "" else ", без иконки",
+            ),
+        )
     }
 }
 
@@ -995,6 +1025,27 @@ private fun findItemTable(explicit: String? = null): mcplus.net.ItemTable {
     return mcplus.net.ItemTable.load(file)
 }
 
+/**
+ * Effect names for the numbers on the wire, generated with `tools/build-effect-table.js`.
+ *
+ * A missing table is not fatal: the client still works, effect icons simply do not appear
+ * (the id is unknown, so there is no texture file to load).
+ */
+private fun findEffectTable(explicit: String? = null): mcplus.net.EffectTable {
+    val candidates = buildList {
+        explicit?.let { add(java.io.File(it)) }
+        add(java.io.File("data/effects-777.tsv"))
+        add(java.io.File("../data/effects-777.tsv"))
+        add(java.io.File("../../data/effects-777.tsv"))
+    }
+    val file = candidates.firstOrNull { it.isFile }
+    if (file == null) {
+        System.err.println("Нет таблицы эффектов (data/effects-777.tsv): иконки зелий рисоваться не будут.")
+        return mcplus.net.EffectTable.EMPTY
+    }
+    return mcplus.net.EffectTable.load(file)
+}
+
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
     val account = if (options.online) loadAccount() else null
     val attempts = 3
@@ -1014,6 +1065,7 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session {
                 protocolVersion = options.protocol,
                 log = if (options.verbose) { line -> println("  $line") } else { _ -> },
                 itemTable = findItemTable(),
+                effectTable = findEffectTable(),
             ).join()
         } catch (e: ServerDisconnectException) {
             // The session server rate limits joins and propagates them lazily, so a fresh

@@ -26,6 +26,7 @@ class Session internal constructor(
     val joinResult: JoinResult,
     private val log: (String) -> Unit = {},
     itemTable: ItemTable = ItemTable.EMPTY,
+    effectTable: EffectTable = EffectTable.EMPTY,
 ) : Closeable {
 
     var playerPosition: PlayerPosition? = null
@@ -63,6 +64,9 @@ class Session internal constructor(
      * Клиент их не считает: сервер присылает имена, доли и оформление.
      */
     val bossBars: BossBars = BossBars()
+
+    /** Эффекты на нашем игроке: зелья, маяк, зачарования. Иконки рисует HUD. */
+    val effects: Effects = Effects(effectTable)
 
     /** Why the connection ended, or null while it is alive. */
     @Volatile
@@ -125,7 +129,15 @@ class Session internal constructor(
                 Protocol777.Play.SET_HEALTH,
                 Protocol777.Play.SET_EXPERIENCE,
                 Protocol777.Play.RESPAWN ->
-                    vitals.onPacket(packet.id, packet.body)
+                    vitals.onPacket(packet.id, packet.body).also { handled ->
+                        // Смерть снимает эффекты: сервер тоже присылает удаления, но после
+                        // возрождения на экране не должно остаться иконок прошлой жизни.
+                        if (handled && packet.id == Protocol777.Play.RESPAWN) effects.clear()
+                    }
+
+                Protocol777.Play.UPDATE_MOB_EFFECT,
+                Protocol777.Play.REMOVE_MOB_EFFECT ->
+                    effects.onPacket(packet.id, packet.body, joinResult.joinGame.entityId)
 
                 Protocol777.Play.SYSTEM_CHAT ->
                     readSystemChat(packet.body)?.let { chat.add(it) }

@@ -250,7 +250,7 @@ object GlView {
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
                     // HUD поверх сцены: спрайты интерфейса тоже из установки игрока.
-                    val hudSprites = HudSprites.load(directory)
+                    val hudSprites = HudSprites.load(directory, session?.effects?.iconNames ?: emptyList())
                     if (hudSprites == null) println("Спрайты HUD не найдены: HUD рисуется прямоугольниками")
                     val hud = Hud(
                         HudRenderer(hudSprites, textures, width, height),
@@ -308,6 +308,9 @@ object GlView {
 
                     /** Сколько полос босса было в прошлом кадре — чтобы напечатать их один раз. */
                     var knownBossBars = -1
+
+                    /** Какие эффекты были в прошлом кадре — печатаем только изменения. */
+                    var knownEffects = ""
 
                     fun requestRespawn() {
                         session?.requestRespawn()
@@ -459,6 +462,7 @@ object GlView {
                         val vitals = session?.vitals
                         val dead = vitals?.dead == true
                         val bossBars = session?.bossBars?.snapshot() ?: emptyList()
+                        val effects = session?.effects?.snapshot() ?: emptyList()
                         if (bossBars.size != knownBossBars) {
                             knownBossBars = bossBars.size
                             if (bossBars.isNotEmpty()) {
@@ -466,6 +470,11 @@ object GlView {
                                     "%s %.0f%%".format(bar.name.ifEmpty { "без имени" }, bar.progress * 100f)
                                 })
                             }
+                        }
+                        val effectSummary = effects.joinToString { "%s %d".format(it.name, it.amplifier + 1) }
+                        if (effectSummary != knownEffects) {
+                            knownEffects = effectSummary
+                            if (effects.isNotEmpty()) println("Эффекты: $effectSummary")
                         }
 
                         if (input.inventoryToggleRequested && !dead && !chat.open) {
@@ -926,7 +935,7 @@ object GlView {
                                 hud.drawChat(chatLines, System.nanoTime())
                                 hud.drawChatInput(chat.text)
                             } else {
-                                hud.draw(inventory, vitals, bossBars, itemName, itemNameAlpha)
+                                hud.draw(inventory, vitals, bossBars, effects, itemName, itemNameAlpha)
                                 hud.drawChat(chatLines, System.nanoTime())
                             }
                         }

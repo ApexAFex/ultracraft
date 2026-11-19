@@ -1,5 +1,6 @@
 package mcplus.app.gl
 
+import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
 import mcplus.net.ChatLine
 import mcplus.net.Inventory
@@ -26,6 +27,7 @@ class Hud(
         inventory: Inventory?,
         vitals: Vitals?,
         bossBars: List<BossBar>,
+        effects: List<ActiveEffect>,
         itemName: String?,
         itemNameAlpha: Float,
     ) {
@@ -34,6 +36,7 @@ class Hud(
 
         drawHotbar(inventory, s)
         drawBossBars(bossBars)
+        drawEffects(effects, s)
         if (vitals != null) {
             drawHearts(vitals)
             drawFood(vitals)
@@ -282,8 +285,37 @@ class Hud(
         }
     }
 
-    private fun appendBossBarNames(
-        labels: MutableList<TextRenderer.ScreenLabel>,
+    /**
+     * Иконки эффектов справа сверху: фон, картинка эффекта по центру.
+     *
+     * Порядок внутри группы — по id эффекта, чтобы иконки не перескакивали при обновлении
+     * длительности. Эффекты без флага «показывать иконку» (например, от маяка) пропускаются:
+     * так делает и ванильный клиент.
+     */
+    private fun drawEffects(effects: List<ActiveEffect>, s: Float) {
+        var beneficial = 0
+        var other = 0
+        for (effect in effects.sortedBy { it.id }) {
+            if (!effect.showIcon) continue
+            val index = if (effect.beneficial) beneficial++ else other++
+            val rect = HudLayout.effectIcon(effect.beneficial, index, width, height)
+            if (!renderer.sprite(EffectHud.background(effect.ambient), rect)) {
+                renderer.rect(rect, 0x101010, 0.5f)
+            }
+            val inset = (HudLayout.EFFECT_SIZE - HudLayout.EFFECT_ICON_SIZE) / 2f * s
+            val icon = HudRect(
+                rect.x + inset,
+                rect.y + inset,
+                HudLayout.EFFECT_ICON_SIZE * s,
+                HudLayout.EFFECT_ICON_SIZE * s,
+            )
+            if (!renderer.sprite(EffectHud.spriteKey(effect.name), icon)) {
+                renderer.rect(icon, 0x808080, 0.5f)
+            }
+        }
+    }
+
+    private fun appendBossBarNames(        labels: MutableList<TextRenderer.ScreenLabel>,
         bars: List<BossBar>,
         s: Float,
     ) {

@@ -40,6 +40,9 @@ class HudSprites(val sheet: SpriteSheet) {
             add("armor_full" to "hud/armor_full.png")
             add("xp_background" to "hud/experience_bar_background.png")
             add("xp_progress" to "hud/experience_bar_progress.png")
+            // Подложки иконок эффектов: обычная и «фоновая» (маяк, кондуит).
+            add("effect_background" to "hud/effect_background.png")
+            add("effect_background_ambient" to "hud/effect_background_ambient.png")
             // Полосы босса: семь цветов и четыре вида с насечками. Имена файлов берутся
             // из того же каталога `gui/sprites/boss_bar`, что и в ванили.
             for (color in BOSS_COLORS) {
@@ -53,14 +56,20 @@ class HudSprites(val sheet: SpriteSheet) {
         }
 
         /**
+         * @param effectNames эффекты из таблицы: для каждого ищется `mob_effect/<имя>.png`.
          * @return атлас или null, если игра не найдена — тогда HUD рисует простые прямоугольники.
          *   Отдельные отсутствующие файлы пропускаются: версии отличаются, падать из-за этого нельзя.
          */
-        fun load(directory: File?): HudSprites? {
-            val images = ArrayList<Pair<String, BufferedImage>>(FILES.size + 1)
+        fun load(directory: File?, effectNames: List<String> = emptyList()): HudSprites? {
+            val images = ArrayList<Pair<String, BufferedImage>>(FILES.size + effectNames.size + 1)
             for ((name, file) in FILES) {
                 val image = GameFiles.readPng(directory, ROOT + file) ?: continue
                 images += name to image
+            }
+            for (name in effectNames) {
+                val image = GameFiles.readPng(directory, "assets/minecraft/textures/mob_effect/$name.png")
+                    ?: continue
+                images += EffectHud.spriteKey(name) to image
             }
             if (images.isEmpty()) return null
             // Белый квадрат: им рисуются сплошные полосы и подложки одним проходом со спрайтами.

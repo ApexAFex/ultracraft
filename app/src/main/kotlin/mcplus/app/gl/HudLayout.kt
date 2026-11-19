@@ -33,6 +33,13 @@ object HudLayout {
     const val BOSS_BAR_STEP = 19f
     const val BOSS_BAR_TOP = 12f
 
+    /** Иконка эффекта: фон 24×24, сама картинка 18×18 по центру (как в ванили). */
+    const val EFFECT_SIZE = 24f
+    const val EFFECT_ICON_SIZE = 18f
+    const val EFFECT_STEP = 25f
+    const val EFFECT_COLUMN_STEP = 26f
+    const val EFFECT_MARGIN = 1f
+
     /** Ванильный «GUI scale»: 2 на маленьком окне, до 4 на большом. */
     fun scale(height: Int): Int = (height / VIRTUAL_HEIGHT).toInt().coerceIn(2, 4)
 
@@ -141,5 +148,30 @@ object HudLayout {
         val s = scale(height).toFloat()
         val bar = bossBar(index, width, height)
         return bar.centreX to bar.y - 9f * s
+    }
+
+    /**
+     * Иконка эффекта в правом верхнем углу.
+     *
+     * Как в ванили: положительные эффекты идут рядом справа налево по верхнему краю, все
+     * остальные — столбцом ниже, по одной в строке. [index] — номер в своей группе с нуля.
+     */
+    fun effectIcon(beneficial: Boolean, index: Int, width: Int, height: Int): HudRect {
+        val s = scale(height).toFloat()
+        return if (beneficial) {
+            HudRect(
+                x = width - EFFECT_STEP * (index + 1) * s,
+                y = EFFECT_MARGIN * s,
+                width = EFFECT_SIZE * s,
+                height = EFFECT_SIZE * s,
+            )
+        } else {
+            HudRect(
+                x = width - EFFECT_STEP * s,
+                y = (EFFECT_MARGIN + EFFECT_COLUMN_STEP * (index + 1)) * s,
+                width = EFFECT_SIZE * s,
+                height = EFFECT_SIZE * s,
+            )
+        }
     }
 }

@@ -89,4 +89,31 @@ class HudLayoutTest {
         val (_, nameTop) = HudLayout.bossBarNameAnchor(0, 1280, 720)
         assertTrue(nameTop < first.y, "имя босса попало на полосу")
     }
+
+    @Test
+    fun `beneficial effects form a row at the top right`() {
+        val s = HudLayout.scale(720).toFloat()
+        val first = HudLayout.effectIcon(beneficial = true, index = 0, width = 1280, height = 720)
+        val second = HudLayout.effectIcon(beneficial = true, index = 1, width = 1280, height = 720)
+
+        // Спрайт 24 при шаге 25: правый край на один пиксель интерфейса от края экрана.
+        assertEquals(1280f - s, first.right, 0.01f)
+        assertEquals(first.y, second.y, 0.01f)
+        assertTrue(second.x < first.x, "вторая иконка должна быть левее первой")
+        assertTrue(second.right <= first.x, "иконки эффектов пересеклись")
+        assertTrue(first.y < 10f, "иконки не у верхнего края: ${first.y}")
+    }
+
+    @Test
+    fun `other effects form a column under the row`() {
+        val s = HudLayout.scale(720).toFloat()
+        val beneficial = HudLayout.effectIcon(beneficial = true, index = 0, width = 1280, height = 720)
+        val first = HudLayout.effectIcon(beneficial = false, index = 0, width = 1280, height = 720)
+        val second = HudLayout.effectIcon(beneficial = false, index = 1, width = 1280, height = 720)
+
+        assertEquals(1280f - s, first.right, 0.01f)
+        assertEquals(beneficial.x, first.x, 0.01f)
+        assertTrue(first.y >= beneficial.bottom, "столбец налез на ряд полезных эффектов")
+        assertTrue(second.y >= first.bottom, "иконки в столбце пересеклись")
+    }
 }
