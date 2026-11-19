@@ -47,19 +47,36 @@ object PlayerModel {
         Box("leftLeg", 0, 0, -2, 4, 12, 4, 16, 48, 12),
     )
 
-    val parts: List<Part> by lazy {
-        BOXES.map { box ->
-            Part(
-                name = box.name,
-                pivotX = (box.x + box.width / 2f) / 16f,
-                pivotY = box.pivotY / 16f,
-                pivotZ = 0f,
-                data = build(box),
-            )
-        }
-    }
+    /**
+     * Классическая развёртка 64×32 (скелет, старое оружие): у неё нет отдельных текстур для
+     * левых конечностей, они зеркалят правые. Современные скины 64×64 держат их отдельно.
+     */
+    private val CLASSIC_BOXES = listOf(
+        Box("head", -4, 24, -4, 8, 8, 8, 0, 0, 24),
+        Box("body", -4, 12, -2, 8, 12, 4, 16, 16, 12),
+        Box("rightArm", -8, 12, -2, 4, 12, 4, 40, 16, 24),
+        Box("leftArm", 4, 12, -2, 4, 12, 4, 40, 16, 24),
+        Box("rightLeg", -4, 0, -2, 4, 12, 4, 0, 16, 12),
+        Box("leftLeg", 0, 0, -2, 4, 12, 4, 0, 16, 12),
+    )
 
-    val vertexCount: Int by lazy { parts.sumOf { it.vertexCount } }
+    /** @param classic true для скинов 64×32 (скелет): левые конечности берут текстуру правых. */
+    fun parts(classic: Boolean = false): List<Part> = if (classic) CLASSIC_PARTS else MODERN_PARTS
+
+    private val MODERN_PARTS: List<Part> by lazy { BOXES.map { part(it) } }
+    private val CLASSIC_PARTS: List<Part> by lazy { CLASSIC_BOXES.map { part(it) } }
+
+    private fun part(box: Box): Part = Part(
+        name = box.name,
+        pivotX = (box.x + box.width / 2f) / 16f,
+        pivotY = box.pivotY / 16f,
+        pivotZ = 0f,
+        data = build(box),
+    )
+
+    val parts: List<Part> get() = MODERN_PARTS
+
+    val vertexCount: Int by lazy { MODERN_PARTS.sumOf { it.vertexCount } }
 
     /** Largest limb swing in radians, at full speed. */
     const val MAX_SWING = 0.8f

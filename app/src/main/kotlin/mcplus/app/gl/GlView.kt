@@ -26,6 +26,10 @@ object GlView {
     /** One server tick: 20 per second. Physics and movement packets both run on it. */
     private const val TICK_SECONDS = 1.0 / 20.0
 
+    /** Гуманоидные мобы, которых рисуем моделью человека с их текстурой. */
+    private val ZOMBIE_TYPES = setOf("zombie", "husk", "drowned", "zombie_villager", "zombified_piglin")
+    private val SKELETON_TYPES = setOf("skeleton", "stray", "bogged")
+
     /** Catch-up limit for one frame — beyond this the backlog is dropped, not simulated. */
     private const val MAX_TICKS_PER_FRAME = 5
 
@@ -258,6 +262,16 @@ object GlView {
                     if (skin == null) println("Скин игрока не найден: игроки рисуются коробками")
                     // Мобы: простые коробки, окрашенные средним цветом настоящих текстур.
                     val mobRenderer = MobRenderer(width, height, MobRenderer.loadColors(directory))
+                    // Гуманоидные мобы — та же модель человека, но со своей текстурой.
+                    val zombieRenderer = PlayerRenderer(
+                        width, height,
+                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/zombie/zombie.png"),
+                    )
+                    val skeletonRenderer = PlayerRenderer(
+                        width, height,
+                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/skeleton/skeleton.png"),
+                        classic = true,
+                    )
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -939,14 +953,20 @@ object GlView {
                                 dx * dx + dy * dy + dz * dz
                             }
                             println("Сущностей: ${entities.size}, ближайшая: " + (nearest?.let {
-                                "id=${it.id} type=${it.type} ${entityTypes.nameOf(it.type)} (%.1f, %.1f, %.1f)"
-                                    .format(it.x, it.y, it.z)
+                                "id=${it.id} type=${it.type} ${entityTypes.nameOf(it.type)} (%.1f, %.1f, %.1f)%s"
+                                    .format(
+                                        it.x, it.y, it.z,
+                                        it.health?.let { health -> ", здоровье %.1f".format(health) }
+                                            ?: ", полей ${it.metadata.size}",
+                                    )
                             } ?: "нет"))
                             lastEntityCount = entities.size
                         }
                         // Players get a humanoid with a skin; common mobs get simple box models;
                         // everything else stays a coloured box.
                         val players = ArrayList<PlayerRenderer.Player>()
+                        val zombies = ArrayList<PlayerRenderer.Player>()
+                        val skeletons = ArrayList<PlayerRenderer.Player>()
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         for (entity in entities) {
@@ -961,11 +981,20 @@ object GlView {
                                 )
                             } else {
                                 val name = entityTypes.nameOf(entity.type)
+                                val humanoid = PlayerRenderer.Player(
+                                    x = entity.x,
+                                    y = entity.y,
+                                    z = entity.z,
+                                    yaw = entity.yaw,
+                                    walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
+                                    walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                )
                                 val family = MobModels.familyOf(name)
-                                if (family == MobFamily.NONE) {
-                                    boxes += entity
-                                } else {
-                                    mobs += MobRenderer.Mob(
+                                when {
+                                    name in ZOMBIE_TYPES -> zombies += humanoid
+                                    name in SKELETON_TYPES -> skeletons += humanoid
+                                    family == MobFamily.NONE -> boxes += entity
+                                    else -> mobs += MobRenderer.Mob(
                                         x = entity.x,
                                         y = entity.y,
                                         z = entity.z,
@@ -980,6 +1009,8 @@ object GlView {
                             }
                         }
                         playerRenderer.draw(camera, players)
+                        zombieRenderer.draw(camera, zombies)
+                        skeletonRenderer.draw(camera, skeletons)
                         mobRenderer.draw(camera, mobs)
                         entityRenderer.draw(camera, boxes)
                         // Only players are in the tab list, so only they get a nametag.
@@ -1149,6 +1180,8 @@ object GlView {
                     }
                     entityRenderer.close()
                     mobRenderer.close()
+                    zombieRenderer.close()
+                    skeletonRenderer.close()
                     playerRenderer.close()
                     skyRenderer.close()
                     hud.close()

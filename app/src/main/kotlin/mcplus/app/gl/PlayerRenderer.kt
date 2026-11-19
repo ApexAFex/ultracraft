@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
@@ -18,6 +18,8 @@ class PlayerRenderer(
     private val width: Int,
     private val height: Int,
     private val skin: BufferedImage?,
+    /** Скин 64×32 (скелет): левые конечности зеркалят правые. */
+    private val classic: Boolean = false,
 ) : Closeable {
 
     /** One player to draw: position, facing in protocol degrees, walk phase and speed. */
@@ -47,7 +49,7 @@ class PlayerRenderer(
         GL30.glBindVertexArray(vao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, vbo)
 
-        val parts = PlayerModel.parts
+        val parts = PlayerModel.parts(classic)
         val total = parts.sumOf { it.data.size }
         var offset = 0
         offsets = IntArray(parts.size)
@@ -84,7 +86,7 @@ class PlayerRenderer(
         GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
         GL30.glBindVertexArray(vao)
 
-        val parts = PlayerModel.parts
+        val parts = PlayerModel.parts(classic)
         for (player in players) {
             fillModel(player)
             for ((index, part) in parts.withIndex()) {
@@ -212,3 +214,4 @@ class PlayerRenderer(
         """
     }
 }
+

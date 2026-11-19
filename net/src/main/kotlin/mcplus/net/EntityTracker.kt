@@ -58,6 +58,22 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     var pitch: Float = 0f
         private set
 
+    /** Поля `Set Entity Data`: номер поля → значение. */
+    @Volatile
+    private var meta: Map<Int, MetaEntry> = emptyMap()
+
+    val metadata: Map<Int, MetaEntry> get() = meta
+
+    /** Здоровье из метаданных живого существа (поле 9, float) или null. */
+    val health: Float? get() = meta[HEALTH_FIELD]?.takeIf { it.type == 3 }?.number?.toFloat()
+
+    /** Своё имя из метаданных, если сервер его дал. */
+    val customName: String? get() = meta[NAME_FIELD]?.text?.trim()?.ifEmpty { null }
+
+    fun applyMetadata(values: Map<Int, MetaEntry>) {
+        if (values.isNotEmpty()) meta = values
+    }
+
     fun look(newYaw: Float, newPitch: Float) {
         // Byte-encoded rotations come in 1/256 turns; anything wildly out of range is a parse
         // mistake and would throw the model to a random direction.
@@ -174,6 +190,14 @@ class EntityTracker {
                 return true
             }
 
+            Protocol777.Play.SET_ENTITY_DATA -> {
+                runCatching {
+                    val (id, values) = readEntityMetadata(packet.body)
+                    entities[id]?.applyMetadata(values)
+                }
+                return true
+            }
+
             else -> return false
         }
     }
@@ -248,3 +272,7 @@ class EntityTracker {
         const val TURN = 360f
     }
 }
+
+/** Номера полей `LivingEntity` в 26.x: имя и здоровье. */
+private const val NAME_FIELD = 2
+private const val HEALTH_FIELD = 9
