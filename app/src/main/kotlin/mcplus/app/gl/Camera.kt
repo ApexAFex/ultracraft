@@ -52,12 +52,15 @@ class Camera(
         z += f[2] * forwardAmount + rightZ * rightAmount
     }
 
+    /** Угол обзора в градусах: бег немного расширяет его, как в ванили. */
+    var fovDegrees: Float = 70f
+
     fun viewProjection(aspect: Float): FloatArray {
         val f = forward()
         val eye = doubleArrayOf(x, y, z)
         val center = doubleArrayOf(x + f[0], y + f[1], z + f[2])
         val view = Mat4.lookAt(eye, center)
-        val projection = Mat4.perspective(Math.toRadians(70.0).toFloat(), aspect, 0.1f, 2000f)
+        val projection = Mat4.perspective(Math.toRadians(fovDegrees.toDouble()).toFloat(), aspect, 0.1f, 2000f)
         return Mat4.multiply(projection, view)
     }
 }

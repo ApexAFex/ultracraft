@@ -60,6 +60,13 @@ object ContainerScreen {
     fun halfHeight(totalRows: Int): Float =
         (totalRows / 2f) * InventoryScreen.STEP + InventoryScreen.SLOT / 2f
 
+    /** Экранная точка ячейки: та же геометрия, что у инвентаря, но со своими рядами. */
+    fun screenPointOf(cell: Cell, totalRows: Int, width: Int, height: Int): Pair<Double, Double> {
+        val scale = InventoryScreen.pixelsPerUnit(height)
+        return (width / 2.0 + horizontalOf(cell) * scale) to
+            (height / 2.0 - verticalOf(cell, totalRows) * scale)
+    }
+
     /** Слот под курсором или null, если курсор между ячейками. */
     fun slotAt(container: OpenContainer, horizontal: Float, vertical: Float): Cell? {
         val rows = totalRows(container)

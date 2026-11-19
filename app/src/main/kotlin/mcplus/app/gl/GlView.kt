@@ -145,6 +145,8 @@ object GlView {
         /** Показать отладочные строки (F3) и список игроков (Tab). */
         debug: Boolean = false,
         showTab: Boolean = false,
+        /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
+        particleDemo: Boolean = false,
         /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
         /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
@@ -315,6 +317,8 @@ object GlView {
                     if (skin == null) println("Скин игрока не найден: игроки рисуются коробками")
                     // Мобы: коробки с настоящими текстурами.
                     val mobRenderer = MobRenderer(width, height, directory)
+                    // Частицы: спрайты из textures/particle, собранные в один атлас.
+                    val particleRenderer = ParticleRenderer(width, height, directory)
                     // Гуманоидные мобы — та же модель человека, но со своей текстурой.
                     val zombieRenderer = PlayerRenderer(
                         width, height,
@@ -579,7 +583,7 @@ object GlView {
                         var x: Double, var y: Double, var z: Double,
                         var vx: Double, var vy: Double, var vz: Double,
                         var life: Float,
-                        val red: Float, val green: Float, val blue: Float,
+                        val name: String,
                         val size: Float,
                     )
 
@@ -946,7 +950,9 @@ object GlView {
                                 GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS)
                         val sprintHeld = !sneakHeld && !chat.open && !inventoryOpen &&
                             (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
-                                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS)
+                                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS ||
+                                input.sprintDoubleTap)
+                        camera.fovDegrees = if (sprintHeld) 78f else 70f
                         val inputScale = when {
                             sneakHeld -> 0.4
                             sprintHeld -> 1.35
@@ -1023,6 +1029,7 @@ object GlView {
                                     if (chat.open) 0.0 else input.strafe * inputScale,
                                     if (chat.open) false else input.jump,
                                     if (chat.open) false else input.descend,
+                                    sneak = sneakHeld,
                                 )
                             }
                             if (ready && !playerLoadedSent) {
@@ -1235,7 +1242,6 @@ object GlView {
                             val dy = spawn.y - camera.y
                             val dz = spawn.z - camera.z
                             if (dx * dx + dy * dy + dz * dz > 576.0) continue
-                            val color = particleColor(spawn.name)
                             val random = java.util.Random()
                             repeat(2) {
                                 particles += ParticlePiece(
@@ -1246,10 +1252,8 @@ object GlView {
                                     random.nextDouble() * 0.3,
                                     (random.nextDouble() - 0.5) * 0.4,
                                     1.2f,
-                                    ((color shr 16) and 0xFF) / 255f,
-                                    ((color shr 8) and 0xFF) / 255f,
-                                    (color and 0xFF) / 255f,
-                                    0.07f,
+                                    spawn.name,
+                                    0.18f,
                                 )
                             }
                         }
@@ -1388,18 +1392,40 @@ object GlView {
                             }
                             renderer.drawBlockCubes(camera, debrisCubes)
                         }
-                        // Частицы из пакета — белой текстурой, окрашенной в цвет типа.
+                        // Частицы из пакета — спрайтами из textures/particle.
                         if (particles.isNotEmpty()) {
-                            val white = atlas.layerOf("white_wool")
-                            val pieces = particles.map { piece ->
-                                Renderer.BlockCube(
-                                    piece.x, piece.y, piece.z, piece.size,
-                                    white, white, white,
-                                    yaw = piece.life * 6f,
-                                    red = piece.red, green = piece.green, blue = piece.blue,
+                            val sprites = particles.map { piece ->
+                                val age = 1.2f - piece.life
+                                val frames = particleRenderer.frameCount(piece.name)
+                                ParticleRenderer.Sprite(
+                                    piece.x, piece.y, piece.z,
+                                    piece.size,
+                                    particleRenderer.frameOf(piece.name, (age * 10f).toInt() % frames),
+                                    (piece.life / 1.2f).coerceIn(0f, 1f),
                                 )
                             }
-                            renderer.drawBlockCubes(camera, pieces)
+                            particleRenderer.draw(camera, sprites)
+                        }
+                        if (particleDemo) {
+                            // Образцы всех загруженных спрайтов перед камерой: видно, что атлас
+                            // собран и шейдер рисует, даже если сервер частиц не присылал.
+                            val forward = camera.forward()
+                            val right = camera.right()
+                            val up = camera.up()
+                            val samples = listOf("flame", "smoke", "crit", "splash", "explosion", "bubble")
+                            val sprites = samples.mapIndexed { index, name ->
+                                val depth = 3f + index * 0.35f
+                                val side = (index - samples.size / 2f) * 0.45f
+                                ParticleRenderer.Sprite(
+                                    camera.x + forward[0] * depth + right[0] * side - up[0] * 0.3f,
+                                    camera.y + forward[1] * depth + right[1] * side - up[1] * 0.3f,
+                                    camera.z + forward[2] * depth + right[2] * side - up[2] * 0.3f,
+                                    0.5f,
+                                    particleRenderer.frameOf(name, (frame / 4) % particleRenderer.frameCount(name)),
+                                    1f,
+                                )
+                            }
+                            particleRenderer.draw(camera, sprites)
                         }
                         // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
                         if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
@@ -1445,6 +1471,7 @@ object GlView {
                                 camera, openContainer, inventory, renderer, textRenderer, atlas,
                                 input.mouseX, input.mouseY, width, height,
                             )
+                            hud.drawContainerOverlay(openContainer, inventory, input.mouseX, input.mouseY)
                             GL30.glEnable(GL30.GL_DEPTH_TEST)
                         } else if (inventory != null && inventoryOpen) {
                             GL30.glDisable(GL30.GL_DEPTH_TEST)
@@ -1641,6 +1668,7 @@ object GlView {
                     sound.close()
                     entityRenderer.close()
                     mobRenderer.close()
+                    particleRenderer.close()
                     zombieRenderer.close()
                     skeletonRenderer.close()
                     playerRenderer.close()

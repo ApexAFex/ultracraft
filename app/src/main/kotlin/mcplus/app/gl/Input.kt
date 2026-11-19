@@ -49,6 +49,8 @@ class Input(private val window: Long, private val camera: Camera) {
     private var pageUpPressed = false
     private var pageDownPressed = false
     private var hudKeyPressed = false
+    private var forwardPressed = false
+    private var lastForwardNanos = 0L
     private var mouseWasDown = false
 
     /** Символы, набранные с клавиатуры с прошлого кадра (то, что печатает человек). */
@@ -104,6 +106,10 @@ class Input(private val window: Long, private val camera: Camera) {
 
     /** F1 прячет HUD и предмет в руке. */
     var hudToggleRequested: Boolean = false
+        private set
+
+    /** Двойное нажатие W включает бег до отпускания клавиши. */
+    var sprintDoubleTap: Boolean = false
         private set
 
     /** Set once when the left mouse button goes down inside the inventory screen. */
@@ -178,6 +184,15 @@ class Input(private val window: Long, private val camera: Camera) {
         }
         jump = pressed(GLFW.GLFW_KEY_SPACE)
         descend = pressed(GLFW.GLFW_KEY_LEFT_SHIFT)
+
+        // Двойной тап W: бег до отпускания клавиши.
+        val forwardKey = pressed(GLFW.GLFW_KEY_W)
+        if (forwardKey && !forwardPressed) {
+            if (now - lastForwardNanos < 300_000_000L) sprintDoubleTap = true
+            lastForwardNanos = now
+        }
+        if (!forwardKey) sprintDoubleTap = false
+        forwardPressed = forwardKey
 
         val fly = pressed(GLFW.GLFW_KEY_F)
         flyToggleRequested = fly && !flyPressed

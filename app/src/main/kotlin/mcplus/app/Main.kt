@@ -889,6 +889,7 @@ private fun windowCommand(args: List<String>) {
     var openAt: Triple<Int, Int, Int>? = null
     var debug = false
     var showTab = false
+    var particleDemo = false
     val pass = ArrayList<String>(args.size)
     var index = 0
     while (index < args.size) {
@@ -896,6 +897,7 @@ private fun windowCommand(args: List<String>) {
             "--open" -> openAt = parsePosition(args.getOrNull(++index) ?: fail("--open требует x,y,z"))
             "--debug" -> debug = true
             "--tab" -> showTab = true
+            "--particles" -> particleDemo = true
             else -> pass += args[index]
         }
         index++
@@ -941,6 +943,7 @@ private fun windowCommand(args: List<String>) {
             openAt = openAt,
             debug = debug,
             showTab = showTab,
+            particleDemo = particleDemo,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
             particleTable = findParticleTable(),

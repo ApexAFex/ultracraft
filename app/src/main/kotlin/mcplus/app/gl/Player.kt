@@ -49,6 +49,7 @@ class Player(
         strafe: Double,
         jump: Boolean,
         descend: Boolean,
+        sneak: Boolean = false,
     ) {
         val step = (if (flying) FLY_SPEED else WALK_SPEED) * dt
 
@@ -78,6 +79,16 @@ class Player(
 
             onGround = false
             moveVertical(velocityY * dt, world, blocks)
+        }
+
+        // Кража не даёт шагнуть в пустоту: под следующей точкой должна быть опора.
+        if (sneak && onGround && !flying && (dx != 0.0 || dz != 0.0)) {
+            val supportX = floor(x + dx).toInt()
+            val supportZ = floor(z + dz).toInt()
+            if (world.blockAt(supportX, floor(y - 0.2).toInt(), supportZ) == 0) {
+                dx = 0.0
+                dz = 0.0
+            }
         }
 
         moveHorizontal(dx, dz, world, blocks)

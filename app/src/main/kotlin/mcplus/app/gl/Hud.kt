@@ -166,6 +166,64 @@ class Hud(
         hoveredName?.let { drawTooltip(it, hoverX, hoverY) }
     }
 
+    /** То же поверх экрана контейнера: счётчики, износ и подсказка. */
+    fun drawContainerOverlay(
+        container: mcplus.net.OpenContainer,
+        inventory: Inventory,
+        mouseX: Double,
+        mouseY: Double,
+    ) {
+        val text = this.text ?: return
+        val rows = ContainerScreen.totalRows(container)
+        val cells = ContainerScreen.cells(container)
+        if (cells.size < 2) return
+        val (firstX, _) = ContainerScreen.screenPointOf(cells[0], rows, width, height)
+        val (nextX, _) = ContainerScreen.screenPointOf(cells[1], rows, width, height)
+        val slotPixels = abs(nextX - firstX).toFloat()
+        if (slotPixels <= 1f) return
+        val scale = (slotPixels / 20f).coerceIn(0.7f, 2.0f)
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        var hovered: String? = null
+        var hoverX = 0f
+        var hoverY = 0f
+
+        for (cell in cells) {
+            val stack = container.slot(cell.menuSlot) ?: continue
+            if (!stack.isKnown) continue
+            val (screenX, screenY) = ContainerScreen.screenPointOf(cell, rows, width, height)
+            val px = screenX.toFloat()
+            val py = screenY.toFloat()
+            if (stack.count > 1) {
+                labels += TextRenderer.ScreenLabel(
+                    px + slotPixels * 0.4f, py + slotPixels * 0.1f,
+                    stack.count.toString(), scale,
+                )
+            }
+            val max = itemStats.of(stack.itemId)?.maxDamage ?: 0
+            if (max > 0 && stack.damage > 0) {
+                val fraction = ((max - stack.damage).toFloat() / max).coerceIn(0f, 1f)
+                val color = when {
+                    fraction > 0.5f -> 0x35C035
+                    fraction > 0.25f -> 0xD0C020
+                    else -> 0xD03020
+                }
+                renderer.begin()
+                renderer.rect(px - slotPixels / 2 + 2f, py + slotPixels / 2 - 4f, slotPixels - 4f, 3f, 0x101010, 0.85f)
+                renderer.rect(px - slotPixels / 2 + 2f, py + slotPixels / 2 - 4f, (slotPixels - 4f) * fraction, 3f, color, 0.95f)
+                renderer.draw()
+            }
+            if (mouseX >= px - slotPixels / 2 && mouseX <= px + slotPixels / 2 &&
+                mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
+            ) {
+                hovered = inventory.nameOf(stack)
+                hoverX = mouseX.toFloat()
+                hoverY = mouseY.toFloat()
+            }
+        }
+        if (labels.isNotEmpty()) text.drawScreen(labels)
+        hovered?.let { drawTooltip(it, hoverX, hoverY) }
+    }
+
     /** Подсказка с названием предмета рядом с курсором, с зажимом по краям экрана. */
     fun drawTooltip(value: String, mouseX: Float, mouseY: Float) {
         val text = this.text ?: return
