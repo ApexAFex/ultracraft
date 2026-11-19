@@ -10,6 +10,11 @@ class ChunkSection(
     var skyLight: ByteArray? = null,
     /** Слой света блоков (4 бита на клетку) или null, если там всегда 0. */
     var blockLight: ByteArray? = null,
+    /**
+     * Биомы секции: 64 номера в сетке 4×4×4, индекс `(y shl 4) or (z shl 2) or x`.
+     * По ним считается цвет травы и листвы.
+     */
+    val biomes: IntArray? = null,
 ) {
     init {
         require(blocks.size == 4096) { "Секция должна содержать 4096 блоков" }
@@ -84,6 +89,22 @@ class World(val minY: Int) {
     }
 
     fun isLoaded(chunkX: Int, chunkZ: Int): Boolean = chunks.containsKey(key(chunkX, chunkZ))
+
+    /**
+     * Номер биома в точке или -1, если биомов нет.
+     *
+     * Сетка биомов вчетверо грубее блоков: одна клетка биома — это 4×4×4 блока.
+     */
+    fun biomeAt(x: Int, y: Int, z: Int): Int {
+        val column = chunks[key(x shr 4, z shr 4)] ?: return -1
+        val sectionIndex = (y - minY) / 16
+        val section = column.sections.getOrNull(sectionIndex) ?: return -1
+        val localY = (y - minY) % 16
+        if (localY < 0) return -1
+        val biomes = section.biomes ?: return -1
+        val index = ((localY shr 2) shl 4) or (((z and 15) shr 2) shl 2) or ((x and 15) shr 2)
+        return biomes[index]
+    }
 
     /**
      * Свет в точке: блоки в старших четырёх битах, небо в младших.

@@ -44,6 +44,21 @@ object GameFiles {
         return null
     }
 
+    /** Reads one text file (JSON, mcmeta) from the newest jar that has it. */
+    fun readText(directory: File?, path: String): String? {
+        val root = directory ?: minecraftDirectory() ?: return null
+        for (jar in versionJars(root)) {
+            val text = runCatching {
+                ZipFile(jar).use { zip ->
+                    val entry = zip.getEntry(path) ?: return@use null
+                    zip.getInputStream(entry).readBytes().decodeToString()
+                }
+            }.getOrNull() ?: continue
+            return text
+        }
+        return null
+    }
+
     private fun BufferedImage.toRgba(): BufferedImage {
         if (type == BufferedImage.TYPE_INT_ARGB) return this
         val converted = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)

@@ -31,9 +31,16 @@ class ChunkMesh(
 
 object MeshBuilder {
 
-    private const val FLOATS_PER_VERTEX = 8
+    private const val FLOATS_PER_VERTEX = 11
 
-    fun build(world: World, blocks: BlockTable, atlas: TextureAtlas, chunkX: Int, chunkZ: Int): ChunkMesh {
+    fun build(
+        world: World,
+        blocks: BlockTable,
+        atlas: TextureAtlas,
+        chunkX: Int,
+        chunkZ: Int,
+        tints: BiomeTints = BiomeTints.DEFAULT,
+    ): ChunkMesh {
         val column = world.column(chunkX, chunkZ)
             ?: return ChunkMesh(chunkX, chunkZ, FloatArray(0), 0)
 
@@ -42,6 +49,7 @@ object MeshBuilder {
 
         for (sectionIndex in column.sections.indices) {
             val states = column.sections[sectionIndex].blocks
+            val biomes = column.sections[sectionIndex].biomes
             for (index in 0 until 4096) {
                 val state = states[index]
                 if (state == 0 || blocks.isAir(state)) continue
@@ -53,15 +61,34 @@ object MeshBuilder {
                 val name = blocks.nameOf(state)
                 if (name in PLANTS) continue
 
+                // Цвет травы, листвы и воды зависит от биома. Биом в секции — сетка 4×4×4,
+                // поэтому его номер берётся прямо из массива секции без обращения к миру.
+                val biomeId = if (biomes != null && (name in TINTED || name.endsWith("_leaves"))) {
+                    val cell = (((index shr 8) shr 2) shl 4) or
+                        ((((index shr 4) and 15) shr 2) shl 2) or ((index and 15) shr 2)
+                    biomes[cell]
+                } else {
+                    -1
+                }
+                val tint = if (biomeId >= 0) {
+                    when {
+                        name == "grass_block" -> tints.ratio(BiomeTints.GRASS, biomeId)
+                        name == "water" -> tints.ratio(BiomeTints.WATER, biomeId)
+                        else -> tints.ratio(BiomeTints.FOLIAGE, biomeId)
+                    }
+                } else {
+                    null
+                }
+
                 // Вода и лёд уходят в отдельный буфер: их надо рисовать с прозрачностью
                 // и без записи в глубину, иначе за ними не видно дна.
                 val target = if (name in TRANSLUCENT) translucentData else vertexData
                 val shape = blocks.shapeOf(state)
                 if (shape == null) {
-                    emitBox(target, world, blocks, atlas, x, y, z, FULL_CUBE, name, null)
+                    emitBox(target, world, blocks, atlas, x, y, z, FULL_CUBE, name, null, tint)
                 } else {
                     for (box in boxesOf(shape)) {
-                        emitBox(target, world, blocks, atlas, x, y, z, box, name, shape)
+                        emitBox(target, world, blocks, atlas, x, y, z, box, name, shape, tint)
                     }
                 }
             }
@@ -164,6 +191,7 @@ object MeshBuilder {
         box: Box,
         name: String,
         self: BlockShape?,
+        blockTint: FloatArray?,
     ) {
         for (face in FACES) {
             val onBorder = when {
@@ -194,6 +222,11 @@ object MeshBuilder {
             }
             val base = world.lightAt(baseX, baseY, baseZ)
             val layer = atlas.layerFor(name, face.kind).toFloat()
+            // Трава красится только сверху: бок — это земля с травяной кромкой.
+            val tint = if (name == "grass_block" && face.kind != TextureAtlas.Kind.TOP) null else blockTint
+            val red = tint?.get(0) ?: 1f
+            val green = tint?.get(1) ?: 1f
+            val blue = tint?.get(2) ?: 1f
 
             fun vertex(px: Float, py: Float, pz: Float) {
                 val light = cornerLight(
@@ -218,6 +251,9 @@ object MeshBuilder {
                 val v = if (face.dy != 0) 1f - pz else 1f - py
                 data.add(u)
                 data.add(v)
+                data.add(red)
+                data.add(green)
+                data.add(blue)
             }
 
             when (face.id) {
@@ -423,6 +459,9 @@ object MeshBuilder {
     private val TRANSLUCENT = setOf(
         "water", "ice", "frosted_ice", "slime_block", "honey_block", "tinted_glass",
     )
+
+    /** Блоки, которым биом меняет цвет: трава, листва, лоза и вода. */
+    private val TINTED = setOf("grass_block", "vine", "water")
 }
 
 /** Growable float array — avoids boxing while building hundreds of thousands of vertices. */

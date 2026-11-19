@@ -112,6 +112,8 @@ class Renderer(
         GL30.glEnableVertexAttribArray(3)
         GL30.glVertexAttribPointer(4, 2, GL30.GL_FLOAT, false, stride, 6L * Float.SIZE_BYTES)
         GL30.glEnableVertexAttribArray(4)
+        GL30.glVertexAttribPointer(5, 3, GL30.GL_FLOAT, false, stride, 8L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(5)
     }
 
     /**
@@ -216,6 +218,9 @@ class Renderer(
                 crackData[offset++] = layer
                 crackData[offset++] = corner[3]     // u
                 crackData[offset++] = corner[4]     // v
+                crackData[offset++] = 1f            // tint r
+                crackData[offset++] = 1f            // tint g
+                crackData[offset++] = 1f            // tint b
             }
         }
 
@@ -277,6 +282,9 @@ class Renderer(
                 hotbarData[offset++] = icon.layer
                 hotbarData[offset++] = u
                 hotbarData[offset++] = w
+                hotbarData[offset++] = 1f
+                hotbarData[offset++] = 1f
+                hotbarData[offset++] = 1f
             }
 
             vertex(left, top, 0f, 0f)
@@ -417,8 +425,8 @@ class Renderer(
         /** The crack cube is a hair larger than the block, so both surfaces stay visible. */
         const val CRACK_INFLATE = 0.002f
 
-        /** Сколько чисел на вершину мира: x, y, z, shade, light, layer, u, v. */
-        const val VERTEX_FLOATS = 8
+        /** Сколько чисел на вершину мира: x, y, z, shade, light, layer, u, v, r, g, b. */
+        const val VERTEX_FLOATS = 11
 
         /** Полный свет (небо 15, блоки 15): иконки и трещины рисуются без затемнения. */
         const val FULL_LIGHT = 255f
@@ -482,16 +490,19 @@ class Renderer(
             layout(location = 2) in float aLight;
             layout(location = 3) in float aLayer;
             layout(location = 4) in vec2 aUv;
+            layout(location = 5) in vec3 aTint;
             uniform mat4 uViewProj;
             uniform vec3 uCameraPos;
             out float vShade;
             out vec3 vUv;
             out float vLight;
             out float vDistance;
+            out vec3 vTint;
             void main() {
                 vShade = aShade;
                 vUv = vec3(aUv, aLayer);
                 vLight = aLight;
+                vTint = aTint;
                 vDistance = length(aPos - uCameraPos);
                 gl_Position = uViewProj * vec4(aPos, 1.0);
             }
@@ -503,6 +514,7 @@ class Renderer(
             in vec3 vUv;
             in float vLight;
             in float vDistance;
+            in vec3 vTint;
             uniform sampler2DArray uAtlas;
             uniform float uDaylight;
             uniform vec3 uFogColor;
@@ -521,7 +533,7 @@ class Renderer(
                 float brightness = mix(0.16, 1.0, light);
                 if (uUnlit > 0.5) brightness = 1.0;
 
-                vec3 color = texel.rgb * vShade * brightness;
+                vec3 color = texel.rgb * vShade * brightness * vTint;
                 float fog = uUnlit > 0.5 ? 0.0 : clamp((vDistance - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
                 FragColor = vec4(mix(color, uFogColor, fog), texel.a);
             }

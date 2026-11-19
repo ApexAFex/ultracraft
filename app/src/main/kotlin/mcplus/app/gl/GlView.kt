@@ -145,10 +145,15 @@ object GlView {
             val atlas = directory?.let { TextureAtlas.load(it) } ?: TextureAtlas.colored(blocks.allNames())
             println("Текстуры: ${atlas.size} слоёв, источник: ${atlas.source}")
 
+            // Цвета биомов: номера приходят в секциях чанка, оттенки — из данных игры.
+            val biomeNames = session?.joinResult?.registries?.biomeNames ?: emptyList()
+            val tints = BiomeTints.load(directory, biomeNames)
+            if (biomeNames.isNotEmpty()) println("Биомы: ${biomeNames.size} названий из реестра")
+
             val pipeline = if (meshThreads > 0) {
-                MeshPipeline(world, blocks, atlas, meshThreads)
+                MeshPipeline(world, blocks, atlas, tints, meshThreads)
             } else {
-                MeshPipeline(world, blocks, atlas)
+                MeshPipeline(world, blocks, atlas, tints)
             }
             var requested = 0
             for (chunkX in centerChunkX - radiusChunks..centerChunkX + radiusChunks) {
@@ -322,6 +327,14 @@ object GlView {
                         player.x, player.y, player.z,
                         if (serverSpawn != null) "позиция сервера" else "подбор по рельефу",
                     ))
+                    val spawnBiome = world.biomeAt(
+                        kotlin.math.floor(player.x).toInt(),
+                        kotlin.math.floor(player.y).toInt(),
+                        kotlin.math.floor(player.z).toInt(),
+                    )
+                    if (spawnBiome >= 0) {
+                        println("Биом под игроком: ${biomeNames.getOrNull(spawnBiome) ?: spawnBiome}")
+                    }
                     println(
                         "Полёт: " + when (session?.abilities?.mayFly) {
                             true -> "разрешён сервером (F)"

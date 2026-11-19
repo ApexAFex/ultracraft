@@ -69,9 +69,9 @@ class TextureAtlas(
     fun tintOf(layer: Int): Int? {
         val name = namesByLayer.getOrNull(layer) ?: return null
         return when {
-            name == "grass_block_top" || name == "grass_block_side_overlay" -> 0x79C05A
-            name == "vine" || name.endsWith("_leaves") -> 0x59AE30
-            name == "water_still" || name == "water_flow" || name == "water_overlay" -> 0x3F76E4
+            name == "grass_block_top" || name == "grass_block_side_overlay" -> TINT_GRASS
+            name == "vine" || name.endsWith("_leaves") -> TINT_FOLIAGE
+            name == "water_still" || name == "water_flow" || name == "water_overlay" -> TINT_WATER
             else -> null
         }
     }
@@ -81,6 +81,11 @@ class TextureAtlas(
     private val missingLayer: Int = layers["missing"] ?: 0
 
     companion object {
+        /** Цвета, которыми атлас запекает траву, листву и воду, пока биом неизвестен. */
+        const val TINT_GRASS = 0x79C05A
+        const val TINT_FOLIAGE = 0x59AE30
+        const val TINT_WATER = 0x3F76E4
+
         private const val TILE = 16
         private const val BLOCK_TEXTURES = "assets/minecraft/textures/block/"
         private const val BLOCK_STATES = "assets/minecraft/blockstates/"

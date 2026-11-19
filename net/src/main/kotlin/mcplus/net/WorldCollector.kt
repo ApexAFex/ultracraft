@@ -35,21 +35,42 @@ class WorldCollector(private val session: Session) {
         var deadline = startedAt + durationMs
         var askedForRespawn = false
 
-        while (world.chunkCount < maxChunks && System.currentTimeMillis() < deadline) {
-            val packet = session.receive()
-            if (packet.id == Protocol777.Play.CHUNK_DATA) {
-                world.add(readChunkColumn(packet.body, sectionCount))
-            } else {
-                onPacket(packet)
-                if (!askedForRespawn && world.chunkCount == 0 &&
-                    System.currentTimeMillis() - startedAt > durationMs / 3
-                ) {
-                    session.requestRespawn()
-                    askedForRespawn = true
-                    deadline = System.currentTimeMillis() + durationMs
+        // Чтение с коротким тайм-аутом: мёртвому игроку сервер не шлёт чанки вообще, и без
+        // этого ждать приходилось бы вечно — окно просто не открывалось.
+        session.setReadTimeout(READ_TIMEOUT_MS)
+        try {
+            while (world.chunkCount < maxChunks && System.currentTimeMillis() < deadline) {
+                val packet = try {
+                    session.receive()
+                } catch (_: java.net.SocketTimeoutException) {
+                    if (!askedForRespawn && world.chunkCount == 0) {
+                        session.requestRespawn()
+                        askedForRespawn = true
+                        deadline = System.currentTimeMillis() + durationMs
+                    }
+                    continue
+                }
+                if (packet.id == Protocol777.Play.CHUNK_DATA) {
+                    world.add(readChunkColumn(packet.body, sectionCount))
+                } else {
+                    onPacket(packet)
+                    if (!askedForRespawn && world.chunkCount == 0 &&
+                        System.currentTimeMillis() - startedAt > durationMs / 3
+                    ) {
+                        session.requestRespawn()
+                        askedForRespawn = true
+                        deadline = System.currentTimeMillis() + durationMs
+                    }
                 }
             }
+        } finally {
+            session.setReadTimeout(DEFAULT_READ_TIMEOUT_MS)
         }
         return world
+    }
+
+    private companion object {
+        const val READ_TIMEOUT_MS = 250
+        const val DEFAULT_READ_TIMEOUT_MS = 15_000
     }
 }

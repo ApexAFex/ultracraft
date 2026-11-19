@@ -33,15 +33,20 @@ internal fun readChunkColumn(body: ByteArray, sectionCount: Int): ChunkColumn {
     if (sectionCount !in 0..MAX_SECTIONS) throw ProtocolException("Секций в чанке: $sectionCount")
 
     val states = ArrayList<IntArray>(sectionCount)
+    val biomes = ArrayList<IntArray>(sectionCount)
     repeat(sectionCount) {
         data.readShort()                                              // block count
         data.readShort()                                              // fluid count (1.21.5+)
         val blocks = PalettedContainer.read(data, SECTION_BLOCK_COUNT, 8)
-        PalettedContainer.read(data, SECTION_BIOME_COUNT, 3)          // biomes, unused so far
+        val biomeContainer = PalettedContainer.read(data, SECTION_BIOME_COUNT, 3)
 
         val sectionStates = IntArray(SECTION_BLOCK_COUNT)
         for (index in 0 until SECTION_BLOCK_COUNT) sectionStates[index] = blocks.get(index)
         states += sectionStates
+
+        val sectionBiomes = IntArray(SECTION_BIOME_COUNT)
+        for (index in 0 until SECTION_BIOME_COUNT) sectionBiomes[index] = biomeContainer.get(index)
+        biomes += sectionBiomes
     }
 
     if (data.remaining != 0) {
@@ -69,7 +74,7 @@ internal fun readChunkColumn(body: ByteArray, sectionCount: Int): ChunkColumn {
     }
 
     val sections = (0 until sectionCount).map { index ->
-        ChunkSection(states[index], light.sky[index], light.block[index])
+        ChunkSection(states[index], light.sky[index], light.block[index], biomes[index])
     }
     return ChunkColumn(chunkX, chunkZ, sections)
 }

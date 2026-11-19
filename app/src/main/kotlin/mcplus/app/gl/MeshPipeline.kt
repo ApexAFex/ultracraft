@@ -20,6 +20,7 @@ class MeshPipeline(
     private val world: World,
     private val blocks: BlockTable,
     private val atlas: TextureAtlas,
+    private val tints: BiomeTints = BiomeTints.DEFAULT,
     private val threads: Int = (Runtime.getRuntime().availableProcessors() - 1).coerceAtLeast(1),
 ) : Closeable {
 
@@ -54,7 +55,7 @@ class MeshPipeline(
         queued.incrementAndGet()
         executor.execute {
             try {
-                results += MeshBuilder.build(world, blocks, atlas, chunkX, chunkZ)
+                results += MeshBuilder.build(world, blocks, atlas, chunkX, chunkZ, tints)
             } finally {
                 inFlight.remove(key)
                 queued.decrementAndGet()

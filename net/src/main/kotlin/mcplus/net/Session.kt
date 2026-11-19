@@ -187,6 +187,11 @@ class Session internal constructor(
         }
     }
 
+    /** Меняет тайм-аут чтения: короткий нужен там, где ждём пакеты «пока не надоест». */
+    fun setReadTimeout(millis: Int) {
+        connection.setReadTimeout(millis)
+    }
+
     /** Sends a packet, or remembers why it could not be sent. Never throws. */
     fun send(packet: Packet) {
         if (isClosed) return

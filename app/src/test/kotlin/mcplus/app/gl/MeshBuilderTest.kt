@@ -18,6 +18,9 @@ import kotlin.test.assertTrue
  */
 class MeshBuilderTest {
 
+    /** Вершина мира: x, y, z, shade, light, layer, u, v, r, g, b. */
+    private val MESH_STRIDE = 11
+
     private val blocks = BlockTable.load(
         File.createTempFile("blocks-mesh", ".tsv").apply {
             deleteOnExit()
@@ -164,7 +167,7 @@ class MeshBuilderTest {
         world.add(ChunkColumn(0, 0, sections))
 
         val data = mesh(world).data
-        val lights = (0 until data.size step 8).map { data[it + 4] }.distinct()
+        val lights = (0 until data.size step MESH_STRIDE).map { data[it + 4] }.distinct()
         assertEquals(listOf(15f), lights, "при ровном свете все углы одинаковые")
     }
 
@@ -184,7 +187,7 @@ class MeshBuilderTest {
             val z = data[index + 2]
             assertTrue(x in 0f..16f && z in 0f..16f, "вершина вне чанка: $x, $y, $z")
             assertTrue(y >= 48f && y <= 64f, "вершина вне секции: $x, $y, $z")
-            index += 8
+            index += MESH_STRIDE
         }
     }
 
@@ -218,7 +221,7 @@ class MeshBuilderTest {
         var index = 0
         while (index < mesh.data.size) {
             values += mesh.data[index + axis]
-            index += 8
+            index += MESH_STRIDE
         }
         return values
     }
@@ -256,7 +259,7 @@ class MeshBuilderTest {
         var index = 0
         while (index < mesh.data.size) {
             if (mesh.data[index + 1] > 48.9f) high += mesh.data[index]
-            index += 8
+            index += MESH_STRIDE
         }
 
         assertTrue(high.isNotEmpty(), "у ступени нет верхней части")
@@ -304,3 +307,4 @@ class MeshBuilderTest {
         assertEquals(11 * 2 * 3, shapeMesh(world).vertexCount)
     }
 }
+
