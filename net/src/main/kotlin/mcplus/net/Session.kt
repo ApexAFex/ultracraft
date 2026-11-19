@@ -35,6 +35,9 @@ class Session internal constructor(
     /** Табло сервера: цели и очки, выбранная боковая панель. */
     val scoreboard = Scoreboard()
 
+    /** Тексты табличек по координатам. */
+    val signs = Signs()
+
     /** Строка над хотбаром и большой заголовок: приходят компонентами. */    @Volatile
     var actionBar: String? = null
         private set
@@ -216,6 +219,8 @@ class Session internal constructor(
 
                 Protocol777.Play.SET_CHUNK_CACHE_RADIUS ->
                     serverChunkRadius = runCatching { ByteReader(packet.body).readVarInt() }.getOrDefault(-1)
+
+                Protocol777.Play.BLOCK_ENTITY_DATA -> signs.onPacket(packet.id, packet.body)
 
                 Protocol777.Play.SET_OBJECTIVE,
                 Protocol777.Play.SET_SCORE,

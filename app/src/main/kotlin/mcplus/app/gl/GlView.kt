@@ -630,7 +630,10 @@ object GlView {
                     var sprintDustNanos = 0L
                     var lightningUntilNanos = 0L
                     var nextCaveSoundNanos = 0L
+                    var nextElementSoundNanos = 0L
                     var lastAttackNanos = 0L
+                    var invLastClickNanos = 0L
+                    var invLastClickSlot = -1
                     var cameraMode = cameraModeAtStart
                     var invMouseSlot = -1
                     var invDragging = false
@@ -937,7 +940,24 @@ object GlView {
                                 )
                                 InventoryScreen.slotAt(horizontal, vertical)
                             }
+                            // Двойной клик по слоту собирает все одинаковые предметы.
+                            var handledClick = false
+                            if (input.clickRequested && hovered != null) {
+                                val now = System.nanoTime()
+                                if (now - invLastClickNanos < 300_000_000L &&
+                                    invLastClickSlot == hovered.menuSlot
+                                ) {
+                                    session?.clickSlot(
+                                        hovered.menuSlot,
+                                        input = mcplus.net.ContainerInput.PICKUP_ALL,
+                                    )
+                                    handledClick = true
+                                }
+                                invLastClickNanos = now
+                                invLastClickSlot = hovered.menuSlot
+                            }
                             when {
+                                handledClick -> Unit
                                 shiftHeld && input.clickRequested -> clickInventoryAt(
                                     input.mouseX, input.mouseY, button = 0, quick = true,
                                 )
@@ -1514,6 +1534,22 @@ object GlView {
                                 nextCaveSoundNanos = now + 30_000_000_000L
                                 sound.play("ambient.cave", player.x, player.y, player.z)
                             }
+                            // Вода и огонь рядом: их «дыхание» слышно время от времени.
+                            if (sound.available && now > nextElementSoundNanos) {
+                                nextElementSoundNanos = now + 6_000_000_000L
+                                var water = false
+                                var fire = false
+                                val px = kotlin.math.floor(player.x).toInt()
+                                val py = kotlin.math.floor(player.y).toInt()
+                                val pz = kotlin.math.floor(player.z).toInt()
+                                for (dx in -4..4) for (dy in -1..2) for (dz in -4..4) {
+                                    val name = blocks.nameOf(world.blockAt(px + dx, py + dy, pz + dz))
+                                    if ("water" in name) water = true
+                                    if ("fire" in name || "lava" in name || "campfire" in name) fire = true
+                                }
+                                if (water) sound.play("block.water.ambient", player.x, player.y, player.z)
+                                if (fire) sound.play("block.fire.ambient", player.x, player.y, player.z)
+                            }
                         }
 
                         // Дальние чанки выгружаются: иначе память растёт всю игру.
@@ -1715,7 +1751,8 @@ object GlView {
                                         if (state != 0 && itemName != null) {
                                             cubes += Renderer.BlockCube(
                                                 entity.x,
-                                                entity.y + 0.16,
+                                                entity.y + 0.16 +
+                                                    kotlin.math.sin(nowNanos / 1_000_000_000.0 * 2 + entity.id) * 0.05,
                                                 entity.z,
                                                 0.28f,
                                                 atlas.layerFor(itemName, TextureAtlas.Kind.TOP),
@@ -1881,6 +1918,25 @@ object GlView {
                             )
                         }
                         textRenderer?.draw(camera, labels)
+                        // Текст табличек: строки над самим блоком, мелким кеглем.
+                        val signLabels = ArrayList<TextRenderer.Label>()
+                        for (sign in session?.signs?.snapshot().orEmpty()) {
+                            val dx = sign.x + 0.5 - camera.x
+                            val dz = sign.z + 0.5 - camera.z
+                            if (dx * dx + dz * dz > 48.0 * 48.0) continue
+                            sign.lines.forEachIndexed { index, line ->
+                                if (line.isBlank()) return@forEachIndexed
+                                signLabels += TextRenderer.Label(
+                                    sign.x + 0.5,
+                                    sign.y + 0.9 - index * 0.22,
+                                    sign.z + 0.5,
+                                    line,
+                                )
+                            }
+                        }
+                        if (signLabels.isNotEmpty()) {
+                            textRenderer?.draw(camera, signLabels, scaleOverride = 0.02f)
+                        }
                         if (target != null && !inventoryOpen && openContainer == null) {
                             renderer.drawOutline(camera, target.x, target.y, target.z)
                         }
@@ -2023,6 +2079,15 @@ object GlView {
                                         ],
                                     "Цель: " + (target?.let {
                                         "${blocks.nameOf(world.blockAt(it.x, it.y, it.z))} (${it.x}, ${it.y}, ${it.z})"
+                                    } ?: "—"),
+                                    run {
+                                        val runtime = Runtime.getRuntime()
+                                        val used = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024
+                                        "Память: $used МБ"
+                                    },
+                                    "В руке: " + (session?.inventory?.heldName()?.let { name ->
+                                        val durability = session?.heldDurability()
+                                        if (durability != null) "$name ${durability.first}/${durability.second}" else name
                                     } ?: "—"),
                                 ),
                             )

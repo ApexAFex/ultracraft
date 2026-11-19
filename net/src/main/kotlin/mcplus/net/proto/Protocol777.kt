@@ -92,6 +92,8 @@ object Protocol777 {
         const val CLEAR_TITLES: Int = 0x0E
         /** Радиус стриминга чанков, который сервер выбрал для клиента. */
         const val SET_CHUNK_CACHE_RADIUS: Int = 0x61
+        /** Данные блок-сущности: таблички, сундуки и прочее. */
+        const val BLOCK_ENTITY_DATA: Int = 0x06
         const val ACKNOWLEDGE_BLOCK_CHANGE: Int = 0x04
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32
