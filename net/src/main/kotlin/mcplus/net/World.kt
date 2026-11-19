@@ -21,12 +21,26 @@ class ChunkSection(
     }
 }
 
+/** Блок-сущность из чанка: координаты и NBT (может отсутствовать). */
+class BlockEntity(
+    val x: Int,
+    val y: Int,
+    val z: Int,
+    val tag: mcplus.protocol.nbt.NbtTag?,
+)
+
 /**
  * A chunk column: 24 sections for the overworld, bottom to top.
  *
  * Keeps every block state, not just the surface — the 3D view needs the whole volume.
  */
-class ChunkColumn(val x: Int, val z: Int, val sections: List<ChunkSection>) {
+class ChunkColumn(
+    val x: Int,
+    val z: Int,
+    val sections: List<ChunkSection>,
+    /** Блок-сущности из пакета чанка: таблички, сундуки, печи. */
+    val blockEntities: List<BlockEntity> = emptyList(),
+) {
 
     /** Topmost non-air state of every column, indexed by `z * 16 + x`. */
     val topStates: IntArray by lazy {

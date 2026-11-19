@@ -10,7 +10,8 @@ import mcplus.protocol.nbt.NbtReader
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Таблички: текст приходит в `Block Entity Data` (0x06) и хранится по координатам.
+ * Таблички: текст приходит двумя путями — вместе с чанком (блок-сущности в `Chunk Data`)
+ * и отдельным пакетом `Block Entity Data` (0x06), когда текст меняют.
  *
  * В 26.x сообщения лежат в `front_text.messages` списком строк, и каждая строка — JSON
  * компонент. Для показа достаточно вытащить `text`; цвета и нажатия не поддерживаются.
@@ -21,28 +22,36 @@ class Signs {
 
     private val signs = ConcurrentHashMap<Long, SignText>()
 
+    /** Пакет `Block Entity Data`: позиция, тип, NBT. */
     fun onPacket(packetId: Int, body: ByteArray): Boolean {
         if (packetId != Protocol777.Play.BLOCK_ENTITY_DATA) return false
-        runCatching { read(body) }
+        runCatching {
+            val reader = ByteReader(body)
+            val position = reader.readPosition()
+            reader.readVarInt() // тип блок-сущности
+            accept(position.x, position.y, position.z, NbtReader.read(reader))
+        }.onFailure { println("Табличка: пакет не разобрать — ${it.message}") }
         return true
+    }
+
+    /** Блок-сущность из пакета чанка: сюда же попадают таблички, поставленные до входа. */
+    fun accept(x: Int, y: Int, z: Int, tag: NbtTag?) {
+        val compound = tag as? NbtCompound ?: return
+        val lines = readLines(compound) ?: return
+        val key = key(x, y, z)
+        signs[key] = SignText(x, y, z, lines)
     }
 
     fun snapshot(): List<SignText> = signs.values.toList()
 
-    private fun read(body: ByteArray) {
-        val reader = ByteReader(body)
-        val position = reader.readPosition()
-        reader.readVarInt() // тип блок-сущности
-        val tag = NbtReader.read(reader)
-        val compound = tag as? NbtCompound ?: return
-        val front = compound["front_text"] as? NbtCompound ?: return
-        val messages = front["messages"] as? NbtList ?: return
+    private fun readLines(compound: NbtCompound): List<String>? {
+        val front = compound["front_text"] as? NbtCompound ?: return null
+        val messages = front["messages"] as? NbtList ?: return null
         val lines = messages.items.mapNotNull { message ->
             (message as? NbtString)?.value?.let(::textOf)
         }
-        if (lines.none { it.isNotBlank() }) return
-        val key = key(position.x, position.y, position.z)
-        signs[key] = SignText(position.x, position.y, position.z, lines)
+        if (lines.none { it.isNotBlank() }) return null
+        return lines
     }
 
     /** Достаёт `text` из JSON-компонента; для простой строки возвращает её как есть. */

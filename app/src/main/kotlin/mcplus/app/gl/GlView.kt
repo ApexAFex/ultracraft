@@ -324,6 +324,7 @@ object GlView {
             var sequence = 0
             var leftWasDown = false
             var rightWasDown = false
+            var middleWasDown = false
 
             GlTextures(atlas).use { textures ->
                 Renderer(textures, width, height).use { renderer ->
@@ -641,6 +642,27 @@ object GlView {
                     var selfWalkDistance = 0.0
                     var selfSpeed = 0.0
 
+                    // «Полный экран» из настроек применяется при запуске, а не только по F11:
+                    // иначе после перезапуска окно снова оказывается маленьким.
+                    if (Settings.fullscreen && !demo && !hidden) {
+                        val monitor = GLFW.glfwGetPrimaryMonitor()
+                        if (monitor != 0L) {
+                            val mode = GLFW.glfwGetVideoMode(monitor)
+                            if (mode != null) {
+                                fullscreen = true
+                                boundsSaved = true
+                                windowedX = 80
+                                windowedY = 80
+                                windowedWidth = width
+                                windowedHeight = height
+                                GLFW.glfwSetWindowMonitor(
+                                    window, monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate(),
+                                )
+                                println("Полный экран из настроек")
+                            }
+                        }
+                    }
+
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
 
@@ -934,6 +956,9 @@ object GlView {
                             val leftHeld = GLFW.glfwGetMouseButton(
                                 window, GLFW.GLFW_MOUSE_BUTTON_LEFT,
                             ) == GLFW.GLFW_PRESS
+                            val middleHeld = GLFW.glfwGetMouseButton(
+                                window, GLFW.GLFW_MOUSE_BUTTON_MIDDLE,
+                            ) == GLFW.GLFW_PRESS
                             val hovered = run {
                                 val (horizontal, vertical) = InventoryScreen.panelPoint(
                                     input.mouseX, input.mouseY, width, height,
@@ -942,7 +967,17 @@ object GlView {
                             }
                             // Двойной клик по слоту собирает все одинаковые предметы.
                             var handledClick = false
-                            if (input.clickRequested && hovered != null) {
+                            // Средняя кнопка в творческом режиме клонирует предмет из слота.
+                            if (middleHeld && !middleWasDown && hovered != null) {
+                                session?.clickSlot(
+                                    hovered.menuSlot,
+                                    button = 2,
+                                    input = mcplus.net.ContainerInput.CLONE,
+                                )
+                                handledClick = true
+                                println("Клонирование из слота ${hovered.menuSlot}")
+                            }
+                            if (!handledClick && input.clickRequested && hovered != null) {
                                 val now = System.nanoTime()
                                 if (now - invLastClickNanos < 300_000_000L &&
                                     invLastClickSlot == hovered.menuSlot
@@ -1003,6 +1038,9 @@ object GlView {
                             val leftPressed = GLFW.glfwGetMouseButton(
                                 window, GLFW.GLFW_MOUSE_BUTTON_LEFT,
                             ) == GLFW.GLFW_PRESS
+                            val middlePressed = GLFW.glfwGetMouseButton(
+                                window, GLFW.GLFW_MOUSE_BUTTON_MIDDLE,
+                            ) == GLFW.GLFW_PRESS
                             val shift = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
                                 GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS
                             val (horizontal, vertical) = InventoryScreen.panelPoint(
@@ -1010,7 +1048,12 @@ object GlView {
                             )
                             val cell = ContainerScreen.slotAt(openContainer, horizontal, vertical)
 
-                            if (leftPressed && !shift) {
+                            if (middlePressed && !middleWasDown && cell != null) {
+                                // Творческое клонирование: сервер сам выдаёт стак в курсор.
+                                session?.clickSlot(cell.menuSlot, button = 2, input = mcplus.net.ContainerInput.CLONE)
+                                mouseSlot = -1
+                                println("Клонирование из слота меню ${cell.menuSlot}")
+                            } else if (leftPressed && !shift) {
                                 // Нажатие — обычный клик (взять/положить), а если палец пошёл
                                 // по другим слотам, начинается перетаскивание.
                                 if (input.clickRequested && cell != null) {
@@ -1695,6 +1738,7 @@ object GlView {
                         // everything else stays a coloured box.
                         val players = ArrayList<PlayerRenderer.Player>()
                         if (cameraMode > 0) {
+                            val ownSwingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
                             players += PlayerRenderer.Player(
                                 x = player.x,
                                 y = player.y,
@@ -1702,6 +1746,11 @@ object GlView {
                                 yaw = player.yaw,
                                 walkPhase = (selfWalkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                 walkAmount = (selfSpeed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                swing = if (ownSwingAge in 0.0..1.0) {
+                                    kotlin.math.sin(ownSwingAge * Math.PI).toFloat()
+                                } else {
+                                    0f
+                                },
                             )
                         }
                         val zombies = ArrayList<PlayerRenderer.Player>()
@@ -1965,40 +2014,72 @@ object GlView {
 
                         // Предмет в руке: блок — настоящим мини-кубом с лёгким наклоном,
                         // остальное — плоской иконкой. Взмах при ударе сдвигает и опускает куб.
+                        // От третьего лица куб висит у правой руки модели, а не у камеры.
                         val handItemName = inventory?.heldName()
                         if (!inventoryOpen && openContainer == null && !dead && !chat.open &&
-                            cameraMode == 0 && handItemName != null
+                            handItemName != null
                         ) {
+                            val swingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
+                            val handSwing = if (swingAge in 0.0..1.0) {
+                                kotlin.math.sin(swingAge * Math.PI).toFloat()
+                            } else {
+                                0f
+                            }
                             val handState = blocks.firstStateOf(handItemName)
-                            if (handState != null) {
-                                val swingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
-                                val swing = if (swingAge in 0.0..1.0) {
-                                    kotlin.math.sin(swingAge * Math.PI).toFloat()
+                            if (cameraMode == 0) {
+                                if (handState != null) {
+                                    val forward = camera.forward()
+                                    val right = camera.right()
+                                    val up = camera.up()
+                                    val fx = camera.x + forward[0] * 0.72 + right[0] * 0.34 -
+                                        up[0] * (0.34 - handSwing * 0.14)
+                                    val fy = camera.y + forward[1] * 0.72 + right[1] * 0.34 -
+                                        up[1] * (0.34 - handSwing * 0.14)
+                                    val fz = camera.z + forward[2] * 0.72 + right[2] * 0.34 -
+                                        up[2] * (0.34 - handSwing * 0.14)
+                                    val yaw = -Math.toRadians(camera.yaw.toDouble()).toFloat() + 0.55f + handSwing * 0.5f
+                                    renderer.drawBlockCubes(
+                                        camera,
+                                        listOf(
+                                            Renderer.BlockCube(
+                                                fx, fy, fz, 0.22f,
+                                                atlas.layerFor(handItemName, TextureAtlas.Kind.TOP),
+                                                atlas.layerFor(handItemName, TextureAtlas.Kind.BOTTOM),
+                                                atlas.layerFor(handItemName, TextureAtlas.Kind.SIDE),
+                                                yaw = yaw,
+                                            ),
+                                        ),
+                                        depthTest = false,
+                                    )
                                 } else {
-                                    0f
+                                    renderer.drawHandItem(camera, atlas.layerForItem(handItemName).toFloat())
                                 }
-                                val forward = camera.forward()
-                                val right = camera.right()
-                                val up = camera.up()
-                                val fx = camera.x + forward[0] * 0.72 + right[0] * 0.34 - up[0] * (0.34 - swing * 0.14)
-                                val fy = camera.y + forward[1] * 0.72 + right[1] * 0.34 - up[1] * (0.34 - swing * 0.14)
-                                val fz = camera.z + forward[2] * 0.72 + right[2] * 0.34 - up[2] * (0.34 - swing * 0.14)
-                                val yaw = -Math.toRadians(camera.yaw.toDouble()).toFloat() + 0.55f + swing * 0.5f
+                            } else if (handState != null) {
+                                // Рука сбоку от тела: вперёд и вправо от лица игрока.
+                                val yawRad = Math.toRadians(player.yaw.toDouble())
+                                val aheadX = kotlin.math.sin(yawRad).toFloat()
+                                val aheadZ = kotlin.math.cos(yawRad).toFloat()
+                                val sideX = -aheadZ
+                                val sideZ = aheadX
+                                val reach = 0.24f
+                                val side = 0.44f
+                                val lift = 0.20f - handSwing * 0.18f
                                 renderer.drawBlockCubes(
                                     camera,
                                     listOf(
                                         Renderer.BlockCube(
-                                            fx, fy, fz, 0.22f,
+                                            player.x + aheadX * reach + sideX * side,
+                                            player.y + 1.15 + lift,
+                                            player.z + aheadZ * reach + sideZ * side,
+                                            0.24f,
                                             atlas.layerFor(handItemName, TextureAtlas.Kind.TOP),
                                             atlas.layerFor(handItemName, TextureAtlas.Kind.BOTTOM),
                                             atlas.layerFor(handItemName, TextureAtlas.Kind.SIDE),
-                                            yaw = yaw,
+                                            yaw = -yawRad.toFloat() + 0.5f + handSwing * 0.4f,
                                         ),
                                     ),
-                                    depthTest = false,
+                                    depthTest = true,
                                 )
-                            } else {
-                                renderer.drawHandItem(camera, atlas.layerForItem(handItemName).toFloat())
                             }
                         }
 
@@ -2101,9 +2182,14 @@ object GlView {
                         if (!hudHidden && board != null) {
                             hud.drawScoreboard(board.first, board.second)
                         }
-                        // Строка действия и большой заголовок от сервера.
+                        // Строка действия и большой заголовок от сервера. Строка держится
+                        // две секунды и гаснет за третью, как в ванили, — иначе она висела бы вечно.
                         if (!hudHidden) {
-                            session?.actionBar?.takeIf { it.isNotBlank() }?.let { hud.drawActionBar(it) }
+                            val nowNs = System.nanoTime()
+                            session?.actionBar?.takeIf { it.isNotBlank() }?.let { bar ->
+                                val alpha = actionBarAlpha(session?.actionBarAtNanos ?: 0L, nowNs)
+                                hud.drawActionBar(bar, alpha)
+                            }
                             val title = session?.titleText
                             if (title != null) {
                                 val age = (System.nanoTime() - (session?.titleAtNanos ?: 0L)) / 1_000_000_000.0
@@ -2178,6 +2264,7 @@ object GlView {
 
                         val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
                         val rightDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS
+                        val middleDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
                         // The demo "holds" the button so the self-test also exercises the progress.
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
@@ -2302,6 +2389,7 @@ object GlView {
 
                         leftWasDown = leftDown
                         rightWasDown = rightDown
+                        middleWasDown = middleDown
 
                         if (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames) {
                             // Self-test: report what the walk animation saw, so a screenshot can be

@@ -141,7 +141,8 @@ class Hud(
     }
 
     /** Строка действия над хотбаром (например, «Нажмите, чтобы продолжить»). */
-    fun drawActionBar(value: String) {
+    fun drawActionBar(value: String, alpha: Float = 1f) {
+        if (alpha <= 0.01f) return
         val text = this.text ?: return
         val s = HudLayout.scale(height).toFloat()
         val bar = HudLayout.hotbar(width, height)
@@ -149,6 +150,7 @@ class Hud(
         val widthPx = text.textWidth(value, scale)
         text.drawScreen(
             listOf(TextRenderer.ScreenLabel((width - widthPx) / 2f, bar.y - 40f * s, value, scale)),
+            alpha = alpha,
         )
     }
 
@@ -828,6 +830,20 @@ class Hud(
 
     override fun close() {
         renderer.close()
+    }
+}
+
+/**
+ * Прозрачность строки над хотбаром: две секунды полностью, третья — плавно в ноль.
+ * Ноль в [atNanos] означает «время неизвестно» — такие строки не гасим.
+ */
+internal fun actionBarAlpha(atNanos: Long, nowNanos: Long): Float {
+    if (atNanos <= 0L) return 1f
+    val age = (nowNanos - atNanos) / 1_000_000_000.0
+    return when {
+        age < 2.0 -> 1f
+        age < 3.0 -> (3.0 - age).toFloat()
+        else -> 0f
     }
 }
 

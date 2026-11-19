@@ -51,6 +51,11 @@ class Session internal constructor(
     var titleAtNanos: Long = 0L
         private set
 
+    /** Когда пришла строка над хотбаром: она гаснет через пару секунд сама. */
+    @Volatile
+    var actionBarAtNanos: Long = 0L
+        private set
+
     /** Радиус чанков, который сервер держит для этого клиента. */
     @Volatile
     var serverChunkRadius: Int = -1
@@ -200,8 +205,10 @@ class Session internal constructor(
 
                 Protocol777.Play.BOSS_EVENT -> bossBars.onPacket(packet.body)
 
-                Protocol777.Play.SET_ACTION_BAR_TEXT ->
+                Protocol777.Play.SET_ACTION_BAR_TEXT -> {
                     actionBar = readComponentText(packet.body)
+                    actionBarAtNanos = System.nanoTime()
+                }
 
                 Protocol777.Play.SET_TITLE_TEXT -> {
                     titleText = readComponentText(packet.body)

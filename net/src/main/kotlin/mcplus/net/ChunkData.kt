@@ -53,19 +53,23 @@ internal fun readChunkColumn(body: ByteArray, sectionCount: Int): ChunkColumn {
         throw ProtocolException("После секций осталось ${data.remaining} байт вместо 0 — формат не совпал")
     }
 
-    // Блок-сущности (сундуки, таблички): их содержимое пока не нужно, но пропустить надо.
+    // Блок-сущности (сундуки, таблички): координаты локальные, XZ упакованы в один байт.
     val blockEntityCount = reader.readVarInt()
     if (blockEntityCount !in 0..MAX_BLOCK_ENTITIES) {
         throw ProtocolException("Блок-сущностей в чанке: $blockEntityCount")
     }
+    val blockEntities = ArrayList<BlockEntity>(blockEntityCount)
     repeat(blockEntityCount) {
-        reader.readByte()      // packed XZ
-        reader.readShort()     // Y
+        val packed = reader.readByte().toInt() and 0xFF
+        val localX = packed shr 4
+        val localZ = packed and 0x0F
+        val y = reader.readShort().toInt()
         reader.readVarInt()    // type
         // Данные блок-сущности — необязательный NBT: ноль вместо типа тега означает «нет».
         // Именно так это и приходит на проводе, отдельного boolean здесь нет.
         val tagType = reader.readUnsignedByte()
-        if (tagType != 0) NbtReader.readPayload(reader, tagType)
+        val tag = if (tagType != 0) NbtReader.readPayload(reader, tagType) else null
+        blockEntities += BlockEntity(chunkX * 16 + localX, y, chunkZ * 16 + localZ, tag)
     }
 
     val light = readChunkLight(reader, sectionCount)
@@ -76,7 +80,7 @@ internal fun readChunkColumn(body: ByteArray, sectionCount: Int): ChunkColumn {
     val sections = (0 until sectionCount).map { index ->
         ChunkSection(states[index], light.sky[index], light.block[index], biomes[index])
     }
-    return ChunkColumn(chunkX, chunkZ, sections)
+    return ChunkColumn(chunkX, chunkZ, sections, blockEntities)
 }
 
 private const val SECTION_BLOCK_COUNT = 4096

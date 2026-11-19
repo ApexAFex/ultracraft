@@ -51,7 +51,13 @@ class WorldCollector(private val session: Session) {
                     continue
                 }
                 if (packet.id == Protocol777.Play.CHUNK_DATA) {
-                    world.add(readChunkColumn(packet.body, sectionCount))
+                    val column = readChunkColumn(packet.body, sectionCount)
+                    world.add(column)
+                    // Таблички в чанке: текст лежит в блок-сущностях, отдельного пакета для
+                    // уже стоящих табличек сервер не шлёт.
+                    for (entity in column.blockEntities) {
+                        session.signs.accept(entity.x, entity.y, entity.z, entity.tag)
+                    }
                 } else {
                     onPacket(packet)
                     if (!askedForRespawn && world.chunkCount == 0 &&
