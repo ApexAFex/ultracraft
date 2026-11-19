@@ -1,4 +1,4 @@
-﻿package mcplus.net
+package mcplus.net
 
 import java.io.File
 
@@ -11,11 +11,31 @@ import java.io.File
 class BlockTable private constructor(
     private val names: Array<String>,
     private val air: BooleanArray,
+    private val properties: Array<String>,
 ) {
     fun nameOf(stateId: Int): String =
         if (stateId in names.indices) names[stateId].ifEmpty { "unknown:$stateId" } else "unknown:$stateId"
 
     fun isAir(stateId: Int): Boolean = stateId in air.indices && air[stateId]
+
+    /** Свойства состояния из таблицы: `type=bottom,facing=north` (пусто у обычных блоков). */
+    fun propertiesOf(stateId: Int): String =
+        if (stateId in properties.indices) properties[stateId] else ""
+
+    /**
+     * Форма блока: плита, ступень, дверь, забор — или null, если это куб.
+     *
+     * Разбор идёт по строке свойств и кэшируется: номеров состояний 35 723, но не-кубических
+     * среди них несколько тысяч, а мешер спрашивает форму на каждый блок каждого чанка.
+     */
+    fun shapeOf(stateId: Int): BlockShape? {
+        if (stateId !in names.indices) return null
+        val cached = shapes[stateId]
+        if (cached != null) return cached as? BlockShape
+        val parsed = BlockShape.parse(nameOf(stateId), propertiesOf(stateId))
+        shapes[stateId] = parsed ?: NO_SHAPE
+        return parsed
+    }
 
     val stateCount: Int get() = names.count { it.isNotEmpty() }
 
@@ -28,32 +48,41 @@ class BlockTable private constructor(
     /** Distinct block names in this table. */
     fun allNames(): List<String> = names.filter { it.isNotEmpty() }.distinct()
 
+    private val shapes = java.util.concurrent.ConcurrentHashMap<Int, Any>()
+
     companion object {
         private val AIR_NAMES = setOf("air", "cave_air", "void_air")
 
-        /** Expects lines of `stateId<TAB>block_name`, as produced by `tools/build-block-table.js`. */
+        /** Занятая клетка кэша: «формы нет». null в ConcurrentHashMap класть нельзя. */
+        private val NO_SHAPE = Any()
+
+        /** Expects lines of `stateId<TAB>block_name[<TAB>properties]`. */
         fun load(file: File): BlockTable {
             require(file.isFile) { "Нет файла таблицы блоков: ${file.absolutePath}" }
 
-            val entries = HashMap<Int, String>(40_000)
+            val entries = HashMap<Int, Pair<String, String>>(40_000)
             var maxId = 0
             file.forEachLine { line ->
                 if (line.isBlank() || line.startsWith("#")) return@forEachLine
-                val tab = line.indexOf('\t')
-                if (tab <= 0) return@forEachLine
-                val id = line.substring(0, tab).toIntOrNull() ?: return@forEachLine
-                entries[id] = line.substring(tab + 1).trim()
+                val parts = line.split('\t')
+                val id = parts.getOrNull(0)?.toIntOrNull() ?: return@forEachLine
+                val name = parts.getOrNull(1)?.trim().orEmpty()
+                if (name.isEmpty()) return@forEachLine
+                val properties = parts.getOrNull(2)?.trim().orEmpty()
+                entries[id] = name to properties
                 if (id > maxId) maxId = id
             }
             require(entries.isNotEmpty()) { "Таблица блоков пуста: ${file.absolutePath}" }
 
             val names = Array(maxId + 1) { "" }
             val air = BooleanArray(maxId + 1)
-            entries.forEach { (id, name) ->
-                names[id] = name
-                air[id] = name in AIR_NAMES
+            val properties = Array(maxId + 1) { "" }
+            entries.forEach { (id, value) ->
+                names[id] = value.first
+                properties[id] = value.second
+                air[id] = value.first in AIR_NAMES
             }
-            return BlockTable(names, air)
+            return BlockTable(names, air, properties)
         }
     }
 }

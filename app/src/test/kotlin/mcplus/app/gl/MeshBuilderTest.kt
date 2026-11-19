@@ -175,4 +175,120 @@ class MeshBuilderTest {
             index += 8
         }
     }
+
+    // ---------------------------------------------------------------- формы блоков
+
+    /** Отдельная таблица: у состояний есть свойства, иначе плиту от куба не отличить. */
+    private val shapes = BlockTable.load(
+        File.createTempFile("blocks-shapes", ".tsv").apply {
+            deleteOnExit()
+            writeText(
+                "0\tair\t\n" +
+                    "1\tstone\t\n" +
+                    "2\toak_slab\ttype=bottom\n" +
+                    "3\toak_slab\ttype=top\n" +
+                    "4\toak_stairs\tfacing=east,half=bottom,shape=straight\n" +
+                    "5\toak_fence\teast=false,north=false,south=false,west=false\n" +
+                    "6\toak_door\tfacing=west,half=lower,hinge=left,open=false\n",
+            )
+        },
+    )
+
+    private val shapeAtlas = TextureAtlas.colored(
+        listOf("air", "stone", "oak_slab", "oak_stairs", "oak_fence", "oak_door"),
+    )
+
+    private fun shapeMesh(world: World): ChunkMesh = MeshBuilder.build(world, shapes, shapeAtlas, 0, 0)
+
+    /** Все координаты вершин одного измерения: помогает проверять высоту и толщину. */
+    private fun axisValues(mesh: ChunkMesh, axis: Int): List<Float> {
+        val values = ArrayList<Float>()
+        var index = 0
+        while (index < mesh.data.size) {
+            values += mesh.data[index + axis]
+            index += 8
+        }
+        return values
+    }
+
+    @Test
+    fun `a bottom slab is half as tall as a block`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 2))
+
+        val mesh = shapeMesh(world)
+        val ys = axisValues(mesh, 1)
+        assertEquals(48f, ys.min(), 0.001f)
+        assertEquals(48.5f, ys.max(), 0.001f)
+        // Шесть граней по два треугольника.
+        assertEquals(6 * 2 * 3, mesh.vertexCount)
+    }
+
+    @Test
+    fun `a top slab hangs from the upper half`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 3))
+
+        val ys = axisValues(shapeMesh(world), 1)
+        assertEquals(48.5f, ys.min(), 0.001f)
+        assertEquals(49f, ys.max(), 0.001f)
+    }
+
+    @Test
+    fun `stairs have a step on the facing side only`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 4))
+
+        val mesh = shapeMesh(world)
+        val high = ArrayList<Float>()
+        var index = 0
+        while (index < mesh.data.size) {
+            if (mesh.data[index + 1] > 48.9f) high += mesh.data[index]
+            index += 8
+        }
+
+        assertTrue(high.isNotEmpty(), "у ступени нет верхней части")
+        assertTrue(high.all { it >= 0.5f }, "ступенька должна быть на восточной половине: $high")
+        assertEquals(49f, axisValues(mesh, 1).max(), 0.001f)
+    }
+
+    @Test
+    fun `a fence without connections is a centre post`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 5))
+
+        val mesh = shapeMesh(world)
+        val xs = axisValues(mesh, 0)
+        val zs = axisValues(mesh, 2)
+        assertTrue(xs.all { it in 0.375f..0.625f }, "столб шире 4/16: $xs")
+        assertTrue(zs.all { it in 0.375f..0.625f }, "столб шире 4/16: $zs")
+    }
+
+    @Test
+    fun `a door is a thin panel at its facing side`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 6))
+
+        val xs = axisValues(shapeMesh(world), 0)
+        assertTrue(xs.all { it <= 3f / 16f + 0.001f }, "дверь должна стоять у западной стороны: $xs")
+    }
+
+    @Test
+    fun `two slabs side by side share one wall`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 2, intArrayOf(1, 48, 0) to 2))
+
+        // 12 граней двух плит минус две совпавшие боковые.
+        assertEquals(10 * 2 * 3, shapeMesh(world).vertexCount)
+    }
+
+    @Test
+    fun `a cube next to a slab keeps the face the slab does not cover`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 1, intArrayOf(1, 48, 0) to 2))
+
+        // У камня остаются все шесть граней (плита закрывает лишь половину), у плиты боковая
+        // грань к камню скрыта: 6 + 5 = 11 граней.
+        assertEquals(11 * 2 * 3, shapeMesh(world).vertexCount)
+    }
 }

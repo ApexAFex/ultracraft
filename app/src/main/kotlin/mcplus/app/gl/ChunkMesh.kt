@@ -1,6 +1,10 @@
 package mcplus.app.gl
 
+import mcplus.net.BlockShape
 import mcplus.net.BlockTable
+import mcplus.net.ShapeDirection
+import mcplus.net.SlabHalf
+import mcplus.net.StairShape
 import mcplus.net.World
 
 /**
@@ -8,6 +12,10 @@ import mcplus.net.World
  *
  * Chunks are meshed separately so a block change only rebuilds the chunk it touched —
  * rebuilding the whole world would freeze the client for a second on every click.
+ *
+ * Кубические блоки и не-кубические (плиты, ступени, двери, заборы) идут одним путём:
+ * форма — это набор коробок, куб — единственная коробка от 0 до 1. Так текстуры, свет и
+ * отсечение граней считаются в одном месте.
  */
 class ChunkMesh(
     val chunkX: Int,
@@ -41,41 +49,12 @@ object MeshBuilder {
                 val name = blocks.nameOf(state)
                 if (name in PLANTS) continue
 
-                for (face in FACES) {
-                    val neighbour = world.blockAt(x + face.dx, y + face.dy, z + face.dz)
-                    if (!isTransparent(neighbour, blocks)) continue
-
-                    // Свет берётся из клетки, в которую смотрит грань; каждый угол считает
-                    // своё среднее по соседям, поэтому поверхность освещается плавно.
-                    val baseX = x + face.dx
-                    val baseY = y + face.dy
-                    val baseZ = z + face.dz
-                    val base = world.lightAt(baseX, baseY, baseZ)
-                    val layer = atlas.layerFor(name, face.kind).toFloat()
-                    for (corner in face.quad.indices) {
-                        val point = face.quad[corner]
-                        val light = cornerLight(
-                            world, blocks, baseX, baseY, baseZ, base,
-                            face.dx, face.dy, face.dz, point,
-                        )
-                        vertexData.add(x + point[0])
-                        vertexData.add(y + point[1])
-                        vertexData.add(z + point[2])
-                        vertexData.add(face.shade)
-                        vertexData.add(light.toFloat())
-                        vertexData.add(layer)
-
-                        // UVs follow the block face: top and bottom use x/z, sides use the
-                        // horizontal axis and y. v is flipped because textures are uploaded
-                        // top-down, so without it grass ends up at the bottom of a side.
-                        val u = when {
-                            face.dy != 0 -> point[0]
-                            face.dx != 0 -> if (face.dx > 0) point[2] else 1f - point[2]
-                            else -> if (face.dz > 0) point[0] else 1f - point[0]
-                        }
-                        val v = if (face.dy != 0) 1f - point[2] else 1f - point[1]
-                        vertexData.add(u)
-                        vertexData.add(v)
+                val shape = blocks.shapeOf(state)
+                if (shape == null) {
+                    emitBox(vertexData, world, blocks, atlas, x, y, z, FULL_CUBE, name, null)
+                } else {
+                    for (box in boxesOf(shape)) {
+                        emitBox(vertexData, world, blocks, atlas, x, y, z, box, name, shape)
                     }
                 }
             }
@@ -83,6 +62,209 @@ object MeshBuilder {
 
         val data = vertexData.toArray()
         return ChunkMesh(chunkX, chunkZ, data, data.size / FLOATS_PER_VERTEX)
+    }
+
+    /** Коробка внутри клетки блока: координаты от 0 до 1. */
+    internal data class Box(
+        val x0: Float,
+        val y0: Float,
+        val z0: Float,
+        val x1: Float,
+        val y1: Float,
+        val z1: Float,
+    )
+
+    private val FULL_CUBE = Box(0f, 0f, 0f, 1f, 1f, 1f)
+
+    /** Формы повторяются тысячами блоков, поэтому коробки кэшируются по форме. */
+    private val shapeBoxes = java.util.concurrent.ConcurrentHashMap<BlockShape, List<Box>>()
+
+    internal fun boxesOf(shape: BlockShape): List<Box> =
+        shapeBoxes.computeIfAbsent(shape) { buildBoxes(it) }
+
+    private fun buildBoxes(shape: BlockShape): List<Box> = when (shape) {
+        is BlockShape.Slab -> if (shape.half == SlabHalf.TOP) {
+            listOf(Box(0f, 0.5f, 0f, 1f, 1f, 1f))
+        } else {
+            listOf(Box(0f, 0f, 0f, 1f, 0.5f, 1f))
+        }
+
+        is BlockShape.Stairs -> {
+            val top = shape.half == SlabHalf.TOP
+            val base = if (top) Box(0f, 0.5f, 0f, 1f, 1f, 1f) else Box(0f, 0f, 0f, 1f, 0.5f, 1f)
+            val step = stepBox(shape.facing, if (top) 0f else 0.5f, if (top) 0.5f else 1f)
+            listOf(base, step)
+        }
+
+        is BlockShape.Door -> {
+            // Панель толщиной 3/16 у той стороны, в которую смотрит дверь.
+            val thickness = 3f / 16f
+            when (shape.facing) {
+                ShapeDirection.NORTH -> listOf(Box(0f, 0f, 0f, 1f, 1f, thickness))
+                ShapeDirection.SOUTH -> listOf(Box(0f, 0f, 1f - thickness, 1f, 1f, 1f))
+                ShapeDirection.WEST -> listOf(Box(0f, 0f, 0f, thickness, 1f, 1f))
+                ShapeDirection.EAST -> listOf(Box(1f - thickness, 0f, 0f, 1f, 1f, 1f))
+            }
+        }
+
+        is BlockShape.Fence -> {
+            // Столб 4/16 в центре и по две перекладины к каждому соседу.
+            val boxes = ArrayList<Box>(9)
+            boxes += Box(0.375f, 0f, 0.375f, 0.625f, 1f, 0.625f)
+            val railThickness = 1f / 16f
+            for (y in FENCE_RAIL_HEIGHTS) {
+                val y0 = y
+                val y1 = y + railThickness * 3f
+                if (shape.east) boxes += Box(0.625f, y0, 0.4375f, 1f, y1, 0.5625f)
+                if (shape.west) boxes += Box(0f, y0, 0.4375f, 0.375f, y1, 0.5625f)
+                if (shape.north) boxes += Box(0.4375f, y0, 0f, 0.5625f, y1, 0.375f)
+                if (shape.south) boxes += Box(0.4375f, y0, 0.625f, 0.5625f, y1, 1f)
+            }
+            boxes
+        }
+    }
+
+    private val FENCE_RAIL_HEIGHTS = floatArrayOf(6f / 16f, 12f / 16f)
+
+    private fun stepBox(facing: ShapeDirection, y0: Float, y1: Float): Box = when (facing) {
+        ShapeDirection.EAST -> Box(0.5f, y0, 0f, 1f, y1, 1f)
+        ShapeDirection.WEST -> Box(0f, y0, 0f, 0.5f, y1, 1f)
+        ShapeDirection.NORTH -> Box(0f, y0, 0f, 1f, y1, 0.5f)
+        ShapeDirection.SOUTH -> Box(0f, y0, 0.5f, 1f, y1, 1f)
+    }
+
+    /**
+     * Emits one box: for every face either a quad or nothing.
+     *
+     * A face on the cell border is hidden when the neighbour fully covers it. A face inside
+     * the cell (the top of a bottom slab, the step of a stair) is always drawn — there is no
+     * neighbour to hide it. Частичные блоки соседа не скрывают грань куба: за плитой видно
+     * половину стены, и «оптимизация» здесь оставила бы дыру.
+     */
+    private fun emitBox(
+        data: FloatArrayBuilder,
+        world: World,
+        blocks: BlockTable,
+        atlas: TextureAtlas,
+        x: Int,
+        y: Int,
+        z: Int,
+        box: Box,
+        name: String,
+        self: BlockShape?,
+    ) {
+        for (face in FACES) {
+            val onBorder = when {
+                face.dx > 0 -> box.x1 >= 1f
+                face.dx < 0 -> box.x0 <= 0f
+                face.dy > 0 -> box.y1 >= 1f
+                face.dy < 0 -> box.y0 <= 0f
+                face.dz > 0 -> box.z1 >= 1f
+                else -> box.z0 <= 0f
+            }
+
+            val baseX: Int
+            val baseY: Int
+            val baseZ: Int
+            if (onBorder) {
+                val neighbourX = x + face.dx
+                val neighbourY = y + face.dy
+                val neighbourZ = z + face.dz
+                val neighbour = world.blockAt(neighbourX, neighbourY, neighbourZ)
+                if (occludes(neighbour, blocks, self)) continue
+                baseX = neighbourX
+                baseY = neighbourY
+                baseZ = neighbourZ
+            } else {
+                baseX = x
+                baseY = y
+                baseZ = z
+            }
+            val base = world.lightAt(baseX, baseY, baseZ)
+            val layer = atlas.layerFor(name, face.kind).toFloat()
+
+            fun vertex(px: Float, py: Float, pz: Float) {
+                val light = cornerLight(
+                    world, blocks, baseX, baseY, baseZ, base,
+                    face.dx, face.dy, face.dz, px, py, pz,
+                )
+                data.add(x + px)
+                data.add(y + py)
+                data.add(z + pz)
+                data.add(face.shade)
+                data.add(light.toFloat())
+                data.add(layer)
+
+                // UVs follow the block face: top and bottom use x/z, sides use the
+                // horizontal axis and y. v is flipped because textures are uploaded
+                // top-down, so without it grass ends up at the bottom of a side.
+                val u = when {
+                    face.dy != 0 -> px
+                    face.dx != 0 -> if (face.dx > 0) pz else 1f - pz
+                    else -> if (face.dz > 0) px else 1f - px
+                }
+                val v = if (face.dy != 0) 1f - pz else 1f - py
+                data.add(u)
+                data.add(v)
+            }
+
+            when (face.id) {
+                FACE_UP -> {
+                    vertex(box.x0, box.y1, box.z1); vertex(box.x1, box.y1, box.z1)
+                    vertex(box.x1, box.y1, box.z0)
+                    vertex(box.x0, box.y1, box.z1); vertex(box.x1, box.y1, box.z0)
+                    vertex(box.x0, box.y1, box.z0)
+                }
+
+                FACE_DOWN -> {
+                    vertex(box.x0, box.y0, box.z0); vertex(box.x1, box.y0, box.z0)
+                    vertex(box.x1, box.y0, box.z1)
+                    vertex(box.x0, box.y0, box.z0); vertex(box.x1, box.y0, box.z1)
+                    vertex(box.x0, box.y0, box.z1)
+                }
+
+                FACE_EAST -> {
+                    vertex(box.x1, box.y0, box.z0); vertex(box.x1, box.y1, box.z0)
+                    vertex(box.x1, box.y1, box.z1)
+                    vertex(box.x1, box.y0, box.z0); vertex(box.x1, box.y1, box.z1)
+                    vertex(box.x1, box.y0, box.z1)
+                }
+
+                FACE_WEST -> {
+                    vertex(box.x0, box.y0, box.z1); vertex(box.x0, box.y1, box.z1)
+                    vertex(box.x0, box.y1, box.z0)
+                    vertex(box.x0, box.y0, box.z1); vertex(box.x0, box.y1, box.z0)
+                    vertex(box.x0, box.y0, box.z0)
+                }
+
+                FACE_SOUTH -> {
+                    vertex(box.x0, box.y0, box.z1); vertex(box.x1, box.y0, box.z1)
+                    vertex(box.x1, box.y1, box.z1)
+                    vertex(box.x0, box.y0, box.z1); vertex(box.x1, box.y1, box.z1)
+                    vertex(box.x0, box.y1, box.z1)
+                }
+
+                FACE_NORTH -> {
+                    vertex(box.x1, box.y0, box.z0); vertex(box.x0, box.y0, box.z0)
+                    vertex(box.x0, box.y1, box.z0)
+                    vertex(box.x1, box.y0, box.z0); vertex(box.x0, box.y1, box.z0)
+                    vertex(box.x1, box.y1, box.z0)
+                }
+            }
+        }
+    }
+
+    /**
+     * Скрывает ли сосед грань целиком.
+     *
+     * Кубический непрозрачный блок — да. Плита, ступень, дверь или забор — нет: они закрывают
+     * только часть клетки. Исключение — такая же плита рядом: её боковая грань совпадает
+     * с нашей, и без отсечения две грани дали бы мерцание.
+     */
+    private fun occludes(state: Int, blocks: BlockTable, self: BlockShape?): Boolean {
+        if (isTransparent(state, blocks)) return false
+        val other = blocks.shapeOf(state) ?: return true
+        return self is BlockShape.Slab && other is BlockShape.Slab && self.half == other.half
     }
 
     /**
@@ -104,10 +286,25 @@ object MeshBuilder {
         dy: Int,
         dz: Int,
         point: FloatArray,
+    ): Int = cornerLight(world, blocks, x, y, z, base, dx, dy, dz, point[0], point[1], point[2])
+
+    internal fun cornerLight(
+        world: World,
+        blocks: BlockTable,
+        x: Int,
+        y: Int,
+        z: Int,
+        base: Int,
+        dx: Int,
+        dy: Int,
+        dz: Int,
+        px: Float,
+        py: Float,
+        pz: Float,
     ): Int {
-        val alongX = if (point[0] > 0.5f) 1 else -1
-        val alongY = if (point[1] > 0.5f) 1 else -1
-        val alongZ = if (point[2] > 0.5f) 1 else -1
+        val alongX = if (px > 0.5f) 1 else -1
+        val alongY = if (py > 0.5f) 1 else -1
+        val alongZ = if (pz > 0.5f) 1 else -1
 
         // Касательные — две оси, по которым грань не смещается.
         val firstX: Int
@@ -171,54 +368,31 @@ object MeshBuilder {
     }
 
     private class Face(
+        val id: Int,
         val dx: Int,
         val dy: Int,
         val dz: Int,
         val shade: Float,
         val kind: TextureAtlas.Kind,
-        val quad: Array<FloatArray>,
     )
 
-    private fun face(
-        dx: Int,
-        dy: Int,
-        dz: Int,
-        shade: Float,
-        kind: TextureAtlas.Kind,
-        vararg corners: FloatArray,
-    ) = Face(dx, dy, dz, shade, kind, arrayOf(*corners))
+    private const val FACE_UP = 0
+    private const val FACE_DOWN = 1
+    private const val FACE_EAST = 2
+    private const val FACE_WEST = 3
+    private const val FACE_SOUTH = 4
+    private const val FACE_NORTH = 5
+
+    private fun face(id: Int, dx: Int, dy: Int, dz: Int, shade: Float, kind: TextureAtlas.Kind) =
+        Face(id, dx, dy, dz, shade, kind)
 
     private val FACES = arrayOf(
-        face(
-            0, 1, 0, 1.0f, TextureAtlas.Kind.TOP,
-            floatArrayOf(0f, 1f, 1f), floatArrayOf(1f, 1f, 1f), floatArrayOf(1f, 1f, 0f),
-            floatArrayOf(0f, 1f, 1f), floatArrayOf(1f, 1f, 0f), floatArrayOf(0f, 1f, 0f),
-        ),
-        face(
-            0, -1, 0, 0.45f, TextureAtlas.Kind.BOTTOM,
-            floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 0f, 1f),
-            floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 0f, 1f), floatArrayOf(0f, 0f, 1f),
-        ),
-        face(
-            1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE,
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 1f, 0f), floatArrayOf(1f, 1f, 1f),
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(1f, 1f, 1f), floatArrayOf(1f, 0f, 1f),
-        ),
-        face(
-            -1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE,
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(0f, 1f, 1f), floatArrayOf(0f, 1f, 0f),
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(0f, 1f, 0f), floatArrayOf(0f, 0f, 0f),
-        ),
-        face(
-            0, 0, 1, 0.62f, TextureAtlas.Kind.SIDE,
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 0f, 1f), floatArrayOf(1f, 1f, 1f),
-            floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 1f, 1f), floatArrayOf(0f, 1f, 1f),
-        ),
-        face(
-            0, 0, -1, 0.62f, TextureAtlas.Kind.SIDE,
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 1f, 0f),
-            floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f, 0f), floatArrayOf(1f, 1f, 0f),
-        ),
+        face(FACE_UP, 0, 1, 0, 1.0f, TextureAtlas.Kind.TOP),
+        face(FACE_DOWN, 0, -1, 0, 0.45f, TextureAtlas.Kind.BOTTOM),
+        face(FACE_EAST, 1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE),
+        face(FACE_WEST, -1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE),
+        face(FACE_SOUTH, 0, 0, 1, 0.62f, TextureAtlas.Kind.SIDE),
+        face(FACE_NORTH, 0, 0, -1, 0.62f, TextureAtlas.Kind.SIDE),
     )
 
     private val PLANTS = setOf(
