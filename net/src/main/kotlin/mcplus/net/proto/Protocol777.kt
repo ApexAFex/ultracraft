@@ -92,6 +92,8 @@ object Protocol777 {
         const val GAME_EVENT: Int = 0x27
         const val SYSTEM_CHAT: Int = 0x7C
         const val PLAYER_CHAT: Int = 0x42
+        const val SET_TIME: Int = 0x73
+        const val LIGHT_UPDATE: Int = 0x31
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00

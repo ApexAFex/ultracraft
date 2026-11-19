@@ -9,6 +9,8 @@ out/
 tools/server/
 tools/wiki/
 tools/mcd/
+tools/chunks/
+app/tools/
 data/
 registry-dump/
 .mcplus/

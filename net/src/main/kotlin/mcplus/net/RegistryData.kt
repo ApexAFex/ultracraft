@@ -21,14 +21,28 @@ class Registries {
 
     private val dimensionTypes = mutableListOf<DimensionType>()
 
+    /**
+     * Часы мира (`data/minecraft/world_clock`): `overworld` задаёт время суток.
+     *
+     * `Set Time` присылает карту «часы → состояние», где часы — числовой id реестра;
+     * без этой таблицы непонятно, какая из записей отвечает за день и ночь.
+     */
+    private val worldClocks = mutableListOf<String>()
+
     val registryIds = mutableListOf<String>()
 
     fun dimensionType(id: Int): DimensionType? = dimensionTypes.getOrNull(id)
+
+    fun worldClock(id: Int): String? = worldClocks.getOrNull(id)
 
     val dimensionTypeCount: Int get() = dimensionTypes.size
 
     internal fun addDimensionType(type: DimensionType) {
         dimensionTypes += type
+    }
+
+    internal fun addWorldClock(name: String) {
+        worldClocks += name
     }
 }
 
@@ -39,8 +53,22 @@ internal fun readRegistryData(body: ByteArray, registries: Registries) {
 
     if (registryId == "minecraft:dimension_type") {
         readDimensionTypes(reader, registries)
+    } else if (registryId == "minecraft:world_clock") {
+        readWorldClocks(reader, registries)
     }
     // biomes, damage types, chat types… are not needed yet
+}
+
+private fun readWorldClocks(reader: ByteReader, registries: Registries) {
+    val entryCount = reader.readVarInt()
+    if (entryCount !in 0..64) throw ProtocolException("Часов мира в реестре: $entryCount")
+
+    repeat(entryCount) {
+        val name = reader.readString().removePrefix("minecraft:")
+        // Содержимое часов (длина суток и фаза) пока не нужно: время приходит пакетом.
+        if (reader.readBoolean()) NbtReader.read(reader)
+        registries.addWorldClock(name)
+    }
 }
 
 private fun readDimensionTypes(reader: ByteReader, registries: Registries) {

@@ -166,6 +166,7 @@ object GlView {
             // Counted on the reader thread: shows whether the server accepts our edits or
             // quietly puts the world back.
             val blockUpdates = java.util.concurrent.atomic.AtomicInteger()
+            val lightUpdates = java.util.concurrent.atomic.AtomicInteger()
             val chunkFailures = java.util.concurrent.atomic.AtomicInteger()
 
             /**
@@ -195,6 +196,15 @@ object GlView {
                         val position = reader.readPosition()
                         world.applyBlockUpdate(packet.body)
                         remeshAround(position.x, position.y, position.z)
+                    }
+                    return
+                }
+                if (packet.id == Protocol777.Play.LIGHT_UPDATE) {
+                    lightUpdates.incrementAndGet()
+                    runCatching {
+                        val id = world.applyLightUpdate(packet.body) ?: return
+                        // Свет меняет вид всего чанка: без пересборки он остался бы прежним.
+                        pipeline.request(mcplus.net.World.chunkOfX(id), mcplus.net.World.chunkOfZ(id))
                     }
                     return
                 }
@@ -756,7 +766,29 @@ object GlView {
                         }
 
                         GL30.glViewport(0, 0, width, height)
-                        GL30.glClearColor(0.56f, 0.75f, 0.91f, 1f)
+
+                        // Небо и свет: время суток приходит от сервера, погода — событиями.
+                        // День не пересобирает чанки: свет лежит в вершинах, а «сколько сейчас
+                        // дня» — это форма шейдера.
+                        val sky = session?.sky
+                        val daylightFraction = Daylight.factor(sky?.dayTicks ?: 6_000L)
+                        val light = Daylight.effectiveLight(
+                            daylightFraction,
+                            sky?.rain ?: 0f,
+                            sky?.thunder ?: 0f,
+                        )
+                        val skyColor = Daylight.skyColor(daylightFraction, sky?.rain ?: 0f)
+                        renderer.daylight = light
+                        renderer.fogColor = Daylight.fogColor(skyColor)
+                        renderer.fogStart = 90f
+                        renderer.fogEnd = 170f
+
+                        GL30.glClearColor(
+                            ((skyColor shr 16) and 0xFF) / 255f,
+                            ((skyColor shr 8) and 0xFF) / 255f,
+                            (skyColor and 0xFF) / 255f,
+                            1f,
+                        )
                         GL30.glClear(GL30.GL_COLOR_BUFFER_BIT or GL30.GL_DEPTH_BUFFER_BIT)
 
                         renderer.draw(camera)
@@ -946,7 +978,7 @@ object GlView {
                     textRenderer?.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
-                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, чанков не разобрано ${chunkFailures.get()}")
+                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}")
                     println("Игроков в списке: ${playerList.size}")
                 }
             }

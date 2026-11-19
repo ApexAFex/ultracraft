@@ -54,6 +54,9 @@ class Session internal constructor(
     /** Chat lines: written by the reader thread, read by the game loop. */
     val chat: ChatLog = ChatLog()
 
+    /** Time of day and weather: the client only displays them. */
+    val sky: SkyState = SkyState()
+
     /** Why the connection ended, or null while it is alive. */
     @Volatile
     var closeReason: String? = null
@@ -125,6 +128,9 @@ class Session internal constructor(
                         val name = players.nameOf(sender) ?: sender.toString().take(8)
                         chat.add("<$name> $text")
                     }
+
+                Protocol777.Play.SET_TIME, Protocol777.Play.GAME_EVENT ->
+                    sky.onPacket(packet.id, packet.body) { joinResult.registries.worldClock(it) }
 
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 

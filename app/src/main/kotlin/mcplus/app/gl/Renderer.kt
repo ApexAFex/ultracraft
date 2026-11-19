@@ -18,6 +18,20 @@ class Renderer(
     private val program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
     private val viewProjLocation = GL30.glGetUniformLocation(program, "uViewProj")
     private val atlasLocation = GL30.glGetUniformLocation(program, "uAtlas")
+    private val daylightLocation = GL30.glGetUniformLocation(program, "uDaylight")
+    private val cameraLocation = GL30.glGetUniformLocation(program, "uCameraPos")
+    private val fogColorLocation = GL30.glGetUniformLocation(program, "uFogColor")
+    private val fogStartLocation = GL30.glGetUniformLocation(program, "uFogStart")
+    private val fogEndLocation = GL30.glGetUniformLocation(program, "uFogEnd")
+    private val unlitLocation = GL30.glGetUniformLocation(program, "uUnlit")
+
+    /** Свет неба: 0 — ночь, 1 — день. Ставится каждый кадр из времени суток. */
+    var daylight: Float = 1f
+
+    /** Цвет тумана (и неба) в 0xRRGGBB. */
+    var fogColor: Int = 0x87CEEB
+    var fogStart: Float = 80f
+    var fogEnd: Float = 170f
 
     private val outlineProgram = createProgram(OUTLINE_VERTEX_SHADER, OUTLINE_FRAGMENT_SHADER)
     private val outlineViewProjLocation = GL30.glGetUniformLocation(outlineProgram, "uViewProj")
@@ -28,12 +42,12 @@ class Renderer(
     /** Crack overlay buffers: same vertex layout as the block shader. */
     private val crackVao = GL30.glGenVertexArrays()
     private val crackVbo = GL30.glGenBuffers()
-    private val crackData = FloatArray(6 * 6 * 7)
+    private val crackData = FloatArray(36 * VERTEX_FLOATS)
 
     /** Icons of the hotbar (9) and of the inventory screen (46 share this buffer). */
     private val hotbarVao = GL30.glGenVertexArrays()
     private val hotbarVbo = GL30.glGenBuffers()
-    private val hotbarData = FloatArray(64 * 6 * 7)
+    private val hotbarData = FloatArray(64 * 6 * VERTEX_FLOATS)
 
     private class Part(val vao: Int, val vbo: Int) {
         var count: Int = 0
@@ -52,16 +66,7 @@ class Renderer(
         GL30.glBindVertexArray(crackVao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, crackVbo)
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, crackData.size.toLong() * Float.SIZE_BYTES, GL30.GL_DYNAMIC_DRAW)
-        val crackStride = 7 * Float.SIZE_BYTES
-        GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, crackStride, 0L)
-        GL30.glEnableVertexAttribArray(0)
-        GL30.glVertexAttribPointer(1, 1, GL30.GL_FLOAT, false, crackStride, 3L * Float.SIZE_BYTES)
-        GL30.glEnableVertexAttribArray(1)
-        GL30.glVertexAttribPointer(2, 1, GL30.GL_FLOAT, false, crackStride, 4L * Float.SIZE_BYTES)
-        GL30.glEnableVertexAttribArray(2)
-        GL30.glVertexAttribPointer(3, 2, GL30.GL_FLOAT, false, crackStride, 5L * Float.SIZE_BYTES)
-        GL30.glEnableVertexAttribArray(3)
-        GL30.glBindVertexArray(0)
+        configureLayout(crackVao)
 
         GL30.glBindVertexArray(hotbarVao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, hotbarVbo)
@@ -70,14 +75,7 @@ class Renderer(
             hotbarData.size.toLong() * Float.SIZE_BYTES,
             GL30.GL_DYNAMIC_DRAW,
         )
-        GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, crackStride, 0L)
-        GL30.glEnableVertexAttribArray(0)
-        GL30.glVertexAttribPointer(1, 1, GL30.GL_FLOAT, false, crackStride, 3L * Float.SIZE_BYTES)
-        GL30.glEnableVertexAttribArray(1)
-        GL30.glVertexAttribPointer(2, 1, GL30.GL_FLOAT, false, crackStride, 4L * Float.SIZE_BYTES)
-        GL30.glEnableVertexAttribArray(2)
-        GL30.glVertexAttribPointer(3, 2, GL30.GL_FLOAT, false, crackStride, 5L * Float.SIZE_BYTES)
-        GL30.glEnableVertexAttribArray(3)
+        configureLayout(hotbarVao)
         GL30.glBindVertexArray(0)
 
         GL30.glEnable(GL30.GL_DEPTH_TEST)
@@ -87,19 +85,30 @@ class Renderer(
     private fun configure(part: Part) {
         GL30.glBindVertexArray(part.vao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, part.vbo)
+        configureLayout(part.vao)
+        GL30.glBindVertexArray(0)
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, 0)
+    }
 
-        val stride = 7 * Float.SIZE_BYTES
+    /**
+     * Раскладка вершины мира: `x, y, z, shade, light, layer, u, v`.
+     *
+     * `light` — упакованный свет: блоки в старших четырёх битах, небо в младших. Свет не
+     * запекается в меш, а применяется в шейдере: иначе смена дня и ночи требовала бы
+     * пересобрать все чанки.
+     */
+    private fun configureLayout(vao: Int) {
+        val stride = VERTEX_FLOATS * Float.SIZE_BYTES
         GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, stride, 0L)
         GL30.glEnableVertexAttribArray(0)
         GL30.glVertexAttribPointer(1, 1, GL30.GL_FLOAT, false, stride, 3L * Float.SIZE_BYTES)
         GL30.glEnableVertexAttribArray(1)
         GL30.glVertexAttribPointer(2, 1, GL30.GL_FLOAT, false, stride, 4L * Float.SIZE_BYTES)
         GL30.glEnableVertexAttribArray(2)
-        GL30.glVertexAttribPointer(3, 2, GL30.GL_FLOAT, false, stride, 5L * Float.SIZE_BYTES)
+        GL30.glVertexAttribPointer(3, 1, GL30.GL_FLOAT, false, stride, 5L * Float.SIZE_BYTES)
         GL30.glEnableVertexAttribArray(3)
-
-        GL30.glBindVertexArray(0)
-        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, 0)
+        GL30.glVertexAttribPointer(4, 2, GL30.GL_FLOAT, false, stride, 6L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(4)
     }
 
     /**
@@ -129,10 +138,20 @@ class Renderer(
     }
 
     fun draw(camera: Camera) {
+        val red = ((fogColor shr 16) and 0xFF) / 255f
+        val green = ((fogColor shr 8) and 0xFF) / 255f
+        val blue = (fogColor and 0xFF) / 255f
+
         GL30.glUseProgram(program)
         textures.bind(0)
         GL30.glUniform1i(atlasLocation, 0)
         GL30.glUniformMatrix4fv(viewProjLocation, false, camera.viewProjection(width.toFloat() / height.toFloat()))
+        GL30.glUniform1f(daylightLocation, daylight)
+        GL30.glUniform3f(cameraLocation, camera.x.toFloat(), camera.y.toFloat(), camera.z.toFloat())
+        GL30.glUniform3f(fogColorLocation, red, green, blue)
+        GL30.glUniform1f(fogStartLocation, fogStart)
+        GL30.glUniform1f(fogEndLocation, fogEnd)
+        GL30.glUniform1f(unlitLocation, 0f)
 
         for (part in parts.values) {
             if (part.count == 0) continue
@@ -159,6 +178,7 @@ class Renderer(
                 crackData[offset++] = blockY + corner[1] * (if (corner[1] > 0.5f) high else low)
                 crackData[offset++] = blockZ + corner[2] * (if (corner[2] > 0.5f) high else low)
                 crackData[offset++] = 1f            // shade
+                crackData[offset++] = FULL_LIGHT
                 crackData[offset++] = layer
                 crackData[offset++] = corner[3]     // u
                 crackData[offset++] = corner[4]     // v
@@ -178,6 +198,7 @@ class Renderer(
             viewProjLocation, false,
             camera.viewProjection(width.toFloat() / height.toFloat()),
         )
+        GL30.glUniform1f(unlitLocation, 1f)
         GL30.glBindVertexArray(crackVao)
         GL30.glEnable(GL30.GL_BLEND)
         GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
@@ -218,6 +239,7 @@ class Renderer(
                 hotbarData[offset++] = centreY + right[1] * h + up[1] * v
                 hotbarData[offset++] = centreZ + right[2] * h + up[2] * v
                 hotbarData[offset++] = icon.shade
+                hotbarData[offset++] = FULL_LIGHT
                 hotbarData[offset++] = icon.layer
                 hotbarData[offset++] = u
                 hotbarData[offset++] = w
@@ -245,11 +267,12 @@ class Renderer(
             viewProjLocation, false,
             camera.viewProjection(width.toFloat() / height.toFloat()),
         )
+        GL30.glUniform1f(unlitLocation, 1f)
         GL30.glBindVertexArray(hotbarVao)
         GL30.glEnable(GL30.GL_BLEND)
         GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
         GL30.glDisable(GL30.GL_DEPTH_TEST)
-        GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, offset / 7)
+        GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, offset / VERTEX_FLOATS)
         GL30.glEnable(GL30.GL_DEPTH_TEST)
         GL30.glDisable(GL30.GL_BLEND)
         GL30.glBindVertexArray(0)
@@ -356,6 +379,12 @@ class Renderer(
         /** The crack cube is a hair larger than the block, so both surfaces stay visible. */
         const val CRACK_INFLATE = 0.002f
 
+        /** Сколько чисел на вершину мира: x, y, z, shade, light, layer, u, v. */
+        const val VERTEX_FLOATS = 8
+
+        /** Полный свет (небо 15, блоки 15): иконки и трещины рисуются без затемнения. */
+        const val FULL_LIGHT = 255f
+
         /** The six faces of a unit cube: corners with their texture coordinates. */
         class CrackFace(val corners: List<FloatArray>)
 
@@ -412,14 +441,20 @@ class Renderer(
             #version 330 core
             layout(location = 0) in vec3 aPos;
             layout(location = 1) in float aShade;
-            layout(location = 2) in float aLayer;
-            layout(location = 3) in vec2 aUv;
+            layout(location = 2) in float aLight;
+            layout(location = 3) in float aLayer;
+            layout(location = 4) in vec2 aUv;
             uniform mat4 uViewProj;
+            uniform vec3 uCameraPos;
             out float vShade;
             out vec3 vUv;
+            out float vLight;
+            out float vDistance;
             void main() {
                 vShade = aShade;
                 vUv = vec3(aUv, aLayer);
+                vLight = aLight;
+                vDistance = length(aPos - uCameraPos);
                 gl_Position = uViewProj * vec4(aPos, 1.0);
             }
         """
@@ -428,12 +463,29 @@ class Renderer(
             #version 330 core
             in float vShade;
             in vec3 vUv;
+            in float vLight;
+            in float vDistance;
             uniform sampler2DArray uAtlas;
+            uniform float uDaylight;
+            uniform vec3 uFogColor;
+            uniform float uFogStart;
+            uniform float uFogEnd;
+            uniform float uUnlit;
             out vec4 FragColor;
             void main() {
                 vec4 texel = texture(uAtlas, vUv);
                 if (texel.a < 0.5) discard;
-                FragColor = vec4(texel.rgb * vShade, 1.0);
+
+                // Свет упакован: блоки в старших четырёх битах, небо в младших.
+                float blockLight = floor(vLight / 16.0) / 15.0;
+                float skyLight = mod(vLight, 16.0) / 15.0;
+                float light = max(blockLight, skyLight * uDaylight);
+                float brightness = mix(0.16, 1.0, light);
+                if (uUnlit > 0.5) brightness = 1.0;
+
+                vec3 color = texel.rgb * vShade * brightness;
+                float fog = uUnlit > 0.5 ? 0.0 : clamp((vDistance - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
+                FragColor = vec4(mix(color, uFogColor, fog), 1.0);
             }
         """
 

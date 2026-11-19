@@ -1,10 +1,10 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockTable
 import mcplus.net.World
 
 /**
- * Meshes one chunk column: `x, y, z, shade, layer, u, v` per vertex, six vertices per quad.
+ * Meshes one chunk column: `x, y, z, shade, light, layer, u, v` per vertex, six vertices per quad.
  *
  * Chunks are meshed separately so a block change only rebuilds the chunk it touched —
  * rebuilding the whole world would freeze the client for a second on every click.
@@ -20,7 +20,7 @@ class ChunkMesh(
 
 object MeshBuilder {
 
-    private const val FLOATS_PER_VERTEX = 7
+    private const val FLOATS_PER_VERTEX = 8
 
     fun build(world: World, blocks: BlockTable, atlas: TextureAtlas, chunkX: Int, chunkZ: Int): ChunkMesh {
         val column = world.column(chunkX, chunkZ)
@@ -45,6 +45,9 @@ object MeshBuilder {
                     val neighbour = world.blockAt(x + face.dx, y + face.dy, z + face.dz)
                     if (!isTransparent(neighbour, blocks)) continue
 
+                    // Свет берётся из клетки, в которую смотрит грань: именно она освещает
+                    // поверхность. Упакован как (блоки << 4) | небо.
+                    val light = world.lightAt(x + face.dx, y + face.dy, z + face.dz)
                     val layer = atlas.layerFor(name, face.kind).toFloat()
                     for (corner in face.quad.indices) {
                         val point = face.quad[corner]
@@ -52,6 +55,7 @@ object MeshBuilder {
                         vertexData.add(y + point[1])
                         vertexData.add(z + point[2])
                         vertexData.add(face.shade)
+                        vertexData.add(light.toFloat())
                         vertexData.add(layer)
 
                         // UVs follow the block face: top and bottom use x/z, sides use the

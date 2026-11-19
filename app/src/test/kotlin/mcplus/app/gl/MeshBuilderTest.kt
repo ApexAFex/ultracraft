@@ -123,7 +123,7 @@ class MeshBuilderTest {
             val z = data[index + 2]
             assertTrue(x in 0f..16f && z in 0f..16f, "вершина вне чанка: $x, $y, $z")
             assertTrue(y >= 48f && y <= 64f, "вершина вне секции: $x, $y, $z")
-            index += 7
+            index += 8
         }
     }
 }
