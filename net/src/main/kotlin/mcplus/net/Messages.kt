@@ -291,6 +291,12 @@ private val CHAT_TRANSLATIONS = mapOf(
     "container.enchant" to "Enchant",
     "container.anvil" to "Repair & Name",
     "container.merchant" to "Villager",
+    "container.cartography_table" to "Cartography Table",
+    "container.stonecutter" to "Stonecutter",
+    "container.loom" to "Loom",
+    "container.smithing" to "Smithing",
+    "container.grindstone_title" to "Repair & Disenchant",
+    "container.lectern" to "Lectern",
 )
 
 private const val NBT_STRING = 0x08

@@ -207,6 +207,8 @@ class ParticleRenderer(
             "snowflake" -> listOf("snowflake")
             "cherry_leaves" -> listOf("cherry_0")
             "dust" -> listOf("generic_0")
+            "rain" -> listOf("rain")
+            "snow" -> listOf("snow")
             else -> (0..7).map { "generic_$it" }
         }
 
@@ -224,7 +226,13 @@ class ParticleRenderer(
                 val slots = ArrayList<Int>()
                 for (file in files) {
                     val image = loaded.getOrPut(file) {
-                        GameFiles.readPng(root, "assets/minecraft/textures/particle/$file.png")
+                        // Дождь и снег лежат не в textures/particle, а в textures/environment.
+                        val path = when (file) {
+                            "rain" -> "assets/minecraft/textures/environment/rain.png"
+                            "snow" -> "assets/minecraft/textures/environment/snow.png"
+                            else -> "assets/minecraft/textures/particle/$file.png"
+                        }
+                        GameFiles.readPng(root, path)
                     }
                     if (image == null) continue
                     val column = slot % 32
@@ -253,6 +261,7 @@ class ParticleRenderer(
             "splash", "explosion", "explosion_emitter", "bubble", "bubble_pop", "lava",
             "note", "heart", "angry_villager", "portal", "enchant", "glow", "ash",
             "white_ash", "snowflake", "cherry_leaves", "dust", "generic",
+            "rain", "snow",
         )
 
         private const val VERTEX_SHADER = """

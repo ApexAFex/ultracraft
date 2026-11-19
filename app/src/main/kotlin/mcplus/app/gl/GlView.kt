@@ -36,6 +36,12 @@ object GlView {
         "experience_bottle", "potion", "fireball", "small_fireball",
     )
 
+    /** Команды для дополнения по Tab после «/». */
+    private val COMMANDS = listOf(
+        "help", "list", "me", "msg", "tell", "time", "weather", "tp", "gamemode",
+        "give", "summon", "kill", "seed", "spawnpoint", "setworldspawn", "clear",
+    )
+
     /** Блок, который только что стал воздухом: из него сыплются кусочки. */
     private class PendingBreak(val x: Int, val y: Int, val z: Int, val state: Int)
 
@@ -813,7 +819,14 @@ object GlView {
                         // Чат: T открывает строку, «/» — команду. Пока строка открыта, клавиши
                         // становятся текстом, поэтому движение и хотбар ниже отключаются.
                         if (chat.open) {
-                            if (input.tabCompleteRequested) chat.complete(playerList.names())
+                            if (input.tabCompleteRequested) {
+                                val candidates = if (chat.text.startsWith("/")) {
+                                    COMMANDS
+                                } else {
+                                    playerList.names()
+                                }
+                                chat.complete(candidates)
+                            }
                             // PageUp листает историю вверх, PageDown — обратно к свежим строкам.
                             if (input.chatScrollUpRequested) {
                                 chatScroll = minOf(chatScroll + 5, session?.chat?.size ?: 0)
@@ -1614,6 +1627,17 @@ object GlView {
                                         2.2f, "snowflake", 0.12f,
                                     )
                                 }
+                            } else {
+                                // Дождь: короткие быстрые струи вокруг игрока.
+                                repeat(6) {
+                                    particles += ParticlePiece(
+                                        player.x + (Math.random() - 0.5) * 14,
+                                        player.y + 6 + Math.random() * 6,
+                                        player.z + (Math.random() - 0.5) * 14,
+                                        0.4, -14.0, 0.4,
+                                        0.8f, "rain", 0.14f,
+                                    )
+                                }
                             }
                         }
                         if (entities.size != lastEntityCount) {
@@ -1997,6 +2021,9 @@ object GlView {
                                     "Сторона: " + listOf("юг", "запад", "север", "восток")[
                                         ((kotlin.math.floor(camera.yaw / 90f + 0.5f).toInt() % 4) + 4) % 4
                                         ],
+                                    "Цель: " + (target?.let {
+                                        "${blocks.nameOf(world.blockAt(it.x, it.y, it.z))} (${it.x}, ${it.y}, ${it.z})"
+                                    } ?: "—"),
                                 ),
                             )
                         }
@@ -2127,6 +2154,13 @@ object GlView {
                             if (hitId >= 0 && hitDistance < blockDistance) {
                                 session?.attack(hitId)
                                 lastAttackNanos = System.nanoTime()
+                                entities.firstOrNull { it.id == hitId }?.let { hitEntity ->
+                                    repeat(6) {
+                                        pendingParticles += mcplus.net.ParticleSpawn(
+                                            hitEntity.x, hitEntity.y + 0.9, hitEntity.z, "crit",
+                                        )
+                                    }
+                                }
                                 println("Удар по сущности id=$hitId (%.2f блока)".format(hitDistance))
                                 swingNanos = System.nanoTime()
                                 holdRequested = false
