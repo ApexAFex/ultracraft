@@ -70,7 +70,7 @@ class Hud(
     }
 
     /** Экран смерти: затемнение, заголовок и кнопка возрождения. */
-    fun drawDeathScreen() {
+    fun drawDeathScreen(where: String? = null, worldName: String? = null) {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
         renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x300000, 0.65f)
@@ -90,6 +90,20 @@ class Hud(
                 height * 0.30f,
                 title,
                 titleScale,
+            ),
+            TextRenderer.ScreenLabel(
+                (width - (text?.textWidth(where ?: "", s * 0.8f) ?: 0f)) / 2f,
+                height * 0.30f + 34f * s,
+                where ?: "",
+                s * 0.8f,
+                0xC0C0C0,
+            ),
+            TextRenderer.ScreenLabel(
+                (width - (text?.textWidth(worldName ?: "", s * 0.7f) ?: 0f)) / 2f,
+                height * 0.30f + 46f * s,
+                worldName ?: "",
+                s * 0.7f,
+                0x9FB8D0,
             ),
             TextRenderer.ScreenLabel(
                 button.centreX - (text?.textWidth(respawn, s) ?: 0f) / 2f,

@@ -94,6 +94,9 @@ sealed interface BlockShape {
     /** Знамёна: полотнище на столбе или у стены ([wall]); цвет даёт шерсть из имени. */
     data class Banner(val wall: ShapeDirection? = null) : BlockShape
 
+    /** Сундук: корпус и крышка; двойной сундук пока выглядит как два одинарных. */
+    data object Chest : BlockShape
+
     companion object {
         /**
          * @param name имя блока без `minecraft:` (`oak_stairs`).
@@ -177,6 +180,8 @@ sealed interface BlockShape {
                     Banner(ShapeDirection.byName(values["facing"]) ?: ShapeDirection.NORTH)
 
                 name.endsWith("_banner") -> Banner()
+
+                name == "chest" || name == "trapped_chest" || name == "ender_chest" -> Chest
 
                 else -> null
             }

@@ -221,7 +221,8 @@ class MeshBuilderTest {
                     "20\twhite_wall_banner\tfacing=south\n" +
                     "21\twheat\tage=0\n" +
                     "22\twheat\tage=7\n" +
-                    "23\tcarrots\tage=3\n",
+                    "23\tcarrots\tage=3\n" +
+                    "24\tchest\tfacing=north,type=single,waterlogged=false\n",
             )
         },
     )
@@ -467,6 +468,19 @@ class MeshBuilderTest {
         world.add(chunkWith(intArrayOf(0, 48, 0) to 23))
         // У моркови три стадии: age=3 — последняя.
         assertEquals(48f + 0.8f, axisValues(shapeMesh(world), 1).max(), 0.001f)
+    }
+
+    @Test
+    fun `a chest is a body and a lid narrower than a cube`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 24))
+
+        val mesh = shapeMesh(world)
+        val xs = axisValues(mesh, 0)
+        val ys = axisValues(mesh, 1)
+        assertEquals(1f / 16f, xs.min(), 0.001f)
+        assertEquals(15f / 16f, xs.max(), 0.001f)
+        assertEquals(48f + 14f / 16f, ys.max(), 0.001f, "крышка ниже полного блока")
     }
 }
 

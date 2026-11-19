@@ -189,6 +189,11 @@ object MeshBuilder {
             }
         }
 
+        is BlockShape.Chest -> listOf(
+            Box(1f / 16f, 0f, 1f / 16f, 15f / 16f, 10f / 16f, 15f / 16f),
+            Box(1f / 16f, 10f / 16f, 1f / 16f, 15f / 16f, 14f / 16f, 15f / 16f),
+        )
+
         is BlockShape.Banner -> {
             val wall = shape.wall
             if (wall != null) {
@@ -327,6 +332,8 @@ object MeshBuilder {
         is BlockShape.Banner -> name
             .removeSuffix("_wall_banner")
             .removeSuffix("_banner") + "_wool"
+
+        is BlockShape.Chest -> if (name == "ender_chest") "obsidian" else "oak_planks"
 
         else -> name
     }

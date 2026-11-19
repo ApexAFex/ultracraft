@@ -887,6 +887,11 @@ object GlView {
                             if (input.chatScrollDownRequested) {
                                 chatScroll = maxOf(0, chatScroll - 5)
                             }
+                            // Колесо мыши тоже листает чат, как PageUp/PageDown.
+                            if (input.scrollSlotDelta != 0) {
+                                chatScroll = (chatScroll - input.scrollSlotDelta)
+                                    .coerceIn(0, session?.chat?.size ?: 0)
+                            }
                             if (input.enterRequested) {
                                 val line = chat.submit()
                                 if (line != null) {
@@ -2020,6 +2025,37 @@ object GlView {
                                     )
                                 }
                             }
+
+                            // Броня из `Set Equipment` (слоты 2..5): кубы цвета материала
+                            // поверх модели. Своих слоёв брони пока нет, но силуэт виден.
+                            val typeName = entityTypes.nameOf(entity.type)
+                            val isHumanoid = playerList.nameOf(entity.uuid) != null ||
+                                typeName in ZOMBIE_TYPES || typeName in SKELETON_TYPES ||
+                                typeName in ENDERMAN_TYPES || typeName in PIGLIN_TYPES
+                            if (isHumanoid) {
+                                val yaw = -Math.toRadians(entity.yaw.toDouble()).toFloat()
+                                val pieces = listOf(
+                                    Triple(5, 1.55, 0.62f),   // шлем
+                                    Triple(4, 1.15, 0.66f),   // нагрудник
+                                    Triple(3, 0.62, 0.5f),    // штаны
+                                    Triple(2, 0.14, 0.5f),    // ботинки
+                                )
+                                for ((slot, offsetY, size) in pieces) {
+                                    val itemId = entity.equipmentItem(slot)
+                                    if (itemId <= 0) continue
+                                    val itemName = itemTable.nameOf(itemId) ?: continue
+                                    val material = ArmorTint.material(itemName) ?: continue
+                                    val layer = atlas.layerOf(material)
+                                    cubes += Renderer.BlockCube(
+                                        entity.x,
+                                        entity.y + offsetY,
+                                        entity.z,
+                                        size,
+                                        layer, layer, layer,
+                                        yaw = yaw,
+                                    )
+                                }
+                            }
                         }
                         playerRenderer.draw(camera, players)
                         zombieRenderer.draw(camera, zombies)
@@ -2238,7 +2274,10 @@ object GlView {
                             hud.drawInventoryScreen(inventory, input.mouseX, input.mouseY)
                         }
                         if (dead) {
-                            hud.drawDeathScreen()
+                            hud.drawDeathScreen(
+                                where = "Координаты: %.1f, %.1f, %.1f".format(player.x, player.y, player.z),
+                                worldName = session?.joinResult?.joinGame?.dimensionName,
+                            )
                         } else if (!inventoryOpen && openContainer == null) {
                             val chatLines = session?.chat?.snapshot() ?: emptyList()
                             if (chat.open) {
@@ -2274,6 +2313,8 @@ object GlView {
                                 listOf(
                                     "Кадров в секунду: $fps",
                                     "Координаты: %.2f, %.2f, %.2f".format(player.x, player.y, player.z),
+                                    "Режим: ${session?.joinResult?.joinGame?.gameModeName ?: "?"}",
+                                    "Мир: ${session?.joinResult?.joinGame?.dimensionName ?: "?"}",
                                     "Чанк: ${kotlin.math.floor(player.x).toInt() shr 4}, ${kotlin.math.floor(player.z).toInt() shr 4}",
                                     "Сущностей: ${entities.size}, чанков: ${renderer.chunkCount}",
                                     "Биом: " + (
