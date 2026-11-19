@@ -577,6 +577,14 @@ object GlView {
                     var settingDownWasDown = false
                     var ambientNanos = 0L
                     var rainSoundNanos = 0L
+                    /** Полный экран и запомненное окно; счётчик предметов для звука подбора. */
+                    var fullscreen = false
+                    var windowedX = 0
+                    var windowedY = 0
+                    var windowedWidth = width
+                    var windowedHeight = height
+                    var boundsSaved = false
+                    var lastItemTotal = -1
 
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
@@ -679,6 +687,38 @@ object GlView {
                         }
                         if (input.hudToggleRequested && !chat.open) {
                             hudHidden = !hudHidden
+                        }
+                        // F11 — полный экран; границы окна запоминаются для возврата.
+                        if (input.fullscreenToggleRequested) {
+                            if (!boundsSaved) {
+                                val xpos = java.nio.IntBuffer.allocate(1)
+                                val ypos = java.nio.IntBuffer.allocate(1)
+                                val windowWidth = java.nio.IntBuffer.allocate(1)
+                                val windowHeight = java.nio.IntBuffer.allocate(1)
+                                GLFW.glfwGetWindowPos(window, xpos, ypos)
+                                GLFW.glfwGetWindowSize(window, windowWidth, windowHeight)
+                                windowedX = xpos[0]
+                                windowedY = ypos[0]
+                                windowedWidth = windowWidth[0]
+                                windowedHeight = windowHeight[0]
+                                boundsSaved = true
+                            }
+                            fullscreen = !fullscreen
+                            val monitor = GLFW.glfwGetPrimaryMonitor()
+                            if (fullscreen && monitor != 0L) {
+                                val mode = GLFW.glfwGetVideoMode(monitor)
+                                if (mode != null) {
+                                    GLFW.glfwSetWindowMonitor(
+                                        window, monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate(),
+                                    )
+                                }
+                            } else {
+                                GLFW.glfwSetWindowMonitor(
+                                    window, 0L, windowedX, windowedY, windowedWidth, windowedHeight,
+                                    GLFW.GLFW_DONT_CARE,
+                                )
+                            }
+                            println(if (fullscreen) "Полный экран" else "Оконный режим")
                         }
                         if (!chat.open && !inventoryOpen && openContainer == null && !paused) {
                             if (input.dropRequested) session?.send(mcplus.net.PlayerMovement.drop(all = false))
@@ -1625,6 +1665,11 @@ object GlView {
 
                         // HUD рисуется отдельным проходом поверх сцены. Открытый инвентарь или
                         // контейнер его прячет, как в ванили, а смерть заменяет HUD экраном смерти.
+                        val totalItems = inventory?.contents()?.sumOf { it.second.count } ?: 0
+                        if (lastItemTotal in 0 until totalItems) {
+                            sound.play("entity.item.pickup", player.x, player.y, player.z)
+                        }
+                        lastItemTotal = totalItems
                         if (dead) {
                             hud.drawDeathScreen()
                         } else if (!inventoryOpen && openContainer == null) {
@@ -1855,6 +1900,13 @@ object GlView {
 
                         GLFW.glfwSwapBuffers(window)
                         GLFW.glfwPollEvents()
+                        if (input.screenshotRequested) {
+                            val directory = java.io.File("screenshots").apply { mkdirs() }
+                            val stamp = java.time.LocalDateTime.now().format(
+                                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss"),
+                            )
+                            savePng(java.io.File(directory, "screenshot-$stamp.png"), width, height)
+                        }
                         fpsFrames++
                         val fpsNow = System.nanoTime()
                         if (fpsNow - fpsSinceNanos >= 1_000_000_000L) {

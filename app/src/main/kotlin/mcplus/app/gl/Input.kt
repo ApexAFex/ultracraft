@@ -52,6 +52,8 @@ class Input(private val window: Long, private val camera: Camera) {
     private var forwardPressed = false
     private var lastForwardNanos = 0L
     private var dropPressed = false
+    private var screenshotPressed = false
+    private var fullscreenPressed = false
     private var mouseWasDown = false
 
     /** Символы, набранные с клавиатуры с прошлого кадра (то, что печатает человек). */
@@ -118,6 +120,13 @@ class Input(private val window: Long, private val camera: Camera) {
         private set
 
     var dropStackRequested: Boolean = false
+        private set
+
+    /** F2 сохраняет снимок экрана, F11 переключает полный экран. */
+    var screenshotRequested: Boolean = false
+        private set
+
+    var fullscreenToggleRequested: Boolean = false
         private set
 
     /** Set once when the left mouse button goes down inside the inventory screen. */
@@ -259,6 +268,14 @@ class Input(private val window: Long, private val camera: Camera) {
         dropRequested = drop && !dropPressed && !control
         dropStackRequested = drop && !dropPressed && control
         dropPressed = drop
+
+        val shot = pressed(GLFW.GLFW_KEY_F2)
+        screenshotRequested = shot && !screenshotPressed
+        screenshotPressed = shot
+
+        val fullscreen = pressed(GLFW.GLFW_KEY_F11)
+        fullscreenToggleRequested = fullscreen && !fullscreenPressed
+        fullscreenPressed = fullscreen
 
         // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
         // a frame-by-frame repeat would send a packet per frame.

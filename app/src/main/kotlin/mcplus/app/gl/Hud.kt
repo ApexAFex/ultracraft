@@ -240,10 +240,24 @@ class Hud(
             if (mouseX >= px - slotPixels / 2 && mouseX <= px + slotPixels / 2 &&
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
-                hoveredName = inventory.nameOf(stack)
+                val name = inventory.nameOf(stack) ?: continue
+                hoveredName = if (max > 0 && stack.damage > 0) {
+                    "$name  ${max - stack.damage}/$max"
+                } else {
+                    name
+                }
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
             }
+        }
+
+        // Стопка на курсоре: предмет уже нарисован, не хватает количества.
+        val carried = inventory.carriedOrNull()
+        if (carried != null && carried.count > 1) {
+            labels += TextRenderer.ScreenLabel(
+                (mouseX + 6).toFloat(), (mouseY + 4).toFloat(),
+                carried.count.toString(), scale,
+            )
         }
 
         if (labels.isNotEmpty()) text.drawScreen(labels)
@@ -299,7 +313,12 @@ class Hud(
             if (mouseX >= px - slotPixels / 2 && mouseX <= px + slotPixels / 2 &&
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
-                hovered = inventory.nameOf(stack)
+                val name = inventory.nameOf(stack) ?: continue
+                hovered = if (max > 0 && stack.damage > 0) {
+                    "$name  ${max - stack.damage}/$max"
+                } else {
+                    name
+                }
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
             }
