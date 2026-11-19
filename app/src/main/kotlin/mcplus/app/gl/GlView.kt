@@ -937,7 +937,9 @@ object GlView {
                         // выбрасывает предмет из слота под курсором.
                         if (inventoryOpen || openContainer != null) {
                             val hoveredMenuSlot = if (openContainer != null) {
-                                val (h, v) = InventoryScreen.panelPoint(input.mouseX, input.mouseY, width, height)
+                                val (h, v) = ContainerScreen.panelPoint(
+                                    openContainer, input.mouseX, input.mouseY, width, height,
+                                )
                                 ContainerScreen.slotAt(openContainer, h, v)?.menuSlot
                             } else {
                                 val (h, v) = InventoryScreen.panelPoint(input.mouseX, input.mouseY, width, height)
@@ -1071,8 +1073,8 @@ object GlView {
                             ) == GLFW.GLFW_PRESS
                             val shift = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
                                 GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS
-                            val (horizontal, vertical) = InventoryScreen.panelPoint(
-                                input.mouseX, input.mouseY, width, height,
+                            val (horizontal, vertical) = ContainerScreen.panelPoint(
+                                openContainer, input.mouseX, input.mouseY, width, height,
                             )
                             val cell = ContainerScreen.slotAt(openContainer, horizontal, vertical)
 
@@ -2148,27 +2150,9 @@ object GlView {
                             renderer.drawOutline(camera, target.x, target.y, target.z)
                         }
 
-                        // Inventory screen replaces the hotbar while it is open: slots, icons and
-                        // the dragged stack are all drawn on the same world-space panel.
+                        // Экраны инвентаря и контейнера рисуются в экранном слое (HUD),
+                        // ванильными фонами: мировую панель больше не используем.
                         val inventory = session?.inventory
-                        if (openContainer != null && inventory != null) {
-                            // Интерфейс не должен прятаться за блоком, если камера внутри него.
-                            GL30.glDisable(GL30.GL_DEPTH_TEST)
-                            ContainerScreen.draw(
-                                camera, openContainer, inventory, renderer, textRenderer, atlas,
-                                input.mouseX, input.mouseY, width, height,
-                            )
-                            hud.drawContainerOverlay(openContainer, inventory, input.mouseX, input.mouseY)
-                            GL30.glEnable(GL30.GL_DEPTH_TEST)
-                        } else if (inventory != null && inventoryOpen) {
-                            GL30.glDisable(GL30.GL_DEPTH_TEST)
-                            InventoryScreen.draw(
-                                camera, inventory, renderer, textRenderer, atlas,
-                                input.mouseX, input.mouseY, width, height,
-                            )
-                            hud.drawInventoryOverlay(inventory, input.mouseX, input.mouseY)
-                            GL30.glEnable(GL30.GL_DEPTH_TEST)
-                        }
 
                         // Предмет в руке: блок — настоящим мини-кубом с лёгким наклоном,
                         // остальное — плоской иконкой. Взмах при ударе сдвигает и опускает куб.
@@ -2248,6 +2232,11 @@ object GlView {
                             sound.play("entity.item.pickup", player.x, player.y, player.z)
                         }
                         lastItemTotal = totalItems
+                        if (openContainer != null && inventory != null) {
+                            hud.drawContainerScreen(openContainer, inventory, input.mouseX, input.mouseY)
+                        } else if (inventory != null && inventoryOpen) {
+                            hud.drawInventoryScreen(inventory, input.mouseX, input.mouseY)
+                        }
                         if (dead) {
                             hud.drawDeathScreen()
                         } else if (!inventoryOpen && openContainer == null) {

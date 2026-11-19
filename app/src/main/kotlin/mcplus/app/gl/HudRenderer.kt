@@ -110,6 +110,32 @@ class HudRenderer(
         return true
     }
 
+    /**
+     * Часть спрайта: у фонов меню картинка 256×256, а нужный кусок 176×(166…222).
+     * Координаты [sx], [sy], [sw], [sh] — в пикселях исходной картинки.
+     */
+    fun spriteSub(
+        name: String,
+        rect: HudRect,
+        sx: Int,
+        sy: Int,
+        sw: Int,
+        sh: Int,
+        alpha: Float = 1f,
+    ): Boolean {
+        val sprite = sprites?.get(name) ?: return false
+        val sheetWidth = image.width.toFloat()
+        val sheetHeight = image.height.toFloat()
+        val uv = floatArrayOf(
+            (sprite.x + sx) / sheetWidth,
+            (sprite.y + sy) / sheetHeight,
+            (sprite.x + sx + sw) / sheetWidth,
+            (sprite.y + sy + sh) / sheetHeight,
+        )
+        quad(rect.x, rect.y, rect.width, rect.height, uv, 0xFFFFFF, alpha)
+        return true
+    }
+
     /** Иконка предмета из массивной текстуры блоков. */
     fun icon(rect: HudRect, layer: Int, shade: Float = 1f) {
         ensureIcons()

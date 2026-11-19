@@ -561,29 +561,6 @@ class Renderer(
         drawIcons(camera, centreX, centreY, centreZ, listOf(Icon(0f, 0f, 0.28f, layer)))
     }
 
-    /** The nine hotbar cells, with the selected one larger and brighter. */
-    fun drawHotbar(camera: Camera, layers: List<Float?>, selected: Int) {        val forward = camera.forward()
-        val up = camera.up()
-        val distance = 1.2f
-        val centreX = camera.x.toFloat() + forward[0] * distance - up[0] * 0.5f
-        val centreY = camera.y.toFloat() + forward[1] * distance - up[1] * 0.5f
-        val centreZ = camera.z.toFloat() + forward[2] * distance - up[2] * 0.5f
-
-        val cell = InventoryScreen.SLOT
-        val step = InventoryScreen.STEP
-        val icons = (0 until 9).mapNotNull { index ->
-            val layer = layers.getOrNull(index) ?: return@mapNotNull null
-            Icon(
-                horizontal = (index - 4) * step,
-                vertical = 0f,
-                size = if (index == selected) cell * 1.18f else cell,
-                layer = layer,
-                shade = if (index == selected) 1.0f else 0.78f,
-            )
-        }
-        drawIcons(camera, centreX, centreY, centreZ, icons)
-    }
-
     /** Wireframe cube around the targeted block. */
     fun drawOutline(camera: Camera, blockX: Int, blockY: Int, blockZ: Int) {
         var offset = 0

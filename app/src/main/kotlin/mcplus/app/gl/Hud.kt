@@ -5,6 +5,8 @@ import mcplus.net.BossBar
 import mcplus.net.ChatLine
 import mcplus.net.Inventory
 import mcplus.net.ItemStats
+import mcplus.net.MenuLayout
+import mcplus.net.OpenContainer
 import mcplus.net.StyledRun
 import mcplus.net.StyledText
 import mcplus.net.Vitals
@@ -303,6 +305,104 @@ class Hud(
     }
 
     /**
+     * Экран инвентаря в экранном слое: ванильный фон `container/inventory.png` и иконки
+     * в пикселях этого фона. Слоты, подписи и подсказка живут в тех же координатах.
+     */
+    fun drawInventoryScreen(inventory: Inventory, mouseX: Double, mouseY: Double) {
+        val s = InventoryScreen.scale(height)
+        val ox = InventoryScreen.originX(width, s)
+        val oy = InventoryScreen.originY(height, s)
+        val panel = HudRect(ox, oy, InventoryScreen.GUI_WIDTH * s, InventoryScreen.PANEL_HEIGHT * s)
+        renderer.begin()
+        if (!renderer.spriteSub("gui_inventory", panel, 0, 0, 176, 166)) {
+            renderer.rect(panel, 0x101018, 0.85f)
+        }
+        // В ванильном фоне на месте модели игрока чёрный прямоугольник — рисуем фигурку.
+        fun preview(x: Float, y: Float, w: Float, h: Float, color: Int) {
+            renderer.rect(ox + x * s, oy + y * s, w * s, h * s, color, 1f)
+        }
+        preview(26f, 8f, 50f, 62f, 0x2A2A2A)  // подложка под модель
+        preview(34f, 10f, 8f, 8f, 0xC79B76)   // голова
+        preview(34f, 8f, 8f, 3f, 0x3B2A1A)    // волосы
+        preview(34f, 22f, 8f, 12f, 0x00AAAA)  // рубашка
+        preview(30f, 22f, 4f, 12f, 0xC79B76)  // руки
+        preview(42f, 22f, 4f, 12f, 0xC79B76)
+        preview(34f, 36f, 4f, 12f, 0x3B3BC7)  // штаны
+        preview(42f, 36f, 4f, 12f, 0x3B3BC7)
+        for (cell in InventoryScreen.cells) {
+            val stack = inventory.menuSlot(cell.menuSlot) ?: continue
+            val name = inventory.nameOf(stack) ?: continue
+            renderer.icon(
+                HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s),
+                atlas.layerForItem(name),
+            )
+        }
+        val carried = inventory.nameOf(inventory.carriedOrNull())
+        if (carried != null) {
+            renderer.icon(
+                HudRect(mouseX.toFloat() - 8f * s, mouseY.toFloat() - 8f * s, 16f * s, 16f * s),
+                atlas.layerForItem(carried),
+            )
+        }
+        renderer.draw()
+        drawInventoryOverlay(inventory, mouseX, mouseY)
+    }
+
+    /** Экран контейнера: фон своего меню, слоты и подписи в экранном слое. */
+    fun drawContainerScreen(container: OpenContainer, inventory: Inventory, mouseX: Double, mouseY: Double) {
+        val layout = ContainerScreen.layout(container)
+        val s = ContainerScreen.scale(height)
+        val ox = ContainerScreen.originX(width, s)
+        val oy = ContainerScreen.originY(height, layout.panelHeight, s)
+        val panel = HudRect(ox, oy, ContainerScreen.GUI_WIDTH * s, layout.panelHeight * s)
+        renderer.begin()
+        if (!renderer.spriteSub(layout.background, panel, 0, 0, 176, layout.panelHeight)) {
+            renderer.rect(panel, 0x101018, 0.85f)
+        }
+        // У наковальни в текстуре красное поле имени: рисуем поверх тёмное, как EditBox.
+        if (container.type == "anvil") {
+            renderer.rect(ox + 58f * s, oy + 20f * s, 112f * s, 16f * s, 0x202020, 0.95f)
+        }
+        // Печь: пламя и стрелка плавки по данным меню (0/1 — горение, 2/3 — плавка).
+        if (container.type in MenuLayout.FURNACES) {
+            val burn = container.dataValue(0) ?: 0
+            val burnTotal = (container.dataValue(1) ?: 0).coerceAtLeast(1)
+            if (burn > 0) {
+                val height = 14f * (burn.toFloat() / burnTotal).coerceIn(0f, 1f)
+                renderer.rect(ox + 56f * s, oy + (36f + 14f - height) * s, 14f * s, height * s, 0xFF8A1E, 0.9f)
+            }
+            val cook = container.dataValue(2) ?: 0
+            val cookTotal = (container.dataValue(3) ?: 0).coerceAtLeast(1)
+            if (cook > 0) {
+                val width = 24f * (cook.toFloat() / cookTotal).coerceIn(0f, 1f)
+                renderer.rect(ox + 79f * s, oy + 35f * s, width * s, 16f * s, 0xFFFFFF, 0.5f)
+            }
+        }
+        for (cell in ContainerScreen.cells(container)) {
+            val stack = container.slot(cell.menuSlot) ?: continue
+            val name = inventory.nameOf(stack) ?: continue
+            renderer.icon(
+                HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s),
+                atlas.layerForItem(name),
+            )
+        }
+        val carried = inventory.nameOf(container.carriedOrNull())
+        if (carried != null) {
+            renderer.icon(
+                HudRect(mouseX.toFloat() - 8f * s, mouseY.toFloat() - 8f * s, 16f * s, 16f * s),
+                atlas.layerForItem(carried),
+            )
+        }
+        renderer.draw()
+        if (container.title.isNotBlank()) {
+            text?.drawScreen(
+                listOf(TextRenderer.ScreenLabel(ox + 8f * s, oy + 6f * s, container.title, s * 0.8f)),
+            )
+        }
+        drawContainerOverlay(container, inventory, mouseX, mouseY)
+    }
+
+    /**
      * Подписи поверх открытого инвентаря: количество в стопке, полоска износа и подсказка
      * с названием предмета под курсором. Рисуется в экранных координатах, потому что панель
      * инвентаря живёт в мире, а цифры должны быть пиксельными.
@@ -314,10 +414,8 @@ class Hud(
         var hoverX = 0f
         var hoverY = 0f
 
-        val (firstX, firstY) = InventoryScreen.screenPointOf(InventoryScreen.cells[0], width, height)
-        val (nextX, _) = InventoryScreen.screenPointOf(InventoryScreen.cells[1], width, height)
-        val slotPixels = abs(nextX - firstX).toFloat()
-        val scale = (slotPixels / 20f).coerceIn(0.7f, 2.0f)
+        val slotPixels = 18f * InventoryScreen.scale(height)
+        val scale = slotPixels / 18f
         if (slotPixels <= 1f) return
 
         for (cell in InventoryScreen.cells) {
@@ -327,10 +425,11 @@ class Hud(
             val px = screenX.toFloat()
             val py = screenY.toFloat()
             if (stack.count > 1) {
+                val label = stack.count.toString()
                 labels += TextRenderer.ScreenLabel(
-                    px + slotPixels * 0.4f,
-                    py + slotPixels * 0.1f,
-                    stack.count.toString(),
+                    px + slotPixels * 0.5f - text.textWidth(label, scale),
+                    py + slotPixels * 0.5f - 8f * scale,
+                    label,
                     scale,
                 )
             }
@@ -391,14 +490,11 @@ class Hud(
         mouseY: Double,
     ) {
         val text = this.text ?: return
-        val rows = ContainerScreen.totalRows(container)
         val cells = ContainerScreen.cells(container)
         if (cells.size < 2) return
-        val (firstX, _) = ContainerScreen.screenPointOf(cells[0], rows, width, height)
-        val (nextX, _) = ContainerScreen.screenPointOf(cells[1], rows, width, height)
-        val slotPixels = abs(nextX - firstX).toFloat()
+        val slotPixels = 18f * ContainerScreen.scale(height)
+        val scale = slotPixels / 18f
         if (slotPixels <= 1f) return
-        val scale = (slotPixels / 20f).coerceIn(0.7f, 2.0f)
         val labels = ArrayList<TextRenderer.ScreenLabel>()
         var hovered: String? = null
         var hoverX = 0f
@@ -407,13 +503,15 @@ class Hud(
         for (cell in cells) {
             val stack = container.slot(cell.menuSlot) ?: continue
             if (!stack.isKnown) continue
-            val (screenX, screenY) = ContainerScreen.screenPointOf(cell, rows, width, height)
+            val (screenX, screenY) = ContainerScreen.screenPointOf(container, cell, width, height)
             val px = screenX.toFloat()
             val py = screenY.toFloat()
             if (stack.count > 1) {
+                val label = stack.count.toString()
                 labels += TextRenderer.ScreenLabel(
-                    px + slotPixels * 0.4f, py + slotPixels * 0.1f,
-                    stack.count.toString(), scale,
+                    px + slotPixels * 0.5f - text.textWidth(label, scale),
+                    py + slotPixels * 0.5f - 8f * scale,
+                    label, scale,
                 )
             }
             val max = itemStats.of(stack.itemId)?.maxDamage ?: 0

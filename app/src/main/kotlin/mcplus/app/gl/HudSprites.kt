@@ -40,6 +40,23 @@ class HudSprites(val sheet: SpriteSheet) {
             add("armor_full" to "hud/armor_full.png")
             add("xp_background" to "hud/experience_bar_background.png")
             add("xp_progress" to "hud/experience_bar_progress.png")
+            // Фоны ванильных меню: рисуются в экранном слое, как в оригинале.
+            add("gui_inventory" to "assets/minecraft/textures/gui/container/inventory.png")
+            add("gui_generic" to "assets/minecraft/textures/gui/container/generic_54.png")
+            add("gui_crafting" to "assets/minecraft/textures/gui/container/crafting_table.png")
+            add("gui_furnace" to "assets/minecraft/textures/gui/container/furnace.png")
+            add("gui_anvil" to "assets/minecraft/textures/gui/container/anvil.png")
+            add("gui_enchanting" to "assets/minecraft/textures/gui/container/enchanting_table.png")
+            add("gui_brewing" to "assets/minecraft/textures/gui/container/brewing_stand.png")
+            add("gui_beacon" to "assets/minecraft/textures/gui/container/beacon.png")
+            add("gui_hopper" to "assets/minecraft/textures/gui/container/hopper.png")
+            add("gui_shulker" to "assets/minecraft/textures/gui/container/shulker_box.png")
+            add("gui_stonecutter" to "assets/minecraft/textures/gui/container/stonecutter.png")
+            add("gui_smithing" to "assets/minecraft/textures/gui/container/smithing.png")
+            add("gui_grindstone" to "assets/minecraft/textures/gui/container/grindstone.png")
+            add("gui_loom" to "assets/minecraft/textures/gui/container/loom.png")
+            add("gui_cartography" to "assets/minecraft/textures/gui/container/cartography_table.png")
+            add("gui_villager" to "assets/minecraft/textures/gui/container/villager.png")
             // Подложки иконок эффектов: обычная и «фоновая» (маяк, кондуит).
             add("effect_background" to "hud/effect_background.png")
             add("effect_background_ambient" to "hud/effect_background_ambient.png")
@@ -63,7 +80,8 @@ class HudSprites(val sheet: SpriteSheet) {
         fun load(directory: File?, effectNames: List<String> = emptyList()): HudSprites? {
             val images = ArrayList<Pair<String, BufferedImage>>(FILES.size + effectNames.size + 1)
             for ((name, file) in FILES) {
-                val image = GameFiles.readPng(directory, ROOT + file) ?: continue
+                val path = if (file.startsWith("assets/")) file else ROOT + file
+                val image = GameFiles.readPng(directory, path) ?: continue
                 images += name to image
             }
             for (name in effectNames) {
@@ -83,3 +101,4 @@ class HudSprites(val sheet: SpriteSheet) {
             HudSprites(SpriteSheet.pack(images, padding))
     }
 }
+

@@ -1,224 +1,141 @@
 package mcplus.app.gl
 
-import mcplus.net.Inventory
 import mcplus.net.MenuLayout
 import mcplus.net.OpenContainer
-import kotlin.math.abs
 
 /**
- * Экран контейнера: сундук, верстак, печь — всё, что сервер открыл через `Open Screen`.
+ * Экран контейнера: ванильный фон из `textures/gui/container` и слоты в его пикселях.
  *
- * Как и инвентарь, экран рисуется плоской панелью в мире в 1.2 блока перед камерой: своего
- * экранного прохода у клиента нет. Раскладка зависит только от числа слотов меню, которое
- * прислал сервер: сначала слоты контейнера, затем 27 слотов инвентаря и 9 хотбара.
+ * Раскладка зависит от типа меню, который прислал сервер: у сундука сетка 9×N, у печи —
+ * вход/топливо/выход, у наковальни два входа и результат. Незнакомое меню падает в сетку.
  */
 object ContainerScreen {
 
-    /** Ячейка меню: номер слота на проводе и место в сетке 9 колонок. */
-    data class Cell(val menuSlot: Int, val column: Int, val row: Int)
+    const val GUI_WIDTH = 176
 
-    private const val COLUMNS = 9
+    data class Cell(val menuSlot: Int, val x: Float, val y: Float)
 
-    /**
-     * Раскладки меню, у которых слоты стоят не сеткой: наковальня, торговец, маяк,
-     * камнерез, ткацкий станок, кузнечный стол, точило, картография, чары и варка.
-     * Пары «номер слота → колонка, ряд»; строки считаются по самой нижней ячейке.
-     */
-    private val SPECIAL: Map<String, List<Triple<Int, Int, Int>>> = mapOf(
-        "anvil" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 3, 0)),
-        "merchant" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 3, 0)),
-        "beacon" to listOf(Triple(0, 4, 0)),
-        "stonecutter" to listOf(Triple(0, 0, 0), Triple(1, 2, 0)),
-        "loom" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 0), Triple(3, 4, 0)),
-        "smithing" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 0), Triple(3, 4, 0)),
-        "grindstone" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 1)),
-        "cartography_table" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 3, 0)),
-        "enchantment" to listOf(Triple(0, 0, 0), Triple(1, 0, 1)),
-        "brewing_stand" to listOf(
-            Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 0), Triple(3, 1, 1), Triple(4, 3, 1),
-        ),
+    /** Фон меню, высота картинки и слоты контейнера (без инвентаря игрока). */
+    data class Layout(
+        val background: String,
+        val panelHeight: Int,
+        val slots: List<Cell>,
+        val playerY: Int,
     )
 
-    private fun special(type: String): List<Triple<Int, Int, Int>>? = SPECIAL[type]
+    private fun slot(index: Int, x: Float, y: Float) = Cell(index, x, y)
 
-    fun containerRows(container: OpenContainer): Int {
-        val special = special(container.type)
-        if (special != null) return special.maxOf { it.third } + 1
-        return if (container.type in MenuLayout.FURNACES) 2
-        else (container.containerSlots + COLUMNS - 1) / COLUMNS
+    private val SPECIAL: Map<String, (OpenContainer) -> Layout> = mapOf(
+        "furnace" to { Layout("gui_furnace", 166, listOf(slot(0, 56f, 17f), slot(1, 56f, 53f), slot(2, 116f, 35f)), 84) },
+        "blast_furnace" to { Layout("gui_furnace", 166, listOf(slot(0, 56f, 17f), slot(1, 56f, 53f), slot(2, 116f, 35f)), 84) },
+        "smoker" to { Layout("gui_furnace", 166, listOf(slot(0, 56f, 17f), slot(1, 56f, 53f), slot(2, 116f, 35f)), 84) },
+        "anvil" to { Layout("gui_anvil", 166, listOf(slot(0, 27f, 47f), slot(1, 76f, 47f), slot(2, 134f, 47f)), 84) },
+        "enchantment" to { Layout("gui_enchanting", 166, listOf(slot(0, 15f, 47f), slot(1, 35f, 47f)), 84) },
+        "beacon" to { Layout("gui_beacon", 166, listOf(slot(0, 80f, 109f)), 84) },
+        "brewing_stand" to {
+            Layout(
+                "gui_brewing", 166,
+                listOf(slot(0, 56f, 51f), slot(1, 79f, 51f), slot(2, 102f, 51f), slot(3, 79f, 17f), slot(4, 17f, 17f)),
+                84,
+            )
+        },
+        "hopper" to { Layout("gui_hopper", 166, (0 until 5).map { slot(it, 44f + it * 18f, 20f) }, 84) },
+        "shulker_box" to {
+            Layout("gui_shulker", 166, (0 until 27).map { slot(it, 8f + (it % 9) * 18f, 18f + (it / 9) * 18f) }, 84)
+        },
+        "stonecutter" to { Layout("gui_stonecutter", 166, listOf(slot(0, 20f, 47f), slot(1, 143f, 47f)), 84) },
+        "smithing" to {
+            Layout(
+                "gui_smithing", 166,
+                listOf(slot(0, 8f, 48f), slot(1, 26f, 48f), slot(2, 44f, 48f), slot(3, 98f, 48f)),
+                84,
+            )
+        },
+        "grindstone" to {
+            Layout("gui_grindstone", 166, listOf(slot(0, 44f, 19f), slot(1, 66f, 19f), slot(2, 98f, 37f)), 84)
+        },
+        "loom" to {
+            Layout(
+                "gui_loom", 166,
+                listOf(slot(0, 13f, 26f), slot(1, 33f, 26f), slot(2, 23f, 44f), slot(3, 143f, 58f)),
+                84,
+            )
+        },
+        "cartography_table" to {
+            Layout("gui_cartography", 166, listOf(slot(0, 15f, 15f), slot(1, 50f, 15f), slot(2, 145f, 40f)), 84)
+        },
+    )
+
+    fun layout(container: OpenContainer): Layout {
+        SPECIAL[container.type]?.let { return it(container) }
+        if (container.type == "crafting") {
+            val slots = ArrayList<Cell>(10)
+            slots += slot(0, 124f, 35f)
+            for (row in 0 until 3) for (column in 0 until 3) {
+                slots += slot(1 + row * 3 + column, 30f + column * 18f, 17f + row * 18f)
+            }
+            return Layout("gui_crafting", 166, slots, 84)
+        }
+        val rows = if (MenuLayout.isChest(container.type)) {
+            (container.containerSlots / 9).coerceIn(1, 6)
+        } else {
+            ((container.containerSlots + 8) / 9).coerceIn(1, 6)
+        }
+        val slots = (0 until rows * 9).map {
+            slot(it, 8f + (it % 9) * 18f, 18f + (it / 9) * 18f)
+        }
+        val height = 114 + 18 * rows
+        return Layout(if (rows >= 3) "gui_generic" else "gui_generic", height, slots, 30 + rows * 18)
     }
 
-    fun totalRows(container: OpenContainer): Int = containerRows(container) + 3 + 1
-
     fun cells(container: OpenContainer): List<Cell> {
-        val cells = ArrayList<Cell>(container.slotCount)
-        val playerRow = containerRows(container)
-        val special = special(container.type)
-        if (special != null) {
-            for ((slot, column, row) in special) cells += Cell(slot, column, row)
-        } else if (container.type in MenuLayout.FURNACES) {
-            // Печь: вход слева сверху, топливо под ним, выход справа — между ними огонь и стрелка.
-            cells += Cell(0, 0, 0)
-            cells += Cell(1, 0, 1)
-            cells += Cell(2, 2, 1)
-        } else {
-            val containerSlots = container.containerSlots
-            for (index in 0 until containerSlots) {
-                cells += Cell(index, index % COLUMNS, index / COLUMNS)
-            }
-        }
+        val layout = layout(container)
+        val cells = ArrayList<Cell>(layout.slots.size + 36)
+        cells += layout.slots
         val playerStart = container.playerStart
         for (index in 0 until 27) {
-            cells += Cell(playerStart + index, index % COLUMNS, playerRow + index / COLUMNS)
+            cells += Cell(playerStart + index, 8f + (index % 9) * 18f, layout.playerY.toFloat() + (index / 9) * 18f)
         }
         for (index in 0 until 9) {
-            cells += Cell(playerStart + 27 + index, index, playerRow + 3)
+            cells += Cell(playerStart + 27 + index, 8f + index * 18f, layout.playerY + 58f)
         }
         return cells
     }
 
-    /** Смещение ячейки от центра панели: по горизонтали и по вертикали. */
-    fun horizontalOf(cell: Cell): Float = (cell.column - 4) * InventoryScreen.STEP
+    fun containerRows(container: OpenContainer): Int =
+        ((layout(container).playerY - 18) / 18).coerceAtLeast(1)
 
-    fun verticalOf(cell: Cell, totalRows: Int): Float =
-        ((totalRows - 1) / 2f - cell.row) * InventoryScreen.STEP
+    fun totalRows(container: OpenContainer): Int = containerRows(container) + 4
 
-    fun halfWidth(): Float = 4.5f * InventoryScreen.STEP + InventoryScreen.SLOT / 2f
+    fun scale(height: Int): Float = HudLayout.scale(height).toFloat()
 
-    fun halfHeight(totalRows: Int): Float =
-        (totalRows / 2f) * InventoryScreen.STEP + InventoryScreen.SLOT / 2f
+    fun originX(width: Int, scale: Float): Float = (width - GUI_WIDTH * scale) / 2f
 
-    /** Экранная точка ячейки: та же геометрия, что у инвентаря, но со своими рядами. */
-    fun screenPointOf(cell: Cell, totalRows: Int, width: Int, height: Int): Pair<Double, Double> {
-        val scale = InventoryScreen.pixelsPerUnit(height)
-        return (width / 2.0 + horizontalOf(cell) * scale) to
-            (height / 2.0 - verticalOf(cell, totalRows) * scale)
+    fun originY(height: Int, panelHeight: Int, scale: Float): Float =
+        (height - panelHeight * scale) / 2f
+
+    fun screenPointOf(container: OpenContainer, cell: Cell, width: Int, height: Int): Pair<Double, Double> {
+        val layout = layout(container)
+        val scale = scale(height)
+        return (originX(width, scale) + (cell.x + 9f) * scale).toDouble() to
+            (originY(height, layout.panelHeight, scale) + (cell.y + 9f) * scale).toDouble()
     }
 
-    /** Слот под курсором или null, если курсор между ячейками. */
-    fun slotAt(container: OpenContainer, horizontal: Float, vertical: Float): Cell? {
-        val rows = totalRows(container)
-        return cells(container).firstOrNull {
-            abs(horizontal - horizontalOf(it)) <= InventoryScreen.SLOT / 2f &&
-                abs(vertical - verticalOf(it, rows)) <= InventoryScreen.SLOT / 2f
-        }
+    fun panelPoint(container: OpenContainer, mouseX: Double, mouseY: Double, width: Int, height: Int): Pair<Float, Float> {
+        val layout = layout(container)
+        val scale = scale(height)
+        return ((mouseX - originX(width, scale)) / scale).toFloat() to
+            ((mouseY - originY(height, layout.panelHeight, scale)) / scale).toFloat()
     }
 
-    fun draw(
-        camera: Camera,
-        container: OpenContainer,
-        inventory: Inventory,
-        renderer: Renderer,
-        text: TextRenderer?,
-        atlas: TextureAtlas,
-        mouseX: Double,
-        mouseY: Double,
-        width: Int,
-        height: Int,
-    ) {
-        val centre = InventoryScreen.centre(camera)
-        val right = camera.right()
-        val up = camera.up()
-        val rows = totalRows(container)
-
-        fun bar(
-            horizontal: Float,
-            vertical: Float,
-            halfW: Float,
-            halfH: Float,
-            alpha: Float,
-            red: Float = 0.34f,
-            green: Float = 0.34f,
-            blue: Float = 0.34f,
-        ) {
-            text?.drawBar(
-                camera,
-                (centre[0] + right[0] * horizontal + up[0] * vertical).toDouble(),
-                (centre[1] + right[1] * horizontal + up[1] * vertical).toDouble(),
-                (centre[2] + right[2] * horizontal + up[2] * vertical).toDouble(),
-                halfW, halfH, red, green, blue, alpha,
-            )
+    fun slotAt(container: OpenContainer, horizontal: Float, vertical: Float): Cell? =
+        cells(container).firstOrNull {
+            horizontal >= it.x && horizontal < it.x + 18f &&
+                vertical >= it.y && vertical < it.y + 18f
         }
 
-        text?.drawBar(
-            camera, centre[0].toDouble(), centre[1].toDouble(), centre[2].toDouble(),
-            halfWidth(), halfHeight(rows), 0.05f, 0.05f, 0.08f, 0.8f,
-        )
-
-        val cells = cells(container)
-        for (cell in cells) {
-            val horizontal = horizontalOf(cell)
-            val vertical = verticalOf(cell, rows)
-            // Тёмная рамка и светлая середина — слот читается даже на фоне травы.
-            bar(horizontal, vertical, InventoryScreen.SLOT / 2f + 0.004f, InventoryScreen.SLOT / 2f + 0.004f, 0.9f, 0.12f, 0.12f, 0.14f)
-            bar(horizontal, vertical, InventoryScreen.SLOT / 2f, InventoryScreen.SLOT / 2f, 0.85f, 0.42f, 0.42f, 0.46f)
-        }
-
-        // Заголовок окна над панелью: «Chest», «Furnace», «Crafting». Мелкий кегль: обычный
-        // размер подписи в мире здесь был бы в целый блок.
-        val titleY = halfHeight(rows) + 0.05f
-        text?.draw(
-            camera,
-            listOf(
-                TextRenderer.Label(
-                    (centre[0] + up[0] * titleY).toDouble(),
-                    (centre[1] + up[1] * titleY).toDouble(),
-                    (centre[2] + up[2] * titleY).toDouble(),
-                    container.title,
-                ),
-            ),
-            scaleOverride = 0.007f,
-        )
-
-        // Прогресс печи: пламя (0/1) и стрелка плавки (2/3) из `Container Set Data`.
-        if (container.type in MenuLayout.FURNACES) {
-            val burn = container.dataValue(0) ?: 0
-            val burnTotal = container.dataValue(1) ?: 1
-            val cook = container.dataValue(2) ?: 0
-            val cookTotal = container.dataValue(3) ?: 1
-            val flame = (burn.toFloat() / burnTotal.coerceAtLeast(1)).coerceIn(0f, 1f)
-            if (flame > 0f) {
-                bar(
-                    InventoryScreen.STEP / 2f, 0f,
-                    InventoryScreen.STEP / 2f, InventoryScreen.SLOT * 0.15f * flame,
-                    0.9f, red = 1f, green = 0.55f, blue = 0.1f,
-                )
-            }
-            val arrow = (cook.toFloat() / cookTotal.coerceAtLeast(1)).coerceIn(0f, 1f)
-            if (arrow > 0f) {
-                bar(
-                    InventoryScreen.STEP, -InventoryScreen.STEP / 2f,
-                    InventoryScreen.SLOT / 2f * arrow, InventoryScreen.SLOT * 0.08f,
-                    0.9f, red = 0.9f, green = 0.9f, blue = 0.9f,
-                )
-            }
-        }
-
-        val icons = cells.mapNotNull { cell ->
-            val stack = container.slot(cell.menuSlot) ?: return@mapNotNull null
-            val name = inventory.nameOf(stack) ?: return@mapNotNull null
-            Renderer.Icon(
-                horizontal = horizontalOf(cell),
-                vertical = verticalOf(cell, rows),
-                size = InventoryScreen.SLOT * 0.9f,
-                layer = atlas.layerForItem(name).toFloat(),
-            )
-        }
-        renderer.drawIcons(camera, centre[0], centre[1], centre[2], icons)
-
-        val carried = container.carriedOrNull()
-        val carriedName = inventory.nameOf(carried)
-        if (carriedName != null) {
-            val (horizontal, vertical) = InventoryScreen.panelPoint(mouseX, mouseY, width, height)
-            renderer.drawIcons(
-                camera, centre[0], centre[1], centre[2],
-                listOf(
-                    Renderer.Icon(
-                        horizontal, vertical, InventoryScreen.SLOT * 0.9f,
-                        atlas.layerForItem(carriedName).toFloat(), 1.0f,
-                    ),
-                ),
-            )
-        }
+    fun slotAtScreen(container: OpenContainer, mouseX: Double, mouseY: Double, width: Int, height: Int): Cell? {
+        val (x, y) = panelPoint(container, mouseX, mouseY, width, height)
+        return slotAt(container, x, y)
     }
 }
