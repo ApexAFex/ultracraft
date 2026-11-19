@@ -35,8 +35,12 @@ fun main(args: Array<String>) {
 }
 
 private fun dispatch(args: List<String>) {
-    // A self-test must not stop on a dialog nobody will click.
-    CrashReport.showDialogs = "--demo" !in args
+    // Dialogs are for the window only. A console command that dies must not pop a modal
+    // window on the desktop — nobody asked for one, nothing can close it from the terminal,
+    // and it hides the real message behind a click. Console runs get stderr and the log file.
+    // Self-tests never stop on a dialog nobody will click either.
+    val opensWindow = args.isEmpty() || args[0] == "window"
+    CrashReport.showDialogs = opensWindow && "--demo" !in args
     when {
         args.isEmpty() -> windowCommand(emptyList())
         args[0] == "join" -> joinCommand(args.drop(1))
@@ -364,16 +368,25 @@ private fun mineCommand(args: List<String>) {
             standing?.x ?: 0.0, standing?.y ?: 0.0, standing?.z ?: 0.0,
             0f, 1.5f, mcplus.net.PlayerMovement.ON_GROUND,
         )
-        repeat(hold) {
+        var held = 0
+        // A dropped connection ends the hold early: waiting out the rest of the time would
+        // only make the command look frozen.
+        while (held < hold && !open.isClosed) {
             Thread.sleep(50)
             open.send(lookDown)
             open.send(mcplus.net.PlayerMovement.tickEnd())
+            held++
+        }
+        if (open.isClosed) {
+            println("Сервер закрыл соединение на ${held}-м тике: ${open.closeReason ?: "без причины"}")
+            return
         }
         open.send(BlockInteraction.playerAction(BlockInteraction.STOP_DESTROY_BLOCK, x, y, z, 1, sequence++))
         open.send(mcplus.net.PlayerMovement.tickEnd())
 
         val deadline = System.currentTimeMillis() + 2_000
         var answer: Int? = null
+        var lost: String? = null
         try {
             while (System.currentTimeMillis() < deadline) {
                 val packet = open.receive()
@@ -389,11 +402,20 @@ private fun mineCommand(args: List<String>) {
             }
         } catch (e: java.net.SocketTimeoutException) {
             // Silence is a valid answer here, so it must not end the command as a crash.
+        } catch (e: java.io.IOException) {
+            // A dropped connection (the server kicked us, or it stopped) is an answer too:
+            // say it and stay a diagnostic command, not a crash with a stack trace.
+            lost = e.message ?: e.javaClass.simpleName
         }
-        when (val state = answer) {
-            null -> println("Сервер ничего не прислал за 2 секунды: блок не изменился")
-            0 -> println("Сервер сломал блок: air")
-            else -> println("Сервер вернул блок: ${blocks.nameOf(state)} ($state)")
+        val kickReason = open.closeReason
+        when {
+            lost != null -> println("Соединение закрыто: $lost")
+            kickReason != null -> println("Сервер закрыл соединение: $kickReason")
+            else -> when (val state = answer) {
+                null -> println("Сервер ничего не прислал за 2 секунды: блок не изменился")
+                0 -> println("Сервер сломал блок: air")
+                else -> println("Сервер вернул блок: ${blocks.nameOf(state)} ($state)")
+            }
         }
     }
 }
