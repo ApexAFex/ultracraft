@@ -3,6 +3,7 @@ package mcplus.net
 import mcplus.protocol.ByteWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -44,5 +45,23 @@ class DisconnectReasonTest {
     @Test
     fun `plain text reasons are left alone`() {
         assertEquals("Сервер на техработах", translateReason("Сервер на техработах"))
+    }
+
+    /** The login state sends JSON, not NBT — and a JSON component may hold only a key. */
+    @Test
+    fun `login kicks arrive as json and are translated too`() {
+        val json = """{"translate":"multiplayer.disconnect.unverified_username"}"""
+        val body = ByteWriter().writeString(json).toByteArray()
+
+        val reason = decodeReason(body)
+
+        assertTrue(reason.contains("Mojang"), reason)
+    }
+
+    @Test
+    fun `only an unverified join is worth retrying`() {
+        assertTrue(isRetryableDisconnect("multiplayer.disconnect.unverified_username"))
+        assertFalse(isRetryableDisconnect("multiplayer.disconnect.banned"))
+        assertFalse(isRetryableDisconnect("вы забанены на этом сервере"))
     }
 }

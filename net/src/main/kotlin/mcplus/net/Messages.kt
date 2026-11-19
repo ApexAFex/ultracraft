@@ -152,7 +152,7 @@ internal fun readJoinGame(reader: ByteReader): JoinGame {
  */
 internal fun decodeReason(packetBody: ByteArray): String = translateReason(rawReason(packetBody))
 
-private fun rawReason(packetBody: ByteArray): String {
+internal fun rawReason(packetBody: ByteArray): String {
     runCatching {
         val reader = ByteReader(packetBody)
         val json = reader.readString()
@@ -178,8 +178,18 @@ internal fun translateReason(text: String): String {
     }
 }
 
+/**
+ * The session server sometimes refuses a join that came right after another one: joins are
+ * rate limited and the session list propagates lazily. That is worth retrying — a ban,
+ * a white list or a full server is not.
+ */
+internal fun isRetryableDisconnect(rawReason: String): Boolean =
+    rawReason.trim() == "multiplayer.disconnect.unverified_username"
+
 private val DISCONNECT_REASONS = mapOf(
     "multiplayer.disconnect.flying" to "сервер запрещает полёт — здесь работает выживание",
+    "multiplayer.disconnect.unverified_username" to
+        "сервер не подтвердил вход у Mojang — повтори через минуту",
     "multiplayer.disconnect.invalid_player_movement" to "сервер не согласился с нашим движением",
     "multiplayer.disconnect.invalid_vehicle_movement" to "сервер не согласился с движением транспорта",
     "multiplayer.disconnect.duplicate_login" to "этот игрок уже в игре — вход с другого места",

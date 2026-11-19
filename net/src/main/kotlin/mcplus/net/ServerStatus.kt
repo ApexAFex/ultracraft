@@ -49,7 +49,13 @@ fun flattenComponent(element: JsonElement?): String = when (element) {
     is JsonPrimitive -> element.content
     is JsonArray -> element.joinToString("") { flattenComponent(it) }
     is JsonObject -> buildString {
-        append(flattenComponent(element["text"]))
+        val text = flattenComponent(element["text"])
+        append(text)
+        // A component may carry only a translation key: kick reasons do exactly that.
+        // Showing the key beats showing nothing — translateReason() maps the common ones.
+        if (text.isEmpty()) {
+            (element["translate"] as? JsonPrimitive)?.content?.let { append(it) }
+        }
         (element["extra"] as? JsonArray)?.forEach { append(flattenComponent(it)) }
     }
 }

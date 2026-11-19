@@ -14,7 +14,11 @@ import java.util.UUID
 class EncryptionRequiredException(message: String) : RuntimeException(message)
 
 /** The server refused the session and told us why. */
-class ServerDisconnectException(val reason: String) : RuntimeException("Сервер закрыл соединение: $reason")
+class ServerDisconnectException(
+    val reason: String,
+    /** True when trying the same join again may work (see [isRetryableDisconnect]). */
+    val retryable: Boolean = false,
+) : RuntimeException("Сервер закрыл соединение: $reason")
 
 /**
  * Tells the session server that this client is joining; must be performed with the
@@ -28,8 +32,8 @@ fun interface ServerAuthenticator {
  * Drives one connection from handshake to entering the world:
  * `handshake -> login -> configuration -> play`.
  *
- * Offline mode only for now: no encryption, no chat signing. Online-mode servers are
- * detected and reported instead of being silently mishandled.
+ * Offline servers need nothing extra; an online-mode server asks for an [ServerAuthenticator],
+ * and then the whole login is wrapped in AES/CFB8 encryption.
  */
 class MinecraftClient(
     private val host: String,
@@ -76,8 +80,7 @@ class MinecraftClient(
 
             when (state) {
                 State.LOGIN -> when (packet.id) {
-                    Protocol777.Login.DISCONNECT ->
-                        throw ServerDisconnectException(decodeReason(packet.body))
+                    Protocol777.Login.DISCONNECT -> throw disconnect(packet)
 
                     Protocol777.Login.ENCRYPTION_REQUEST ->
                         handleEncryptionRequest(connection, packet)
@@ -111,8 +114,7 @@ class MinecraftClient(
                 }
 
                 State.CONFIGURATION -> when (packet.id) {
-                    Protocol777.Configuration.DISCONNECT ->
-                        throw ServerDisconnectException(decodeReason(packet.body))
+                    Protocol777.Configuration.DISCONNECT -> throw disconnect(packet)
 
                     Protocol777.Configuration.FINISH -> {
                         connection.send(Packet(Protocol777.Configuration.ACKNOWLEDGE_FINISH, EMPTY))
@@ -157,13 +159,18 @@ class MinecraftClient(
                         joinGame = readJoinGame(ByteReader(packet.body)),
                     )
 
-                    Protocol777.Play.DISCONNECT ->
-                        throw ServerDisconnectException(decodeReason(packet.body))
+                    Protocol777.Play.DISCONNECT -> throw disconnect(packet)
 
                     else -> Unit
                 }
             }
         }
+    }
+
+    /** Reads the reason once: the raw key decides whether the join is worth retrying. */
+    private fun disconnect(packet: Packet): ServerDisconnectException {
+        val raw = rawReason(packet.body)
+        return ServerDisconnectException(translateReason(raw), isRetryableDisconnect(raw))
     }
 
     private fun handshake(): ByteArray = ByteWriter()

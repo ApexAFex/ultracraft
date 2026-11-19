@@ -627,28 +627,41 @@ private fun findBlockTable(explicit: String?): BlockTable {
     return BlockTable.load(file)
 }
 
-private fun connect(host: String, port: Int, options: LoginOptions): Session = try {
+private fun connect(host: String, port: Int, options: LoginOptions): Session {
     val account = if (options.online) loadAccount() else null
+    val attempts = 3
 
-    MinecraftClient(
-        host = host,
-        port = port,
-        username = account?.name ?: options.name,
-        playerUuid = account?.uuid?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() },
-        authenticator = account?.let { acc ->
-            ServerAuthenticator { serverHash ->
-                MinecraftSession.join(acc.accessToken, acc.undashedUuid, serverHash)
+    for (attempt in 1..attempts) {
+        try {
+            return MinecraftClient(
+                host = host,
+                port = port,
+                username = account?.name ?: options.name,
+                playerUuid = account?.uuid?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() },
+                authenticator = account?.let { acc ->
+                    ServerAuthenticator { serverHash ->
+                        MinecraftSession.join(acc.accessToken, acc.undashedUuid, serverHash)
+                    }
+                },
+                protocolVersion = options.protocol,
+                log = if (options.verbose) { line -> println("  $line") } else { _ -> },
+            ).join()
+        } catch (e: ServerDisconnectException) {
+            // The session server rate limits joins and propagates them lazily, so a fresh
+            // join right after another one can be refused. Vanilla clients just try again.
+            if (e.retryable && attempt < attempts) {
+                println("  Сервер не подтвердил сессию у Mojang. Повтор через 5 секунд (${attempt + 1} из $attempts)")
+                Thread.sleep(5_000)
+                continue
             }
-        },
-        protocolVersion = options.protocol,
-        log = if (options.verbose) { line -> println("  $line") } else { _ -> },
-    ).join()
-} catch (e: ServerDisconnectException) {
-    fail(e.message ?: "Сервер закрыл соединение")
-} catch (e: EncryptionRequiredException) {
-    fail(e.message ?: "Требуется вход через Microsoft")
-} catch (e: Exception) {
-    fail("Не удалось войти на $host:$port — ${e.message ?: e::class.simpleName}")
+            fail(e.message ?: "Сервер закрыл соединение")
+        } catch (e: EncryptionRequiredException) {
+            fail(e.message ?: "Требуется вход через Microsoft")
+        } catch (e: Exception) {
+            fail("Не удалось войти на $host:$port — ${e.message ?: e::class.simpleName}")
+        }
+    }
+    fail("Не удалось войти на $host:$port")
 }
 
 /** Reads the stored account, refreshing the token when needed. */
@@ -708,7 +721,7 @@ private fun printUsage() {
 
         Использование:
           mcplus [host[:port]]                      список игроков (Server List Ping)
-          mcplus join [host[:port]] [--name Имя]    войти на сервер (offline-mode)
+          mcplus join [host[:port]] [--online]      войти на сервер (--name для offline)
           mcplus world [host[:port]] [--chunks N]   нарисовать карту мира текстом
           mcplus view [host[:port]] [--chunks N]    нарисовать мир картинкой (PNG)
           mcplus login [--client-id ID]             войти через Microsoft

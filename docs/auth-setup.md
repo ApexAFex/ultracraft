@@ -106,25 +106,46 @@ $env:MCPLUS_CLIENT_ID = "<скопированный id>"
 Или разово: `--client-id <id>`. Если вход жалуется на неверный тенант, попробуй
 `--tenant common` (по умолчанию используется `consumers`).
 
-## Ограничение Mojang
+## Разрешение Mojang (получено 19.11.2026)
 
-Mojang ограничивает доступ к `api.minecraftservices.com`: приложение должно быть одобрено
-вручную. До одобрения шаг `login_with_xbox` отвечает:
+`api.minecraftservices.com` пускает только приложения из allow list, и попасть туда можно
+лишь по заявке <https://aka.ms/mce-reviewappid>. Заявку рассмотрели 19.11.2026 и одобрили:
+id приложения добавлен в список. **Код клиента при этом не менялся** — упирался именно
+доступ, а не реализация.
+
+В письме об одобрении стоит прочитать не только «approved»:
+
+> We did not identify any block outcomes in this reviewed batch. …
+> We do not provide consultation or troubleshoot API access.
+
+То есть одобрение — это только строчка в allow list. Ни «почему 403», ни «почему не пускает
+на сервер» они разбирать не будут.
+
+До одобрения шаг `login_with_xbox` отвечал:
 
 ```
 HTTP 403: Invalid app registration, see https://aka.ms/AppRegInfo
 ```
 
-При этом вход в Microsoft, Xbox Live и XSTS проходят успешно — упирается только последний шаг.
-Это подтверждают независимые реализации: у сторонних лаунчеров та же стена до одобрения
+При этом Microsoft, Xbox Live и XSTS проходили успешно. Это подтверждают и независимые
+реализации: у сторонних лаунчеров была та же стена до одобрения
 ([lighty-launcher](https://github.com/lighty-launcher/lightylauncherlib/blob/ca8c8c1bac47e20756e9fb875ecc245b9d6162c9/crates/auth/docs/microsoft.md),
 [horizon](https://github.com/horizon-rust/horizon/blob/92b0ee1347b82d80e8a8faf6fe2206ad52fcd5d6/docs/microsoft-account.md)).
 
-Что делать: заполнить заявку <https://aka.ms/mce-reviewappid>. По сообщениям разработчиков
-одобрение занимает от нескольких недель; часть заявок остаётся без ответа. Даже регистрация
-в Xbox Developer Program не заменяет эту заявку.
+## Что проверено после одобрения
 
-Пока заявка не одобрена, работают offline-серверы: `mcplus world` без флага `--online`.
+| Шаг | Чем подтверждён |
+|---|---|
+| Microsoft → Xbox Live → XSTS | `mcplus login` дошёл до конца |
+| `login_with_xbox` | профиль `SashimiShrimpA`, `Java Edition есть` |
+| Шифрование канала | сервер в `online-mode=true` принял вход |
+| Подтверждение сессии у Mojang | в логе сервера настоящий UUID профиля |
+| Отказ без входа | `--online` не указан → «Сервер требует вход через Microsoft» |
+
+**Вход сразу после предыдущего может не пройти.** Сервер сессий несколько секунд не принимает
+новую сессию того же профиля и отвечает киком `multiplayer.disconnect.unverified_username`.
+Замер: после паузы 65 секунд первый вход проходит, два подряд — нет. Клиент повторяет вход до
+трёх раз с паузой 5 секунд, так что руками ничего делать не надо.
 
 ## Где лежат токены
 
