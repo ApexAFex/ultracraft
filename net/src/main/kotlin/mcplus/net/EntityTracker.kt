@@ -70,6 +70,12 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     /** Своё имя из метаданных, если сервер его дал. */
     val customName: String? get() = meta[NAME_FIELD]?.text?.trim()?.ifEmpty { null }
 
+    /** Предмет выпавшей сущности (поле 8, тип «стек») или null. */
+    val droppedItem: MetaEntry? get() = meta[DROPPED_ITEM_FIELD]?.takeIf { it.type == 7 }
+
+    /** Сколько живёт сфера опыта — поле 8 у `experience_orb`. */
+    val orbValue: Int? get() = meta[ORB_VALUE_FIELD]?.takeIf { it.type == 1 }?.number?.toInt()
+
     fun applyMetadata(values: Map<Int, MetaEntry>) {
         if (values.isNotEmpty()) meta = values
     }
@@ -276,3 +282,7 @@ class EntityTracker {
 /** Номера полей `LivingEntity` в 26.x: имя и здоровье. */
 private const val NAME_FIELD = 2
 private const val HEALTH_FIELD = 9
+
+/** Поле 8 — предмет для `item` и количество опыта для `experience_orb`. */
+private const val DROPPED_ITEM_FIELD = 8
+private const val ORB_VALUE_FIELD = 8

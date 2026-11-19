@@ -49,6 +49,22 @@ class Renderer(
     private val hotbarVbo = GL30.glGenBuffers()
     private val hotbarData = FloatArray(64 * 6 * VERTEX_FLOATS)
 
+    /** Маленькие кубы мира: выпавшие предметы, блок в руке, частицы ломания. */
+    private val cubeVao = GL30.glGenVertexArrays()
+    private val cubeVbo = GL30.glGenBuffers()
+
+    /** Один куб для отрисовки: центр, размер, слои граней и поворот вокруг Y. */
+    data class BlockCube(
+        val x: Double,
+        val y: Double,
+        val z: Double,
+        val size: Float,
+        val top: Int,
+        val bottom: Int,
+        val side: Int,
+        val yaw: Float = 0f,
+    )
+
     private class Part(val vao: Int, val vbo: Int) {
         var count: Int = 0
     }
@@ -79,6 +95,11 @@ class Renderer(
             GL30.GL_DYNAMIC_DRAW,
         )
         configureLayout(hotbarVao)
+        GL30.glBindVertexArray(0)
+
+        GL30.glBindVertexArray(cubeVao)
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, cubeVbo)
+        configureLayout(cubeVao)
         GL30.glBindVertexArray(0)
 
         GL30.glEnable(GL30.GL_DEPTH_TEST)
@@ -189,9 +210,117 @@ class Renderer(
         GL30.glUseProgram(0)
     }
 
+    /**
+     * Рисует маленькие кубы мира: выпавшие предметы, блок в руке и частицы ломания.
+     *
+     * Один вызов на весь кадр: кубы собираются в буфер и уходят одной отрисовкой в том же
+     * шейдере, что и мир, поэтому свет, туман и атлас совпадают с блоками. [depthTest]
+     * выключается для предмета в руке: он висит перед камерой.
+     */
+    fun drawBlockCubes(camera: Camera, cubes: List<BlockCube>, depthTest: Boolean = true) {
+        if (cubes.isEmpty()) return
+
+        val data = FloatArrayBuilder(cubes.size * 6 * 6 * VERTEX_FLOATS)
+        for (cube in cubes) {
+            val half = cube.size / 2f
+            val cx = cube.x.toFloat()
+            val cy = cube.y.toFloat()
+            val cz = cube.z.toFloat()
+            val c = kotlin.math.cos(cube.yaw)
+            val s = kotlin.math.sin(cube.yaw)
+
+            fun vertex(x: Float, y: Float, z: Float, layer: Int, u: Float, v: Float, shade: Float) {
+                data.add(cx + x * c - z * s)
+                data.add(cy + y)
+                data.add(cz + x * s + z * c)
+                data.add(shade)
+                data.add(FULL_LIGHT)
+                data.add(layer.toFloat())
+                data.add(u)
+                data.add(v)
+                data.add(1f); data.add(1f); data.add(1f)
+            }
+
+            // Верх и низ.
+            vertex(-half, half, half, cube.top, 0f, 1f, 1f)
+            vertex(half, half, half, cube.top, 1f, 1f, 1f)
+            vertex(half, half, -half, cube.top, 1f, 0f, 1f)
+            vertex(-half, half, half, cube.top, 0f, 1f, 1f)
+            vertex(half, half, -half, cube.top, 1f, 0f, 1f)
+            vertex(-half, half, -half, cube.top, 0f, 0f, 1f)
+
+            vertex(-half, -half, -half, cube.bottom, 0f, 1f, 0.45f)
+            vertex(half, -half, -half, cube.bottom, 1f, 1f, 0.45f)
+            vertex(half, -half, half, cube.bottom, 1f, 0f, 0.45f)
+            vertex(-half, -half, -half, cube.bottom, 0f, 1f, 0.45f)
+            vertex(half, -half, half, cube.bottom, 1f, 0f, 0.45f)
+            vertex(-half, -half, half, cube.bottom, 0f, 0f, 0.45f)
+
+            // Бока.
+            vertex(half, -half, -half, cube.side, 0f, 1f, 0.8f)
+            vertex(half, half, -half, cube.side, 0f, 0f, 0.8f)
+            vertex(half, half, half, cube.side, 1f, 0f, 0.8f)
+            vertex(half, -half, -half, cube.side, 0f, 1f, 0.8f)
+            vertex(half, half, half, cube.side, 1f, 0f, 0.8f)
+            vertex(half, -half, half, cube.side, 1f, 1f, 0.8f)
+
+            vertex(-half, -half, half, cube.side, 0f, 1f, 0.8f)
+            vertex(-half, half, half, cube.side, 0f, 0f, 0.8f)
+            vertex(-half, half, -half, cube.side, 1f, 0f, 0.8f)
+            vertex(-half, -half, half, cube.side, 0f, 1f, 0.8f)
+            vertex(-half, half, -half, cube.side, 1f, 0f, 0.8f)
+            vertex(-half, -half, -half, cube.side, 1f, 1f, 0.8f)
+
+            vertex(-half, -half, half, cube.side, 0f, 1f, 0.62f)
+            vertex(half, -half, half, cube.side, 1f, 1f, 0.62f)
+            vertex(half, half, half, cube.side, 1f, 0f, 0.62f)
+            vertex(-half, -half, half, cube.side, 0f, 1f, 0.62f)
+            vertex(half, half, half, cube.side, 1f, 0f, 0.62f)
+            vertex(-half, half, half, cube.side, 0f, 0f, 0.62f)
+
+            vertex(half, -half, -half, cube.side, 0f, 1f, 0.62f)
+            vertex(-half, -half, -half, cube.side, 1f, 1f, 0.62f)
+            vertex(-half, half, -half, cube.side, 1f, 0f, 0.62f)
+            vertex(half, -half, -half, cube.side, 0f, 1f, 0.62f)
+            vertex(-half, half, -half, cube.side, 1f, 0f, 0.62f)
+            vertex(half, half, -half, cube.side, 0f, 0f, 0.62f)
+        }
+
+        val vertices = data.toArray()
+        val buffer = MemoryUtil.memAllocFloat(vertices.size)
+        buffer.put(vertices).flip()
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, cubeVbo)
+        GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_DYNAMIC_DRAW)
+        MemoryUtil.memFree(buffer)
+
+        GL30.glUseProgram(program)
+        textures.bind(0)
+        GL30.glUniform1i(atlasLocation, 0)
+        GL30.glUniformMatrix4fv(
+            viewProjLocation, false,
+            camera.viewProjection(width.toFloat() / height.toFloat()),
+        )
+        GL30.glUniform1f(daylightLocation, daylight)
+        GL30.glUniform3f(cameraLocation, camera.x.toFloat(), camera.y.toFloat(), camera.z.toFloat())
+        GL30.glUniform3f(
+            fogColorLocation,
+            ((fogColor shr 16) and 0xFF) / 255f,
+            ((fogColor shr 8) and 0xFF) / 255f,
+            (fogColor and 0xFF) / 255f,
+        )
+        GL30.glUniform1f(fogStartLocation, fogStart)
+        GL30.glUniform1f(fogEndLocation, fogEnd)
+        GL30.glUniform1f(unlitLocation, 0f)
+        if (!depthTest) GL30.glDisable(GL30.GL_DEPTH_TEST)
+        GL30.glBindVertexArray(cubeVao)
+        GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, vertices.size / VERTEX_FLOATS)
+        GL30.glBindVertexArray(0)
+        if (!depthTest) GL30.glEnable(GL30.GL_DEPTH_TEST)
+        GL30.glUseProgram(0)
+    }
+
     /** Квадрат расстояния от камеры до центра чанка — для порядка отрисовки воды. */
-    private fun chunkDistanceSquared(chunkKey: Long, camera: Camera): Double {
-        val chunkX = (chunkKey shr 32).toInt()
+    private fun chunkDistanceSquared(chunkKey: Long, camera: Camera): Double {        val chunkX = (chunkKey shr 32).toInt()
         val chunkZ = chunkKey.toInt()
         val dx = chunkX * 16.0 + 8.0 - camera.x
         val dz = chunkZ * 16.0 + 8.0 - camera.z
@@ -407,6 +536,8 @@ class Renderer(
         GL30.glDeleteVertexArrays(crackVao)
         GL30.glDeleteBuffers(hotbarVbo)
         GL30.glDeleteVertexArrays(hotbarVao)
+        GL30.glDeleteBuffers(cubeVbo)
+        GL30.glDeleteVertexArrays(cubeVao)
         GL30.glDeleteProgram(program)
         GL30.glDeleteProgram(outlineProgram)
     }

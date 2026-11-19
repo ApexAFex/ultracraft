@@ -30,6 +30,9 @@ object GlView {
     private val ZOMBIE_TYPES = setOf("zombie", "husk", "drowned", "zombie_villager", "zombified_piglin")
     private val SKELETON_TYPES = setOf("skeleton", "stray", "bogged")
 
+    /** Блок, который только что стал воздухом: из него сыплются кусочки. */
+    private class PendingBreak(val x: Int, val y: Int, val z: Int, val state: Int)
+
     /** Catch-up limit for one frame — beyond this the backlog is dropped, not simulated. */
     private const val MAX_TICKS_PER_FRAME = 5
 
@@ -124,6 +127,8 @@ object GlView {
         openAt: Triple<Int, Int, Int>? = null,
         /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
+        /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
+        itemTable: mcplus.net.ItemTable = mcplus.net.ItemTable.EMPTY,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -202,6 +207,8 @@ object GlView {
 
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
+            val breakEvents = java.util.concurrent.ConcurrentLinkedQueue<PendingBreak>()
+
             fun handle(packet: mcplus.protocol.Packet) {
                 // The tab list is the only source of other players' names, so it goes first.
                 if (playerList.onPacket(packet.id, packet.body)) return
@@ -211,7 +218,12 @@ object GlView {
                     runCatching {
                         val reader = mcplus.protocol.ByteReader(packet.body)
                         val position = reader.readPosition()
+                        val before = world.blockAt(position.x, position.y, position.z)
                         world.applyBlockUpdate(packet.body)
+                        val after = world.blockAt(position.x, position.y, position.z)
+                        if (before != 0 && after == 0) {
+                            breakEvents += PendingBreak(position.x, position.y, position.z, before)
+                        }
                         remeshAround(position.x, position.y, position.z)
                     }
                     return
@@ -389,6 +401,9 @@ object GlView {
                     /** The release was sent; from now on only the server's answer matters. */
                     var miningStopSent = false
 
+                    /** Время последнего взмаха рукой — от него идёт анимация кисти. */
+                    var swingNanos = 0L
+
                     /** Set by the frame loop, consumed by the tick: one mining step per tick. */
                     var holdRequested = false
                     var aimTarget: Raycast.Hit? = null
@@ -404,6 +419,8 @@ object GlView {
                                 hit.x, hit.y, hit.z, hit.face, sequence++,
                             ),
                         )
+                        session?.send(mcplus.net.PlayerMovement.swingArm())
+                        swingNanos = System.nanoTime()
                         mining = true
                         miningX = hit.x
                         miningY = hit.y
@@ -471,6 +488,8 @@ object GlView {
                             ),
                         )
                         println("Поставлен блок: $nextX, $nextY, $nextZ")
+                        session?.send(mcplus.net.PlayerMovement.swingArm())
+                        swingNanos = System.nanoTime()
                     }
 
                     var uploaded = 0
@@ -479,6 +498,16 @@ object GlView {
                     var lastEntityCount = -1
                     var frame = 0
                     var inventoryOpen = false
+
+                    /** Куски блоков от только что сломанных блоков. */
+                    class Debris(
+                        var x: Double, var y: Double, var z: Double,
+                        var vx: Double, var vy: Double, var vz: Double,
+                        var life: Float,
+                        val top: Int, val bottom: Int, val side: Int,
+                    )
+
+                    val debris = ArrayList<Debris>()
 
                     /** Turns a screen position into a click on the slot under it, if any. */
                     fun clickInventoryAt(mouseX: Double, mouseY: Double) {
@@ -980,6 +1009,45 @@ object GlView {
                         )
                         tracker.tick(input.deltaSeconds)
                         val entities = tracker.snapshot()
+
+                        // Куски только что сломанных блоков: короткая вспышка вместо пустоты.
+                        while (true) {
+                            val event = breakEvents.poll() ?: break
+                            val dx = event.x + 0.5 - camera.x
+                            val dy = event.y + 0.5 - camera.y
+                            val dz = event.z + 0.5 - camera.z
+                            if (dx * dx + dy * dy + dz * dz > 144.0) continue
+                            val blockName = blocks.nameOf(event.state)
+                            val top = atlas.layerFor(blockName, TextureAtlas.Kind.TOP)
+                            val bottom = atlas.layerFor(blockName, TextureAtlas.Kind.BOTTOM)
+                            val side = atlas.layerFor(blockName, TextureAtlas.Kind.SIDE)
+                            val random = java.util.Random(event.x * 31L + event.y * 17L + event.z)
+                            repeat(10) {
+                                debris += Debris(
+                                    event.x + 0.15 + random.nextDouble() * 0.7,
+                                    event.y + 0.15 + random.nextDouble() * 0.7,
+                                    event.z + 0.15 + random.nextDouble() * 0.7,
+                                    (random.nextDouble() - 0.5) * 2.5,
+                                    1.5 + random.nextDouble() * 2.0,
+                                    (random.nextDouble() - 0.5) * 2.5,
+                                    0.55f,
+                                    top, bottom, side,
+                                )
+                            }
+                        }
+                        val debrisDelta = input.deltaSeconds.toFloat()
+                        if (debris.isNotEmpty()) {
+                            val iterator = debris.iterator()
+                            while (iterator.hasNext()) {
+                                val piece = iterator.next()
+                                piece.vy -= 14.0 * debrisDelta
+                                piece.x += piece.vx * debrisDelta
+                                piece.y += piece.vy * debrisDelta
+                                piece.z += piece.vz * debrisDelta
+                                piece.life -= debrisDelta
+                                if (piece.life <= 0f) iterator.remove()
+                            }
+                        }
                         if (entities.size != lastEntityCount) {
                             val nearest = entities.minByOrNull {
                                 val dx = it.x - player.x; val dy = it.y - player.y; val dz = it.z - player.z
@@ -1002,6 +1070,8 @@ object GlView {
                         val skeletons = ArrayList<PlayerRenderer.Player>()
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
+                        val cubes = ArrayList<Renderer.BlockCube>()
+                        val nowNanos = System.nanoTime()
                         for (entity in entities) {
                             if (playerList.nameOf(entity.uuid) != null) {
                                 players += PlayerRenderer.Player(
@@ -1026,6 +1096,40 @@ object GlView {
                                 when {
                                     name in ZOMBIE_TYPES -> zombies += humanoid
                                     name in SKELETON_TYPES -> skeletons += humanoid
+                                    name == "item" -> {
+                                        // Выпавший предмет: мини-куб блока, если это блок.
+                                        val stack = entity.droppedItem
+                                        val itemName = stack?.takeIf { it.itemId >= 0 }
+                                            ?.let { itemTable.nameOf(it.itemId) }
+                                        val state = itemName?.let { blocks.firstStateOf(it) } ?: 0
+                                        if (state != 0 && itemName != null) {
+                                            cubes += Renderer.BlockCube(
+                                                entity.x,
+                                                entity.y + 0.16,
+                                                entity.z,
+                                                0.28f,
+                                                atlas.layerFor(itemName, TextureAtlas.Kind.TOP),
+                                                atlas.layerFor(itemName, TextureAtlas.Kind.BOTTOM),
+                                                atlas.layerFor(itemName, TextureAtlas.Kind.SIDE),
+                                                yaw = (nowNanos / 1_000_000_000.0 * 1.4 + entity.id).toFloat(),
+                                            )
+                                        }
+                                    }
+
+                                    name == "experience_orb" -> {
+                                        // Сфера опыта: маленький жёлтый куб, качается над землёй.
+                                        cubes += Renderer.BlockCube(
+                                            entity.x,
+                                            entity.y + 0.12,
+                                            entity.z,
+                                            0.18f,
+                                            atlas.layerOf("gold_block"),
+                                            atlas.layerOf("gold_block"),
+                                            atlas.layerOf("gold_block"),
+                                            yaw = (nowNanos / 1_000_000_000.0 * 2.0).toFloat(),
+                                        )
+                                    }
+
                                     family == MobFamily.NONE -> boxes += entity
                                     else -> mobs += MobRenderer.Mob(
                                         x = entity.x,
@@ -1046,6 +1150,17 @@ object GlView {
                         skeletonRenderer.draw(camera, skeletons)
                         mobRenderer.draw(camera, mobs)
                         entityRenderer.draw(camera, boxes)
+                        if (debris.isNotEmpty()) {
+                            val debrisCubes = debris.map {
+                                Renderer.BlockCube(
+                                    it.x, it.y, it.z, 0.09f, it.top, it.bottom, it.side,
+                                    yaw = (it.life * 10f),
+                                )
+                            }
+                            renderer.drawBlockCubes(camera, debrisCubes)
+                        }
+                        // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
+                        if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
                         // Only players are in the tab list, so only they get a nametag.
                         val labels = entities.mapNotNull { entity ->
                             val name = playerList.nameOf(entity.uuid) ?: return@mapNotNull null
@@ -1092,11 +1207,41 @@ object GlView {
                             )
                         }
 
-                        // Предмет в руке — плоскость перед камерой, как «рука» у простых
-                        // клиентов. Настоящей 3D-модели руки в ванили у нас пока нет.
+                        // Предмет в руке: блок — настоящим мини-кубом с лёгким наклоном,
+                        // остальное — плоской иконкой. Взмах при ударе сдвигает и опускает куб.
                         val handItemName = inventory?.heldName()
                         if (!inventoryOpen && openContainer == null && !dead && !chat.open && handItemName != null) {
-                            renderer.drawHandItem(camera, atlas.layerForItem(handItemName).toFloat())
+                            val handState = blocks.firstStateOf(handItemName)
+                            if (handState != null) {
+                                val swingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
+                                val swing = if (swingAge in 0.0..1.0) {
+                                    kotlin.math.sin(swingAge * Math.PI).toFloat()
+                                } else {
+                                    0f
+                                }
+                                val forward = camera.forward()
+                                val right = camera.right()
+                                val up = camera.up()
+                                val fx = camera.x + forward[0] * 0.72 + right[0] * 0.34 - up[0] * (0.34 - swing * 0.14)
+                                val fy = camera.y + forward[1] * 0.72 + right[1] * 0.34 - up[1] * (0.34 - swing * 0.14)
+                                val fz = camera.z + forward[2] * 0.72 + right[2] * 0.34 - up[2] * (0.34 - swing * 0.14)
+                                val yaw = -Math.toRadians(camera.yaw.toDouble()).toFloat() + 0.55f + swing * 0.5f
+                                renderer.drawBlockCubes(
+                                    camera,
+                                    listOf(
+                                        Renderer.BlockCube(
+                                            fx, fy, fz, 0.22f,
+                                            atlas.layerFor(handItemName, TextureAtlas.Kind.TOP),
+                                            atlas.layerFor(handItemName, TextureAtlas.Kind.BOTTOM),
+                                            atlas.layerFor(handItemName, TextureAtlas.Kind.SIDE),
+                                            yaw = yaw,
+                                        ),
+                                    ),
+                                    depthTest = false,
+                                )
+                            } else {
+                                renderer.drawHandItem(camera, atlas.layerForItem(handItemName).toFloat())
+                            }
                         }
 
                         // HUD рисуется отдельным проходом поверх сцены. Открытый инвентарь или

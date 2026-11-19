@@ -11,7 +11,14 @@ import java.util.UUID
  * число для числовых типов и текст для строк и компонентов. Этого хватает, чтобы показать
  * здоровье и имя моба; сам протокол менять не нужно.
  */
-data class MetaEntry(val type: Int, val number: Double = 0.0, val text: String? = null)
+data class MetaEntry(
+    val type: Int,
+    val number: Double = 0.0,
+    val text: String? = null,
+    /** Для типа 7 (стек предмета): id и количество; -1 — предмет с нечитаемыми компонентами. */
+    val itemId: Int = 0,
+    val itemCount: Int = 0,
+)
 
 /**
  * Разбор `Set Entity Data` (0x65): id сущности и список полей.
@@ -87,7 +94,26 @@ private fun readMetaValue(reader: ByteReader, type: Int): MetaEntry? = when (typ
     19 -> MetaEntry(type, reader.readVarInt().toDouble())
     20 -> MetaEntry(type, reader.readVarInt().toDouble())
     21 -> MetaEntry(type, reader.readVarInt().toDouble())
-    // 7 (стек), 16 (частица), 17 (данные жителя) и всё незнакомое — стоп.
+    // 7 — стек предмета: count, id, патч компонентов. Патч с добавленными компонентами
+    // прочитать нельзя (у каждого свой кодек), поэтому такой предмет помечается неизвестным.
+    7 -> {
+        val count = reader.readVarInt()
+        if (count <= 0) {
+            MetaEntry(type)
+        } else {
+            val itemId = reader.readVarInt()
+            val added = reader.readVarInt()
+            val removed = reader.readVarInt()
+            if (added != 0) {
+                MetaEntry(type, itemId = -1, itemCount = count)
+            } else {
+                repeat(removed) { reader.readVarInt() }
+                MetaEntry(type, itemId = itemId, itemCount = count)
+            }
+        }
+    }
+
+    // 16 (частица), 17 (данные жителя) и всё незнакомое — стоп.
     else -> null
 }
 

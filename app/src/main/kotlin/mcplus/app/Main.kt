@@ -937,6 +937,7 @@ private fun windowCommand(args: List<String>) {
             replay = replay,
             openAt = openAt,
             entityTypes = findEntityTable(),
+            itemTable = findItemTable(),
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending

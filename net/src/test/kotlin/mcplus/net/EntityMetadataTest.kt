@@ -62,13 +62,41 @@ class EntityMetadataTest {
         val packet = body(
             7,
             field(9, 3, ByteWriter().writeFloat(20f).toByteArray()),
-            field(10, 7, ByteWriter().writeVarInt(1).toByteArray()), // стек предмета: неизвестно
+            field(10, 16, ByteWriter().writeVarInt(1).toByteArray()), // частица: неизвестно
             field(11, 3, ByteWriter().writeFloat(1f).toByteArray()),
         )
         val (_, meta) = readEntityMetadata(packet)
 
         assertEquals(20f, meta.getValue(9).number.toFloat())
         assertTrue(10 !in meta, "после неизвестного типа ничего не читаем")
+    }
+
+    @Test
+    fun `a dropped item stack is read when it has no extra components`() {
+        val payload = ByteWriter()
+            .writeVarInt(3)   // count
+            .writeVarInt(42)  // item id
+            .writeVarInt(0)   // added components
+            .writeVarInt(0)   // removed components
+            .toByteArray()
+        val packet = body(1, field(8, 7, payload))
+        val entry = readEntityMetadata(packet).second.getValue(8)
+
+        assertEquals(42, entry.itemId)
+        assertEquals(3, entry.itemCount)
+    }
+
+    @Test
+    fun `a dropped item with components is marked unknown`() {
+        val payload = ByteWriter()
+            .writeVarInt(1)
+            .writeVarInt(42)
+            .writeVarInt(1)   // один добавленный компонент: длину значения не знаем
+            .writeVarInt(0)
+            .toByteArray()
+        val entry = readEntityMetadata(body(1, field(8, 7, payload))).second.getValue(8)
+
+        assertEquals(-1, entry.itemId)
     }
 
     @Test

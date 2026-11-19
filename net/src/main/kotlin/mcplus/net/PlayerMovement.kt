@@ -75,5 +75,16 @@ object PlayerMovement {
      */
     fun playerLoaded(): Packet = Packet(Protocol777.Play.PLAYER_LOADED, EMPTY)
 
+    /** Взмах рукой: в 26.3 это `player_action` с действием `STAB`. */
+    fun swingArm(): Packet = Packet(
+        Protocol777.Play.PLAYER_ACTION,
+        mcplus.protocol.ByteWriter()
+            .writeVarInt(Protocol777.Play.SWING_ACTION)
+            .writePosition(0, 0, 0)
+            .writeByte(0)
+            .writeVarInt(0)
+            .toByteArray(),
+    )
+
     private val EMPTY = ByteArray(0)
 }
