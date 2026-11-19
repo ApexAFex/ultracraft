@@ -116,6 +116,8 @@ object GlView {
         meshThreads: Int = 0,
         /** Packets read while the first chunks were awaited; replayed before the loop starts. */
         replay: List<mcplus.protocol.Packet> = emptyList(),
+        /** Блок, по которому кликнуть правой кнопкой на 30-м кадре (проверка контейнеров). */
+        openAt: Triple<Int, Int, Int>? = null,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -318,6 +320,9 @@ object GlView {
                     /** Какие эффекты были в прошлом кадре — печатаем только изменения. */
                     var knownEffects = ""
 
+                    /** Контейнер уже напечатан в лог — чтобы не повторять каждый кадр. */
+                    var containerLogged = false
+
                     fun requestRespawn() {
                         session?.requestRespawn()
                         session?.vitals?.respawned()
@@ -477,6 +482,15 @@ object GlView {
                         val dead = vitals?.dead == true
                         val bossBars = session?.bossBars?.snapshot() ?: emptyList()
                         val effects = session?.effects?.snapshot() ?: emptyList()
+                        val openContainer = session?.container
+                        if (openContainer != null && !containerLogged) {
+                            containerLogged = true
+                            println(
+                                "Открыт контейнер: ${openContainer.type}, «${openContainer.title}», " +
+                                    "слотов ${openContainer.slotCount}",
+                            )
+                        }
+                        if (openContainer == null) containerLogged = false
                         if (bossBars.size != knownBossBars) {
                             knownBossBars = bossBars.size
                             if (bossBars.isNotEmpty()) {
@@ -492,11 +506,13 @@ object GlView {
                         }
 
                         if (input.inventoryToggleRequested && !dead && !chat.open) {
-                            inventoryOpen = !inventoryOpen
+                            if (openContainer != null) session?.closeContainer()
+                            else inventoryOpen = !inventoryOpen
                         }
                         if (input.escapeRequested) {
                             when {
                                 chat.open -> chat.close()
+                                openContainer != null -> session?.closeContainer()
                                 inventoryOpen -> inventoryOpen = false
                                 dead -> Unit
                                 else -> GLFW.glfwSetWindowShouldClose(window, true)
@@ -529,7 +545,7 @@ object GlView {
                         }
                         // Курсор виден, когда им пользуется экран: инвентарь или экран смерти.
                         // Иначе он снова захвачен и управляет камерой.
-                        input.setCursorVisible(inventoryOpen || dead)
+                        input.setCursorVisible(inventoryOpen || dead || openContainer != null)
 
                         // Смерть: сервер выставил здоровье в ноль и перестал стримить мир.
                         // Пока игрок не возродился, ходить и копать некуда — экран смерти
@@ -575,6 +591,30 @@ object GlView {
                         // click and answers with the whole menu, cursor included.
                         if (inventoryOpen && input.clickRequested) {
                             clickInventoryAt(input.mouseX, input.mouseY)
+                        }
+
+                        // Клик по открытому контейнеру: слоты те же, но номер окна другой,
+                        // и сервер применяет клик именно к своему меню.
+                        if (openContainer != null && input.clickRequested) {
+                            val (horizontal, vertical) = InventoryScreen.panelPoint(
+                                input.mouseX, input.mouseY, width, height,
+                            )
+                            val cell = ContainerScreen.slotAt(openContainer, horizontal, vertical)
+                            if (cell != null) {
+                                session?.clickSlot(cell.menuSlot)
+                                println("Клик по слоту меню ${cell.menuSlot}")
+                            }
+                        }
+
+                        // Проверка контейнера без рук: правый клик по заданному блоку.
+                        if (openAt != null && session != null && frame == 30) {
+                            session.send(
+                                mcplus.net.BlockInteraction.useItemOn(
+                                    openAt.first, openAt.second, openAt.third, face = 1,
+                                    cursorX = 0.5f, cursorY = 0.5f, cursorZ = 0.5f, sequence = 1,
+                                ),
+                            )
+                            println("Демо: правый клик по блоку ${openAt.first}, ${openAt.second}, ${openAt.third}")
                         }
 
                         // Self-test of the same path without a hand on the mouse: open the screen,
@@ -925,14 +965,19 @@ object GlView {
                             )
                         }
                         textRenderer?.draw(camera, labels)
-                        if (target != null && !inventoryOpen) {
+                        if (target != null && !inventoryOpen && openContainer == null) {
                             renderer.drawOutline(camera, target.x, target.y, target.z)
                         }
 
                         // Inventory screen replaces the hotbar while it is open: slots, icons and
                         // the dragged stack are all drawn on the same world-space panel.
                         val inventory = session?.inventory
-                        if (inventory != null && inventoryOpen) {
+                        if (openContainer != null && inventory != null) {
+                            ContainerScreen.draw(
+                                camera, openContainer, inventory, renderer, textRenderer, atlas,
+                                input.mouseX, input.mouseY, width, height,
+                            )
+                        } else if (inventory != null && inventoryOpen) {
                             InventoryScreen.draw(
                                 camera, inventory, renderer, textRenderer, atlas,
                                 input.mouseX, input.mouseY, width, height,
@@ -942,15 +987,15 @@ object GlView {
                         // Предмет в руке — плоскость перед камерой, как «рука» у простых
                         // клиентов. Настоящей 3D-модели руки в ванили у нас пока нет.
                         val handItemName = inventory?.heldName()
-                        if (!inventoryOpen && !dead && !chat.open && handItemName != null) {
+                        if (!inventoryOpen && openContainer == null && !dead && !chat.open && handItemName != null) {
                             renderer.drawHandItem(camera, atlas.layerForItem(handItemName).toFloat())
                         }
 
-                        // HUD рисуется отдельным проходом поверх сцены. Открытый инвентарь его
-                        // прячет, как в ванили, а смерть заменяет HUD экраном смерти.
+                        // HUD рисуется отдельным проходом поверх сцены. Открытый инвентарь или
+                        // контейнер его прячет, как в ванили, а смерть заменяет HUD экраном смерти.
                         if (dead) {
                             hud.drawDeathScreen()
-                        } else if (!inventoryOpen) {
+                        } else if (!inventoryOpen && openContainer == null) {
                             val chatLines = session?.chat?.snapshot() ?: emptyList()
                             if (chat.open) {
                                 // Пока печатаешь, хотбар и сердца уступают место строке ввода.
@@ -975,11 +1020,15 @@ object GlView {
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
                         // With the inventory open the same button drags items, so it must not mine.
-                        holdRequested = !inventoryOpen && !dead && !chat.open &&
+                        holdRequested = !inventoryOpen && openContainer == null && !dead && !chat.open &&
                             (leftDown || (demo && frame >= 5 && frame < 900))
-                        aimTarget = if (inventoryOpen || dead || chat.open) null else miningTarget
+                        aimTarget = if (inventoryOpen || openContainer != null || dead || chat.open) null else miningTarget
 
-                        if (!inventoryOpen && !dead && !chat.open && rightDown && !rightWasDown && target != null) demoPlace(target)
+                        if (!inventoryOpen && openContainer == null && !dead && !chat.open &&
+                            rightDown && !rightWasDown && target != null
+                        ) {
+                            demoPlace(target)
+                        }
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         if (demo && frame == DEMO_AIM_AT) {
                             // Aim at the closest **player** first: nicknames and player models are

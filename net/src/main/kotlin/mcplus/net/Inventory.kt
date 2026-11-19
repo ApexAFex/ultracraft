@@ -186,28 +186,10 @@ class Inventory(
      * of unknown length, so a non-empty "added" list makes the stack unreadable: it is reported
      * as [UNKNOWN_ITEM] with the count we did read, and the rest of the packet is abandoned.
      */
-    private fun readStack(reader: ByteReader): Stack? {
-        val count = reader.readVarInt()
-        if (count <= 0) return null
-        val itemId = reader.readVarInt()
-
-        val added = reader.readVarInt()
-        val removed = reader.readVarInt()
-        if (added != 0) throw UnreadableStack(count)
-        repeat(removed) { reader.readVarInt() }
-
-        return Stack(itemId, count)
-    }
+    private fun readStack(reader: ByteReader): Stack? = readMenuStack(reader)
 
     /** A single-slot packet can afford this: the count is known, the name is not. */
-    private fun readOrMarkUnreadable(reader: ByteReader): Stack? =
-        try {
-            readStack(reader)
-        } catch (e: UnreadableStack) {
-            Stack(UNKNOWN_ITEM, e.count)
-        }
-
-    private class UnreadableStack(val count: Int) : RuntimeException()
+    private fun readOrMarkUnreadable(reader: ByteReader): Stack? = readMenuStackOrUnknown(reader)
 
     /**
      * The player inventory menu lists crafting first, so the hotbar is 36..44 there, while the
@@ -244,3 +226,27 @@ class Inventory(
         val ARMOUR_MENU_SLOTS = 5..8
     }
 }
+
+/** Один стек в меню: count, item id, patch. Бросает [UnreadableStack] на компонентах. */
+internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
+    val count = reader.readVarInt()
+    if (count <= 0) return null
+    val itemId = reader.readVarInt()
+
+    val added = reader.readVarInt()
+    val removed = reader.readVarInt()
+    if (added != 0) throw UnreadableStack(count)
+    repeat(removed) { reader.readVarInt() }
+
+    return Inventory.Stack(itemId, count)
+}
+
+/** То же, но нечитаемый стек превращается в «неизвестный предмет» с количеством. */
+internal fun readMenuStackOrUnknown(reader: ByteReader): Inventory.Stack? =
+    try {
+        readMenuStack(reader)
+    } catch (e: UnreadableStack) {
+        Inventory.Stack(-1, e.count)
+    }
+
+internal class UnreadableStack(val count: Int) : RuntimeException()

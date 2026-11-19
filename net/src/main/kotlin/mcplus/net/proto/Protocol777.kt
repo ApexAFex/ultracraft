@@ -83,6 +83,9 @@ object Protocol777 {
         const val SYNCHRONIZE_POSITION: Int = 0x49
         const val CONTAINER_SET_CONTENT: Int = 0x12
         const val CONTAINER_SET_SLOT: Int = 0x14
+        const val CONTAINER_SET_DATA: Int = 0x13
+        const val CONTAINER_CLOSE: Int = 0x11
+        const val OPEN_SCREEN: Int = 0x3C
         const val SET_HELD_SLOT: Int = 0x6B
         const val SET_CURSOR_ITEM: Int = 0x62
         const val SET_PLAYER_INVENTORY: Int = 0x6E
@@ -103,6 +106,7 @@ object Protocol777 {
         const val CHAT_COMMAND: Int = 0x07
         const val CHAT: Int = 0x09
         const val CONTAINER_CLICK: Int = 0x12
+        const val CONTAINER_CLOSE_SERVERBOUND: Int = 0x13
         const val CHUNK_BATCH_RECEIVED: Int = 0x0B
         const val CLIENT_STATUS: Int = 0x0C
         const val CLIENT_TICK_END: Int = 0x0D

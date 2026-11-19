@@ -271,6 +271,23 @@ private val CHAT_TRANSLATIONS = mapOf(
     // Имена боссов приходят ключами перевода; без них полоса дракона подписана сырым ключом.
     "entity.minecraft.ender_dragon" to "Ender Dragon",
     "entity.minecraft.wither" to "Wither",
+    // Заголовки контейнеров: `Open Screen` присылает ключ, а не готовый текст.
+    "container.chest" to "Chest",
+    "container.chestDouble" to "Large Chest",
+    "container.crafting" to "Crafting",
+    "container.inventory" to "Inventory",
+    "container.furnace" to "Furnace",
+    "container.blast_furnace" to "Blast Furnace",
+    "container.smoker" to "Smoker",
+    "container.hopper" to "Item Hopper",
+    "container.dispenser" to "Dispenser",
+    "container.dropper" to "Dropper",
+    "container.shulkerBox" to "Shulker Box",
+    "container.brewing" to "Brewing Stand",
+    "container.beacon" to "Beacon",
+    "container.enchant" to "Enchant",
+    "container.anvil" to "Repair & Name",
+    "container.merchant" to "Villager",
 )
 
 private const val NBT_STRING = 0x08

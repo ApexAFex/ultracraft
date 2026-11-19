@@ -50,6 +50,8 @@ class MinecraftClient(
     private val effectTable: EffectTable = EffectTable.EMPTY,
     /** Default item numbers (armour, durability): they are not sent with the stack. */
     private val itemStats: ItemStats = ItemStats.EMPTY,
+    /** Names for menu ids: the menu registry is built in as well. */
+    private val menuTable: MenuTable = MenuTable.EMPTY,
 ) {
 
     private enum class State { LOGIN, CONFIGURATION, PLAY }
@@ -64,7 +66,7 @@ class MinecraftClient(
 
         val connection = Connection(socket)
         return try {
-            Session(connection, handshakeAndLogin(connection), log, itemTable, effectTable, itemStats)
+            Session(connection, handshakeAndLogin(connection), log, itemTable, effectTable, itemStats, menuTable)
         } catch (t: Throwable) {
             connection.close()
             throw t

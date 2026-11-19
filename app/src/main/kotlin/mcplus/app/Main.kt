@@ -54,6 +54,7 @@ private fun dispatch(args: List<String>) {
         args[0] == "hotbar" -> hotbarCommand(args.drop(1))
         args[0] == "hud" -> hudCommand(args.drop(1))
         args[0] == "textures" -> texturesCommand(args.drop(1))
+        args[0] == "container" -> containerCommand(args.drop(1))
         args[0] == "click" -> clickCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
@@ -884,7 +885,19 @@ private fun resolveStoreFile(explicit: String?): java.io.File {
 // ---------------------------------------------------------------- window
 
 private fun windowCommand(args: List<String>) {
-    val options = parseLoginArgs(args) ?: return
+    // `--open x,y,z` — проверка контейнеров: правый клик по блоку на 30-м кадре.
+    var openAt: Triple<Int, Int, Int>? = null
+    val pass = ArrayList<String>(args.size)
+    var index = 0
+    while (index < args.size) {
+        if (args[index] == "--open") {
+            openAt = parsePosition(args.getOrNull(++index) ?: fail("--open требует x,y,z"))
+        } else {
+            pass += args[index]
+        }
+        index++
+    }
+    val options = parseLoginArgs(pass) ?: return
     val size = options.chunks.coerceIn(3, 21)
     val radius = (size - 1) / 2
     val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
@@ -922,6 +935,7 @@ private fun windowCommand(args: List<String>) {
             demo = options.demo,
             meshThreads = options.threads,
             replay = replay,
+            openAt = openAt,
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
@@ -1089,6 +1103,22 @@ private fun findItemStats(explicit: String? = null): mcplus.net.ItemStats {
     return mcplus.net.ItemStats.load(file)
 }
 
+/** Names for menu ids, generated with `tools/build-menu-table.js`. */
+private fun findMenuTable(explicit: String? = null): mcplus.net.MenuTable {
+    val candidates = buildList {
+        explicit?.let { add(java.io.File(it)) }
+        add(java.io.File("data/menus-777.tsv"))
+        add(java.io.File("../data/menus-777.tsv"))
+        add(java.io.File("../../data/menus-777.tsv"))
+    }
+    val file = candidates.firstOrNull { it.isFile }
+    if (file == null) {
+        System.err.println("Нет таблицы меню (data/menus-777.tsv): типы контейнеров будут номерами.")
+        return mcplus.net.MenuTable.EMPTY
+    }
+    return mcplus.net.MenuTable.load(file)
+}
+
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
     val account = if (options.online) loadAccount() else null
     val attempts = 3
@@ -1110,6 +1140,7 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session {
                 itemTable = findItemTable(),
                 effectTable = findEffectTable(),
                 itemStats = findItemStats(),
+                menuTable = findMenuTable(),
             ).join()
         } catch (e: ServerDisconnectException) {
             // The session server rate limits joins and propagates them lazily, so a fresh
@@ -1196,6 +1227,7 @@ private fun printUsage() {
           mcplus watch [host[:port]] [--seconds N]  наблюдать, какие сущности двигаются
           mcplus hud [host[:port]] [--seconds N]    здоровье, броня, эффекты и боссы (числа HUD)
           mcplus textures [блок]...                 какие текстуры игра ставит блоку
+          mcplus container --at x,y,z [--click N]   открыть сундук/верстак и показать слоты
           mcplus chunkdump [host[:port]]            сохранить сырые пакеты чанков
 
         Флаги:
@@ -1205,6 +1237,7 @@ private fun printUsage() {
           --chunks N     размер карты в чанках, по умолчанию 3 (48 блоков)
           --threads N    потоков на сборку мешей, по умолчанию все ядра минус одно
           --hidden       окно без рамки (для снимков)
+          --open x,y,z   (window) кликнуть правой кнопкой по блоку — проверка контейнеров
           --frames N     выйти после N кадров, сохранив снимок в --out
           --demo         самопроверка: ломает и ставит блок, идёт вперёд
           --seconds N    (watch) сколько секунд наблюдать, по умолчанию 20
@@ -1248,6 +1281,77 @@ private fun texturesCommand(args: List<String>) {
         fun texture(layer: Int) = atlas.namesByLayer.getOrNull(layer) ?: "слой $layer"
         println("  $block: верх ${texture(faces.top)}, низ ${texture(faces.bottom)}, бок ${texture(faces.side)}")
     }
+}
+
+/**
+ * Открывает контейнер у блока и печатает, что в нём лежит.
+ *
+ * Нужна для проверки без окна: правый клик по сундуку — это `Use Item On`, а ответ сервера —
+ * `Open Screen` и `Container Set Content`. `--click N` дополнительно кликает по слоту меню.
+ */
+private fun containerCommand(args: List<String>) {
+    var at: Triple<Int, Int, Int>? = null
+    var click: Int? = null
+    var seconds = 2
+    val rest = ArrayList<String>()
+    var index = 0
+    while (index < args.size) {
+        when (args[index]) {
+            "--at" -> at = parsePosition(args.getOrNull(++index) ?: fail("--at требует x,y,z"))
+            "--click" -> click = args.getOrNull(++index)?.toIntOrNull() ?: fail("--click требует номер слота")
+            "--seconds" -> seconds = args.getOrNull(++index)?.toIntOrNull() ?: fail("--seconds требует число")
+            else -> rest += args[index]
+        }
+        index++
+    }
+    val position = at ?: fail("--at обязателен: к какому блоку кликать")
+    val options = parseLoginArgs(rest) ?: return
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+
+    connect(host, port, options).use { open ->
+        // Без этого пакета сервер считает игрока ещё не загруженным и игнорирует
+        // взаимодействия с блоками — в том числе правый клик по сундуку.
+        open.send(mcplus.net.PlayerMovement.playerLoaded())
+        open.drain(300)
+        open.send(
+            BlockInteraction.useItemOn(
+                position.first, position.second, position.third, face = 1,
+                cursorX = 0.5f, cursorY = 0.5f, cursorZ = 0.5f, sequence = 1,
+            ),
+        )
+        open.drain(seconds * 1_000L)
+
+        val container = open.container ?: fail("Контейнер не открылся: сервер не прислал Open Screen")
+        println("Контейнер: ${container.type}, «${container.title}», слотов ${container.slotCount}")
+        printContainer(open, container)
+
+        if (click != null) {
+            open.clickSlot(click)
+            open.drain(1_500)
+            println("После клика по слоту $click:")
+            printContainer(open, container)
+        }
+        open.closeContainer()
+        open.drain(300)
+    }
+}
+
+private fun printContainer(session: Session, container: mcplus.net.OpenContainer) {
+    val inventory = session.inventory
+    if (container.contents().isEmpty()) {
+        println("  (пусто)")
+    } else {
+        for ((slot, stack) in container.contents()) {
+            val where = if (slot >= container.playerStart) {
+                if (slot < container.playerStart + 27) "инвентарь ${slot - container.playerStart}" else "хотбар ${slot - container.playerStart - 27}"
+            } else {
+                "контейнер $slot"
+            }
+            println("  $where: ${inventory.nameOf(stack) ?: "?"} × ${stack.count}")
+        }
+    }
+    val cursor = inventory.nameOf(container.carriedOrNull())
+    println("  курсор: ${cursor ?: "—"}")
 }
 
 private fun fail(message: String): Nothing {

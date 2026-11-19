@@ -28,6 +28,7 @@ class Session internal constructor(
     itemTable: ItemTable = ItemTable.EMPTY,
     effectTable: EffectTable = EffectTable.EMPTY,
     itemStats: ItemStats = ItemStats.EMPTY,
+    private val menuTable: MenuTable = MenuTable.EMPTY,
 ) : Closeable {
 
     var playerPosition: PlayerPosition? = null
@@ -68,6 +69,15 @@ class Session internal constructor(
 
     /** Эффекты на нашем игроке: зелья, маяк, зачарования. Иконки рисует HUD. */
     val effects: Effects = Effects(effectTable)
+
+    /**
+     * Открытый контейнер (сундук, верстак, печь) или null, если открыт только инвентарь.
+     *
+     * Меняется в потоке сети, читается кадром — поэтому volatile.
+     */
+    @Volatile
+    var container: OpenContainer? = null
+        private set
 
     /** Why the connection ended, or null while it is alive. */
     @Volatile
@@ -120,12 +130,23 @@ class Session internal constructor(
                 Protocol777.Play.PLAYER_INFO, Protocol777.Play.PLAYER_REMOVE ->
                     players.onPacket(packet.id, packet.body)
 
-                Protocol777.Play.CONTAINER_SET_CONTENT,
-                Protocol777.Play.CONTAINER_SET_SLOT,
                 Protocol777.Play.SET_PLAYER_INVENTORY,
-                Protocol777.Play.SET_CURSOR_ITEM,
                 Protocol777.Play.SET_HELD_SLOT ->
                     inventory.onPacket(packet.id, packet.body)
+
+                Protocol777.Play.CONTAINER_SET_CONTENT,
+                Protocol777.Play.CONTAINER_SET_SLOT,
+                Protocol777.Play.SET_CURSOR_ITEM,
+                Protocol777.Play.CONTAINER_SET_DATA ->
+                    routeMenuPacket(packet)
+
+                Protocol777.Play.OPEN_SCREEN ->
+                    container = readOpenScreen(packet.body, menuTable)
+
+                Protocol777.Play.CONTAINER_CLOSE -> {
+                    val id = ByteReader(packet.body).readVarInt()
+                    if (container?.id == id) container = null
+                }
 
                 Protocol777.Play.SET_HEALTH,
                 Protocol777.Play.SET_EXPERIENCE,
@@ -238,8 +259,51 @@ class Session internal constructor(
         menuSlot: Int,
         button: Int = 0,
         input: Int = ContainerInput.PICKUP,
+        containerId: Int = container?.id ?: 0,
     ) {
-        send(ContainerClicks.click(FORCE_FULL_STATE, menuSlot, button, input))
+        send(ContainerClicks.click(FORCE_FULL_STATE, menuSlot, button, input, containerId))
+    }
+
+    /** Закрывает открытый контейнер: сервер должен убрать окно и у себя. */
+    fun closeContainer() {
+        val open = container ?: return
+        container = null
+        send(
+            Packet(
+                Protocol777.Play.CONTAINER_CLOSE_SERVERBOUND,
+                ByteWriter().writeVarInt(open.id).toByteArray(),
+            ),
+        )
+    }
+
+    /**
+     * Разбирает пакеты меню: игрок всегда получает их для **текущего** окна, поэтому
+     * маршрут зависит от того, открыт ли контейнер, и от номера окна в пакете.
+     */
+    private fun routeMenuPacket(packet: Packet) {
+        val open = container
+        if (open == null) {
+            inventory.onPacket(packet.id, packet.body)
+            return
+        }
+        when (packet.id) {
+            Protocol777.Play.CONTAINER_SET_CONTENT -> {
+                val id = ByteReader(packet.body).readVarInt()
+                if (id == open.id) applyContainerContent(open, packet.body)
+                else inventory.onPacket(packet.id, packet.body)
+            }
+
+            Protocol777.Play.CONTAINER_SET_SLOT -> {
+                val id = ByteReader(packet.body).readVarInt()
+                if (id == open.id) applyContainerSlot(open, packet.body)
+                else inventory.onPacket(packet.id, packet.body)
+            }
+
+            Protocol777.Play.CONTAINER_SET_DATA -> applyContainerData(open, packet.body)
+
+            Protocol777.Play.SET_CURSOR_ITEM ->
+                open.putCarried(readMenuStackOrUnknown(ByteReader(packet.body)))
+        }
     }
 
     /**
