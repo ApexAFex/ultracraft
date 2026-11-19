@@ -304,9 +304,9 @@ class Hud(
             ) {
                 val name = inventory.nameOf(stack) ?: continue
                 hoveredName = if (max > 0 && stack.damage > 0) {
-                    "$name  ${max - stack.damage}/$max"
+                    "$name  ${max - stack.damage}/$max" + if (stack.count > 1) " ×${stack.count}" else ""
                 } else {
-                    name
+                    name + if (stack.count > 1) " ×${stack.count}" else ""
                 }
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
@@ -384,12 +384,19 @@ class Hud(
             ) {
                 val name = inventory.nameOf(stack) ?: continue
                 hovered = if (max > 0 && stack.damage > 0) {
-                    "$name  ${max - stack.damage}/$max"
+                    "$name  ${max - stack.damage}/$max" + if (stack.count > 1) " ×${stack.count}" else ""
                 } else {
-                    name
+                    name + if (stack.count > 1) " ×${stack.count}" else ""
                 }
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
+                // Рамка слота под курсором.
+                renderer.begin()
+                renderer.rect(px - slotPixels / 2, py - slotPixels / 2, slotPixels, 2f, 0xFFFFFF, 0.8f)
+                renderer.rect(px - slotPixels / 2, py + slotPixels / 2 - 2f, slotPixels, 2f, 0xFFFFFF, 0.8f)
+                renderer.rect(px - slotPixels / 2, py - slotPixels / 2, 2f, slotPixels, 0xFFFFFF, 0.8f)
+                renderer.rect(px + slotPixels / 2 - 2f, py - slotPixels / 2, 2f, slotPixels, 0xFFFFFF, 0.8f)
+                renderer.draw()
             }
         }
         if (labels.isNotEmpty()) text.drawScreen(labels)
@@ -443,6 +450,19 @@ class Hud(
         if (alpha <= 0.01f) return
         renderer.begin()
         renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0xFF0000, alpha * 0.35f)
+        renderer.draw()
+    }
+
+    /** Индикатор перезарядки удара под прицелом: заполняется от 0 до 1. */
+    fun drawAttackIndicator(fraction: Float) {
+        if (fraction >= 1f) return
+        val s = HudLayout.scale(height).toFloat()
+        val widthPx = 20f * s
+        val x = width / 2f - widthPx / 2f
+        val y = height / 2f + 10f * s
+        renderer.begin()
+        renderer.rect(x, y, widthPx, 2f * s, 0x101010, 0.7f)
+        renderer.rect(x, y, widthPx * fraction.coerceIn(0f, 1f), 2f * s, 0xFFFFFF, 0.9f)
         renderer.draw()
     }
 

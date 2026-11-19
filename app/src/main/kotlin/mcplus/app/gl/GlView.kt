@@ -624,6 +624,7 @@ object GlView {
                     var sprintDustNanos = 0L
                     var lightningUntilNanos = 0L
                     var nextCaveSoundNanos = 0L
+                    var lastAttackNanos = 0L
                     var cameraMode = cameraModeAtStart
                     var invMouseSlot = -1
                     var invDragging = false
@@ -1413,6 +1414,16 @@ object GlView {
                             dimension,
                         )
                         renderer.draw(camera)
+                        if (debug && GLFW.glfwGetKey(window, GLFW.GLFW_KEY_B) == GLFW.GLFW_PRESS) {
+                            for (entity in tracker.snapshot()) {
+                                val (boxWidth, boxHeight, boxDepth) = EntityRay.boxOf(entityTypes.nameOf(entity.type))
+                                renderer.drawWireBox(
+                                    camera,
+                                    entity.x - boxWidth / 2, entity.y, entity.z - boxDepth / 2,
+                                    entity.x + boxWidth / 2, entity.y + boxHeight, entity.z + boxDepth / 2,
+                                )
+                            }
+                        }
                         // F3+G — рамка текущего чанка.
                         if (debug && GLFW.glfwGetKey(window, GLFW.GLFW_KEY_G) == GLFW.GLFW_PRESS) {
                             renderer.drawChunkBorder(
@@ -1931,6 +1942,11 @@ object GlView {
                                     inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
                                     durability = session?.heldDurability(),
                                 )
+                                // Индикатор перезарядки удара.
+                                if (lastAttackNanos != 0L) {
+                                    val attackAge = (System.nanoTime() - lastAttackNanos) / 600_000_000.0
+                                    if (attackAge < 1.0) hud.drawAttackIndicator(attackAge.toFloat())
+                                }
 
                                 // Красная вспышка при уроне: гаснет за 0,4 секунды.
                                 if (damageFlashNanos != 0L) {
@@ -1978,6 +1994,9 @@ object GlView {
                                         kotlin.math.floor(player.z).toInt(),
                                     ),
                                     "Радиус сервера: ${session?.serverChunkRadius ?: -1} чанков",
+                                    "Сторона: " + listOf("юг", "запад", "север", "восток")[
+                                        ((kotlin.math.floor(camera.yaw / 90f + 0.5f).toInt() % 4) + 4) % 4
+                                        ],
                                 ),
                             )
                         }
@@ -2107,6 +2126,7 @@ object GlView {
                             } ?: Double.MAX_VALUE
                             if (hitId >= 0 && hitDistance < blockDistance) {
                                 session?.attack(hitId)
+                                lastAttackNanos = System.nanoTime()
                                 println("Удар по сущности id=$hitId (%.2f блока)".format(hitDistance))
                                 swingNanos = System.nanoTime()
                                 holdRequested = false
@@ -2134,6 +2154,7 @@ object GlView {
                                 val dz = nearest.z - camera.z
                                 if (dx * dx + dy * dy + dz * dz <= 12.25) {
                                     session?.attack(nearest.id)
+                                    lastAttackNanos = System.nanoTime()
                                     println("Демо: удар по сущности id=${nearest.id} ${entityTypes.nameOf(nearest.type)}")
                                 }
                             }
