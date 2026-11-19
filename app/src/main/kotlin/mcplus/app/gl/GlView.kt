@@ -142,6 +142,8 @@ object GlView {
         centerChunkZ: Int,
         radiusChunks: Int,
         captureAfterFrames: Int = 0,
+        /** Снять кадр через столько секунд после открытия окна (для снимков с чатом). */
+        captureAfterSeconds: Double? = null,
         captureTo: File? = null,
         width: Int = 1280,
         height: Int = 720,
@@ -163,6 +165,8 @@ object GlView {
         pauseAtStart: Boolean = false,
         /** Начать с вида от третьего лица (для снимка): 0 — от первого, 1 — сзади, 2 — спереди. */
         cameraModeAtStart: Int = 0,
+        /** Наклон камеры в градусах на старте: для снимков, где нужен ровный горизонт. */
+        pitchAtStart: Float? = null,
         /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
         /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
@@ -387,6 +391,9 @@ object GlView {
                     val dimension = session?.joinResult?.joinGame?.dimensionName
                         ?.substringAfterLast(':') ?: "overworld"
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
+                    if (pitchAtStart != null) {
+                        camera.pitch = Math.toRadians(pitchAtStart.toDouble()).toFloat()
+                    }
                     val input = Input(window, camera)
                     val chat = ChatInput()
 
@@ -589,6 +596,7 @@ object GlView {
                     val startedAt = System.currentTimeMillis()
                     var lastEntityCount = -1
                     var frame = 0
+                    val windowStartedAt = System.nanoTime()
                     var inventoryOpen = false
 
                     /** Кадров в секунду для отладочной строки. */
@@ -707,6 +715,19 @@ object GlView {
                         open.clickSlot(cell.menuSlot, button = button, input = action)
                         println("Клик по слоту ${cell.menuSlot}: кнопка $button${if (quick) ", shift" else ""}")
                     }
+
+                    /**
+                     * Насколько камера от третьего лица может отойти назад, не залезая в блок.
+                     */
+                    fun clearCameraDistance(
+                        originX: Double,
+                        originY: Double,
+                        originZ: Double,
+                        direction: FloatArray,
+                        max: Float,
+                    ): Float = CameraCollision.distance(
+                        world, blocks, originX, originY, originZ, direction, max,
+                    )
 
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
@@ -1388,10 +1409,21 @@ object GlView {
                             Player.EYE_HEIGHT - (if (sneakHeld) 0.15 else 0.0)
                         camera.z = previousZ + (player.z - previousZ) * alpha
 
-                        // F5: камера отъезжает назад (или вперёд и разворачивается).
+                        // F5: камера отъезжает назад (или вперёд и разворачивается). Стену
+                        // она не проходит: расстояние укорачивается до первого твёрдого блока.
                         if (cameraMode != 0) {
                             val direction = camera.forward()
-                            val offset = if (cameraMode == 1) -4.0f else 4.0f
+                            val sign = if (cameraMode == 1) -1f else 1f
+                            val ray = floatArrayOf(
+                                direction[0] * sign,
+                                direction[1] * sign,
+                                direction[2] * sign,
+                            )
+                            val allowed = clearCameraDistance(
+                                camera.x, camera.y + 0.3f, camera.z, ray,
+                                max = 4.0f,
+                            )
+                            val offset = sign * allowed
                             camera.x += direction[0] * offset
                             camera.y += direction[1] * offset + 0.3f
                             camera.z += direction[2] * offset
@@ -1967,24 +1999,34 @@ object GlView {
                             )
                         }
                         textRenderer?.draw(camera, labels)
-                        // Текст табличек: строки над самим блоком, мелким кеглем.
+                        // Текст табличек: строки над самим блоком, мелким кеглем. Надпись
+                        // сдвигается к камере на толщину доски (0.56), иначе она тонет
+                        // внутри доски и тест глубины режет буквы.
                         val signLabels = ArrayList<TextRenderer.Label>()
                         for (sign in session?.signs?.snapshot().orEmpty()) {
-                            val dx = sign.x + 0.5 - camera.x
-                            val dz = sign.z + 0.5 - camera.z
-                            if (dx * dx + dz * dz > 48.0 * 48.0) continue
+                            val dx = camera.x - (sign.x + 0.5)
+                            val dz = camera.z - (sign.z + 0.5)
+                            val dxz = sign.x + 0.5 - camera.x
+                            val dzz = sign.z + 0.5 - camera.z
+                            if (dxz * dxz + dzz * dzz > 48.0 * 48.0) continue
+                            val length = kotlin.math.sqrt(dx * dx + dz * dz).coerceAtLeast(0.001)
+                            val offsetX = (dx / length).toFloat() * 0.56f
+                            val offsetZ = (dz / length).toFloat() * 0.56f
                             sign.lines.forEachIndexed { index, line ->
                                 if (line.isBlank()) return@forEachIndexed
                                 signLabels += TextRenderer.Label(
-                                    sign.x + 0.5,
-                                    sign.y + 0.9 - index * 0.22,
-                                    sign.z + 0.5,
+                                    sign.x + 0.5 + offsetX,
+                                    sign.y + 0.9 - index * 0.12,
+                                    sign.z + 0.5 + offsetZ,
                                     line,
                                 )
                             }
                         }
                         if (signLabels.isNotEmpty()) {
-                            textRenderer?.draw(camera, signLabels, scaleOverride = 0.02f)
+                            textRenderer?.draw(
+                                camera, signLabels, scaleOverride = 0.02f,
+                                plates = false, depthTest = true,
+                            )
                         }
                         if (target != null && !inventoryOpen && openContainer == null) {
                             renderer.drawOutline(camera, target.x, target.y, target.z)
@@ -2099,6 +2141,9 @@ object GlView {
                                 hud.drawChat(chatLines, System.nanoTime(), chatScroll)
                                 hud.drawChatInput(chat.text)
                             } else if (!hudHidden) {
+                                // Строки чата видны и без открытой строки ввода: раньше они
+                                // рисовались только пока печатаешь.
+                                hud.drawChat(chatLines, System.nanoTime(), chatScroll)
                                 hud.draw(
                                     inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
                                     durability = session?.heldDurability(),
@@ -2391,7 +2436,10 @@ object GlView {
                         rightWasDown = rightDown
                         middleWasDown = middleDown
 
-                        if (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames) {
+                        val elapsedSeconds = (System.nanoTime() - windowStartedAt) / 1_000_000_000.0
+                        val captureNow = (captureAfterSeconds != null && elapsedSeconds >= captureAfterSeconds) ||
+                            (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames)
+                        if (captureNow) {
                             // Self-test: report what the walk animation saw, so a screenshot can be
                             // checked against numbers instead of guesswork.
                             val subject = players.minByOrNull { player ->

@@ -94,8 +94,13 @@ object MeshBuilder {
                     shape == null ->
                         emitBox(target, world, blocks, atlas, x, y, z, FULL_CUBE, name, null, tint)
 
-                    else -> for (box in boxesOf(shape)) {
-                        emitBox(target, world, blocks, atlas, x, y, z, box, name, shape, tint)
+                    else -> {
+                        // У таблички и знамени нет своей текстуры в атласе блоков: доска
+                        // берёт доски своей породы, полотнище — шерсть своего цвета.
+                        val texture = textureForShape(name, shape)
+                        for (box in boxesOf(shape)) {
+                            emitBox(target, world, blocks, atlas, x, y, z, box, texture, shape, tint)
+                        }
                     }
                 }
             }
@@ -170,6 +175,31 @@ object MeshBuilder {
         }
 
         BlockShape.Carpet -> listOf(Box(0f, 0f, 0f, 1f, 1f / 16f, 1f))
+
+        is BlockShape.Sign -> {
+            val wall = shape.wall
+            if (wall != null) {
+                // Настенная: доска толщиной 2/16 на стене, от 4/16 до 12/16 по высоте.
+                listOf(wallPanel(wall, 2f / 16f, 4f / 16f, 12f / 16f))
+            } else {
+                listOf(
+                    Box(7f / 16f, 0f, 7f / 16f, 9f / 16f, 6f / 16f, 9f / 16f),
+                    Box(1f / 16f, 6f / 16f, 7f / 16f, 15f / 16f, 1f, 9f / 16f),
+                )
+            }
+        }
+
+        is BlockShape.Banner -> {
+            val wall = shape.wall
+            if (wall != null) {
+                listOf(wallPanel(wall, 2f / 16f, 2f / 16f, 1f))
+            } else {
+                listOf(
+                    Box(7f / 16f, 0f, 7f / 16f, 9f / 16f, 1f, 9f / 16f),
+                    Box(1f / 16f, 2f / 16f, 7f / 16f, 15f / 16f, 1f, 9f / 16f),
+                )
+            }
+        }
 
         is BlockShape.SnowLayers -> {
             val height = (shape.layers * 2f / 16f).coerceAtMost(1f)
@@ -272,6 +302,33 @@ object MeshBuilder {
             ShapeDirection.WEST -> Box(0f, 0f, 0f, thickness, 1f, 1f)
             ShapeDirection.EAST -> Box(1f - thickness, 0f, 0f, 1f, 1f, 1f)
         }
+    }
+
+    /** Панель у стены [facing] заданной толщины и высоты: доска таблички или знамя. */
+    private fun wallPanel(
+        facing: ShapeDirection,
+        thickness: Float,
+        y0: Float,
+        y1: Float,
+    ): Box = when (facing) {
+        ShapeDirection.NORTH -> Box(0f, y0, 0f, 1f, y1, thickness)
+        ShapeDirection.SOUTH -> Box(0f, y0, 1f - thickness, 1f, y1, 1f)
+        ShapeDirection.WEST -> Box(0f, y0, 0f, thickness, y1, 1f)
+        ShapeDirection.EAST -> Box(1f - thickness, y0, 0f, 1f, y1, 1f)
+    }
+
+    /** Чем рисовать табличку или знамя, если своей текстуры у блока нет. */
+    private fun textureForShape(name: String, shape: BlockShape): String = when (shape) {
+        is BlockShape.Sign -> name
+            .removeSuffix("_wall_sign")
+            .removeSuffix("_hanging_sign")
+            .removeSuffix("_sign") + "_planks"
+
+        is BlockShape.Banner -> name
+            .removeSuffix("_wall_banner")
+            .removeSuffix("_banner") + "_wool"
+
+        else -> name
     }
 
     private fun rotateClockwise(facing: ShapeDirection): ShapeDirection = when (facing) {

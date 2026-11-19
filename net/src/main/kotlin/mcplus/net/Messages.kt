@@ -214,6 +214,117 @@ private val DISCONNECT_REASONS = mapOf(
     "multiplayer.disconnect.too_many_pending_chats" to "слишком много неподтверждённых сообщений",
 )
 
+/** Цвет по умолчанию: белый, как у компонента без `color`. */
+internal const val TEXT_WHITE = 0xFFFFFF
+
+/** Кусок текста одного цвета. */
+data class StyledRun(val text: String, val color: Int)
+
+/**
+ * Текст компонента с цветом каждого куска: им рисуются чат и табло.
+ *
+ * Цвет приходит либо полем `color` (`red`, `#12AB34`), либо кодами `§c` прямо в строке.
+ * Жирность, курсив и нажатия пока не разбираются — только цвет.
+ */
+class StyledText(val runs: List<StyledRun>) {
+
+    val text: String = runs.joinToString("") { it.text }
+
+    operator fun plus(other: StyledText): StyledText = StyledText(runs + other.runs)
+
+    companion object {
+        val EMPTY = StyledText(emptyList())
+
+        fun plain(value: String): StyledText = StyledText(listOf(StyledRun(value, TEXT_WHITE)))
+    }
+}
+
+/** Коды `§0`…`§f`, `§r` — сброс к белому. Неизвестный код просто пропускается. */
+fun stringRuns(value: String, inherited: Int = TEXT_WHITE): List<StyledRun> {
+    if (value.isEmpty()) return emptyList()
+    val runs = ArrayList<StyledRun>()
+    val current = StringBuilder()
+    var color = inherited
+    var index = 0
+    while (index < value.length) {
+        val char = value[index]
+        if (char == '§' && index + 1 < value.length) {
+            val code = value[index + 1].lowercaseChar()
+            val next = LEGACY_COLORS[code]
+            if (next != null || code == 'r') {
+                if (current.isNotEmpty()) {
+                    runs += StyledRun(current.toString(), color)
+                    current.clear()
+                }
+                color = if (code == 'r') TEXT_WHITE else next!!
+                index += 2
+                continue
+            }
+            // Неизвестный код (жирность, курсив) просто выкидываем вместе с §.
+            index += 2
+            continue
+        }
+        current.append(char)
+        index++
+    }
+    if (current.isNotEmpty()) runs += StyledRun(current.toString(), color)
+    return runs
+}
+
+/** Цвета компонента по имени или `#RRGGBB`; неизвестное имя — белый. */
+fun colorOf(value: String?, inherited: Int = TEXT_WHITE): Int {
+    if (value == null) return inherited
+    val named = COLOR_NAMES[value.lowercase()]
+    if (named != null) return named
+    if (value.startsWith("#") && value.length == 7) {
+        return value.substring(1).toIntOrNull(16) ?: inherited
+    }
+    return inherited
+}
+
+private val COLOR_NAMES = mapOf(
+    "black" to 0x000000, "dark_blue" to 0x0000AA, "dark_green" to 0x00AA00,
+    "dark_aqua" to 0x00AAAA, "dark_red" to 0xAA0000, "dark_purple" to 0xAA00AA,
+    "gold" to 0xFFAA00, "gray" to 0xAAAAAA, "dark_gray" to 0x555555,
+    "blue" to 0x5555FF, "green" to 0x55FF55, "aqua" to 0x55FFFF,
+    "red" to 0xFF5555, "light_purple" to 0xFF55FF, "yellow" to 0xFFFF55,
+    "white" to 0xFFFFFF,
+)
+
+private val LEGACY_COLORS = mapOf(
+    '0' to 0x000000, '1' to 0x0000AA, '2' to 0x00AA00, '3' to 0x00AAAA,
+    '4' to 0xAA0000, '5' to 0xAA00AA, '6' to 0xFFAA00, '7' to 0xAAAAAA,
+    '8' to 0x555555, '9' to 0x5555FF, 'a' to 0x55FF55, 'b' to 0x55FFFF,
+    'c' to 0xFF5555, 'd' to 0xFF55FF, 'e' to 0xFFFF55, 'f' to 0xFFFFFF,
+)
+
+/** Куски текста компонента с учётом наследования цвета от родителей к `extra`. */
+fun componentRuns(tag: NbtTag, inherited: Int = TEXT_WHITE): List<StyledRun> = when (tag) {
+    is NbtString -> stringRuns(tag.value, inherited)
+
+    is NbtCompound -> {
+        val color = colorOf(tag.string("color"), inherited)
+        val extra = tag.list("extra")?.flatMap { componentRuns(it, color) }.orEmpty()
+        val own = when {
+            tag.string("text") != null -> stringRuns(tag.string("text")!!, color)
+            tag.entries[""] != null -> componentRuns(tag.entries[""]!!, color)
+            tag.string("translate") != null ->
+                stringRuns(translateKey(tag.string("translate")!!, translateArgs(tag)), color)
+            else -> emptyList()
+        }
+        own + extra
+    }
+
+    is NbtList -> tag.items.flatMap { componentRuns(it, inherited) }
+    is NbtByte -> stringRuns(tag.value.toString(), inherited)
+    is NbtShort -> stringRuns(tag.value.toString(), inherited)
+    is NbtInt -> stringRuns(tag.value.toString(), inherited)
+    is NbtLong -> stringRuns(tag.value.toString(), inherited)
+    is NbtFloat -> stringRuns(tag.value.toString(), inherited)
+    is NbtDouble -> stringRuns(tag.value.toString(), inherited)
+    else -> emptyList()
+}
+
 /**
  * Текст текстового компонента в NBT: `text`, `translate` (с аргументами `with`/`args`) и
  * `extra`. Цвет и стиль не разбираются: HUD рисует строки одним цветом.

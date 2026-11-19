@@ -6,7 +6,12 @@ import mcplus.protocol.nbt.NbtReader
 import java.util.UUID
 
 /** Одна строка чата: текст и время получения (по нему считается затухание). */
-data class ChatLine(val text: String, val atNanos: Long)
+data class ChatLine(
+    val text: String,
+    val atNanos: Long,
+    /** Цвет каждого куска; пустой список — рисовать белым. */
+    val runs: List<StyledRun> = emptyList(),
+)
 
 /**
  * История чата: последние [capacity] строк.
@@ -20,10 +25,14 @@ class ChatLog(private val capacity: Int = 200) {
     val size: Int get() = synchronized(lines) { lines.size }
 
     fun add(text: String, atNanos: Long = System.nanoTime()) {
-        val clean = text.trim()
+        add(StyledText.plain(text), atNanos)
+    }
+
+    fun add(styled: StyledText, atNanos: Long = System.nanoTime()) {
+        val clean = styled.text.trim()
         if (clean.isEmpty()) return
         synchronized(lines) {
-            lines.addLast(ChatLine(clean, atNanos))
+            lines.addLast(ChatLine(clean, atNanos, styled.runs))
             while (lines.size > capacity) lines.removeFirst()
         }
     }
@@ -45,6 +54,20 @@ internal fun readSystemChat(body: ByteArray): String? {
     val overlay = reader.remaining > 0 && reader.readBoolean()
     if (overlay) return null
     return componentText(tag).trim().ifEmpty { null }
+}
+
+/**
+ * `System Chat` с цветами: текст и куски по цветам. Строку над хотбаром (`overlay`)
+ * по-прежнему отдаёт отдельный пакет, поэтому здесь она отбрасывается.
+ */
+internal fun readSystemChatStyled(body: ByteArray): StyledText? {
+    val reader = ByteReader(body)
+    val tag = NbtReader.read(reader)
+    val overlay = reader.remaining > 0 && reader.readBoolean()
+    if (overlay) return null
+    val runs = componentRuns(tag)
+    if (runs.isEmpty()) return null
+    return StyledText(runs)
 }
 
 /**

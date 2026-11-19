@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class Scoreboard {
 
-    private class Objective(val name: String, var title: String, var renderType: Int)
+    private class Objective(val name: String, var title: StyledText, var renderType: Int)
 
     private val objectives = ConcurrentHashMap<String, Objective>()
 
@@ -23,6 +23,9 @@ class Scoreboard {
         private set
 
     private val scores = ConcurrentHashMap<String, ConcurrentHashMap<String, Int>>()
+
+    /** Своё имя очка (компонент в `Set Score`), если сервер его прислал. */
+    private val displayNames = ConcurrentHashMap<String, ConcurrentHashMap<String, StyledText>>()
 
     fun onPacket(packetId: Int, body: ByteArray): Boolean = when (packetId) {
         Protocol777.Play.SET_OBJECTIVE -> {
@@ -52,8 +55,10 @@ class Scoreboard {
                 val objective = reader.readString()
                 if (objective.isEmpty()) {
                     for (map in scores.values) map.remove(entity)
+                    for (map in displayNames.values) map.remove(entity)
                 } else {
                     scores[objective]?.remove(entity)
+                    displayNames[objective]?.remove(entity)
                 }
             }
             true
@@ -72,7 +77,7 @@ class Scoreboard {
             if (sidebar == name) sidebar = null
             return
         }
-        val title = componentText(NbtReader.read(reader))
+        val title = StyledText(componentRuns(NbtReader.read(reader)))
         val renderType = reader.readVarInt()
         // Необязательный числовой формат: его кодек не разбираем, но флаг дочитываем.
         if (reader.remaining > 0 && reader.readBoolean()) return
@@ -85,25 +90,29 @@ class Scoreboard {
         val objective = reader.readString()
         val value = reader.readVarInt()
         if (reader.remaining > 0 && reader.readBoolean()) {
-            // Своё имя очка: компонент читаем, чтобы не сдвинуть поток.
-            NbtReader.read(reader)
+            // Своё имя очка: компонент читаем, чтобы не сдвинуть поток, и запоминаем цвет.
+            val display = StyledText(componentRuns(NbtReader.read(reader)))
+            displayNames.getOrPut(objective) { ConcurrentHashMap() }[entity] = display
         }
         if (reader.remaining > 0 && reader.readBoolean()) return
         scores.getOrPut(objective) { ConcurrentHashMap() }[entity] = value
     }
 
     /** Строки боковой панели: заголовок и пары «имя — очки», по убыванию очков. */
-    fun sidebarLines(limit: Int = 15): Pair<String, List<Pair<String, Int>>>? {
+    fun sidebarLines(limit: Int = 15): Pair<StyledText, List<Pair<StyledText, Int>>>? {
         val objectiveName = sidebar ?: return null
         val objective = objectives[objectiveName] ?: return null
+        val names = displayNames[objectiveName]
         val entries = scores[objectiveName]?.entries
             ?.sortedByDescending { it.value }
             ?.take(limit)
-            ?.map { it.key to it.value }
+            ?.map { (entity, value) ->
+                (names?.get(entity) ?: StyledText(stringRuns(entity))) to value
+            }
             ?: emptyList()
         if (entries.isEmpty()) return null
         return objective.title to entries
     }
 
-    fun objectiveTitle(name: String): String? = objectives[name]?.title
+    fun objectiveTitle(name: String): String? = objectives[name]?.title?.text
 }

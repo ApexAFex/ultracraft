@@ -192,12 +192,12 @@ class Session internal constructor(
                     effects.onPacket(packet.id, packet.body, joinResult.joinGame.entityId)
 
                 Protocol777.Play.SYSTEM_CHAT ->
-                    readSystemChat(packet.body)?.let { chat.add(it) }
+                    readSystemChatStyled(packet.body)?.let { chat.add(it) }
 
                 Protocol777.Play.PLAYER_CHAT ->
                     readPlayerChat(packet.body)?.let { (sender, text) ->
                         val name = players.nameOf(sender) ?: sender.toString().take(8)
-                        chat.add("<$name> $text")
+                        chat.add(StyledText.plain("<$name> ") + StyledText(stringRuns(text)))
                     }
 
                 Protocol777.Play.SET_TIME, Protocol777.Play.GAME_EVENT ->

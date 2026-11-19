@@ -5,6 +5,8 @@ import mcplus.net.BossBar
 import mcplus.net.ChatLine
 import mcplus.net.Inventory
 import mcplus.net.ItemStats
+import mcplus.net.StyledRun
+import mcplus.net.StyledText
 import mcplus.net.Vitals
 import java.io.Closeable
 import kotlin.math.abs
@@ -108,14 +110,21 @@ class Hud(
     fun respawnButton(): HudRect = HudLayout.respawnButton(width, height)
 
     /** Боковая панель табло: заголовок и строки «имя — очки» справа сверху. */
-    fun drawScoreboard(title: String, entries: List<Pair<String, Int>>) {
+    fun drawScoreboard(title: StyledText, entries: List<Pair<StyledText, Int>>) {
         val text = this.text ?: return
         if (entries.isEmpty()) return
         val s = HudLayout.scale(height).toFloat()
         val labels = ArrayList<TextRenderer.ScreenLabel>()
-        val titleWidth = text.textWidth(title, s)
-        val rows = entries.map { (name, value) -> "$name  $value" }
-        val widest = maxOf(titleWidth, rows.maxOf { text.textWidth(it, s) })
+
+        fun widthOf(value: StyledText): Float =
+            value.runs.sumOf { text.textWidth(it.text, s).toDouble() }.toFloat()
+
+        val rows = entries.map { (name, value) -> name to "  $value" }
+        val titleWidth = widthOf(title)
+        val widest = maxOf(
+            titleWidth,
+            rows.maxOf { (name, value) -> widthOf(name) + text.textWidth(value, s) },
+        )
         val right = width - 4f * s
         val left = right - widest - 6f * s
         var y = height * 0.08f
@@ -123,10 +132,28 @@ class Hud(
         renderer.begin()
         renderer.rect(left - 3f * s, y - 2f * s, widest + 10f * s, (rows.size + 1) * 10f * s + 4f * s, 0x000000, 0.45f)
         renderer.draw()
-        labels += TextRenderer.ScreenLabel(left, y, title, s)
+
+        /** Кладёт куски строки подряд, начиная с [startX], и возвращает конец. */
+        fun emit(styled: StyledText, startX: Float, rowY: Float, fallback: Int = 0xFFFFFF): Float {
+            var pen = startX
+            for (run in styled.runs) {
+                labels += TextRenderer.ScreenLabel(pen, rowY, run.text, s, run.color)
+                pen += text.textWidth(run.text, s)
+            }
+            if (styled.runs.isEmpty()) {
+                labels += TextRenderer.ScreenLabel(pen, rowY, styled.text, s, fallback)
+                pen += text.textWidth(styled.text, s)
+            }
+            return pen
+        }
+
+        emit(title, left, y)
         y += 10f * s
-        for (row in rows) {
-            labels += TextRenderer.ScreenLabel(left, y, row, s)
+        for ((name, value) in rows) {
+            val end = emit(name, left, y)
+            // Число красим цветом последнего куска имени: так подписи не пестрят.
+            val color = name.runs.lastOrNull()?.color ?: 0xFFFFFF
+            labels += TextRenderer.ScreenLabel(end, y, value, s, color)
             y += 10f * s
         }
         text.drawScreen(labels)
@@ -510,16 +537,74 @@ class Hud(
             if (drawn++ >= CHAT_LINES) break
             val alpha = chatAlpha(line.atNanos, nowNanos)
             if (alpha <= 0.01f) continue
-            for (part in wrap(line.text, maxWidth, s).asReversed()) {
-                val lineWidth = text.textWidth(part, s)
+            val wrapped = wrapStyled(styledChars(line), maxWidth, s).asReversed()
+            for (runs in wrapped) {
+                val lineWidth = runs.sumOf { text.textWidth(it.text, s).toDouble() }.toFloat()
                 renderer.begin()
                 renderer.rect(bar.x - 2f * s, y - s, lineWidth + 6f * s, 10f * s, 0x000000, 0.32f * alpha)
                 renderer.draw()
-                text.drawScreen(listOf(TextRenderer.ScreenLabel(bar.x, y, part, s)), alpha = alpha)
+                var pen = bar.x
+                val labels = ArrayList<TextRenderer.ScreenLabel>(runs.size)
+                for (run in runs) {
+                    labels += TextRenderer.ScreenLabel(pen, y, run.text, s, run.color)
+                    pen += text.textWidth(run.text, s)
+                }
+                text.drawScreen(labels, alpha = alpha)
                 y -= 10f * s
                 if (y < 0f) return
             }
         }
+    }
+
+    /** Символы строки чата вместе с их цветом; без кусков — всё белое. */
+    private fun styledChars(line: ChatLine): List<Pair<Char, Int>> {
+        if (line.runs.isEmpty()) return line.text.map { it to 0xFFFFFF }
+        return line.runs.flatMap { run -> run.text.map { it to run.color } }
+    }
+
+    /**
+     * Перенос цветной строки по словам: ширина считается по символам, а цвет едет вместе
+     * с буквой, поэтому куски одного цвета склеиваются обратно уже на готовой строке.
+     */
+    private fun wrapStyled(
+        chars: List<Pair<Char, Int>>,
+        maxWidth: Float,
+        scale: Float,
+    ): List<List<StyledRun>> {
+        val text = this.text ?: return listOf(chars.toRuns())
+        val lines = ArrayList<List<StyledRun>>()
+        var current = ArrayList<Pair<Char, Int>>()
+        var lastSpace = -1
+        for (entry in chars) {
+            current += entry
+            if (entry.first == ' ') lastSpace = current.size - 1
+            if (current.size > 1 && text.textWidth(current.joinToString("") { it.first.toString() }, scale) > maxWidth) {
+                val breakAt = if (lastSpace > 0) lastSpace else current.size - 1
+                if (breakAt > 0) lines += current.subList(0, breakAt).toRuns()
+                val tailStart = if (lastSpace > 0) breakAt + 1 else breakAt
+                current = ArrayList(current.subList(minOf(tailStart, current.size), current.size))
+                lastSpace = current.indexOfLast { it.first == ' ' }
+            }
+        }
+        if (current.isNotEmpty()) lines += current.toRuns()
+        return lines
+    }
+
+    /** Склеивает соседние символы одного цвета обратно в куски. */
+    private fun List<Pair<Char, Int>>.toRuns(): List<StyledRun> {
+        val runs = ArrayList<StyledRun>()
+        val current = StringBuilder()
+        var color = 0xFFFFFF
+        for ((char, charColor) in this) {
+            if (current.isNotEmpty() && charColor != color) {
+                runs += StyledRun(current.toString(), color)
+                current.clear()
+            }
+            color = charColor
+            current.append(char)
+        }
+        if (current.isNotEmpty()) runs += StyledRun(current.toString(), color)
+        return runs
     }
 
     /** Строка ввода чата: тёмная полоса внизу экрана и текст с курсором. */
@@ -539,29 +624,6 @@ class Hud(
             age > CHAT_VISIBLE_SECONDS + CHAT_FADE_SECONDS -> 0f
             else -> ((CHAT_VISIBLE_SECONDS + CHAT_FADE_SECONDS - age) / CHAT_FADE_SECONDS).toFloat()
         }
-    }
-
-    /** Перенос длинной строки по словам; слово длиннее строки режется по символам. */
-    private fun wrap(value: String, maxWidth: Float, scale: Float): List<String> {
-        val text = this.text ?: return listOf(value)
-        val lines = ArrayList<String>()
-        var current = StringBuilder()
-        for (word in value.split(' ')) {
-            val candidate = if (current.isEmpty()) word else "$current $word"
-            if (current.isNotEmpty() && text.textWidth(candidate, scale) > maxWidth) {
-                lines += current.toString()
-                current = StringBuilder(word)
-            } else {
-                current = StringBuilder(candidate)
-            }
-            while (current.length > 1 && text.textWidth(current.toString(), scale) > maxWidth) {
-                val cut = current.length / 2
-                lines += current.substring(0, cut)
-                current = StringBuilder(current.substring(cut))
-            }
-        }
-        if (current.isNotEmpty()) lines += current.toString()
-        return lines
     }
 
     private fun drawHotbar(inventory: Inventory?, s: Float) {

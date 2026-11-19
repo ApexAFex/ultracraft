@@ -80,6 +80,15 @@ sealed interface BlockShape {
     /** Высота связи стены: нет, низкая (14/16) или в полный рост. */
     enum class WallSide { NONE, LOW, TALL }
 
+    /**
+     * Табличка: стоящая на полу (столб и доска) или настенная ([wall] — сторона стены).
+     * Текст таблички приходит отдельно, в блок-сущности, и рисуется поверх.
+     */
+    data class Sign(val wall: ShapeDirection? = null) : BlockShape
+
+    /** Знамёна: полотнище на столбе или у стены ([wall]); цвет даёт шерсть из имени. */
+    data class Banner(val wall: ShapeDirection? = null) : BlockShape
+
     companion object {
         /**
          * @param name имя блока без `minecraft:` (`oak_stairs`).
@@ -146,6 +155,18 @@ sealed interface BlockShape {
                     Torch(ShapeDirection.byName(values["facing"]) ?: ShapeDirection.NORTH)
 
                 name in CROSS_PLANTS -> Cross(crossTexture(name, values["half"]), name in TINTED_PLANTS)
+
+                // Таблички и знамёна: доска у стены или столб с доской. Наклон стоящей
+                // таблички (16 поворотов) пока не учитывается — доска смотрит на юг.
+                name.endsWith("_wall_sign") ->
+                    Sign(ShapeDirection.byName(values["facing"]) ?: ShapeDirection.NORTH)
+
+                name.endsWith("_sign") -> Sign()
+
+                name.endsWith("_wall_banner") ->
+                    Banner(ShapeDirection.byName(values["facing"]) ?: ShapeDirection.NORTH)
+
+                name.endsWith("_banner") -> Banner()
 
                 else -> null
             }

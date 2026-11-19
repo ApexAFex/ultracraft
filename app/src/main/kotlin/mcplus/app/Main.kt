@@ -893,6 +893,8 @@ private fun windowCommand(args: List<String>) {
     var particleDemo = false
     var pauseAtStart = false
     var cameraModeAtStart = 0
+    var pitchAtStart: Float? = null
+    var captureAfterSeconds: Double? = null
     val pass = ArrayList<String>(args.size)
     var index = 0
     while (index < args.size) {
@@ -903,6 +905,10 @@ private fun windowCommand(args: List<String>) {
             "--particles" -> particleDemo = true
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
+            "--pitch" -> pitchAtStart =
+                args.getOrNull(++index)?.toFloatOrNull() ?: fail("--pitch ждёт число градусов")
+            "--after" -> captureAfterSeconds =
+                args.getOrNull(++index)?.toDoubleOrNull() ?: fail("--after ждёт число секунд")
             else -> pass += args[index]
         }
         index++
@@ -951,6 +957,8 @@ private fun windowCommand(args: List<String>) {
             particleDemo = particleDemo,
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
+            pitchAtStart = pitchAtStart,
+            captureAfterSeconds = captureAfterSeconds,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
             particleTable = findParticleTable(),

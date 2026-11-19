@@ -41,7 +41,15 @@ class TextRenderer(
      * @param scaleOverride glyph size in blocks per font pixel. Nicknames use the default;
      *   the hotbar label sits much closer to the eye and needs smaller glyphs to look right.
      */
-    fun draw(camera: Camera, labels: List<Label>, scaleOverride: Float? = null) {
+    fun draw(
+        camera: Camera,
+        labels: List<Label>,
+        scaleOverride: Float? = null,
+        /** Тёмная плашка под надписью: нужна никнеймам, но не тексту таблички. */
+        plates: Boolean = true,
+        /** Текст таблички прячется за блоками, никнеймы — нет. */
+        depthTest: Boolean = false,
+    ) {
         if (labels.isEmpty()) return
         val scale = scaleOverride ?: this.scale
         val padding = this.padding * (scale / this.scale)
@@ -56,12 +64,14 @@ class TextRenderer(
             val textWidth = font.textWidth(label.text) * scale
             val left = -textWidth / 2f
 
-            addQuad(
-                plate, label, right, up,
-                left - padding, -padding,
-                left + textWidth + padding, heightBlocks + padding,
-                UV_ZERO,
-            )
+            if (plates) {
+                addQuad(
+                    plate, label, right, up,
+                    left - padding, -padding,
+                    left + textWidth + padding, heightBlocks + padding,
+                    UV_ZERO,
+                )
+            }
 
             var pen = left
             for (char in label.text) {
@@ -90,11 +100,15 @@ class TextRenderer(
         GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
         GL30.glBindVertexArray(vao)
 
-        GL30.glDisable(GL30.GL_DEPTH_TEST)
+        if (depthTest) {
+            GL30.glEnable(GL30.GL_DEPTH_TEST)
+        } else {
+            GL30.glDisable(GL30.GL_DEPTH_TEST)
+        }
         GL30.glEnable(GL30.GL_BLEND)
         GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
 
-        drawArray(plate.toArray(), 0.05f, 0.05f, 0.05f, 0.45f, textured = false)
+        if (plates) drawArray(plate.toArray(), 0.05f, 0.05f, 0.05f, 0.45f, textured = false)
         drawArray(glyphs.toArray(), 1f, 1f, 1f, 1f, textured = true)
 
         GL30.glDisable(GL30.GL_BLEND)
@@ -160,7 +174,14 @@ class TextRenderer(
     }
 
     /** Подпись в пикселях экрана: (x, y) — левый верхний угол, scale — пикселей на пиксель шрифта. */
-    data class ScreenLabel(val x: Float, val y: Float, val text: String, val scale: Float)
+    data class ScreenLabel(
+        val x: Float,
+        val y: Float,
+        val text: String,
+        val scale: Float,
+        /** Цвет букв, 0xRRGGBB. Белый по умолчанию. */
+        val color: Int = 0xFFFFFF,
+    )
 
     /** Ширина строки в пикселях экрана при данном масштабе. */
     fun textWidth(text: String, scale: Float): Float = font.textWidth(text) * scale
@@ -169,27 +190,11 @@ class TextRenderer(
      * Текст HUD: тот же шрифт игры, но плоский и поверх сцены.
      *
      * Тень рисуется отдельным проходом со сдвигом в один пиксель шрифта — как в ванили:
-     * белые буквы на светлом небе без неё не читаются.
+     * белые буквы на светлом небе без неё не читаются. Подписи разных цветов идут
+     * отдельными проходами, иначе одна строка покрасила бы весь список.
      */
     fun drawScreen(labels: List<ScreenLabel>, alpha: Float = 1f) {
         if (labels.isEmpty()) return
-        var characters = 0
-        for (label in labels) characters += label.text.length
-        val glyphs = FloatArrayBuilder(characters * 6 * 5)
-        val shadows = FloatArrayBuilder(characters * 6 * 5)
-
-        for (label in labels) {
-            var pen = label.x
-            val glyphHeight = GLYPH_PIXELS * label.scale
-            for (char in label.text) {
-                val glyphWidth = font.glyphWidth(char) * label.scale
-                if (glyphWidth > 0f) {
-                    emitScreen(shadows, pen + label.scale, label.y + label.scale, glyphWidth, glyphHeight, font.uv(char))
-                    emitScreen(glyphs, pen, label.y, glyphWidth, glyphHeight, font.uv(char))
-                }
-                pen += font.advance(char) * label.scale
-            }
-        }
 
         GL30.glUseProgram(program)
         GL30.glUniformMatrix4fv(viewProjLocation, false, ortho(width.toFloat(), height.toFloat()))
@@ -203,8 +208,37 @@ class TextRenderer(
         GL30.glEnable(GL30.GL_BLEND)
         GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
 
-        drawArray(shadows.toArray(), 0.25f, 0.25f, 0.25f, alpha, textured = true)
-        drawArray(glyphs.toArray(), 1f, 1f, 1f, alpha, textured = true)
+        var start = 0
+        while (start < labels.size) {
+            val color = labels[start].color
+            var end = start
+            while (end < labels.size && labels[end].color == color) end++
+            val run = labels.subList(start, end)
+
+            var characters = 0
+            for (label in run) characters += label.text.length
+            val glyphs = FloatArrayBuilder(characters * 6 * 5)
+            val shadows = FloatArrayBuilder(characters * 6 * 5)
+            for (label in run) {
+                var pen = label.x
+                val glyphHeight = GLYPH_PIXELS * label.scale
+                for (char in label.text) {
+                    val glyphWidth = font.glyphWidth(char) * label.scale
+                    if (glyphWidth > 0f) {
+                        emitScreen(shadows, pen + label.scale, label.y + label.scale, glyphWidth, glyphHeight, font.uv(char))
+                        emitScreen(glyphs, pen, label.y, glyphWidth, glyphHeight, font.uv(char))
+                    }
+                    pen += font.advance(char) * label.scale
+                }
+            }
+
+            val red = ((color shr 16) and 0xFF) / 255f
+            val green = ((color shr 8) and 0xFF) / 255f
+            val blue = (color and 0xFF) / 255f
+            drawArray(shadows.toArray(), red * 0.25f, green * 0.25f, blue * 0.25f, alpha, textured = true)
+            drawArray(glyphs.toArray(), red, green, blue, alpha, textured = true)
+            start = end
+        }
 
         GL30.glDisable(GL30.GL_BLEND)
         GL30.glEnable(GL30.GL_DEPTH_TEST)

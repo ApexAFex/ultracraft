@@ -214,7 +214,11 @@ class MeshBuilderTest {
                     "13\toak_stairs\tfacing=east,half=bottom,shape=inner_left\n" +
                     "14\toak_stairs\tfacing=east,half=bottom,shape=inner_right\n" +
                     "15\toak_stairs\tfacing=east,half=bottom,shape=outer_left\n" +
-                    "16\toak_stairs\tfacing=east,half=bottom,shape=outer_right\n",
+                    "16\toak_stairs\tfacing=east,half=bottom,shape=outer_right\n" +
+                    "17\toak_sign\trotation=0,waterlogged=false\n" +
+                    "18\toak_wall_sign\tfacing=north,waterlogged=false\n" +
+                    "19\twhite_banner\trotation=0\n" +
+                    "20\twhite_wall_banner\tfacing=south\n",
             )
         },
     )
@@ -223,6 +227,7 @@ class MeshBuilderTest {
         listOf(
             "air", "stone", "oak_slab", "oak_stairs", "oak_fence", "oak_door",
             "torch", "oak_trapdoor", "white_carpet", "snow", "cobblestone_wall", "short_grass",
+            "oak_planks", "white_wool",
         ),
     )
 
@@ -401,6 +406,43 @@ class MeshBuilderTest {
         assertEquals(2 * 2 * 3, mesh.vertexCount)
         assertEquals(48f, axisValues(mesh, 1).min(), 0.001f)
         assertEquals(49f, axisValues(mesh, 1).max(), 0.001f)
+    }
+
+    @Test
+    fun `a standing sign has a post and a board on top`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 17))
+
+        val mesh = shapeMesh(world)
+        val ys = axisValues(mesh, 1)
+        val xs = axisValues(mesh, 0)
+        assertEquals(48f, ys.min(), 0.001f)
+        assertEquals(49f, ys.max(), 0.001f)
+        // Доска шире столба: 14/16 против 2/16.
+        assertEquals(1f / 16f, xs.min(), 0.001f)
+        assertEquals(15f / 16f, xs.max(), 0.001f)
+    }
+
+    @Test
+    fun `a wall sign is a thin board against its wall`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 18))
+
+        val zs = axisValues(shapeMesh(world), 2)
+        val ys = axisValues(shapeMesh(world), 1)
+        assertTrue(zs.all { it <= 2f / 16f }, "доска должна стоять у северной стены: $zs")
+        assertEquals(48f + 4f / 16f, ys.min(), 0.001f)
+        assertEquals(48f + 12f / 16f, ys.max(), 0.001f)
+    }
+
+    @Test
+    fun `a banner is a pole with cloth and takes its colour from wool`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 19))
+
+        val xs = axisValues(shapeMesh(world), 0)
+        assertEquals(1f / 16f, xs.min(), 0.001f)
+        assertEquals(15f / 16f, xs.max(), 0.001f)
     }
 }
 

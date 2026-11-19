@@ -25,14 +25,31 @@ class ScoreboardTest {
             .toByteArray()
     }
 
-    private fun scorePacket(entity: String, objective: String, value: Int): ByteArray =
-        ByteWriter()
-            .writeString(entity)
-            .writeString(objective)
-            .writeVarInt(value)
-            .writeBoolean(false)
-            .writeBoolean(false)
-            .toByteArray()
+    private fun nbtCompound(vararg entries: Pair<String, String>): ByteArray {
+        val writer = ByteWriter().writeByte(10)
+        for ((name, value) in entries) {
+            writer.writeByte(8)
+            writer.writeShort(name.toByteArray().size)
+            writer.writeBytes(name.toByteArray())
+            writer.writeShort(value.toByteArray().size)
+            writer.writeBytes(value.toByteArray())
+        }
+        return writer.writeByte(0).toByteArray()
+    }
+
+    private fun scorePacket(
+        entity: String,
+        objective: String,
+        value: Int,
+        display: ByteArray? = null,
+    ): ByteArray = ByteWriter()
+        .writeString(entity)
+        .writeString(objective)
+        .writeVarInt(value)
+        .writeBoolean(display != null)
+        .also { if (display != null) it.writeBytes(display) }
+        .writeBoolean(false)
+        .toByteArray()
 
     @Test
     fun `sidebar shows the title and sorted scores`() {
@@ -46,8 +63,38 @@ class ScoreboardTest {
         board.onPacket(Protocol777.Play.SET_SCORE, scorePacket("гость", "board", 42))
 
         val sidebar = board.sidebarLines()
-        assertEquals("Тест", sidebar?.first)
-        assertEquals(listOf("гость" to 42, "mcplus" to 7), sidebar?.second)
+        assertEquals("Тест", sidebar?.first?.text)
+        assertEquals(
+            listOf("гость" to 42, "mcplus" to 7),
+            sidebar?.second?.map { it.first.text to it.second },
+        )
+    }
+
+    @Test
+    fun `colours survive from the objective title and the score display name`() {
+        val board = Scoreboard()
+        val title = nbtCompound("text" to "Тест", "color" to "red")
+        val objective = ByteWriter()
+            .writeString("board")
+            .writeByte(0)
+            .writeBytes(title)
+            .writeVarInt(0)
+            .writeBoolean(false)
+            .toByteArray()
+        board.onPacket(Protocol777.Play.SET_OBJECTIVE, objective)
+        board.onPacket(
+            Protocol777.Play.SET_DISPLAY_OBJECTIVE,
+            ByteWriter().writeByte(1).writeString("board").toByteArray(),
+        )
+        // Имя очка — компонент с кодами §a внутри строки.
+        val display = nbtCompound("text" to "§aЗелёный")
+        board.onPacket(Protocol777.Play.SET_SCORE, scorePacket("mcplus", "board", 7, display))
+
+        val sidebar = board.sidebarLines()!!
+        assertEquals(0xFF5555, sidebar.first.runs.single().color)
+        val name = sidebar.second.single().first
+        assertEquals("Зелёный", name.text)
+        assertEquals(0x55FF55, name.runs.single().color)
     }
 
     @Test
