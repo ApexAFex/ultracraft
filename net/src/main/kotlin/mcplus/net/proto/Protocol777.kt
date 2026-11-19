@@ -69,6 +69,8 @@ object Protocol777 {
         const val SPAWN_ENTITY: Int = 0x01
         /** Анимация сущности: взмах рукой, урон, смерть. */
         const val ANIMATE: Int = 0x02
+        /** Событие сущности: 2 — получен урон. */
+        const val ENTITY_EVENT: Int = 0x22
         const val REMOVE_ENTITIES: Int = 0x4E
         const val UPDATE_ENTITY_POSITION: Int = 0x36
         const val UPDATE_ENTITY_POSITION_ROTATION: Int = 0x37

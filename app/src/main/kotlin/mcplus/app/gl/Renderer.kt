@@ -614,6 +614,51 @@ class Renderer(
         GL30.glUseProgram(0)
     }
 
+    /** Рамка чанка: восемь углов от [minY] до [maxY], двенадцать рёбер. */
+    fun drawChunkBorder(camera: Camera, chunkX: Int, chunkZ: Int, minY: Int, maxY: Int) {
+        val x0 = chunkX * 16f
+        val z0 = chunkZ * 16f
+        val x1 = x0 + 16f
+        val z1 = z0 + 16f
+        val y0 = minY.toFloat()
+        val y1 = maxY.toFloat()
+        val corners = arrayOf(
+            floatArrayOf(x0, y0, z0), floatArrayOf(x1, y0, z0),
+            floatArrayOf(x1, y0, z1), floatArrayOf(x0, y0, z1),
+            floatArrayOf(x0, y1, z0), floatArrayOf(x1, y1, z0),
+            floatArrayOf(x1, y1, z1), floatArrayOf(x0, y1, z1),
+        )
+        val edges = listOf(
+            0 to 1, 1 to 2, 2 to 3, 3 to 0,
+            4 to 5, 5 to 6, 6 to 7, 7 to 4,
+            0 to 4, 1 to 5, 2 to 6, 3 to 7,
+        )
+        var offset = 0
+        for ((start, end) in edges) {
+            outlineData[offset++] = corners[start][0]
+            outlineData[offset++] = corners[start][1]
+            outlineData[offset++] = corners[start][2]
+            outlineData[offset++] = corners[end][0]
+            outlineData[offset++] = corners[end][1]
+            outlineData[offset++] = corners[end][2]
+        }
+        val buffer = MemoryUtil.memAllocFloat(outlineData.size)
+        buffer.put(outlineData).flip()
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, outlineVbo)
+        GL30.glBufferSubData(GL30.GL_ARRAY_BUFFER, 0, buffer)
+        MemoryUtil.memFree(buffer)
+
+        GL30.glUseProgram(outlineProgram)
+        GL30.glUniformMatrix4fv(
+            outlineViewProjLocation, false,
+            camera.viewProjection(width.toFloat() / height.toFloat()),
+        )
+        GL30.glBindVertexArray(outlineVao)
+        GL30.glDrawArrays(GL30.GL_LINES, 0, 24)
+        GL30.glBindVertexArray(0)
+        GL30.glUseProgram(0)
+    }
+
     override fun close() {
         for (part in parts.values) {
             GL30.glDeleteBuffers(part.vbo)

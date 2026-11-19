@@ -53,6 +53,9 @@ class SoundEngine(private val directory: File?) : Closeable {
     /** Фоновая музыка: выключена по умолчанию, включается в настройках. */
     var musicEnabled: Boolean = false
 
+    /** Громкость музыки отдельно от звуков. */
+    var musicVolume: Float = 0.5f
+
     private var musicSource = 0
     private var musicBuffer = 0
     private var musicTrack: String? = null
@@ -126,7 +129,7 @@ class SoundEngine(private val directory: File?) : Closeable {
         musicBuffer = buffer
         AL10.alSourceStop(musicSource)
         AL10.alSourcei(musicSource, AL10.AL_BUFFER, buffer)
-        AL10.alSourcef(musicSource, AL10.AL_GAIN, masterVolume * 0.5f)
+        AL10.alSourcef(musicSource, AL10.AL_GAIN, masterVolume * musicVolume * 0.8f)
         AL10.alSourcePlay(musicSource)
         musicTrack = path
         println("Музыка: $path")

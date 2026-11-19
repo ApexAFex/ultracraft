@@ -32,12 +32,15 @@ class PlayerRenderer(
         val walkAmount: Float = 0f,
         /** 0 — покой, 1 — взмах рукой закончен. */
         val swing: Float = 0f,
+        /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
+        val hurt: Float = 0f,
     )
 
     private val program = createProgram()
     private val viewProjLocation = GL30.glGetUniformLocation(program, "uViewProj")
     private val modelLocation = GL30.glGetUniformLocation(program, "uModel")
     private val skinLocation = GL30.glGetUniformLocation(program, "uSkin")
+    private val tintLocation = GL30.glGetUniformLocation(program, "uTint")
 
     private val vao = GL30.glGenVertexArrays()
     private val vbo = GL30.glGenBuffers()
@@ -90,6 +93,11 @@ class PlayerRenderer(
 
         val parts = PlayerModel.parts(classic)
         for (player in players) {
+            GL30.glUniform3f(
+                tintLocation, 1f,
+                1f - player.hurt * 0.65f,
+                1f - player.hurt * 0.65f,
+            )
             fillModel(player)
             for ((index, part) in parts.withIndex()) {
                 val swingAngle = if (part.name == "rightArm" && player.swing > 0f) {
@@ -215,11 +223,12 @@ class PlayerRenderer(
             in vec2 vUv;
             in float vShade;
             uniform sampler2D uSkin;
+            uniform vec3 uTint;
             out vec4 FragColor;
             void main() {
                 vec4 texel = texture(uSkin, vUv);
                 if (texel.a < 0.1) discard;
-                FragColor = vec4(texel.rgb * vShade, 1.0);
+                FragColor = vec4(texel.rgb * vShade * uTint, 1.0);
             }
         """
     }

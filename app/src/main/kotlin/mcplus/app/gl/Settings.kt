@@ -21,6 +21,9 @@ object Settings {
     /** Фоновая музыка: по умолчанию выключена. */
     var music: Boolean = false
 
+    /** Громкость музыки отдельно от звуков. */
+    var musicVolume: Float = 0.5f
+
     private var file: File = File("settings.properties")
     private var loaded = false
 
@@ -44,6 +47,7 @@ object Settings {
             sensitivity = properties.getProperty("sensitivity")?.toFloatOrNull() ?: sensitivity
             fullscreen = properties.getProperty("fullscreen")?.toBooleanStrictOrNull() ?: fullscreen
             music = properties.getProperty("music")?.toBooleanStrictOrNull() ?: music
+            musicVolume = properties.getProperty("musicVolume")?.toFloatOrNull() ?: musicVolume
             println("Настройки: ${file.absolutePath}, музыка=$music, обзор=$fov")
         }
     }
@@ -58,6 +62,7 @@ object Settings {
             properties.setProperty("sensitivity", sensitivity.toString())
             properties.setProperty("fullscreen", fullscreen.toString())
             properties.setProperty("music", music.toString())
+            properties.setProperty("musicVolume", musicVolume.toString())
             file.outputStream().use { properties.store(it, "ultracraft settings") }
         }
     }

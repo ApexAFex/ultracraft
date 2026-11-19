@@ -183,6 +183,7 @@ class Hud(
         sensitivityPercent: Int,
         selected: Int,
         viewDistance: Int,
+        musicVolumePercent: Int = 50,
     ): List<HudRect> {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
@@ -238,6 +239,12 @@ class Hud(
                     firstX,
                     quit.y + 70f * s,
                     "${if (selected == 3) "> " else ""}Дальность: $viewDistance чанков  (4)",
+                    s * 0.8f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 82f * s,
+                    "${if (selected == 4) "> " else ""}Музыка: $musicVolumePercent%  (5)",
                     s * 0.8f,
                 ),
             ),

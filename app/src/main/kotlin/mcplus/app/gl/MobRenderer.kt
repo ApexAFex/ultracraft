@@ -31,6 +31,8 @@ class MobRenderer(
         val family: MobFamily,
         val scale: Float,
         val texture: Int,
+        /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
+        val hurt: Float = 0f,
     )
 
     private class FamilyMesh(
@@ -45,6 +47,7 @@ class MobRenderer(
     private val viewProjLocation = GL30.glGetUniformLocation(program, "uViewProj")
     private val modelLocation = GL30.glGetUniformLocation(program, "uModel")
     private val textureLocation = GL30.glGetUniformLocation(program, "uSkin")
+    private val tintLocation = GL30.glGetUniformLocation(program, "uTint")
 
     private val meshes = HashMap<MobFamily, FamilyMesh>()
     private val textures = HashMap<String, Int>()
@@ -71,6 +74,11 @@ class MobRenderer(
             val mesh = meshFor(mob.family) ?: continue
             GL30.glBindTexture(GL30.GL_TEXTURE_2D, mob.texture)
             GL30.glBindVertexArray(mesh.vao)
+            GL30.glUniform3f(
+                tintLocation, 1f,
+                1f - mob.hurt * 0.65f,
+                1f - mob.hurt * 0.65f,
+            )
 
             val yaw = -Math.toRadians(mob.yaw.toDouble()).toFloat()
             val base = Mat4.multiply(
@@ -318,11 +326,12 @@ class MobRenderer(
             in vec2 vUv;
             in float vShade;
             uniform sampler2D uSkin;
+            uniform vec3 uTint;
             out vec4 FragColor;
             void main() {
                 vec4 texel = texture(uSkin, vUv);
                 if (texel.a < 0.1) discard;
-                FragColor = vec4(texel.rgb * vShade, 1.0);
+                FragColor = vec4(texel.rgb * vShade * uTint, 1.0);
             }
         """
     }

@@ -67,6 +67,20 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
         swingStartNanos = nowNanos
     }
 
+    /** Вспышка урона: 1 сразу после удара, 0 через 0,3 секунды. */
+    @Volatile
+    private var hurtAtNanos: Long = 0L
+
+    fun hurt(nowNanos: Long) {
+        hurtAtNanos = nowNanos
+    }
+
+    fun hurtProgress(nowNanos: Long): Float {
+        if (hurtAtNanos == 0L) return 0f
+        val age = (nowNanos - hurtAtNanos) / 1_000_000_000.0
+        return (1.0 - age / 0.3).coerceIn(0.0, 1.0).toFloat()
+    }
+
     /** 0 — покой, 1 — взмах закончен. */
     fun swingProgress(nowNanos: Long): Float {
         if (swingStartNanos == 0L) return 0f
@@ -232,6 +246,17 @@ class EntityTracker {
                     val action = reader.readUnsignedByte()
                     // 0 — взмах правой рукой, 3 — левой; урон и смерть пока не анимируются.
                     if (action == 0 || action == 3) entities[id]?.swing(System.nanoTime())
+                }
+                return true
+            }
+
+            Protocol777.Play.ENTITY_EVENT -> {
+                runCatching {
+                    val reader = ByteReader(packet.body)
+                    val id = reader.readVarInt()
+                    val status = reader.readUnsignedByte()
+                    // 2 — получен урон: короткая красная вспышка на модели.
+                    if (status == 2) entities[id]?.hurt(System.nanoTime())
                 }
                 return true
             }

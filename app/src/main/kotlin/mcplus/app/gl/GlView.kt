@@ -31,6 +31,10 @@ object GlView {
     private val SKELETON_TYPES = setOf("skeleton", "stray", "bogged")
     private val ENDERMAN_TYPES = setOf("enderman")
     private val PIGLIN_TYPES = setOf("piglin", "zombified_piglin", "piglin_brute")
+    private val PROJECTILE_TYPES = setOf(
+        "arrow", "spectral_arrow", "snowball", "egg", "ender_pearl", "trident",
+        "experience_bottle", "potion", "fireball", "small_fireball",
+    )
 
     /** Блок, который только что стал воздухом: из него сыплются кусочки. */
     private class PendingBreak(val x: Int, val y: Int, val z: Int, val state: Int)
@@ -598,13 +602,15 @@ object GlView {
                     var baseFov = Settings.fov
                     var volume = Settings.volume
                     var viewDistance = Settings.viewDistance
+                    var musicVolume = Settings.musicVolume
+                    sound.musicVolume = musicVolume
                     var selectedSetting = 0
                     input.sensitivity = Settings.sensitivity
                     var settingLeftWasDown = false
                     var settingRightWasDown = false
                     var settingUpWasDown = false
                     var settingDownWasDown = false
-                    val settingRowWasDown = BooleanArray(4)
+                    val settingRowWasDown = BooleanArray(5)
                     var ambientNanos = 0L
                     var rainSoundNanos = 0L
                     /** Полный экран и запомненное окно; счётчик предметов для звука подбора. */
@@ -1345,6 +1351,16 @@ object GlView {
                             dimension,
                         )
                         renderer.draw(camera)
+                        // F3+G — рамка текущего чанка.
+                        if (debug && GLFW.glfwGetKey(window, GLFW.GLFW_KEY_G) == GLFW.GLFW_PRESS) {
+                            renderer.drawChunkBorder(
+                                camera,
+                                kotlin.math.floor(player.x).toInt() shr 4,
+                                kotlin.math.floor(player.z).toInt() shr 4,
+                                (player.y - 8).toInt(),
+                                (player.y + 8).toInt(),
+                            )
+                        }
                         // Облака после мира: они выше земли и не должны её перекрывать.
                         skyRenderer.drawClouds(
                             camera,
@@ -1564,6 +1580,7 @@ object GlView {
                                     walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                     walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                     swing = entity.swingProgress(System.nanoTime()),
+                                    hurt = entity.hurtProgress(System.nanoTime()),
                                 )
                             } else {
                                 val name = entityTypes.nameOf(entity.type)
@@ -1575,6 +1592,7 @@ object GlView {
                                     walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                     walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                     swing = entity.swingProgress(System.nanoTime()),
+                                    hurt = entity.hurtProgress(System.nanoTime()),
                                 )
                                 val family = MobModels.familyOf(name)
                                 when {
@@ -1582,8 +1600,7 @@ object GlView {
                                     name in SKELETON_TYPES -> skeletons += humanoid
                                     name in ENDERMAN_TYPES -> endermen += humanoid
                                     name in PIGLIN_TYPES -> piglins += humanoid
-                                    name == "item" -> {
-                                        // Выпавший предмет: мини-куб блока, если это блок.
+                                    name == "item" -> {                                        // Выпавший предмет: мини-куб блока, если это блок.
                                         val stack = entity.droppedItem
                                         val itemName = stack?.takeIf { it.itemId >= 0 }
                                             ?.let { itemTable.nameOf(it.itemId) }
@@ -1609,6 +1626,14 @@ object GlView {
                                                 atlas.layerForItem(itemName),
                                             )
                                         }
+                                    }
+
+                                    name in PROJECTILE_TYPES -> {
+                                        val iconName = if (name == "spectral_arrow") "arrow" else name
+                                        worldIcons += Renderer.WorldIcon(
+                                            entity.x, entity.y + 0.3, entity.z, 0.3f,
+                                            atlas.layerForItem(iconName),
+                                        )
                                     }
 
                                     name == "experience_orb" -> {
@@ -1648,6 +1673,7 @@ object GlView {
                                         family = family,
                                         scale = MobModels.scaleOf(name),
                                         texture = mobRenderer.textureFor(name),
+                                        hurt = entity.hurtProgress(System.nanoTime()),
                                     )
                                 }
                             }
@@ -1862,6 +1888,18 @@ object GlView {
                                         ),
                                     "Наклон: %.0f, поворот: %.0f".format(camera.pitch, camera.yaw),
                                     "Дальность: $viewDistance чанков",
+                                    run {
+                                        val skyNow = session?.sky
+                                        val dayTicks = (((skyNow?.dayTicks ?: 0L) % 24000L) + 24000L) % 24000L
+                                        val hours = ((dayTicks / 1000L + 6L) % 24L).toInt()
+                                        val minutes = ((dayTicks % 1000L) * 60L / 1000L).toInt()
+                                        val weather = when {
+                                            (skyNow?.thunder ?: 0f) > 0f -> "гроза"
+                                            (skyNow?.rain ?: 0f) > 0f -> "дождь"
+                                            else -> "ясно"
+                                        }
+                                        "Время: %02d:%02d, погода: %s".format(hours, minutes, weather)
+                                    },
                                 ),
                             )
                         }
@@ -1889,6 +1927,7 @@ object GlView {
                             val buttons = hud.drawPauseMenu(
                                 baseFov, (volume * 100).toInt(),
                                 (input.sensitivity * 100).toInt(), selectedSetting, viewDistance,
+                                (musicVolume * 100).toInt(),
                             )
                             if (input.clickRequested) {
                                 when {
@@ -1898,7 +1937,7 @@ object GlView {
                                 }
                             }
                             // Цифры 1–4 выбирают строку, стрелки меняют её значение.
-                            for (row in 0..3) {
+                            for (row in 0..4) {
                                 val pressedRow = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_1 + row) == GLFW.GLFW_PRESS
                                 if (pressedRow && !settingRowWasDown[row]) selectedSetting = row
                                 settingRowWasDown[row] = pressedRow
@@ -1915,7 +1954,11 @@ object GlView {
                                     0 -> baseFov = (baseFov + 5f * step).coerceIn(40f, 110f)
                                     1 -> volume = (volume + 0.05f * step).coerceIn(0f, 1f)
                                     2 -> input.sensitivity = (input.sensitivity + 0.05f * step).coerceIn(0.2f, 3f)
-                                    else -> viewDistance = (viewDistance + step).coerceIn(4, 16)
+                                    3 -> viewDistance = (viewDistance + step).coerceIn(4, 16)
+                                    else -> {
+                                        musicVolume = (musicVolume + 0.05f * step).coerceIn(0f, 1f)
+                                        sound.musicVolume = musicVolume
+                                    }
                                 }
                             }
                             settingLeftWasDown = leftKey
@@ -2100,6 +2143,7 @@ object GlView {
                     Settings.sensitivity = input.sensitivity
                     Settings.fullscreen = fullscreen
                     Settings.music = sound.musicEnabled
+                    Settings.musicVolume = musicVolume
                     Settings.save()
                     sound.close()
                     entityRenderer.close()
