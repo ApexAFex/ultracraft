@@ -44,6 +44,9 @@ class SoundEngine(private val directory: File?) : Closeable {
     var available = false
         private set
 
+    /** Общая громкость, меняется в настройках паузы. */
+    var masterVolume: Float = 0.7f
+
     /** Сколько звуков уже сыграно — для проверки без слуха. */
     var played = 0
         private set
@@ -107,7 +110,7 @@ class SoundEngine(private val directory: File?) : Closeable {
         AL10.alSourceStop(source)
         AL10.alSourcei(source, AL10.AL_BUFFER, buffer)
         AL10.alSource3f(source, AL10.AL_POSITION, x.toFloat(), y.toFloat(), z.toFloat())
-        AL10.alSourcef(source, AL10.AL_GAIN, 0.55f)
+        AL10.alSourcef(source, AL10.AL_GAIN, masterVolume * 0.8f)
         AL10.alSourcePlay(source)
         played++
     }

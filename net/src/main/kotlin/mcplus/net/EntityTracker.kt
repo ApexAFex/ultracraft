@@ -207,6 +207,11 @@ class EntityTracker {
                 return true
             }
 
+            Protocol777.Play.UPDATE_ENTITY_POSITION_ROTATION -> {
+                runCatching { readRelativeMoveRotation(packet.body) }
+                return true
+            }
+
             Protocol777.Play.TELEPORT_ENTITY -> {
                 runCatching { readTeleport(packet.body) }
                 return true
@@ -266,9 +271,39 @@ class EntityTracker {
         movementPackets++
     }
 
-    /** `entity_position_sync`: path type 0 carries an absolute position and rotation. */
-    private fun readTeleport(body: ByteArray) {
+    /** То же, что [readRelativeMove], плюс поворот: две восьмых-байта после смещений. */
+    private fun readRelativeMoveRotation(body: ByteArray) {
         val reader = ByteReader(body)
+        val id = reader.readVarInt()
+        val properties = reader.readVarInt()
+        val steps = properties ushr 1
+
+        var dx = 0.0
+        var dy = 0.0
+        var dz = 0.0
+        if (steps == 0) {
+            dx = reader.readShort() / 4096.0
+            dy = reader.readShort() / 4096.0
+            dz = reader.readShort() / 4096.0
+        } else {
+            repeat(steps) {
+                reader.readVarInt()
+                dx += reader.readShort() / 4096.0
+                dy += reader.readShort() / 4096.0
+                dz += reader.readShort() / 4096.0
+            }
+        }
+        val yaw = reader.readByte() * TURN / 256f
+        val pitch = reader.readByte() * TURN / 256f
+        entities[id]?.apply {
+            moveBy(dx, dy, dz)
+            look(yaw, pitch)
+        }
+        movementPackets++
+    }
+
+    /** `entity_position_sync`: path type 0 carries an absolute position and rotation. */
+    private fun readTeleport(body: ByteArray) {        val reader = ByteReader(body)
         val id = reader.readVarInt()
         val pathType = reader.readVarInt()
         if (pathType != 0) return // stepped paths are not handled yet
@@ -290,8 +325,7 @@ class EntityTracker {
     }
 
     /** `entity_look`: only the facing changed, angles are 1/256 of a turn. */
-    private fun readRotation(body: ByteArray) {
-        val reader = ByteReader(body)
+    private fun readRotation(body: ByteArray) {        val reader = ByteReader(body)
         val id = reader.readVarInt()
         val yaw = reader.readByte() * TURN / 256f
         val pitch = reader.readByte() * TURN / 256f

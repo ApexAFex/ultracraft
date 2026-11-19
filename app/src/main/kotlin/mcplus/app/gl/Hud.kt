@@ -131,8 +131,16 @@ class Hud(
         text.drawScreen(labels)
     }
 
-    /** Меню паузы: затемнение, заголовок и две кнопки; их прямоугольники нужны клику. */
-    fun drawPauseMenu(): List<HudRect> {
+    /** Синеватый слой под водой: без него вода не читается как вода. */
+    fun drawWaterOverlay(alpha: Float) {
+        if (alpha <= 0.01f) return
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x1A3C6E, alpha)
+        renderer.draw()
+    }
+
+    /** Меню паузы: затемнение, заголовок, кнопки и две настройки; их прямоугольники нужны клику. */
+    fun drawPauseMenu(fov: Float, volume: Int): List<HudRect> {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
         renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x101018, 0.55f)
@@ -164,6 +172,18 @@ class Hud(
                     quit.y + 5f * s,
                     "Выйти",
                     s,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 34f * s,
+                    "Обзор: ${fov.toInt()}°  (стрелки влево/вправо)",
+                    s * 0.8f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 46f * s,
+                    "Громкость: $volume%  (стрелки вверх/вниз)",
+                    s * 0.8f,
                 ),
             ),
         )

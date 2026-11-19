@@ -567,9 +567,16 @@ object GlView {
                     var chatScroll = 0
                     var hudHidden = false
 
-                    /** Меню паузы (Escape) и таймер звуков мобов. */
+                    /** Меню паузы (Escape), настройки и таймер звуков мобов. */
                     var paused = pauseAtStart
+                    var baseFov = 70f
+                    var volume = 0.7f
+                    var settingLeftWasDown = false
+                    var settingRightWasDown = false
+                    var settingUpWasDown = false
+                    var settingDownWasDown = false
                     var ambientNanos = 0L
+                    var rainSoundNanos = 0L
 
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
@@ -963,7 +970,7 @@ object GlView {
                             (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
                                 GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS ||
                                 input.sprintDoubleTap)
-                        camera.fovDegrees = if (sprintHeld) 78f else 70f
+                        camera.fovDegrees = if (sprintHeld) baseFov + 8f else baseFov
                         val inputScale = when {
                             sneakHeld -> 0.4
                             sprintHeld -> 1.35
@@ -998,6 +1005,15 @@ object GlView {
                             }
                             if (mining) {
                                 miningTicks++
+                                // Удары кирки по блоку — каждые четыре тика, как в ванили.
+                                if (miningTicks % 4 == 0) {
+                                    val hitName = blocks.nameOf(world.blockAt(miningX, miningY, miningZ))
+                                    sound.play(
+                                        "block.$hitName.hit",
+                                        miningX + 0.5, miningY + 0.5, miningZ + 0.5,
+                                        "block.stone.hit",
+                                    )
+                                }
                                 if (world.blockAt(miningX, miningY, miningZ) == 0) {
                                     finishMining()
                                 } else if (!miningStopSent && miningNeeded > 1 && miningTicks >= miningNeeded) {
@@ -1138,6 +1154,21 @@ object GlView {
                         renderer.fogStart = 90f
                         renderer.fogEnd = 170f
 
+                        // Под водой другой туман и синий слой: вода должна читаться как вода.
+                        val eyeBlockName = blocks.nameOf(
+                            world.blockAt(
+                                kotlin.math.floor(camera.x).toInt(),
+                                kotlin.math.floor(camera.y).toInt(),
+                                kotlin.math.floor(camera.z).toInt(),
+                            ),
+                        )
+                        val underwater = "water" in eyeBlockName
+                        if (underwater) {
+                            renderer.fogColor = 0x1A3C6E
+                            renderer.fogStart = 0f
+                            renderer.fogEnd = 24f
+                        }
+
                         GL30.glClearColor(
                             ((skyColor shr 16) and 0xFF) / 255f,
                             ((skyColor shr 8) and 0xFF) / 255f,
@@ -1204,6 +1235,12 @@ object GlView {
                                         entity.x, entity.y + 0.8, entity.z,
                                     )
                                 }
+                            }
+                            // Дождь: один и тот же звук раз в несколько секунд, пока идёт.
+                            val rain = session?.sky?.rain ?: 0f
+                            if (sound.available && rain > 0f && now - rainSoundNanos > 9_000_000_000L) {
+                                rainSoundNanos = now
+                                sound.play("weather.rain", player.x, player.y, player.z)
                             }
                         }
 
@@ -1642,7 +1679,7 @@ object GlView {
                             hud.drawScoreboard(board.first, board.second)
                         }
                         if (paused) {
-                            val buttons = hud.drawPauseMenu()
+                            val buttons = hud.drawPauseMenu(baseFov, (volume * 100).toInt())
                             if (input.clickRequested) {
                                 when {
                                     buttons[0].contains(input.mouseX, input.mouseY) -> paused = false
@@ -1650,7 +1687,22 @@ object GlView {
                                         GLFW.glfwSetWindowShouldClose(window, true)
                                 }
                             }
+                            // Стрелки в паузе меняют обзор и громкость.
+                            val leftKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS
+                            val rightKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS
+                            val upKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_UP) == GLFW.GLFW_PRESS
+                            val downKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_DOWN) == GLFW.GLFW_PRESS
+                            if (leftKey && !settingLeftWasDown) baseFov = (baseFov - 5f).coerceIn(40f, 110f)
+                            if (rightKey && !settingRightWasDown) baseFov = (baseFov + 5f).coerceIn(40f, 110f)
+                            if (upKey && !settingUpWasDown) volume = (volume + 0.05f).coerceIn(0f, 1f)
+                            if (downKey && !settingDownWasDown) volume = (volume - 0.05f).coerceIn(0f, 1f)
+                            settingLeftWasDown = leftKey
+                            settingRightWasDown = rightKey
+                            settingUpWasDown = upKey
+                            settingDownWasDown = downKey
+                            sound.masterVolume = volume
                         }
+                        if (underwater) hud.drawWaterOverlay(0.3f)
 
                         // Cracks on the block being mined: ten stages, like vanilla.
                         if (mining) {
