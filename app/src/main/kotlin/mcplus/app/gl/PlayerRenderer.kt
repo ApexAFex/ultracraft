@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
@@ -30,6 +30,8 @@ class PlayerRenderer(
         val yaw: Float,
         val walkPhase: Float = 0f,
         val walkAmount: Float = 0f,
+        /** 0 — покой, 1 — взмах рукой закончен. */
+        val swing: Float = 0f,
     )
 
     private val program = createProgram()
@@ -90,7 +92,12 @@ class PlayerRenderer(
         for (player in players) {
             fillModel(player)
             for ((index, part) in parts.withIndex()) {
-                val angle = PlayerModel.limbAngle(part.name, player.walkPhase, player.walkAmount)
+                val swingAngle = if (part.name == "rightArm" && player.swing > 0f) {
+                    -kotlin.math.sin(player.swing * Math.PI).toFloat() * SWING_ANGLE
+                } else {
+                    0f
+                }
+                val angle = PlayerModel.limbAngle(part.name, player.walkPhase, player.walkAmount) + swingAngle
                 if (angle == 0f) {
                     GL30.glUniformMatrix4fv(modelLocation, false, model)
                 } else {
@@ -184,6 +191,9 @@ class PlayerRenderer(
     }
 
     private companion object {
+        /** Насколько рука поднимается в взмахе, радианы. */
+        const val SWING_ANGLE = 1.1f
+
         const val VERTEX_SHADER = """
             #version 330 core
             layout(location = 0) in vec3 aPos;

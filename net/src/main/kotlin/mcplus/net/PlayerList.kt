@@ -26,6 +26,9 @@ class PlayerList {
 
     fun uuids(): Set<UUID> = names.keys.toSet()
 
+    /** Имена игроков для табло (Tab). */
+    fun names(): List<String> = names.values.sorted()
+
     /** @return true when the packet was understood. */
     fun onPacket(packetId: Int, body: ByteArray): Boolean = when (packetId) {
         Protocol777.Play.PLAYER_INFO -> runCatching { apply(ByteReader(body)) }.getOrDefault(false)

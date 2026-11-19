@@ -58,6 +58,22 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     var pitch: Float = 0f
         private set
 
+    /** Когда сущность в последний раз взмахнула рукой — для анимации. */
+    @Volatile
+    var swingStartNanos: Long = 0L
+        private set
+
+    fun swing(nowNanos: Long) {
+        swingStartNanos = nowNanos
+    }
+
+    /** 0 — покой, 1 — взмах закончен. */
+    fun swingProgress(nowNanos: Long): Float {
+        if (swingStartNanos == 0L) return 0f
+        val age = (nowNanos - swingStartNanos) / 1_000_000_000.0
+        return (age / SWING_SECONDS).coerceIn(0.0, 1.0).toFloat()
+    }
+
     /** Поля `Set Entity Data`: номер поля → значение. */
     @Volatile
     private var meta: Map<Int, MetaEntry> = emptyMap()
@@ -204,6 +220,17 @@ class EntityTracker {
                 return true
             }
 
+            Protocol777.Play.ANIMATE -> {
+                runCatching {
+                    val reader = ByteReader(packet.body)
+                    val id = reader.readVarInt()
+                    val action = reader.readUnsignedByte()
+                    // 0 — взмах правой рукой, 3 — левой; урон и смерть пока не анимируются.
+                    if (action == 0 || action == 3) entities[id]?.swing(System.nanoTime())
+                }
+                return true
+            }
+
             else -> return false
         }
     }
@@ -286,3 +313,6 @@ private const val HEALTH_FIELD = 9
 /** Поле 8 — предмет для `item` и количество опыта для `experience_orb`. */
 private const val DROPPED_ITEM_FIELD = 8
 private const val ORB_VALUE_FIELD = 8
+
+/** Длительность взмаха рукой в секундах. */
+private const val SWING_SECONDS = 0.3

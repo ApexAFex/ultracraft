@@ -125,6 +125,9 @@ object GlView {
         replay: List<mcplus.protocol.Packet> = emptyList(),
         /** Блок, по которому кликнуть правой кнопкой на 30-м кадре (проверка контейнеров). */
         openAt: Triple<Int, Int, Int>? = null,
+        /** Показать отладочные строки (F3) и список игроков (Tab). */
+        debug: Boolean = false,
+        showTab: Boolean = false,
         /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
         /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
@@ -505,6 +508,11 @@ object GlView {
                     var lastEntityCount = -1
                     var frame = 0
                     var inventoryOpen = false
+
+                    /** Кадров в секунду для отладочной строки. */
+                    var fps = 0
+                    var fpsFrames = 0
+                    var fpsSinceNanos = System.nanoTime()
 
                     /** Здоровье и смерть в прошлом кадре — чтобы звук был один раз. */
                     var lastHealth = Float.NaN
@@ -1057,6 +1065,22 @@ object GlView {
                             lastStepZ = player.z
                         }
 
+                        // Дальние чанки выгружаются: иначе память растёт всю игру.
+                        if (frame % 60 == 0) {
+                            val centerX = kotlin.math.floor(player.x).toInt() shr 4
+                            val centerZ = kotlin.math.floor(player.z).toInt() shr 4
+                            val keep = radiusChunks + 4
+                            for (column in world.chunks().toList()) {
+                                if (kotlin.math.abs(column.x - centerX) <= keep &&
+                                    kotlin.math.abs(column.z - centerZ) <= keep
+                                ) {
+                                    continue
+                                }
+                                world.removeChunk(column.x, column.z)
+                                renderer.removeChunk(column.x, column.z)
+                            }
+                        }
+
                         // Куски только что сломанных блоков: короткая вспышка вместо пустоты.
                         while (true) {
                             val event = breakEvents.poll() ?: break
@@ -1120,6 +1144,7 @@ object GlView {
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
+                        val worldIcons = ArrayList<Renderer.WorldIcon>()
                         val nowNanos = System.nanoTime()
                         for (entity in entities) {
                             if (playerList.nameOf(entity.uuid) != null) {
@@ -1130,6 +1155,7 @@ object GlView {
                                     yaw = entity.yaw,
                                     walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                     walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                    swing = entity.swingProgress(System.nanoTime()),
                                 )
                             } else {
                                 val name = entityTypes.nameOf(entity.type)
@@ -1140,6 +1166,7 @@ object GlView {
                                     yaw = entity.yaw,
                                     walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                     walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                    swing = entity.swingProgress(System.nanoTime()),
                                 )
                                 val family = MobModels.familyOf(name)
                                 when {
@@ -1161,6 +1188,15 @@ object GlView {
                                                 atlas.layerFor(itemName, TextureAtlas.Kind.BOTTOM),
                                                 atlas.layerFor(itemName, TextureAtlas.Kind.SIDE),
                                                 yaw = (nowNanos / 1_000_000_000.0 * 1.4 + entity.id).toFloat(),
+                                            )
+                                        } else if (itemName != null) {
+                                            // Инструмент, еда, слиток: плоская иконка к камере.
+                                            worldIcons += Renderer.WorldIcon(
+                                                entity.x,
+                                                entity.y + 0.2,
+                                                entity.z,
+                                                0.32f,
+                                                atlas.layerForItem(itemName),
                                             )
                                         }
                                     }
@@ -1210,6 +1246,7 @@ object GlView {
                         }
                         // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
                         if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
+                        if (worldIcons.isNotEmpty()) renderer.drawWorldIcons(camera, worldIcons)
                         // Only players are in the tab list, so only they get a nametag.
                         val labels = entities.mapNotNull { entity ->
                             val name = playerList.nameOf(entity.uuid) ?: return@mapNotNull null
@@ -1305,6 +1342,22 @@ object GlView {
                                 hud.drawChatInput(chat.text)
                             } else {
                                 hud.draw(inventory, vitals, bossBars, effects, itemName, itemNameAlpha)
+
+                        // Отладка и табло: по флагу (для снимков) или по клавише Tab.
+                        if (debug) {
+                            hud.drawDebug(
+                                listOf(
+                                    "FPS: $fps",
+                                    "XYZ: %.2f, %.2f, %.2f".format(player.x, player.y, player.z),
+                                    "Chunk: ${kotlin.math.floor(player.x).toInt() shr 4}, ${kotlin.math.floor(player.z).toInt() shr 4}",
+                                    "Entities: ${entities.size}, chunks: ${renderer.chunkCount}",
+                                    "Pitch: %.0f, yaw: %.0f".format(camera.pitch, camera.yaw),
+                                ),
+                            )
+                        }
+                        if (showTab || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_TAB) == GLFW.GLFW_PRESS) {
+                            hud.drawTabList(playerList.names())
+                        }
                                 hud.drawChat(chatLines, System.nanoTime())
                             }
                         }
@@ -1403,6 +1456,13 @@ object GlView {
 
                         GLFW.glfwSwapBuffers(window)
                         GLFW.glfwPollEvents()
+                        fpsFrames++
+                        val fpsNow = System.nanoTime()
+                        if (fpsNow - fpsSinceNanos >= 1_000_000_000L) {
+                            fps = (fpsFrames * 1_000_000_000.0 / (fpsNow - fpsSinceNanos)).toInt()
+                            fpsFrames = 0
+                            fpsSinceNanos = fpsNow
+                        }
                         frame++
                     }
                     println("Звук: событий ${sound.events}, доступен ${sound.available}, сыграно ${sound.played} из ${sound.requested}")

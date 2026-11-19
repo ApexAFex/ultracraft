@@ -101,6 +101,46 @@ class Hud(
     fun respawnButton(): HudRect = HudLayout.respawnButton(width, height)
 
     /**
+     * Список игроков по Tab: тёмная панель по центру сверху.
+     *
+     * Ширина панели считается по самой длинной строке, поэтому короткие имена не растягивают
+     * её на весь экран.
+     */
+    fun drawTabList(names: List<String>) {
+        val text = this.text ?: return
+        if (names.isEmpty()) return
+        val s = HudLayout.scale(height).toFloat()
+        val title = "Players: ${names.size}"
+        val lines = listOf(title) + names
+        val widest = lines.maxOf { text.textWidth(it, s) }
+        val left = (width - widest) / 2f
+        var y = height * 0.08f
+
+        for (line in lines) {
+            val lineWidth = text.textWidth(line, s)
+            renderer.begin()
+            renderer.rect((width - lineWidth) / 2f - 3f * s, y - 2f * s, lineWidth + 6f * s, 10f * s, 0x000000, 0.45f)
+            renderer.draw()
+            text.drawScreen(listOf(TextRenderer.ScreenLabel((width - lineWidth) / 2f, y, line, s)))
+            y += 10f * s
+        }
+    }
+
+    /** Отладочные строки слева сверху (F3): кадры, координаты, чанки. */
+    fun drawDebug(lines: List<String>) {
+        val text = this.text ?: return
+        if (lines.isEmpty()) return
+        val s = HudLayout.scale(height).toFloat()
+        val widest = lines.maxOf { text.textWidth(it, s) }
+        renderer.begin()
+        renderer.rect(2f * s, 2f * s, widest + 6f * s, lines.size * 10f * s + 4f * s, 0x000000, 0.4f)
+        renderer.draw()
+        text.drawScreen(lines.mapIndexed { index, line ->
+            TextRenderer.ScreenLabel(4f * s, 4f * s + index * 10f * s, line, s)
+        })
+    }
+
+    /**
      * Строки чата слева над хотбаром: последние [CHAT_LINES] штук, свежие — снизу.
      *
      * Как в ванили, старые сообщения гаснут: полностью видны 8 секунд, за следующие две

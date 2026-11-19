@@ -155,6 +155,16 @@ class Renderer(
 
     val chunkCount: Int get() = parts.size
 
+    /** Убирает меши чанка: и непрозрачные, и полупрозрачные. */
+    fun removeChunk(chunkX: Int, chunkZ: Int) {
+        val chunkKey = key(chunkX, chunkZ)
+        for (map in listOf(parts, translucentParts)) {
+            val part = map.remove(chunkKey) ?: continue
+            GL30.glDeleteBuffers(part.vbo)
+            GL30.glDeleteVertexArrays(part.vao)
+        }
+    }
+
     private fun upload(part: Part, data: FloatArray, count: Int) {
         if (data.isEmpty()) {
             part.count = 0
@@ -316,6 +326,85 @@ class Renderer(
         GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, vertices.size / VERTEX_FLOATS)
         GL30.glBindVertexArray(0)
         if (!depthTest) GL30.glEnable(GL30.GL_DEPTH_TEST)
+        GL30.glUseProgram(0)
+    }
+
+    /** Иконка в мире: всегда повёрнута к камере (выпавший инструмент, еда). */
+    data class WorldIcon(
+        val x: Double,
+        val y: Double,
+        val z: Double,
+        val size: Float,
+        val layer: Int,
+    )
+
+    /**
+     * Рисует плоские иконки, повёрнутые к камере: предметы без блока на земле.
+     *
+     * Квад строится из векторов камеры, поэтому иконка не «смотрит» в сторону, а всегда
+     * видна. Смешивание включено: у иконок есть прозрачные поля.
+     */
+    fun drawWorldIcons(camera: Camera, icons: List<WorldIcon>) {
+        if (icons.isEmpty()) return
+        val right = camera.right()
+        val up = camera.up()
+        val data = FloatArrayBuilder(icons.size * 6 * VERTEX_FLOATS)
+
+        fun vertex(x: Float, y: Float, z: Float, u: Float, v: Float, layer: Int) {
+            data.add(x); data.add(y); data.add(z)
+            data.add(1f)
+            data.add(FULL_LIGHT)
+            data.add(layer.toFloat())
+            data.add(u); data.add(v)
+            data.add(1f); data.add(1f); data.add(1f)
+        }
+
+        for (icon in icons) {
+            val half = icon.size / 2f
+            val cx = icon.x.toFloat()
+            val cy = icon.y.toFloat()
+            val cz = icon.z.toFloat()
+            for (corner in ICON_CORNERS) {
+                vertex(
+                    cx + right[0] * half * corner[0] + up[0] * half * corner[1],
+                    cy + right[1] * half * corner[0] + up[1] * half * corner[1],
+                    cz + right[2] * half * corner[0] + up[2] * half * corner[1],
+                    corner[2], corner[3], icon.layer,
+                )
+            }
+        }
+
+        val vertices = data.toArray()
+        val buffer = MemoryUtil.memAllocFloat(vertices.size)
+        buffer.put(vertices).flip()
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, cubeVbo)
+        GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_DYNAMIC_DRAW)
+        MemoryUtil.memFree(buffer)
+
+        GL30.glUseProgram(program)
+        textures.bind(0)
+        GL30.glUniform1i(atlasLocation, 0)
+        GL30.glUniformMatrix4fv(
+            viewProjLocation, false,
+            camera.viewProjection(width.toFloat() / height.toFloat()),
+        )
+        GL30.glUniform1f(daylightLocation, daylight)
+        GL30.glUniform3f(cameraLocation, camera.x.toFloat(), camera.y.toFloat(), camera.z.toFloat())
+        GL30.glUniform3f(
+            fogColorLocation,
+            ((fogColor shr 16) and 0xFF) / 255f,
+            ((fogColor shr 8) and 0xFF) / 255f,
+            (fogColor and 0xFF) / 255f,
+        )
+        GL30.glUniform1f(fogStartLocation, fogStart)
+        GL30.glUniform1f(fogEndLocation, fogEnd)
+        GL30.glUniform1f(unlitLocation, 1f)
+        GL30.glEnable(GL30.GL_BLEND)
+        GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+        GL30.glBindVertexArray(cubeVao)
+        GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, vertices.size / VERTEX_FLOATS)
+        GL30.glBindVertexArray(0)
+        GL30.glDisable(GL30.GL_BLEND)
         GL30.glUseProgram(0)
     }
 
@@ -581,6 +670,12 @@ class Renderer(
 
         /** The six faces of a unit cube: corners with their texture coordinates. */
         class CrackFace(val corners: List<FloatArray>)
+
+        /** Два треугольника иконки, повёрнутой к камере: x, y, u, v. */
+        val ICON_CORNERS = arrayOf(
+            floatArrayOf(-1f, -1f, 0f, 1f), floatArrayOf(1f, -1f, 1f, 1f), floatArrayOf(1f, 1f, 1f, 0f),
+            floatArrayOf(-1f, -1f, 0f, 1f), floatArrayOf(1f, 1f, 1f, 0f), floatArrayOf(-1f, 1f, 0f, 0f),
+        )
 
         fun face(vararg corners: FloatArray) = CrackFace(corners.toList())
 

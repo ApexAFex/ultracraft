@@ -67,6 +67,8 @@ object Protocol777 {
         const val CHUNK_BATCH_FINISHED: Int = 0x0B
         const val DISCONNECT: Int = 0x20
         const val SPAWN_ENTITY: Int = 0x01
+        /** Анимация сущности: взмах рукой, урон, смерть. */
+        const val ANIMATE: Int = 0x02
         const val REMOVE_ENTITIES: Int = 0x4E
         const val UPDATE_ENTITY_POSITION: Int = 0x36
         const val UPDATE_ENTITY_POSITION_ROTATION: Int = 0x37

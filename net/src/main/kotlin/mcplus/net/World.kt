@@ -76,6 +76,9 @@ class World(val minY: Int) {
 
     fun column(chunkX: Int, chunkZ: Int): ChunkColumn? = chunks[key(chunkX, chunkZ)]
 
+    /** Выгружает чанк из памяти; возвращает его, если он был. */
+    fun removeChunk(chunkX: Int, chunkZ: Int): ChunkColumn? = chunks.remove(key(chunkX, chunkZ))
+
     fun chunks(): Collection<ChunkColumn> = chunks.values
 
     fun blockAt(x: Int, y: Int, z: Int): Int {

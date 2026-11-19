@@ -885,15 +885,18 @@ private fun resolveStoreFile(explicit: String?): java.io.File {
 // ---------------------------------------------------------------- window
 
 private fun windowCommand(args: List<String>) {
-    // `--open x,y,z` — проверка контейнеров: правый клик по блоку на 30-м кадре.
+    // `--open x,y,z` — проверка контейнеров; `--debug` и `--tab` — снимки отладки и табло.
     var openAt: Triple<Int, Int, Int>? = null
+    var debug = false
+    var showTab = false
     val pass = ArrayList<String>(args.size)
     var index = 0
     while (index < args.size) {
-        if (args[index] == "--open") {
-            openAt = parsePosition(args.getOrNull(++index) ?: fail("--open требует x,y,z"))
-        } else {
-            pass += args[index]
+        when (args[index]) {
+            "--open" -> openAt = parsePosition(args.getOrNull(++index) ?: fail("--open требует x,y,z"))
+            "--debug" -> debug = true
+            "--tab" -> showTab = true
+            else -> pass += args[index]
         }
         index++
     }
@@ -936,6 +939,8 @@ private fun windowCommand(args: List<String>) {
             meshThreads = options.threads,
             replay = replay,
             openAt = openAt,
+            debug = debug,
+            showTab = showTab,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
         )
@@ -1255,6 +1260,8 @@ private fun printUsage() {
           --chunks N     размер карты в чанках, по умолчанию 3 (48 блоков)
           --threads N    потоков на сборку мешей, по умолчанию все ядра минус одно
           --hidden       окно без рамки (для снимков)
+          --debug        отладочные строки F3 (FPS, координаты, чанки)
+          --tab          список игроков по Tab
           --open x,y,z   (window) кликнуть правой кнопкой по блоку — проверка контейнеров
           --frames N     выйти после N кадров, сохранив снимок в --out
           --demo         самопроверка: ломает и ставит блок, идёт вперёд
