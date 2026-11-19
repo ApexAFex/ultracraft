@@ -1309,6 +1309,7 @@ private fun texturesCommand(args: List<String>) {
 private fun containerCommand(args: List<String>) {
     var at: Triple<Int, Int, Int>? = null
     var click: Int? = null
+    var drag: List<Int>? = null
     var button = 0
     var quick = false
     var seconds = 2
@@ -1318,6 +1319,8 @@ private fun containerCommand(args: List<String>) {
         when (args[index]) {
             "--at" -> at = parsePosition(args.getOrNull(++index) ?: fail("--at требует x,y,z"))
             "--click" -> click = args.getOrNull(++index)?.toIntOrNull() ?: fail("--click требует номер слота")
+            "--drag" -> drag = (args.getOrNull(++index) ?: fail("--drag требует список слотов"))
+                .split(',').map { it.trim().toIntOrNull() ?: fail("В --drag не число: $it") }
             "--button" -> button = args.getOrNull(++index)?.toIntOrNull() ?: fail("--button требует число")
             "--quick" -> quick = true
             "--seconds" -> seconds = args.getOrNull(++index)?.toIntOrNull() ?: fail("--seconds требует число")
@@ -1351,6 +1354,14 @@ private fun containerCommand(args: List<String>) {
             open.clickSlot(click, button = button, input = action)
             open.drain(1_500)
             println("После клика по слоту $click (кнопка $button${if (quick) ", shift" else ""}):")
+            printContainer(open, container)
+        }
+        // Перетаскивание распределяет предметы с курсора, поэтому идёт после клика.
+        if (drag != null) {
+            val slots = drag ?: emptyList()
+            open.drag(slots)
+            open.drain(1_500)
+            println("После перетаскивания по слотам $slots:")
             printContainer(open, container)
         }
         open.closeContainer()

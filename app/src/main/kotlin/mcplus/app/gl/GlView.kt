@@ -341,6 +341,11 @@ object GlView {
                     /** Контейнер уже напечатан в лог — чтобы не повторять каждый кадр. */
                     var containerLogged = false
 
+                    /** Перетаскивание в контейнере: какие слоты уже прошли. */
+                    var dragging = false
+                    var mouseSlot = -1
+                    val draggedSlots = HashSet<Int>()
+
                     fun requestRespawn() {
                         session?.requestRespawn()
                         session?.vitals?.respawned()
@@ -611,25 +616,53 @@ object GlView {
                             clickInventoryAt(input.mouseX, input.mouseY)
                         }
 
-                        // Клик по открытому контейнеру: левый — взять/положить, правый — половину,
-                        // shift+левый — быстро переложить. Номер окна уходит серверу в пакете.
+                        // Клик по открытому контейнеру: левый — взять или перетащить, правый —
+                        // половину, shift+левый — быстро переложить. Номер окна уходит серверу.
                         if (openContainer != null) {
                             val rightPressed = GLFW.glfwGetMouseButton(
                                 window, GLFW.GLFW_MOUSE_BUTTON_RIGHT,
                             ) == GLFW.GLFW_PRESS
+                            val leftPressed = GLFW.glfwGetMouseButton(
+                                window, GLFW.GLFW_MOUSE_BUTTON_LEFT,
+                            ) == GLFW.GLFW_PRESS
                             val shift = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
                                 GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS
-                            val button = when {
-                                rightPressed && !rightWasDown -> 1
-                                input.clickRequested -> 0
-                                else -> -1
-                            }
-                            if (button >= 0) {
-                                val (horizontal, vertical) = InventoryScreen.panelPoint(
-                                    input.mouseX, input.mouseY, width, height,
-                                )
-                                val cell = ContainerScreen.slotAt(openContainer, horizontal, vertical)
-                                if (cell != null) {
+                            val (horizontal, vertical) = InventoryScreen.panelPoint(
+                                input.mouseX, input.mouseY, width, height,
+                            )
+                            val cell = ContainerScreen.slotAt(openContainer, horizontal, vertical)
+
+                            if (leftPressed && !shift) {
+                                // Нажатие — обычный клик (взять/положить), а если палец пошёл
+                                // по другим слотам, начинается перетаскивание.
+                                if (input.clickRequested && cell != null) {
+                                    session?.clickSlot(cell.menuSlot)
+                                    mouseSlot = cell.menuSlot
+                                    println("Клик по слоту меню ${cell.menuSlot}: кнопка 0")
+                                }
+                                if (mouseSlot >= 0 && cell != null) {
+                                    if (!dragging && cell.menuSlot != mouseSlot) {
+                                        dragging = true
+                                        draggedSlots.clear()
+                                        draggedSlots += mouseSlot
+                                        session?.dragStart(mouseSlot)
+                                        println("Перетаскивание: слоты $mouseSlot …")
+                                    }
+                                    if (dragging && draggedSlots.add(cell.menuSlot)) {
+                                        session?.dragAdd(cell.menuSlot)
+                                    }
+                                }
+                            } else {
+                                if (dragging) {
+                                    dragging = false
+                                    draggedSlots.clear()
+                                    mouseSlot = -1
+                                    session?.dragEnd()
+                                    println("Перетаскивание окончено")
+                                }
+                                mouseSlot = -1
+                                if (cell != null && (rightPressed && !rightWasDown || input.clickRequested && shift)) {
+                                    val button = if (rightPressed && !rightWasDown) 1 else 0
                                     val action = if (button == 0 && shift) {
                                         mcplus.net.ContainerInput.QUICK_MOVE
                                     } else {

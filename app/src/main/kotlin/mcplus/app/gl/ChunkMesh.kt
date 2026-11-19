@@ -138,8 +138,19 @@ object MeshBuilder {
         is BlockShape.Stairs -> {
             val top = shape.half == SlabHalf.TOP
             val base = if (top) Box(0f, 0.5f, 0f, 1f, 1f, 1f) else Box(0f, 0f, 0f, 1f, 0.5f, 1f)
-            val step = stepBox(shape.facing, if (top) 0f else 0.5f, if (top) 0.5f else 1f)
-            listOf(base, step)
+            val y0 = if (top) 0f else 0.5f
+            val y1 = if (top) 0.5f else 1f
+            val step = stepBox(shape.facing, y0, y1)
+            when (shape.shape) {
+                // Прямая ступень: одна ступенька со стороны взгляда.
+                StairShape.STRAIGHT -> listOf(base, step)
+                // Внутренний угол: ступенька продолжается на соседнюю сторону.
+                StairShape.INNER_LEFT -> listOf(base, step, stepBox(leftOf(shape.facing), y0, y1))
+                StairShape.INNER_RIGHT -> listOf(base, step, stepBox(rightOf(shape.facing), y0, y1))
+                // Внешний угол: остаётся только четверть на углу.
+                StairShape.OUTER_LEFT -> listOf(base, intersection(step, stepBox(leftOf(shape.facing), y0, y1)))
+                StairShape.OUTER_RIGHT -> listOf(base, intersection(step, stepBox(rightOf(shape.facing), y0, y1)))
+            }
         }
 
         is BlockShape.Door -> {
@@ -289,6 +300,22 @@ object MeshBuilder {
         ShapeDirection.NORTH -> Box(0f, y0, 0f, 1f, y1, 0.5f)
         ShapeDirection.SOUTH -> Box(0f, y0, 0.5f, 1f, y1, 1f)
     }
+
+    /** Сторона слева от взгляда: у ступени это соседняя половина внутреннего угла. */
+    private fun leftOf(facing: ShapeDirection): ShapeDirection = when (facing) {
+        ShapeDirection.NORTH -> ShapeDirection.WEST
+        ShapeDirection.WEST -> ShapeDirection.SOUTH
+        ShapeDirection.SOUTH -> ShapeDirection.EAST
+        ShapeDirection.EAST -> ShapeDirection.NORTH
+    }
+
+    private fun rightOf(facing: ShapeDirection): ShapeDirection = leftOf(leftOf(leftOf(facing)))
+
+    /** Пересечение двух коробок — четверть на внешнем углу ступени. */
+    private fun intersection(first: Box, second: Box): Box = Box(
+        maxOf(first.x0, second.x0), maxOf(first.y0, second.y0), maxOf(first.z0, second.z0),
+        minOf(first.x1, second.x1), minOf(first.y1, second.y1), minOf(first.z1, second.z1),
+    )
 
     /**
      * Emits one box: for every face either a quad or nothing.

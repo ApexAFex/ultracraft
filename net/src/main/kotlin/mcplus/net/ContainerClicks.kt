@@ -52,4 +52,37 @@ object ContainerClicks {
             .toByteArray()
         return Packet(Protocol777.Play.CONTAINER_CLICK, body)
     }
+
+    /**
+     * Перетаскивание: начало, проход по слотам и конец.
+     *
+     * У `QUICK_CRAFT` кнопки идут тройками: 0/4/8 — начало (левая/правая/средняя), 1/5/9 —
+     * добавить слот, 2/6/10 — конец. Конец посылается с несуществующим слотом -999, как в
+     * ванили: сервер уже знает, какие слоты прошли.
+     */
+    fun drag(
+        menuSlots: List<Int>,
+        button: Int = 0,
+        containerId: Int = 0,
+    ): List<Packet> {
+        if (menuSlots.isEmpty()) return emptyList()
+        val startButton = when (button) {
+            1 -> 4
+            2 -> 8
+            else -> 0
+        }
+        val packets = ArrayList<Packet>(menuSlots.size + 2)
+        packets += click(FORCE_STATE, menuSlots.first(), startButton, ContainerInput.QUICK_CRAFT, containerId)
+        for (slot in menuSlots.drop(1)) {
+            packets += click(FORCE_STATE, slot, startButton + 1, ContainerInput.QUICK_CRAFT, containerId)
+        }
+        packets += click(FORCE_STATE, DRAG_END_SLOT, startButton + 2, ContainerInput.QUICK_CRAFT, containerId)
+        return packets
+    }
+
+    /** Состояние меню, которого у сервера нет: в ответ он пришлёт полное меню. */
+    private const val FORCE_STATE = -1
+
+    /** Слот для конца перетаскивания: сервер его не использует. */
+    const val DRAG_END_SLOT = -999
 }

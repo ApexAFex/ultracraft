@@ -210,7 +210,11 @@ class MeshBuilderTest {
                     "9\twhite_carpet\t\n" +
                     "10\tsnow\tlayers=3\n" +
                     "11\tcobblestone_wall\teast=tall,north=none,south=low,up=true,west=none\n" +
-                    "12\tshort_grass\t\n",
+                    "12\tshort_grass\t\n" +
+                    "13\toak_stairs\tfacing=east,half=bottom,shape=inner_left\n" +
+                    "14\toak_stairs\tfacing=east,half=bottom,shape=inner_right\n" +
+                    "15\toak_stairs\tfacing=east,half=bottom,shape=outer_left\n" +
+                    "16\toak_stairs\tfacing=east,half=bottom,shape=outer_right\n",
             )
         },
     )
@@ -358,6 +362,34 @@ class MeshBuilderTest {
         // Плечо на восток доходит до края клетки, на север — нет (none).
         assertEquals(1f, xs.max(), 0.001f)
         assertTrue(zs.all { it >= 0.25f }, "на севере не должно быть плеча: $zs")
+    }
+
+    @Test
+    fun `corner stairs add or remove part of the step`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 4))
+        val straight = shapeMesh(world).vertexCount
+
+        val innerWorld = world()
+        innerWorld.add(chunkWith(intArrayOf(0, 48, 0) to 13))
+        val inner = shapeMesh(innerWorld)
+
+        val outerWorld = world()
+        outerWorld.add(chunkWith(intArrayOf(0, 48, 0) to 15))
+        val outer = shapeMesh(outerWorld)
+
+        assertTrue(inner.vertexCount > straight, "внутренний угол шире прямой ступени")
+        assertTrue(outer.vertexCount < inner.vertexCount, "внешний угол меньше внутреннего")
+
+        // Внешний угол — четверть: верхняя ступенька не выходит за 0.5 по X и Z.
+        val high = ArrayList<Pair<Float, Float>>()
+        var index = 0
+        while (index < outer.data.size) {
+            if (outer.data[index + 1] > 48.9f) high += outer.data[index] to outer.data[index + 2]
+            index += MESH_STRIDE
+        }
+        assertTrue(high.isNotEmpty(), "у внешнего угла нет верхней части")
+        assertTrue(high.all { it.first >= 0.5f && it.second <= 0.5f }, "четверть не на том углу: $high")
     }
 
     @Test

@@ -264,6 +264,36 @@ class Session internal constructor(
         send(ContainerClicks.click(FORCE_FULL_STATE, menuSlot, button, input, containerId))
     }
 
+    /** Перетаскивание: начало (палец нажат на слоте), добавление слотов и конец. */
+    fun dragStart(menuSlot: Int, button: Int = 0) {
+        val start = when (button) { 1 -> 4; 2 -> 8; else -> 0 }
+        send(ContainerClicks.click(menuStateId(), menuSlot, start, ContainerInput.QUICK_CRAFT, container?.id ?: 0))
+    }
+
+    fun dragAdd(menuSlot: Int, button: Int = 0) {
+        val start = when (button) { 1 -> 4; 2 -> 8; else -> 0 }
+        send(ContainerClicks.click(menuStateId(), menuSlot, start + 1, ContainerInput.QUICK_CRAFT, container?.id ?: 0))
+    }
+
+    fun dragEnd(button: Int = 0) {
+        val start = when (button) { 1 -> 4; 2 -> 8; else -> 0 }
+        send(
+            ContainerClicks.click(
+                menuStateId(), ContainerClicks.DRAG_END_SLOT, start + 2,
+                ContainerInput.QUICK_CRAFT, container?.id ?: 0,
+            ),
+        )
+    }
+
+    /** Для перетаскивания нужен настоящий state id: с выдуманным сервер бросает drag. */
+    private fun menuStateId(): Int = container?.stateId ?: FORCE_FULL_STATE
+
+    /** Перетаскивание предмета по слотам меню: начало, проход, конец. */
+    fun drag(menuSlots: List<Int>, button: Int = 0) {
+        val id = container?.id ?: 0
+        for (packet in ContainerClicks.drag(menuSlots, button, id)) send(packet)
+    }
+
     /** Закрывает открытый контейнер: сервер должен убрать окно и у себя. */
     fun closeContainer() {
         val open = container ?: return
