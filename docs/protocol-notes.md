@@ -92,6 +92,46 @@ update entity position 0x35 → 0x36, synchronize position 0x48 → 0x49, remove
 `actual start of destroying`, `destroyed`, `aborted destroying`, `too far`, `spawn protection`
 и т.п. Это и есть ответ на вопрос «почему не ломается», без гадания по пакетам.
 
+## Инвентарь: id, слоты и предметы
+
+Пакеты (проверены на живом сервере, id из `GameProtocols` самого jar и из
+`reports/packets.json` генератора данных):
+
+| Направление | Пакет | id |
+|---|---|---|
+| clientbound | `container_set_content` (всё содержимое) | `0x12` |
+| clientbound | `container_set_slot` (один слот) | `0x14` |
+| clientbound | `set_held_slot` (выбранный слот хотбара) | `0x6B` |
+| clientbound | `set_player_inventory` (слот инвентаря) | `0x6E` |
+| serverbound | `set_carried_item` (сменить слот) | `0x36` |
+
+**Слоты адресуются двумя разными способами.** `container_set_content` и `container_set_slot`
+описывают **меню** игрока (`InventoryMenu`): крафт, броня, основной инвентарь, хотбар — и там
+хотбар это `36..44`. А `set_player_inventory` описывает сам инвентарь, где хотбар `0..8`.
+Первая версия клиента смешала их и положила предметы «на 36 слотов мимо руки» — ошибка тихая,
+предметы приезжают, просто не в руку.
+
+`set_carried_item` несёт номер слота как **short**, а не VarInt.
+
+**Стек предмета** — это `count` (VarInt, 0 = пусто), `item id` (VarInt) и `DataComponentPatch`:
+два счётчика (добавленные, удалённые) и тела компонентов. У каждого компонента собственный
+кодек, поэтому длину тела без него не узнать: клиент читает точные `count`/`id` только при
+пустом patch (обычная стопка блоков), а иначе показывает предмет как неизвестный. Зато
+`container_set_content` в таком случае отбрасывается целиком — пакеты length-delimited, и
+дальше разбор не едет по мусору.
+
+**Реестр предметов по сети не приходит** (в отличие от измерений и биомов): id предметов
+встроены в клиент. Таблица генерируется из данных самой игры:
+
+```powershell
+java "-DbundlerMainClass=net.minecraft.data.Main" -jar tools/server/server.jar --reports
+node tools/build-item-table.js      # data/items-777.tsv
+```
+
+Тот же запуск даёт `reports/packets.json` — полный список пакетов с id. Если нужно проверить
+id по jar, есть `tools/protocol-ids.java`: он просит список у самого сервера через
+`GameProtocols`, а не парсит байткод.
+
 ## Полёт и кик за полёт
 
 - Разрешение летать приходит отдельным пакетом `Player Abilities` (clientbound 0x41):

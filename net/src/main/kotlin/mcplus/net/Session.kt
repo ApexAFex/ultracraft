@@ -25,6 +25,7 @@ class Session internal constructor(
     private val connection: Connection,
     val joinResult: JoinResult,
     private val log: (String) -> Unit = {},
+    itemTable: ItemTable = ItemTable.EMPTY,
 ) : Closeable {
 
     var playerPosition: PlayerPosition? = null
@@ -43,6 +44,9 @@ class Session internal constructor(
      * not be thrown away.
      */
     val players: PlayerList = PlayerList()
+
+    /** What the player carries; the server sends it right after the join. */
+    val inventory: Inventory = Inventory(itemTable)
 
     /** Why the connection ended, or null while it is alive. */
     @Volatile
@@ -95,6 +99,12 @@ class Session internal constructor(
                 Protocol777.Play.PLAYER_INFO, Protocol777.Play.PLAYER_REMOVE ->
                     players.onPacket(packet.id, packet.body)
 
+                Protocol777.Play.CONTAINER_SET_CONTENT,
+                Protocol777.Play.CONTAINER_SET_SLOT,
+                Protocol777.Play.SET_PLAYER_INVENTORY,
+                Protocol777.Play.SET_HELD_SLOT ->
+                    inventory.onPacket(packet.id, packet.body)
+
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 
                 Protocol777.Play.DISCONNECT ->
@@ -124,6 +134,18 @@ class Session internal constructor(
      */
     fun requestRespawn() {
         send(Packet(Protocol777.Play.CLIENT_STATUS, ByteWriter().writeVarInt(RESPAWN).toByteArray()))
+    }
+
+    /**
+     * Picks a hotbar slot (0..8) and tells the server.
+     *
+     * The slot is applied locally right away, as vanilla does; the server echoes `Set Held Slot`
+     * and corrects us if it disagrees. The packet carries the slot as a **short**, not a VarInt.
+     */
+    fun selectSlot(slot: Int) {
+        if (slot !in 0..8) return
+        inventory.select(slot)
+        send(Packet(Protocol777.Play.SET_CARRIED_ITEM, ByteWriter().writeShort(slot).toByteArray()))
     }
 
     /**

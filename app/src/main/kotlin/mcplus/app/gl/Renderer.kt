@@ -30,6 +30,11 @@ class Renderer(
     private val crackVbo = GL30.glGenBuffers()
     private val crackData = FloatArray(6 * 6 * 7)
 
+    /** Nine hotbar icons: 9 cells × 6 vertices × 7 floats. */
+    private val hotbarVao = GL30.glGenVertexArrays()
+    private val hotbarVbo = GL30.glGenBuffers()
+    private val hotbarData = FloatArray(9 * 6 * 7)
+
     private class Part(val vao: Int, val vbo: Int) {
         var count: Int = 0
     }
@@ -48,6 +53,23 @@ class Renderer(
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, crackVbo)
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, crackData.size.toLong() * Float.SIZE_BYTES, GL30.GL_DYNAMIC_DRAW)
         val crackStride = 7 * Float.SIZE_BYTES
+        GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, crackStride, 0L)
+        GL30.glEnableVertexAttribArray(0)
+        GL30.glVertexAttribPointer(1, 1, GL30.GL_FLOAT, false, crackStride, 3L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(1)
+        GL30.glVertexAttribPointer(2, 1, GL30.GL_FLOAT, false, crackStride, 4L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(2)
+        GL30.glVertexAttribPointer(3, 2, GL30.GL_FLOAT, false, crackStride, 5L * Float.SIZE_BYTES)
+        GL30.glEnableVertexAttribArray(3)
+        GL30.glBindVertexArray(0)
+
+        GL30.glBindVertexArray(hotbarVao)
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, hotbarVbo)
+        GL30.glBufferData(
+            GL30.GL_ARRAY_BUFFER,
+            hotbarData.size.toLong() * Float.SIZE_BYTES,
+            GL30.GL_DYNAMIC_DRAW,
+        )
         GL30.glVertexAttribPointer(0, 3, GL30.GL_FLOAT, false, crackStride, 0L)
         GL30.glEnableVertexAttribArray(0)
         GL30.glVertexAttribPointer(1, 1, GL30.GL_FLOAT, false, crackStride, 3L * Float.SIZE_BYTES)
@@ -168,9 +190,86 @@ class Renderer(
         GL30.glUseProgram(0)
     }
 
-    /** Wireframe cube around the targeted block. */
-    fun drawOutline(camera: Camera, blockX: Int, blockY: Int, blockZ: Int) {
+    /**
+     * The nine hotbar cells as flat block icons in front of the camera.
+     *
+     * There is no screen-space pass in this client, so the strip is drawn in world space at a
+     * fixed distance, the same way the nicknames are: one and a half blocks ahead reads like a
+     * HUD. A cell without a block is skipped, the selected one is drawn larger and brighter.
+     */
+    fun drawHotbar(camera: Camera, layers: List<Float?>, selected: Int) {
+        val forward = camera.forward()
+        val right = camera.right()
+        val up = camera.up()
+        val distance = 1.2f
+        val centreX = camera.x.toFloat() + forward[0] * distance
+        val centreY = camera.y.toFloat() + forward[1] * distance
+        val centreZ = camera.z.toFloat() + forward[2] * distance
+
+        // Nine cells that take about a third of the screen width, like the real hotbar.
+        val cell = 0.075f
+        val step = 0.085f
+        val vertical = -0.5f
         var offset = 0
+
+        for (index in 0 until 9) {
+            val layer = layers.getOrNull(index) ?: continue
+            val size = if (index == selected) cell * 1.18f else cell
+            val half = size / 2f
+            val horizontal = (index - 4) * step
+            val shade = if (index == selected) 1.0f else 0.78f
+
+            fun vertex(h: Float, v: Float, u: Float, w: Float) {
+                hotbarData[offset++] = centreX + right[0] * h + up[0] * v
+                hotbarData[offset++] = centreY + right[1] * h + up[1] * v
+                hotbarData[offset++] = centreZ + right[2] * h + up[2] * v
+                hotbarData[offset++] = shade
+                hotbarData[offset++] = layer
+                hotbarData[offset++] = u
+                hotbarData[offset++] = w
+            }
+
+            val left = horizontal - half
+            val rightEdge = horizontal + half
+            val bottom = vertical - half
+            val top = vertical + half
+
+            vertex(left, top, 0f, 0f)
+            vertex(rightEdge, bottom, 1f, 1f)
+            vertex(rightEdge, top, 1f, 0f)
+
+            vertex(left, top, 0f, 0f)
+            vertex(left, bottom, 0f, 1f)
+            vertex(rightEdge, bottom, 1f, 1f)
+        }
+        if (offset == 0) return
+
+        val buffer = MemoryUtil.memAllocFloat(offset)
+        buffer.put(hotbarData, 0, offset).flip()
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, hotbarVbo)
+        GL30.glBufferSubData(GL30.GL_ARRAY_BUFFER, 0, buffer)
+        MemoryUtil.memFree(buffer)
+
+        GL30.glUseProgram(program)
+        textures.bind(0)
+        GL30.glUniform1i(atlasLocation, 0)
+        GL30.glUniformMatrix4fv(
+            viewProjLocation, false,
+            camera.viewProjection(width.toFloat() / height.toFloat()),
+        )
+        GL30.glBindVertexArray(hotbarVao)
+        GL30.glEnable(GL30.GL_BLEND)
+        GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+        GL30.glDisable(GL30.GL_DEPTH_TEST)
+        GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, offset / 7)
+        GL30.glEnable(GL30.GL_DEPTH_TEST)
+        GL30.glDisable(GL30.GL_BLEND)
+        GL30.glBindVertexArray(0)
+        GL30.glUseProgram(0)
+    }
+
+    /** Wireframe cube around the targeted block. */
+    fun drawOutline(camera: Camera, blockX: Int, blockY: Int, blockZ: Int) {        var offset = 0
         for ((start, end) in EDGES) {
             outlineData[offset++] = blockX + start[0]
             outlineData[offset++] = blockY + start[1]
@@ -207,6 +306,8 @@ class Renderer(
         GL30.glDeleteVertexArrays(outlineVao)
         GL30.glDeleteBuffers(crackVbo)
         GL30.glDeleteVertexArrays(crackVao)
+        GL30.glDeleteBuffers(hotbarVbo)
+        GL30.glDeleteVertexArrays(hotbarVao)
         GL30.glDeleteProgram(program)
         GL30.glDeleteProgram(outlineProgram)
     }

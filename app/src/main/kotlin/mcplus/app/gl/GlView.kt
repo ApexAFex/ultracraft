@@ -46,6 +46,13 @@ object GlView {
     private const val DEMO_MINE_FROM = 700
 
     /**
+     * Demo mode places a block here, before the digging starts, so the self-test exercises
+     * placement too. It only works when the player has something in hand: a fresh survival
+     * player has nothing, so the demo run needs items given over RCON.
+     */
+    private const val DEMO_PLACE_AT = 600
+
+    /**
      * How long a dig may take before the client gives up on it, in ticks beyond its estimate.
      * The server keeps its own progress and breaks the block when it reaches one, so the
      * client holds until the block is really gone; this cap only stops a hopeless attempt.
@@ -74,7 +81,6 @@ object GlView {
         hidden: Boolean = false,
         minecraftDirectory: File? = null,
         session: Session? = null,
-        placeBlockName: String = "stone",
         demo: Boolean = false,
         meshThreads: Int = 0,
         /** Packets read while the first chunks were awaited; replayed before the loop starts. */
@@ -189,7 +195,6 @@ object GlView {
 
             session?.startReading { packet -> handle(packet) }
 
-            val placeState = blocks.firstStateOf(placeBlockName) ?: 1
             var sequence = 0
             var leftWasDown = false
             var rightWasDown = false
@@ -313,13 +318,28 @@ object GlView {
                         mining = false
                     }
 
+                    /**
+                     * The block that the item in hand places, or null when the hand is empty or
+                     * holds something that is not a block (a stick, a tool). The server ignores a
+                     * placement attempt with no block in hand, so the client must not predict one.
+                     */
+                    fun heldBlockState(): Int? {
+                        val name = session?.inventory?.heldName() ?: return null
+                        return blocks.firstStateOf(name)
+                    }
+
                     fun demoPlace(hit: Raycast.Hit) {
+                        val state = heldBlockState()
+                        if (state == null) {
+                            println("Ставить нечего: в руке нет блока")
+                            return
+                        }
                         val (offsetX, offsetY, offsetZ) = Raycast.offset(hit.face)
                         val nextX = hit.x + offsetX
                         val nextY = hit.y + offsetY
                         val nextZ = hit.z + offsetZ
                         if (world.blockAt(nextX, nextY, nextZ) != 0) return
-                        world.setBlock(nextX, nextY, nextZ, placeState)
+                        world.setBlock(nextX, nextY, nextZ, state)
                         pipeline.request(nextX shr 4, nextZ shr 4)
                         session?.send(
                             BlockInteraction.useItemOn(
@@ -338,6 +358,13 @@ object GlView {
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
                         if (demo && frame == DEMO_FLY_ATTEMPT) input.requestFlyToggle()
+
+                        // Number keys pick a hotbar slot; the server echoes the choice.
+                        input.hotbarSlotRequested?.let { slot ->
+                            session?.selectSlot(slot)
+                            val name = session?.inventory?.heldName() ?: "пусто"
+                            println("Слот ${slot + 1}: $name")
+                        }
 
                         // A kick or a network error must end the game on purpose: continuing to
                         // draw a world nobody is talking to is how the client used to "just close".
@@ -568,6 +595,57 @@ object GlView {
                         textRenderer?.draw(camera, labels)
                         if (target != null) renderer.drawOutline(camera, target.x, target.y, target.z)
 
+                        // Hotbar: the icons come from the same atlas the world uses, and the
+                        // selected item's name is written underneath. Without it there is no way
+                        // to tell what is in hand, and placing a block needs exactly that.
+                        val inventory = session?.inventory
+                        if (inventory != null) {
+                            val forward = camera.forward()
+                            val up = camera.up()
+                            val right = camera.right()
+                            // Same plane as the icons inside Renderer.drawHotbar.
+                            val stripX = camera.x + forward[0] * 1.2 - up[0] * 0.5
+                            val stripY = camera.y + forward[1] * 1.2 - up[1] * 0.5
+                            val stripZ = camera.z + forward[2] * 1.2 - up[2] * 0.5
+                            val shift = (inventory.selected - 4) * 0.085f
+                            textRenderer?.drawBar(
+                                camera, stripX, stripY, stripZ, 0.4f, 0.055f, 0.08f, 0.08f, 0.08f, 0.55f,
+                            )
+                            textRenderer?.drawBar(
+                                camera,
+                                stripX + right[0] * shift,
+                                stripY + right[1] * shift,
+                                stripZ + right[2] * shift,
+                                0.05f, 0.05f, 0.95f, 0.95f, 0.95f, 0.35f,
+                            )
+
+                            val layers = (0 until 9).map { slot ->
+                                val name = inventory.nameOf(inventory.stackIn(slot)) ?: return@map null
+                                atlas.layerFor(name, TextureAtlas.Kind.TOP).toFloat()
+                            }
+                            renderer.drawHotbar(camera, layers, inventory.selected)
+
+                            val held = inventory.held()
+                            val text = if (held == null || held.isEmpty) {
+                                "пусто"
+                            } else {
+                                // The font is the game's ASCII set: "×" is not in it, so "x".
+                                "${inventory.nameOf(held) ?: "?"} x${held.count}"
+                            }
+                            textRenderer?.draw(
+                                camera,
+                                listOf(
+                                    TextRenderer.Label(
+                                        camera.x + forward[0] * 0.6 - up[0] * 0.36,
+                                        camera.y + forward[1] * 0.6 - up[1] * 0.36,
+                                        camera.z + forward[2] * 0.6 - up[2] * 0.36,
+                                        text,
+                                    ),
+                                ),
+                                scaleOverride = 0.0035f,
+                            )
+                        }
+
                         // Cracks on the block being mined: ten stages, like vanilla.
                         if (mining) {
                             val stage = ((miningTicks * 10) / miningNeeded).coerceIn(0, 9)
@@ -584,6 +662,7 @@ object GlView {
                         aimTarget = miningTarget
 
                         if (rightDown && !rightWasDown && target != null) demoPlace(target)
+                        if (demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         if (demo && frame == DEMO_AIM_AT) {
                             // Aim at the closest **player** first: nicknames and player models are
                             // what a screenshot needs to check, and a passing mob would hide them.

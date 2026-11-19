@@ -49,6 +49,8 @@ private fun dispatch(args: List<String>) {
         args[0] == "window" -> windowCommand(args.drop(1))
         args[0] == "watch" -> watchCommand(args.drop(1))
         args[0] == "mine" -> mineCommand(args.drop(1))
+        args[0] == "place" -> placeCommand(args.drop(1))
+        args[0] == "hotbar" -> hotbarCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
         args[0] == "logout" -> logoutCommand(args.drop(1))
@@ -420,6 +422,159 @@ private fun mineCommand(args: List<String>) {
     }
 }
 
+// ---------------------------------------------------------------- inventory
+
+/**
+ * Shows what the player carries and which hotbar slot is held.
+ *
+ * Without `--slot` it only reports. The inventory arrives right after the join, so the command
+ * waits for a few chunks first: a player who is not in the world yet has no inventory either.
+ */
+private fun hotbarCommand(args: List<String>) {
+    var slot: Int? = null
+    val rest = ArrayList<String>()
+    var index = 0
+    while (index < args.size) {
+        if (args[index] == "--slot") {
+            slot = args.getOrNull(++index)?.toIntOrNull() ?: fail("--slot требует число от 1 до 9")
+        } else {
+            rest += args[index]
+        }
+        index++
+    }
+    val options = parseLoginArgs(rest) ?: return
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+
+    val session = connect(host, port, options)
+    session.use { open ->
+        WorldCollector(open).collect(maxChunks = 25, durationMs = 1_500)
+        // The slot switch is answered by the server; give the answer time to arrive.
+        slot?.let {
+            open.selectSlot(it - 1)
+            Thread.sleep(300)
+        }
+
+        val inventory = open.inventory
+        val heldName = inventory.heldName() ?: "пусто"
+        println("Выбран слот ${inventory.selected + 1}: $heldName")
+        println("Слоты:")
+        val contents = inventory.contents()
+        if (contents.isEmpty()) {
+            println("  (инвентарь пуст)")
+        }
+        for ((slotIndex, stack) in contents) {
+            val where = if (slotIndex in 0..8) "хотбар ${slotIndex + 1}" else "слот $slotIndex"
+            val name = inventory.nameOf(stack) ?: "не читается (составные части предмета)"
+            println("  $where: $name × ${stack.count}")
+        }
+    }
+}
+
+/**
+ * Places one block from the held item and reports what the server did with it.
+ *
+ * `--at x,y,z` is the block that is *clicked*, `--face` is which side of it (0 = -Y, 1 = +Y,
+ * 2 = -Z, 3 = +Z, 4 = -X, 5 = +X). The new block appears in the neighbour on that side, which is
+ * what the command watches for in `Block Update`.
+ */
+private fun placeCommand(args: List<String>) {
+    var face = 1
+    var slot: Int? = null
+    val rest = ArrayList<String>()
+    var index = 0
+    while (index < args.size) {
+        when (args[index]) {
+            "--face" -> face = args.getOrNull(++index)?.toIntOrNull() ?: fail("--face требует число 0..5")
+            "--slot" -> slot = args.getOrNull(++index)?.toIntOrNull() ?: fail("--slot требует число от 1 до 9")
+            else -> rest += args[index]
+        }
+        index++
+    }
+    if (face !in 0..5) fail("--face ждёт число 0..5")
+    val options = parseLoginArgs(rest) ?: return
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+    val blocks = findBlockTable(options.blocks)
+
+    val session = connect(host, port, options)
+    session.use { open ->
+        val world = WorldCollector(open).collect(maxChunks = 25, durationMs = 2_000)
+        val standing = open.playerPosition
+        val (x, y, z) = options.at ?: run {
+            val px = kotlin.math.floor(standing?.x ?: 0.0).toInt()
+            val py = kotlin.math.floor(standing?.y ?: 0.0).toInt() - 1
+            val pz = kotlin.math.floor(standing?.z ?: 0.0).toInt()
+            // Two blocks away, not one: the player's body overlaps the neighbouring cell, and the
+            // server refuses to place a block into a space a player stands in.
+            val beside = listOf(2 to 0, -2 to 0, 0 to 2, 0 to -2, 1 to 1, -1 to 1, 1 to -1, -1 to -1)
+                .map { (dx, dz) -> Triple(px + dx, py, pz + dz) }
+                // Prefer a block with room above it: otherwise the spot to place into is already
+                // occupied, and the command only sees the server correcting our copy of the world.
+                .sortedByDescending { (bx, by, bz) -> if (world.blockAt(bx, by + 1, bz) == 0) 1 else 0 }
+                .firstOrNull { world.blockAt(it.first, it.second, it.third) != 0 }
+            beside ?: Triple(px, py, pz)
+        }
+        val target = world.blockAt(x, y, z)
+        println("Игрок в ${standing?.let { "%.1f, %.1f, %.1f".format(it.x, it.y, it.z) }}")
+        println("Целевой блок $x, $y, $z: ${blocks.nameOf(target)}")
+
+        println("Жду загрузки игрока на сервере: 70 тиков…")
+        repeat(70) {
+            Thread.sleep(50)
+            open.send(mcplus.net.PlayerMovement.tickEnd())
+        }
+
+        slot?.let { open.selectSlot(it - 1) }
+        val held = open.inventory.heldName()
+        println("В руке: ${held ?: "пусто"}")
+
+        val (dx, dy, dz) = when (face) {
+            0 -> Triple(0, -1, 0)
+            1 -> Triple(0, 1, 0)
+            2 -> Triple(0, 0, -1)
+            3 -> Triple(0, 0, 1)
+            4 -> Triple(-1, 0, 0)
+            else -> Triple(1, 0, 0)
+        }
+        val nx = x + dx
+        val ny = y + dy
+        val nz = z + dz
+
+        var sequence = 0
+        open.send(
+            mcplus.net.BlockInteraction.useItemOn(x, y, z, face, 0.5f, 0.5f, 0.5f, sequence++),
+        )
+        open.send(mcplus.net.PlayerMovement.tickEnd())
+
+        val deadline = System.currentTimeMillis() + 2_000
+        var answer: Int? = null
+        var lost: String? = null
+        try {
+            while (System.currentTimeMillis() < deadline) {
+                val packet = open.receive()
+                if (packet.id != mcplus.net.proto.Protocol777.Play.BLOCK_UPDATE) continue
+                val reader = mcplus.protocol.ByteReader(packet.body)
+                val changed = reader.readPosition()
+                if (changed.x != nx || changed.y != ny || changed.z != nz) continue
+                answer = reader.readVarInt()
+                if (answer != 0) break
+            }
+        } catch (e: java.net.SocketTimeoutException) {
+            // Silence is an answer: nothing was placed.
+        } catch (e: java.io.IOException) {
+            lost = e.message ?: e.javaClass.simpleName
+        }
+
+        val kickReason = open.closeReason
+        when {
+            lost != null -> println("Соединение закрыто: $lost")
+            kickReason != null -> println("Сервер закрыл соединение: $kickReason")
+            answer == null -> println("Блок $nx, $ny, $nz не изменился: сервер ничего не поставил")
+            answer == 0 -> println("Странно: в $nx, $ny, $nz теперь воздух")
+            else -> println("Сервер поставил ${blocks.nameOf(answer!!)} в $nx, $ny, $nz")
+        }
+    }
+}
+
 // ---------------------------------------------------------------- login
 
 private fun loginCommand(args: List<String>) {
@@ -663,6 +818,26 @@ private fun findBlockTable(explicit: String?): BlockTable {
     return BlockTable.load(file)
 }
 
+/**
+ * Item names for the numbers on the wire, generated with `tools/build-item-table.js`.
+ *
+ * A missing table is not fatal: the client still works, item ids simply stay numbers.
+ */
+private fun findItemTable(explicit: String? = null): mcplus.net.ItemTable {
+    val candidates = buildList {
+        explicit?.let { add(java.io.File(it)) }
+        add(java.io.File("data/items-777.tsv"))
+        add(java.io.File("../data/items-777.tsv"))
+        add(java.io.File("../../data/items-777.tsv"))
+    }
+    val file = candidates.firstOrNull { it.isFile }
+    if (file == null) {
+        System.err.println("Нет таблицы предметов (data/items-777.tsv): имена вещей будут номерами.")
+        return mcplus.net.ItemTable.EMPTY
+    }
+    return mcplus.net.ItemTable.load(file)
+}
+
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
     val account = if (options.online) loadAccount() else null
     val attempts = 3
@@ -681,6 +856,7 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session {
                 },
                 protocolVersion = options.protocol,
                 log = if (options.verbose) { line -> println("  $line") } else { _ -> },
+                itemTable = findItemTable(),
             ).join()
         } catch (e: ServerDisconnectException) {
             // The session server rate limits joins and propagates them lazily, so a fresh

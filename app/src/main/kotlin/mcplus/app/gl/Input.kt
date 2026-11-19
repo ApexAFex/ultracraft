@@ -25,9 +25,14 @@ class Input(private val window: Long, private val camera: Camera) {
     private var firstMouse = true
     private var lastTime = System.nanoTime()
     private var flyPressed = false
+    private var hotbarPressed = -1
 
     /** Set once when F is pressed, consumed by the caller to toggle the fly mode. */
     var flyToggleRequested: Boolean = false
+        private set
+
+    /** Hotbar slot 0..8 picked with the number keys, consumed by the caller. */
+    var hotbarSlotRequested: Int? = null
         private set
 
     private val cursorCallback = GLFWCursorPosCallbackI { _, x, y ->
@@ -72,6 +77,15 @@ class Input(private val window: Long, private val camera: Camera) {
         flyToggleRequested = fly && !flyPressed
         flyPressed = fly
 
+        // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
+        // a frame-by-frame repeat would send a packet per frame.
+        hotbarSlotRequested = null
+        val slotDown = HOTBAR_KEYS.indexOfFirst { pressed(it) }
+        if (slotDown != hotbarPressed) {
+            if (slotDown >= 0) hotbarSlotRequested = slotDown
+            hotbarPressed = slotDown
+        }
+
         if (pressed(GLFW.GLFW_KEY_ESCAPE)) GLFW.glfwSetWindowShouldClose(window, true)
     }
 
@@ -84,5 +98,12 @@ class Input(private val window: Long, private val camera: Camera) {
 
     private companion object {
         const val SENSITIVITY = 0.0025f
+
+        /** Keys 1..9 in hotbar order. */
+        val HOTBAR_KEYS = intArrayOf(
+            GLFW.GLFW_KEY_1, GLFW.GLFW_KEY_2, GLFW.GLFW_KEY_3,
+            GLFW.GLFW_KEY_4, GLFW.GLFW_KEY_5, GLFW.GLFW_KEY_6,
+            GLFW.GLFW_KEY_7, GLFW.GLFW_KEY_8, GLFW.GLFW_KEY_9,
+        )
     }
 }

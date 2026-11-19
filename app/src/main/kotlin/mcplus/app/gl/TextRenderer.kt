@@ -37,8 +37,14 @@ class TextRenderer(
     /** How far the dark plate sticks out past the text, in blocks. */
     private val padding = 0.02f
 
-    fun draw(camera: Camera, labels: List<Label>) {
+    /**
+     * @param scaleOverride glyph size in blocks per font pixel. Nicknames use the default;
+     *   the hotbar label sits much closer to the eye and needs smaller glyphs to look right.
+     */
+    fun draw(camera: Camera, labels: List<Label>, scaleOverride: Float? = null) {
         if (labels.isEmpty()) return
+        val scale = scaleOverride ?: this.scale
+        val padding = this.padding * (scale / this.scale)
 
         val right = camera.right()
         val up = camera.up()
@@ -91,6 +97,62 @@ class TextRenderer(
         drawArray(plate.toArray(), 0.05f, 0.05f, 0.05f, 0.45f, textured = false)
         drawArray(glyphs.toArray(), 1f, 1f, 1f, 1f, textured = true)
 
+        GL30.glDisable(GL30.GL_BLEND)
+        GL30.glEnable(GL30.GL_DEPTH_TEST)
+        GL30.glBindVertexArray(0)
+        GL30.glUseProgram(0)
+    }
+
+    /**
+     * A plain rectangle in the camera plane: the hotbar's background and its selected cell.
+     *
+     * The same plane the icons are drawn in, so the caller only has to know where the strip sits.
+     * Alpha blending is on, so a dark bar with alpha < 1 darkens the world without hiding it.
+     */
+    fun drawBar(
+        camera: Camera,
+        centreX: Double,
+        centreY: Double,
+        centreZ: Double,
+        halfWidth: Float,
+        halfHeight: Float,
+        r: Float,
+        g: Float,
+        b: Float,
+        a: Float,
+    ) {
+        val right = camera.right()
+        val up = camera.up()
+        val cx = centreX.toFloat()
+        val cy = centreY.toFloat()
+        val cz = centreZ.toFloat()
+
+        val builder = FloatArrayBuilder(6 * 5)
+        fun emit(horizontal: Float, vertical: Float) {
+            builder.add(cx + right[0] * horizontal + up[0] * vertical)
+            builder.add(cy + right[1] * horizontal + up[1] * vertical)
+            builder.add(cz + right[2] * horizontal + up[2] * vertical)
+            builder.add(0f)
+            builder.add(0f)
+        }
+
+        emit(-halfWidth, halfHeight)
+        emit(halfWidth, -halfHeight)
+        emit(halfWidth, halfHeight)
+        emit(-halfWidth, halfHeight)
+        emit(-halfWidth, -halfHeight)
+        emit(halfWidth, -halfHeight)
+
+        GL30.glUseProgram(program)
+        GL30.glUniformMatrix4fv(
+            viewProjLocation, false,
+            camera.viewProjection(width.toFloat() / height.toFloat()),
+        )
+        GL30.glBindVertexArray(vao)
+        GL30.glDisable(GL30.GL_DEPTH_TEST)
+        GL30.glEnable(GL30.GL_BLEND)
+        GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+        drawArray(builder.toArray(), r, g, b, a, textured = false)
         GL30.glDisable(GL30.GL_BLEND)
         GL30.glEnable(GL30.GL_DEPTH_TEST)
         GL30.glBindVertexArray(0)

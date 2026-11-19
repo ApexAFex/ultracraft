@@ -44,6 +44,8 @@ class MinecraftClient(
     private val protocolVersion: Int = Protocol777.PROTOCOL_VERSION,
     private val timeoutMs: Int = 15_000,
     private val log: (String) -> Unit = {},
+    /** Names for item ids: the item registry is built into the client, not sent. */
+    private val itemTable: ItemTable = ItemTable.EMPTY,
 ) {
 
     private enum class State { LOGIN, CONFIGURATION, PLAY }
@@ -58,7 +60,7 @@ class MinecraftClient(
 
         val connection = Connection(socket)
         return try {
-            Session(connection, handshakeAndLogin(connection), log)
+            Session(connection, handshakeAndLogin(connection), log, itemTable)
         } catch (t: Throwable) {
             connection.close()
             throw t

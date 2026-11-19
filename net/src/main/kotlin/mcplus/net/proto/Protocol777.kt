@@ -80,6 +80,10 @@ object Protocol777 {
         const val PLAYER_REMOVE: Int = 0x46
         const val PLAYER_INFO: Int = 0x47
         const val SYNCHRONIZE_POSITION: Int = 0x49
+        const val CONTAINER_SET_CONTENT: Int = 0x12
+        const val CONTAINER_SET_SLOT: Int = 0x14
+        const val SET_HELD_SLOT: Int = 0x6B
+        const val SET_PLAYER_INVENTORY: Int = 0x6E
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00
@@ -94,6 +98,7 @@ object Protocol777 {
         const val MOVE_PLAYER_FLAGS: Int = 0x21
         const val PLAYER_ACTION: Int = 0x29
         const val PLAYER_LOADED: Int = 0x2C
+        const val SET_CARRIED_ITEM: Int = 0x36
         const val SWING_ARM: Int = 0x3F
         const val USE_ITEM_ON: Int = 0x42
     }
