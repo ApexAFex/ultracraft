@@ -18,21 +18,33 @@ object Settings {
     var sensitivity: Float = 1f
     var fullscreen: Boolean = false
 
+    /** Фоновая музыка: по умолчанию выключена. */
+    var music: Boolean = false
+
     private var file: File = File("settings.properties")
     private var loaded = false
 
     fun load(target: File = File("settings.properties")) {
-        file = target
+        // При запуске через Gradle рабочий каталог бывает корнем проекта, а при сборке exe —
+        // папкой игры; ищем файл в обоих местах.
+        file = listOf(
+            target,
+            File("settings.properties"),
+            File("app/settings.properties"),
+            File("../settings.properties"),
+        ).firstOrNull { it.isFile } ?: target
         loaded = true
-        if (!target.isFile) return
+        if (!file.isFile) return
         runCatching {
             val properties = Properties()
-            target.inputStream().use { properties.load(it) }
+            file.inputStream().use { properties.load(it) }
             fov = properties.getProperty("fov")?.toFloatOrNull() ?: fov
             volume = properties.getProperty("volume")?.toFloatOrNull() ?: volume
             viewDistance = properties.getProperty("viewDistance")?.toIntOrNull() ?: viewDistance
             sensitivity = properties.getProperty("sensitivity")?.toFloatOrNull() ?: sensitivity
             fullscreen = properties.getProperty("fullscreen")?.toBooleanStrictOrNull() ?: fullscreen
+            music = properties.getProperty("music")?.toBooleanStrictOrNull() ?: music
+            println("Настройки: ${file.absolutePath}, музыка=$music, обзор=$fov")
         }
     }
 
@@ -45,6 +57,7 @@ object Settings {
             properties.setProperty("viewDistance", viewDistance.toString())
             properties.setProperty("sensitivity", sensitivity.toString())
             properties.setProperty("fullscreen", fullscreen.toString())
+            properties.setProperty("music", music.toString())
             file.outputStream().use { properties.store(it, "ultracraft settings") }
         }
     }

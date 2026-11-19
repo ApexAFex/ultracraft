@@ -11,7 +11,7 @@ import java.awt.image.BufferedImage
  * Цвета одного биома: трава, листва, вода. Берутся из `effects` файла биома; если явного
  * цвета нет — из цветовой карты по температуре и влажности.
  */
-data class BiomeTint(val grass: Int, val foliage: Int, val water: Int)
+data class BiomeTint(val grass: Int, val foliage: Int, val water: Int, val fog: Int? = null)
 
 /**
  * Оттенки биомов для травы, листвы и воды.
@@ -28,11 +28,16 @@ data class BiomeTint(val grass: Int, val foliage: Int, val water: Int)
 class BiomeTints private constructor(
     /** Множители по id биома для трёх видов: трава, листва, вода. */
     private val ratios: List<Array<FloatArray>?>,
+    /** Цвет тумана биома или null, если его нет. */
+    private val fogs: List<Int?> = emptyList(),
 ) {
 
     /** Множитель цвета для [kind] в биоме [biomeId]; 1 — оставить как в атласе. */
     fun ratio(kind: Int, biomeId: Int): FloatArray =
         ratios.getOrNull(biomeId)?.getOrNull(kind) ?: NEUTRAL
+
+    /** Цвет тумана биома, если он задан в данных игры. */
+    fun fogOf(biomeId: Int): Int? = fogs.getOrNull(biomeId)
 
     companion object {
         const val GRASS = 0
@@ -52,12 +57,14 @@ class BiomeTints private constructor(
             val foliageMap = GameFiles.readPng(directory, "assets/minecraft/textures/colormap/foliage.png")
 
             val ratios = ArrayList<Array<FloatArray>?>(biomeNames.size)
+            val fogs = ArrayList<Int?>(biomeNames.size)
             for (name in biomeNames) {
                 val text = GameFiles.readText(directory, "data/minecraft/worldgen/biome/$name.json")
                 val tint = text?.let { parse(it, grassMap, foliageMap) }
                 ratios += tint?.let { arrayOf(ratio(it.grass, TextureAtlas.TINT_GRASS), ratio(it.foliage, TextureAtlas.TINT_FOLIAGE), ratio(it.water, TextureAtlas.TINT_WATER)) }
+                fogs += tint?.fog
             }
-            return BiomeTints(ratios)
+            return BiomeTints(ratios, fogs)
         }
 
         
@@ -78,7 +85,7 @@ class BiomeTints private constructor(
                 "swamp" -> grass = 0x6A7039
                 "dark_forest" -> grass = average(grass, 0x28340A)
             }
-            return BiomeTint(grass, foliage, water)
+            return BiomeTint(grass, foliage, water, effects.color("fog_color"))
         }
 
         private fun JsonObject.color(key: String): Int? = string(key)?.removePrefix("#")?.toIntOrNull(16)

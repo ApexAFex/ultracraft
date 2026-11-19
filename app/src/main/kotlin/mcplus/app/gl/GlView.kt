@@ -346,6 +346,11 @@ object GlView {
                     )
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
+                    sound.musicEnabled = Settings.music
+                    println("Музыка: включена=${sound.musicEnabled}, треков=${sound.musicTracks}")
+                    var musicKeyWasDown = false
+                    var containerWasOpen = false
+                    var lastLevel = -1
                     val stepTimer = StepSoundTimer()
                     var lastStepX = Double.NaN
                     var lastStepZ = Double.NaN
@@ -682,6 +687,11 @@ object GlView {
                             if (dead && !lastDead) {
                                 sound.play("entity.player.death", player.x, player.y, player.z)
                             }
+                            val levelNow = vitals.level
+                            if (lastLevel >= 0 && levelNow > lastLevel) {
+                                sound.play("entity.player.levelup", player.x, player.y, player.z)
+                            }
+                            lastLevel = levelNow
                             lastHealth = healthNow
                             lastDead = dead
                         }
@@ -696,6 +706,13 @@ object GlView {
                             )
                         }
                         if (openContainer == null) containerLogged = false
+                        if (openContainer != null && !containerWasOpen) {
+                            sound.play("block.chest.open", player.x, player.y, player.z)
+                        }
+                        if (openContainer == null && containerWasOpen) {
+                            sound.play("block.chest.close", player.x, player.y, player.z)
+                        }
+                        containerWasOpen = openContainer != null
                         if (bossBars.size != knownBossBars) {
                             knownBossBars = bossBars.size
                             if (bossBars.isNotEmpty()) {
@@ -721,6 +738,15 @@ object GlView {
                             cameraMode = (cameraMode + 1) % 3
                             println(if (cameraMode == 0) "Вид от первого лица" else "Вид от третьего лица")
                         }
+                        // M включает и выключает фоновую музыку; выбор сохраняется.
+                        val musicKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_M) == GLFW.GLFW_PRESS
+                        if (musicKey && !musicKeyWasDown) {
+                            sound.musicEnabled = !sound.musicEnabled
+                            Settings.music = sound.musicEnabled
+                            println(if (sound.musicEnabled) "Музыка включена" else "Музыка выключена")
+                        }
+                        musicKeyWasDown = musicKey
+                        sound.updateMusic()
                         // F11 — полный экран; границы окна запоминаются для возврата.
                         if (input.fullscreenToggleRequested) {
                             if (!boundsSaved) {
@@ -1292,6 +1318,15 @@ object GlView {
                             renderer.fogColor = 0x1A3C6E
                             renderer.fogStart = 0f
                             renderer.fogEnd = 24f
+                        } else {
+                            // Туман биома (болото, тёмный лес) поверх цвета времени суток.
+                            tints.fogOf(
+                                world.biomeAt(
+                                    kotlin.math.floor(player.x).toInt(),
+                                    kotlin.math.floor(player.y).toInt(),
+                                    kotlin.math.floor(player.z).toInt(),
+                                ),
+                            )?.let { renderer.fogColor = it }
                         }
 
                         GL30.glClearColor(
@@ -2064,6 +2099,7 @@ object GlView {
                     Settings.viewDistance = viewDistance
                     Settings.sensitivity = input.sensitivity
                     Settings.fullscreen = fullscreen
+                    Settings.music = sound.musicEnabled
                     Settings.save()
                     sound.close()
                     entityRenderer.close()

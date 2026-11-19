@@ -40,12 +40,24 @@ class SoundEngine(private val directory: File?) : Closeable {
     /** Сколько событий нашлось в sounds.json. */
     val events: Int get() = catalog.size
 
+    /** Сколько треков в событии `music.game`. */
+    val musicTracks: Int get() = catalog["music.game"]?.size ?: 0
+
     /** Звук недоступен: нет устройства или каталога. */
     var available = false
         private set
 
     /** Общая громкость, меняется в настройках паузы. */
     var masterVolume: Float = 0.7f
+
+    /** Фоновая музыка: выключена по умолчанию, включается в настройках. */
+    var musicEnabled: Boolean = false
+
+    private var musicSource = 0
+    private var musicBuffer = 0
+    private var musicTrack: String? = null
+    private var nextMusicNanos = 0L
+    private var musicPrimed = false
 
     /** Сколько звуков уже сыграно — для проверки без слуха. */
     var played = 0
@@ -73,10 +85,51 @@ class SoundEngine(private val directory: File?) : Closeable {
             AL10.alSourcef(source, AL10.AL_PITCH, 1f)
             sources += source
         }
+        musicSource = AL10.alGenSources()
         true
     }.getOrElse {
         println("Звук не запустился: ${it.message ?: it::class.simpleName}")
         false
+    }
+
+    /**
+     * Поддерживает фоновую музыку: играет трек из `music.game`, ждёт конца и делает паузу.
+     *
+     * Декодирование целого трека занимает память (десятки мегабайт), поэтому одновременно
+     * живёт только один буфер, а следующий трек ставится не раньше чем через две минуты.
+     */
+    fun updateMusic() {
+        if (!available || !musicEnabled || musicSource == 0) return
+        val now = System.nanoTime()
+        if (!musicPrimed) {
+            musicPrimed = true
+            nextMusicNanos = now + 15_000_000_000L
+            return
+        }
+        val state = AL10.alGetSourcei(musicSource, AL10.AL_SOURCE_STATE)
+        if (musicTrack != null && state != AL10.AL_PLAYING) {
+            AL10.alSourceStop(musicSource)
+            if (musicBuffer != 0) {
+                AL10.alDeleteBuffers(musicBuffer)
+                musicBuffer = 0
+            }
+            musicTrack = null
+            nextMusicNanos = now + 120_000_000_000L
+            return
+        }
+        if (state == AL10.AL_PLAYING || now < nextMusicNanos) return
+
+        val tracks = catalog["music.game"] ?: catalog["music.overworld"] ?: return
+        val path = tracks[random.nextInt(tracks.size)]
+        val buffer = bufferFor(path) ?: return
+        if (musicBuffer != 0) AL10.alDeleteBuffers(musicBuffer)
+        musicBuffer = buffer
+        AL10.alSourceStop(musicSource)
+        AL10.alSourcei(musicSource, AL10.AL_BUFFER, buffer)
+        AL10.alSourcef(musicSource, AL10.AL_GAIN, masterVolume * 0.5f)
+        AL10.alSourcePlay(musicSource)
+        musicTrack = path
+        println("Музыка: $path")
     }
 
     /** Ставит слушателя в камеру: звуки слева и справа слышны по-разному. */
@@ -148,6 +201,12 @@ class SoundEngine(private val directory: File?) : Closeable {
 
     override fun close() {
         if (!available) return
+        if (musicSource != 0) {
+            AL10.alSourceStop(musicSource)
+            AL10.alDeleteSources(musicSource)
+            musicSource = 0
+        }
+        if (musicBuffer != 0) AL10.alDeleteBuffers(musicBuffer)
         for (source in sources) AL10.alDeleteSources(source)
         for (buffer in buffers.values) AL10.alDeleteBuffers(buffer)
         ALC10.alcMakeContextCurrent(0L)

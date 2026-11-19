@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,6 +65,16 @@ class BiomeTintsTest {
         assertEquals(1f, ratio[0], 0.0001f)
         assertEquals(1f, ratio[1], 0.0001f)
         assertEquals(1f, ratio[2], 0.0001f)
+    }
+
+    @Test
+    fun `fog colour comes from biome effects`() {
+        val tint = BiomeTints.parse(
+            """{"temperature":0.8,"downfall":0.4,"effects":{"fog_color":"#AABBCC"}}""",
+            null,
+            null,
+        )
+        assertEquals(0xAABBCC, tint?.fog)
     }
 }
 
