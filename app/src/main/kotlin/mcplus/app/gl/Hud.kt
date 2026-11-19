@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
@@ -139,8 +139,14 @@ class Hud(
         renderer.draw()
     }
 
-    /** Меню паузы: затемнение, заголовок, кнопки и две настройки; их прямоугольники нужны клику. */
-    fun drawPauseMenu(fov: Float, volume: Int): List<HudRect> {
+    /** Меню паузы: затемнение, заголовок, кнопки и настройки; их прямоугольники нужны клику. */
+    fun drawPauseMenu(
+        fov: Float,
+        volume: Int,
+        sensitivityPercent: Int,
+        selected: Int,
+        viewDistance: Int,
+    ): List<HudRect> {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
         renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x101018, 0.55f)
@@ -176,13 +182,25 @@ class Hud(
                 TextRenderer.ScreenLabel(
                     firstX,
                     quit.y + 34f * s,
-                    "Обзор: ${fov.toInt()}°  (стрелки влево/вправо)",
+                    "${if (selected == 0) "> " else ""}Обзор: ${fov.toInt()}°  (1)",
                     s * 0.8f,
                 ),
                 TextRenderer.ScreenLabel(
                     firstX,
                     quit.y + 46f * s,
-                    "Громкость: $volume%  (стрелки вверх/вниз)",
+                    "${if (selected == 1) "> " else ""}Громкость: $volume%  (2)",
+                    s * 0.8f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 58f * s,
+                    "${if (selected == 2) "> " else ""}Чувствительность: $sensitivityPercent%  (3)",
+                    s * 0.8f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 70f * s,
+                    "${if (selected == 3) "> " else ""}Дальность: $viewDistance чанков  (4)",
                     s * 0.8f,
                 ),
             ),
@@ -248,6 +266,13 @@ class Hud(
                 }
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
+                // Белая рамка вокруг слота под курсором.
+                renderer.begin()
+                renderer.rect(px - slotPixels / 2, py - slotPixels / 2, slotPixels, 2f, 0xFFFFFF, 0.8f)
+                renderer.rect(px - slotPixels / 2, py + slotPixels / 2 - 2f, slotPixels, 2f, 0xFFFFFF, 0.8f)
+                renderer.rect(px - slotPixels / 2, py - slotPixels / 2, 2f, slotPixels, 0xFFFFFF, 0.8f)
+                renderer.rect(px + slotPixels / 2 - 2f, py - slotPixels / 2, 2f, slotPixels, 0xFFFFFF, 0.8f)
+                renderer.draw()
             }
         }
 
@@ -722,3 +747,4 @@ class Hud(
         renderer.close()
     }
 }
+

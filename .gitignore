@@ -18,3 +18,7 @@ screenshots/
 app/screenshots/
 dist/
 ultracraft-error.txt
+
+# Пользовательские настройки клиента
+settings.properties
+app/settings.properties

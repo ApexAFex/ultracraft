@@ -885,6 +885,7 @@ private fun resolveStoreFile(explicit: String?): java.io.File {
 // ---------------------------------------------------------------- window
 
 private fun windowCommand(args: List<String>) {
+    mcplus.app.gl.Settings.load()
     // `--open x,y,z` — проверка контейнеров; `--debug` и `--tab` — снимки отладки и табло.
     var openAt: Triple<Int, Int, Int>? = null
     var debug = false

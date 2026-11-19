@@ -1,0 +1,51 @@
+package mcplus.app.gl
+
+import java.io.File
+import java.util.Properties
+
+/**
+ * Пользовательские настройки: обзор, громкость, дальность, чувствительность мыши.
+ *
+ * Хранятся простым `properties` рядом с игрой, чтобы не тянуть лишние зависимости. При
+ * отсутствии файла берутся значения по умолчанию; при ошибке чтения — тоже, клиент не должен
+ * падать из-за испорченного конфига.
+ */
+object Settings {
+
+    var fov: Float = 70f
+    var volume: Float = 0.7f
+    var viewDistance: Int = 8
+    var sensitivity: Float = 1f
+    var fullscreen: Boolean = false
+
+    private var file: File = File("settings.properties")
+    private var loaded = false
+
+    fun load(target: File = File("settings.properties")) {
+        file = target
+        loaded = true
+        if (!target.isFile) return
+        runCatching {
+            val properties = Properties()
+            target.inputStream().use { properties.load(it) }
+            fov = properties.getProperty("fov")?.toFloatOrNull() ?: fov
+            volume = properties.getProperty("volume")?.toFloatOrNull() ?: volume
+            viewDistance = properties.getProperty("viewDistance")?.toIntOrNull() ?: viewDistance
+            sensitivity = properties.getProperty("sensitivity")?.toFloatOrNull() ?: sensitivity
+            fullscreen = properties.getProperty("fullscreen")?.toBooleanStrictOrNull() ?: fullscreen
+        }
+    }
+
+    fun save() {
+        if (!loaded) return
+        runCatching {
+            val properties = Properties()
+            properties.setProperty("fov", fov.toString())
+            properties.setProperty("volume", volume.toString())
+            properties.setProperty("viewDistance", viewDistance.toString())
+            properties.setProperty("sensitivity", sensitivity.toString())
+            properties.setProperty("fullscreen", fullscreen.toString())
+            file.outputStream().use { properties.store(it, "ultracraft settings") }
+        }
+    }
+}

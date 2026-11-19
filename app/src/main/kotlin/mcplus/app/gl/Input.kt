@@ -54,6 +54,7 @@ class Input(private val window: Long, private val camera: Camera) {
     private var dropPressed = false
     private var screenshotPressed = false
     private var fullscreenPressed = false
+    private var scrollY = 0.0
     private var mouseWasDown = false
 
     /** Символы, набранные с клавиатуры с прошлого кадра (то, что печатает человек). */
@@ -129,6 +130,11 @@ class Input(private val window: Long, private val camera: Camera) {
     var fullscreenToggleRequested: Boolean = false
         private set
 
+    /** Чувствительность мыши (1.0 — обычная) и выбор слота колесом. */
+    var sensitivity: Float = 1f
+    var scrollSlotDelta: Int = 0
+        private set
+
     /** Set once when the left mouse button goes down inside the inventory screen. */
     var clickRequested: Boolean = false
         private set
@@ -148,8 +154,8 @@ class Input(private val window: Long, private val camera: Camera) {
         if (!cursorVisible) {
             val dx = (x - lastX).toFloat()
             val dy = (y - lastY).toFloat()
-            camera.yaw -= dx * SENSITIVITY
-            camera.pitch = (camera.pitch - dy * SENSITIVITY).coerceIn(-1.55f, 1.55f)
+            camera.yaw -= dx * SENSITIVITY * sensitivity
+            camera.pitch = (camera.pitch - dy * SENSITIVITY * sensitivity).coerceIn(-1.55f, 1.55f)
         }
         lastX = x
         lastY = y
@@ -167,6 +173,7 @@ class Input(private val window: Long, private val camera: Camera) {
         GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED)
         GLFW.glfwSetCursorPosCallback(window, cursorCallback)
         GLFW.glfwSetCharCallback(window, charCallback)
+        GLFW.glfwSetScrollCallback(window) { _, _, yoffset -> scrollY += yoffset }
     }
 
     /** Набранные символы с прошлого вызова; буфер очищается. */
@@ -285,6 +292,14 @@ class Input(private val window: Long, private val camera: Camera) {
             if (slotDown >= 0) hotbarSlotRequested = slotDown
             hotbarPressed = slotDown
         }
+
+        // Колесо мыши листает слоты: вверх — назад, вниз — вперёд.
+        scrollSlotDelta = when {
+            scrollY > 0.0 -> -1
+            scrollY < 0.0 -> 1
+            else -> 0
+        }
+        scrollY = 0.0
 
         val cursorX = DoubleArray(1)
         val cursorY = DoubleArray(1)

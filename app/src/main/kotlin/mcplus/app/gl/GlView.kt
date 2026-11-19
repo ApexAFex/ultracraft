@@ -569,12 +569,16 @@ object GlView {
 
                     /** Меню паузы (Escape), настройки и таймер звуков мобов. */
                     var paused = pauseAtStart
-                    var baseFov = 70f
-                    var volume = 0.7f
+                    var baseFov = Settings.fov
+                    var volume = Settings.volume
+                    var viewDistance = Settings.viewDistance
+                    var selectedSetting = 0
+                    input.sensitivity = Settings.sensitivity
                     var settingLeftWasDown = false
                     var settingRightWasDown = false
                     var settingUpWasDown = false
                     var settingDownWasDown = false
+                    val settingRowWasDown = BooleanArray(4)
                     var ambientNanos = 0L
                     var rainSoundNanos = 0L
                     /** Полный экран и запомненное окно; счётчик предметов для звука подбора. */
@@ -723,6 +727,10 @@ object GlView {
                         if (!chat.open && !inventoryOpen && openContainer == null && !paused) {
                             if (input.dropRequested) session?.send(mcplus.net.PlayerMovement.drop(all = false))
                             if (input.dropStackRequested) session?.send(mcplus.net.PlayerMovement.drop(all = true))
+                            if (input.scrollSlotDelta != 0) {
+                                val current = session?.inventory?.selected ?: 0
+                                session?.selectSlot(Math.floorMod(current + input.scrollSlotDelta, 9))
+                            }
                         }
                         if (input.escapeRequested) {
                             when {
@@ -1288,7 +1296,7 @@ object GlView {
                         if (frame % 60 == 0) {
                             val centerX = kotlin.math.floor(player.x).toInt() shr 4
                             val centerZ = kotlin.math.floor(player.z).toInt() shr 4
-                            val keep = radiusChunks + 4
+                            val keep = viewDistance
                             for (column in world.chunks().toList()) {
                                 if (kotlin.math.abs(column.x - centerX) <= keep &&
                                     kotlin.math.abs(column.z - centerZ) <= keep
@@ -1711,6 +1719,7 @@ object GlView {
                                         ) ?: "?"
                                         ),
                                     "Наклон: %.0f, поворот: %.0f".format(camera.pitch, camera.yaw),
+                                    "Дальность: $viewDistance чанков",
                                 ),
                             )
                         }
@@ -1724,7 +1733,10 @@ object GlView {
                             hud.drawScoreboard(board.first, board.second)
                         }
                         if (paused) {
-                            val buttons = hud.drawPauseMenu(baseFov, (volume * 100).toInt())
+                            val buttons = hud.drawPauseMenu(
+                                baseFov, (volume * 100).toInt(),
+                                (input.sensitivity * 100).toInt(), selectedSetting, viewDistance,
+                            )
                             if (input.clickRequested) {
                                 when {
                                     buttons[0].contains(input.mouseX, input.mouseY) -> paused = false
@@ -1732,15 +1744,27 @@ object GlView {
                                         GLFW.glfwSetWindowShouldClose(window, true)
                                 }
                             }
-                            // Стрелки в паузе меняют обзор и громкость.
+                            // Цифры 1–4 выбирают строку, стрелки меняют её значение.
+                            for (row in 0..3) {
+                                val pressedRow = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_1 + row) == GLFW.GLFW_PRESS
+                                if (pressedRow && !settingRowWasDown[row]) selectedSetting = row
+                                settingRowWasDown[row] = pressedRow
+                            }
                             val leftKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS
                             val rightKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS
                             val upKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_UP) == GLFW.GLFW_PRESS
                             val downKey = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_DOWN) == GLFW.GLFW_PRESS
-                            if (leftKey && !settingLeftWasDown) baseFov = (baseFov - 5f).coerceIn(40f, 110f)
-                            if (rightKey && !settingRightWasDown) baseFov = (baseFov + 5f).coerceIn(40f, 110f)
-                            if (upKey && !settingUpWasDown) volume = (volume + 0.05f).coerceIn(0f, 1f)
-                            if (downKey && !settingDownWasDown) volume = (volume - 0.05f).coerceIn(0f, 1f)
+                            var step = 0
+                            if ((rightKey && !settingRightWasDown) || (upKey && !settingUpWasDown)) step += 1
+                            if ((leftKey && !settingLeftWasDown) || (downKey && !settingDownWasDown)) step -= 1
+                            if (step != 0) {
+                                when (selectedSetting) {
+                                    0 -> baseFov = (baseFov + 5f * step).coerceIn(40f, 110f)
+                                    1 -> volume = (volume + 0.05f * step).coerceIn(0f, 1f)
+                                    2 -> input.sensitivity = (input.sensitivity + 0.05f * step).coerceIn(0.2f, 3f)
+                                    else -> viewDistance = (viewDistance + step).coerceIn(4, 16)
+                                }
+                            }
                             settingLeftWasDown = leftKey
                             settingRightWasDown = rightKey
                             settingUpWasDown = upKey
@@ -1917,6 +1941,12 @@ object GlView {
                         frame++
                     }
                     println("Звук: событий ${sound.events}, доступен ${sound.available}, сыграно ${sound.played} из ${sound.requested}")
+                    Settings.fov = baseFov
+                    Settings.volume = volume
+                    Settings.viewDistance = viewDistance
+                    Settings.sensitivity = input.sensitivity
+                    Settings.fullscreen = fullscreen
+                    Settings.save()
                     sound.close()
                     entityRenderer.close()
                     mobRenderer.close()
