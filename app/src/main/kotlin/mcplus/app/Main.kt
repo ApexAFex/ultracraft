@@ -51,6 +51,7 @@ private fun dispatch(args: List<String>) {
         args[0] == "mine" -> mineCommand(args.drop(1))
         args[0] == "place" -> placeCommand(args.drop(1))
         args[0] == "hotbar" -> hotbarCommand(args.drop(1))
+        args[0] == "hud" -> hudCommand(args.drop(1))
         args[0] == "click" -> clickCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
@@ -484,6 +485,48 @@ private fun printInventory(inventory: mcplus.net.Inventory) {
             println("  $where: ${nameOf(stack)}")
         }
     }
+}
+
+/**
+ * Печатает здоровье, голод и опыт — ровно те числа, по которым рисуется HUD.
+ *
+ * Нужна для проверки без окна и без глаз: `Set Health` и `Set Experience` приходят сразу
+ * после входа, а урон можно нанести снаружи через RCON (`damage <ник> 5`).
+ */
+private fun hudCommand(args: List<String>) {
+    var seconds = 3
+    val rest = ArrayList<String>()
+    var index = 0
+    while (index < args.size) {
+        if (args[index] == "--seconds") {
+            seconds = args.getOrNull(++index)?.toIntOrNull() ?: fail("--seconds требует число секунд")
+        } else {
+            rest += args[index]
+        }
+        index++
+    }
+    val options = parseLoginArgs(rest) ?: return
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+
+    val session = connect(host, port, options)
+    session.use { open ->
+        // Мир не нужен: сервер присылает здоровье сразу после входа, а чужие пакеты
+        // разбирает сам Session. Ждём, пока придут обновления.
+        open.drain(seconds * 1_000L)
+        printVitals(open.vitals)
+    }
+}
+
+private fun printVitals(vitals: mcplus.net.Vitals) {
+    printRows(
+        listOf(
+            "Здоровье" to "%.1f из %.0f".format(vitals.health, mcplus.net.Vitals.MAX_HEALTH),
+            "Голод" to "${vitals.food} из ${mcplus.net.Vitals.MAX_FOOD}",
+            "Насыщение" to "%.1f".format(vitals.saturation),
+            "Опыт" to "уровень ${vitals.level}, полоса %.2f, всего ${vitals.xpTotal}".format(vitals.xpProgress),
+            "Состояние" to if (vitals.dead) "мёртв" else "жив",
+        ),
+    )
 }
 
 /**
@@ -1014,6 +1057,7 @@ private fun printUsage() {
           mcplus ping [host[:port]] [--json]        то же, что и без команды
           mcplus window [host[:port]]               открыть окно и играть
           mcplus watch [host[:port]] [--seconds N]  наблюдать, какие сущности двигаются
+          mcplus hud [host[:port]] [--seconds N]    здоровье, голод и опыт (числа для HUD)
           mcplus chunkdump [host[:port]]            сохранить сырые пакеты чанков
 
         Флаги:

@@ -48,6 +48,9 @@ class Session internal constructor(
     /** What the player carries; the server sends it right after the join. */
     val inventory: Inventory = Inventory(itemTable)
 
+    /** Health, food and experience: numbers the HUD shows, never computed by the client. */
+    val vitals: Vitals = Vitals()
+
     /** Why the connection ended, or null while it is alive. */
     @Volatile
     var closeReason: String? = null
@@ -105,6 +108,11 @@ class Session internal constructor(
                 Protocol777.Play.SET_CURSOR_ITEM,
                 Protocol777.Play.SET_HELD_SLOT ->
                     inventory.onPacket(packet.id, packet.body)
+
+                Protocol777.Play.SET_HEALTH,
+                Protocol777.Play.SET_EXPERIENCE,
+                Protocol777.Play.RESPAWN ->
+                    vitals.onPacket(packet.id, packet.body)
 
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 

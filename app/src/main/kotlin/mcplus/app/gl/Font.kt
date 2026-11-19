@@ -18,7 +18,8 @@ class Font(val image: BufferedImage, private val widths: IntArray) {
     fun glyphWidth(char: Char): Int = widths[char.code and 0xFF]
 
     /** How far the pen moves after this character, in texture pixels. */
-    fun advance(char: Char): Int = glyphWidth(char) + 1
+    fun advance(char: Char): Int =
+        if (char == ' ') SPACE_ADVANCE else glyphWidth(char) + 1
 
     fun textWidth(text: String): Int = text.sumOf { advance(it) }
 
@@ -38,6 +39,12 @@ class Font(val image: BufferedImage, private val widths: IntArray) {
     companion object {
         private const val CELL = 8
         private const val FONT_PATH = "assets/minecraft/textures/font/ascii.png"
+
+        /**
+         * Пробел в ванильном шрифте не измеряется по пикселям: у него нет ни одной
+         * непрозрачной точки, и «ширина + 1» дала бы 1 пиксель — слова слипались бы.
+         */
+        const val SPACE_ADVANCE = 4
 
         fun load(minecraftDirectory: File?): Font? {
             val directory = minecraftDirectory ?: TextureAtlas.findMinecraftDirectory() ?: return null

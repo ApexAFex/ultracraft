@@ -159,6 +159,96 @@ class TextRenderer(
         GL30.glUseProgram(0)
     }
 
+    /** Подпись в пикселях экрана: (x, y) — левый верхний угол, scale — пикселей на пиксель шрифта. */
+    data class ScreenLabel(val x: Float, val y: Float, val text: String, val scale: Float)
+
+    /** Ширина строки в пикселях экрана при данном масштабе. */
+    fun textWidth(text: String, scale: Float): Float = font.textWidth(text) * scale
+
+    /**
+     * Текст HUD: тот же шрифт игры, но плоский и поверх сцены.
+     *
+     * Тень рисуется отдельным проходом со сдвигом в один пиксель шрифта — как в ванили:
+     * белые буквы на светлом небе без неё не читаются.
+     */
+    fun drawScreen(labels: List<ScreenLabel>, alpha: Float = 1f) {
+        if (labels.isEmpty()) return
+        var characters = 0
+        for (label in labels) characters += label.text.length
+        val glyphs = FloatArrayBuilder(characters * 6 * 5)
+        val shadows = FloatArrayBuilder(characters * 6 * 5)
+
+        for (label in labels) {
+            var pen = label.x
+            val glyphHeight = GLYPH_PIXELS * label.scale
+            for (char in label.text) {
+                val glyphWidth = font.glyphWidth(char) * label.scale
+                if (glyphWidth > 0f) {
+                    emitScreen(shadows, pen + label.scale, label.y + label.scale, glyphWidth, glyphHeight, font.uv(char))
+                    emitScreen(glyphs, pen, label.y, glyphWidth, glyphHeight, font.uv(char))
+                }
+                pen += font.advance(char) * label.scale
+            }
+        }
+
+        GL30.glUseProgram(program)
+        GL30.glUniformMatrix4fv(viewProjLocation, false, ortho(width.toFloat(), height.toFloat()))
+        GL30.glUniform1i(fontLocation, 0)
+        GL30.glActiveTexture(GL30.GL_TEXTURE0)
+        GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
+        GL30.glBindVertexArray(vao)
+
+        GL30.glDisable(GL30.GL_DEPTH_TEST)
+        GL30.glDisable(GL30.GL_CULL_FACE)
+        GL30.glEnable(GL30.GL_BLEND)
+        GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+
+        drawArray(shadows.toArray(), 0.25f, 0.25f, 0.25f, alpha, textured = true)
+        drawArray(glyphs.toArray(), 1f, 1f, 1f, alpha, textured = true)
+
+        GL30.glDisable(GL30.GL_BLEND)
+        GL30.glEnable(GL30.GL_DEPTH_TEST)
+        GL30.glBindVertexArray(0)
+        GL30.glUseProgram(0)
+    }
+
+    /** Один глиф в экранных координатах (y растёт вниз), пять чисел на вершину. */
+    private fun emitScreen(
+        target: FloatArrayBuilder,
+        left: Float,
+        top: Float,
+        glyphWidth: Float,
+        glyphHeight: Float,
+        uv: FloatArray,
+    ) {
+        val right = left + glyphWidth
+        val bottom = top + glyphHeight
+
+        fun vertex(x: Float, y: Float, u: Float, v: Float) {
+            target.add(x)
+            target.add(y)
+            target.add(0f)
+            target.add(u)
+            target.add(v)
+        }
+
+        vertex(left, top, uv[0], uv[1])
+        vertex(right, bottom, uv[2], uv[3])
+        vertex(right, top, uv[2], uv[1])
+
+        vertex(left, top, uv[0], uv[1])
+        vertex(left, bottom, uv[0], uv[3])
+        vertex(right, bottom, uv[2], uv[3])
+    }
+
+    /** Ортопроекция «пиксели сверху вниз» в координаты OpenGL, колонками, как ждёт LWJGL. */
+    private fun ortho(width: Float, height: Float): FloatArray = floatArrayOf(
+        2f / width, 0f, 0f, 0f,
+        0f, -2f / height, 0f, 0f,
+        0f, 0f, -1f, 0f,
+        -1f, 1f, 0f, 1f,
+    )
+
     private fun addQuad(
         target: FloatArrayBuilder,
         label: Label,

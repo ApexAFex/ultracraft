@@ -5,7 +5,8 @@ import org.lwjgl.glfw.GLFWCursorPosCallbackI
 
 /**
  * Controls: WASD to walk, Space to jump (or rise when flying), Shift to descend,
- * F toggles flying, 1–9 pick a hotbar slot, E opens the inventory, Escape quits.
+ * F toggles flying, 1–9 pick a hotbar slot, E opens the inventory, R respawns after death,
+ * Escape quits.
  *
  * While the inventory is open the mouse stops steering the camera and moves a visible cursor:
  * looking around and dragging items with the same cursor is impossible, so the mode is explicit.
@@ -37,6 +38,7 @@ class Input(private val window: Long, private val camera: Camera) {
     private var hotbarPressed = -1
     private var inventoryPressed = false
     private var escapePressed = false
+    private var respawnPressed = false
     private var mouseWasDown = false
 
     /** Set once when F is pressed, consumed by the caller to toggle the fly mode. */
@@ -53,6 +55,10 @@ class Input(private val window: Long, private val camera: Camera) {
 
     /** Set once when Escape is pressed; the caller decides what to close. */
     var escapeRequested: Boolean = false
+        private set
+
+    /** Set once when R (or Enter) is pressed — «возродиться» на экране смерти. */
+    var respawnRequested: Boolean = false
         private set
 
     /** Set once when the left mouse button goes down inside the inventory screen. */
@@ -115,6 +121,10 @@ class Input(private val window: Long, private val camera: Camera) {
         val escape = pressed(GLFW.GLFW_KEY_ESCAPE)
         escapeRequested = escape && !escapePressed
         escapePressed = escape
+
+        val respawn = pressed(GLFW.GLFW_KEY_R) || pressed(GLFW.GLFW_KEY_ENTER)
+        respawnRequested = respawn && !respawnPressed
+        respawnPressed = respawn
 
         // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
         // a frame-by-frame repeat would send a packet per frame.

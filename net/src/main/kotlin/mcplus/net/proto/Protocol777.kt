@@ -85,6 +85,11 @@ object Protocol777 {
         const val SET_HELD_SLOT: Int = 0x6B
         const val SET_CURSOR_ITEM: Int = 0x62
         const val SET_PLAYER_INVENTORY: Int = 0x6E
+        const val SET_HEALTH: Int = 0x6A
+        const val SET_EXPERIENCE: Int = 0x69
+        const val RESPAWN: Int = 0x54
+        const val PLAYER_COMBAT_KILL: Int = 0x45
+        const val GAME_EVENT: Int = 0x27
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00

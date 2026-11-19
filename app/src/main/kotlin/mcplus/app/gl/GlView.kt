@@ -60,6 +60,12 @@ object GlView {
     private const val DEMO_INVENTORY_AT = 300
 
     /**
+     * Демо переключает слот здесь: название предмета висит пару секунд, и снимок после этого
+     * кадра показывает подпись так же, как её увидит человек, нажав «2».
+     */
+    private const val DEMO_SELECT_AT = 1200
+
+    /**
      * How long a dig may take before the client gives up on it, in ticks beyond its estimate.
      * The server keeps its own progress and breaks the block when it reaches one, so the
      * client holds until the block is really gone; this cap only stops a hopeless attempt.
@@ -74,6 +80,13 @@ object GlView {
 
     /** Speed at which the limbs swing at full amplitude. */
     private const val WALK_SPEED = 4.3
+
+    /** Сколько секунд висит название предмета после смены слота и сколько длится затухание. */
+    private const val ITEM_NAME_NANOS = 2_000_000_000L
+    private const val FADE_NANOS = 500_000_000.0
+
+    /** Демо-режим возрождается сам через столько наносекунд после смерти. */
+    private const val DEMO_RESPAWN_NANOS = 8_000_000_000L
 
     fun run(
         world: World,
@@ -215,6 +228,13 @@ object GlView {
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
+                    // HUD поверх сцены: спрайты интерфейса тоже из установки игрока.
+                    val hudSprites = HudSprites.load(directory)
+                    if (hudSprites == null) println("Спрайты HUD не найдены: HUD рисуется прямоугольниками")
+                    val hud = Hud(
+                        HudRenderer(hudSprites, textures, width, height),
+                        textRenderer, atlas, width, height,
+                    )
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     val input = Input(window, camera)
 
@@ -243,6 +263,22 @@ object GlView {
                     var previousY = player.y
                     var previousZ = player.z
                     var playerLoadedSent = false
+
+                    // Название предмета в руке показывается пару секунд после смены слота.
+                    var lastSelected = session?.inventory?.selected ?: 0
+                    var lastHeldName: String? = session?.inventory?.heldName()
+                    var itemName: String? = null
+                    var itemNameUntil = 0L
+                    // Смерть: экран смерти рисуется, пока здоровье ноль. Демо возрождается само
+                    // по часам (не по кадрам: скрытое окно рисует без vsync и кадры бегут
+                    // вразы быстрее секунд), чтобы самопроверку можно было прогнать без рук.
+                    var deathNanos = 0L
+
+                    fun requestRespawn() {
+                        session?.requestRespawn()
+                        session?.vitals?.respawned()
+                        println("Возрождение: запрошено у сервера")
+                    }
 
                     println("Спавн: %.1f, %.1f, %.1f (%s)".format(
                         player.x, player.y, player.z,
@@ -385,17 +421,39 @@ object GlView {
 
                         // E opens the inventory screen; the mouse stops steering the camera while
                         // it is open, otherwise the same motion would turn the view.
-                        if (input.inventoryToggleRequested) {
+                        val vitals = session?.vitals
+                        val dead = vitals?.dead == true
+
+                        if (input.inventoryToggleRequested && !dead) {
                             inventoryOpen = !inventoryOpen
-                            input.setCursorVisible(inventoryOpen)
                         }
                         if (input.escapeRequested) {
                             if (inventoryOpen) {
                                 inventoryOpen = false
-                                input.setCursorVisible(false)
-                            } else {
+                            } else if (!dead) {
                                 GLFW.glfwSetWindowShouldClose(window, true)
                             }
+                        }
+                        // Курсор виден, когда им пользуется экран: инвентарь или экран смерти.
+                        // Иначе он снова захвачен и управляет камерой.
+                        input.setCursorVisible(inventoryOpen || dead)
+
+                        // Смерть: сервер выставил здоровье в ноль и перестал стримить мир.
+                        // Пока игрок не возродился, ходить и копать некуда — экран смерти
+                        // закрывает сцену, а возрождение просит клиент.
+                        if (dead) {
+                            if (deathNanos == 0L) {
+                                deathNanos = System.nanoTime()
+                                println("Игрок умер: здоровье 0, экран смерти")
+                            }
+                            val clicked = input.clickRequested &&
+                                hud.respawnButton().contains(input.mouseX, input.mouseY)
+                            val demoRespawn = demo && System.nanoTime() - deathNanos > DEMO_RESPAWN_NANOS
+                            if (input.respawnRequested || clicked || demoRespawn) {
+                                requestRespawn()
+                            }
+                        } else {
+                            deathNanos = 0L
                         }
 
                         // Number keys pick a hotbar slot; the server echoes the choice.
@@ -404,6 +462,20 @@ object GlView {
                             val name = session?.inventory?.heldName() ?: "пусто"
                             println("Слот ${slot + 1}: $name")
                         }
+
+                        // Название предмета в руке. Смотрим на фактическое состояние, а не на
+                        // нажатую клавишу: сервер может поправить слот, и показывать надо его.
+                        val selectedNow = session?.inventory?.selected ?: 0
+                        val heldName = session?.inventory?.heldName()
+                        if (selectedNow != lastSelected || heldName != lastHeldName) {
+                            lastSelected = selectedNow
+                            lastHeldName = heldName
+                            itemName = heldName
+                            itemNameUntil = System.nanoTime() + ITEM_NAME_NANOS
+                        }
+                        val itemNameAlpha = (
+                            (itemNameUntil - System.nanoTime()).toDouble() / FADE_NANOS
+                            ).coerceIn(0.0, 1.0).toFloat()
 
                         // Clicking a slot is the only way to move an item: the server applies the
                         // click and answers with the whole menu, cursor included.
@@ -437,6 +509,12 @@ object GlView {
                                 inventoryOpen = false
                                 input.setCursorVisible(false)
                             }
+                        }
+
+                        // Демо переключает слот: HUD должен показать название предмета.
+                        if (demo && frame == DEMO_SELECT_AT) {
+                            session?.selectSlot(1)
+                            println("Демо: выбран слот 2 (${session?.inventory?.heldName() ?: "пусто"})")
                         }
 
                         // A kick or a network error must end the game on purpose: continuing to
@@ -556,9 +634,15 @@ object GlView {
                             tickAccumulator -= TICK_SECONDS
 
                             if (demo && tickCount % 20L == 0L) {
-                                println("Тик $tickCount: %.2f, %.2f, %.2f — пакетов движения ${moveSender?.movementPackets ?: 0}".format(
-                                    player.x, player.y, player.z,
-                                ))
+                                val vitalsNow = session?.vitals
+                                val where = "Тик $tickCount: %.2f, %.2f, %.2f — пакетов движения ${moveSender?.movementPackets ?: 0}"
+                                    .format(player.x, player.y, player.z)
+                                val state = "здоровье %.1f, еда %d, опыт %d".format(
+                                    vitalsNow?.health ?: -1f,
+                                    vitalsNow?.food ?: -1,
+                                    vitalsNow?.level ?: -1,
+                                )
+                                println("$where, $state")
                             }
                         }
                         // A long stall (window drag, breakpoint) must not turn into a burst of
@@ -678,51 +762,14 @@ object GlView {
                                 camera, inventory, renderer, textRenderer, atlas,
                                 input.mouseX, input.mouseY, width, height,
                             )
-                        } else if (inventory != null) {
-                            val forward = camera.forward()
-                            val up = camera.up()
-                            val right = camera.right()
-                            // Same plane as the icons inside Renderer.drawHotbar.
-                            val stripX = camera.x + forward[0] * 1.2 - up[0] * 0.5
-                            val stripY = camera.y + forward[1] * 1.2 - up[1] * 0.5
-                            val stripZ = camera.z + forward[2] * 1.2 - up[2] * 0.5
-                            val shift = (inventory.selected - 4) * 0.085f
-                            textRenderer?.drawBar(
-                                camera, stripX, stripY, stripZ, 0.4f, 0.055f, 0.08f, 0.08f, 0.08f, 0.55f,
-                            )
-                            textRenderer?.drawBar(
-                                camera,
-                                stripX + right[0] * shift,
-                                stripY + right[1] * shift,
-                                stripZ + right[2] * shift,
-                                0.05f, 0.05f, 0.95f, 0.95f, 0.95f, 0.35f,
-                            )
+                        }
 
-                            val layers = (0 until 9).map { slot ->
-                                val name = inventory.nameOf(inventory.stackIn(slot)) ?: return@map null
-                                atlas.layerFor(name, TextureAtlas.Kind.SIDE).toFloat()
-                            }
-                            renderer.drawHotbar(camera, layers, inventory.selected)
-
-                            val held = inventory.held()
-                            val text = if (held == null || held.isEmpty) {
-                                "пусто"
-                            } else {
-                                // The font is the game's ASCII set: "×" is not in it, so "x".
-                                "${inventory.nameOf(held) ?: "?"} x${held.count}"
-                            }
-                            textRenderer?.draw(
-                                camera,
-                                listOf(
-                                    TextRenderer.Label(
-                                        camera.x + forward[0] * 0.6 - up[0] * 0.36,
-                                        camera.y + forward[1] * 0.6 - up[1] * 0.36,
-                                        camera.z + forward[2] * 0.6 - up[2] * 0.36,
-                                        text,
-                                    ),
-                                ),
-                                scaleOverride = 0.0035f,
-                            )
+                        // HUD рисуется отдельным проходом поверх сцены. Открытый инвентарь его
+                        // прячет, как в ванили, а смерть заменяет HUD экраном смерти.
+                        if (dead) {
+                            hud.drawDeathScreen()
+                        } else if (!inventoryOpen) {
+                            hud.draw(inventory, vitals, itemName, itemNameAlpha)
                         }
 
                         // Cracks on the block being mined: ten stages, like vanilla.
@@ -738,10 +785,10 @@ object GlView {
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
                         // With the inventory open the same button drags items, so it must not mine.
-                        holdRequested = !inventoryOpen && (leftDown || (demo && frame >= 5 && frame < 900))
-                        aimTarget = if (inventoryOpen) null else miningTarget
+                        holdRequested = !inventoryOpen && !dead && (leftDown || (demo && frame >= 5 && frame < 900))
+                        aimTarget = if (inventoryOpen || dead) null else miningTarget
 
-                        if (!inventoryOpen && rightDown && !rightWasDown && target != null) demoPlace(target)
+                        if (!inventoryOpen && !dead && rightDown && !rightWasDown && target != null) demoPlace(target)
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         if (demo && frame == DEMO_AIM_AT) {
                             // Aim at the closest **player** first: nicknames and player models are
@@ -818,6 +865,7 @@ object GlView {
                     }
                     entityRenderer.close()
                     playerRenderer.close()
+                    hud.close()
                     textRenderer?.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
