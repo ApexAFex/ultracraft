@@ -28,7 +28,11 @@
   позиции/поворота), поэтому другие игроки видят нас идущими, а сервер сохраняет нашу
   позицию между сеансами.
 - **Сущности**: приём `Spawn Entity` / `Remove Entities`, интерполяция `move_entity_pos`
-  и `entity_position_sync`; пока рисуются коробками.
+  и `entity_position_sync`; игроки — модель человека со скином и никнеймом, остальные
+  сущности пока коробками.
+
+Чего ещё нет: HUD, света и неба, форм блоков, звука, частиц, чата, мобов — полный разбор
+и порядок работ в [docs/CONTENT.md](docs/CONTENT.md).
 
 ```
 > .\gradlew.bat :app:run --args="world --chunks 4"
@@ -60,8 +64,15 @@
 
 Нужен **JDK 21** для сборки (проверено на Temurin 21.0.13). Gradle ставится сам через wrapper.
 
+Если `JAVA_HOME` уже указывает на JDK 25 (он нужен локальному серверу 26.3), сборке всё равно
+нужен 21 — Gradle 8.10.2 на 25 не запускается:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.13.9-hotspot"
 ```
-.\gradlew.bat build                          # компиляция + 52 теста
+
+```
+.\gradlew.bat build                          # компиляция + 97 тестов
 .\gradlew.bat :app:run --args="mc.hypixel.net"   # список игроков
 .\gradlew.bat :app:run --args="join"             # войти на сервер
 .\gradlew.bat :app:run --args="world --chunks 5" # карта мира текстом
@@ -126,6 +137,7 @@ $env:MCPLUS_CLIENT_ID = "<id приложения Azure>"
 java -DbundlerMainClass=net.minecraft.data.Main -jar tools/server/server.jar --reports
 node tools/build-block-table.js
 node tools/build-item-table.js
+node tools/build-content-report.js
 ```
 
 Тот же запуск даёт таблицу **предметов**: id предметов тоже встроены в клиент, поэтому
@@ -155,6 +167,10 @@ node tools/build-item-table.js
 ## Документы
 
 - [PROJECT.md](PROJECT.md) — память проекта: что сделано, почему именно так, что дальше
+- [docs/CONTENT.md](docs/CONTENT.md) — **наполнение**: что есть в 26.3, что есть у нас,
+  план этапов и правила совместимости
+- [docs/content-appendix.md](docs/content-appendix.md) — полные списки контента игры
+  (генерируется из данных 26.3)
 
 - [docs/START-HERE.md](docs/START-HERE.md) — с чего начать, план, ловушки
 - [docs/protocol-notes.md](docs/protocol-notes.md) — грабли протокола 777, найденные на практике
@@ -164,7 +180,14 @@ node tools/build-item-table.js
 
 ## Следующий шаг
 
-Игроки и мобы как модели с никнеймами вместо коробок; затем шаговые пути сущностей,
-инвентарь и хотбар.
+Курс — на паритет по контенту с оригиналом. Ближайшие три этапа
+([подробно](docs/CONTENT.md#часть-3-план-наполнения)):
+
+1. **экранный слой и HUD** — прицел, здоровье, голод, опыт, чат, экран смерти;
+2. **свет, небо, время, погода** — свет берём из чанка, а не считаем свой;
+3. **формы блоков** — ступени, двери, заборы, вода и стекло перестают быть кубами.
+
+Технические долги (выгрузка чанков, шаговые пути, `move_entity_pos_rot`) идут рядом и не
+заменяют этапы.
 
 
