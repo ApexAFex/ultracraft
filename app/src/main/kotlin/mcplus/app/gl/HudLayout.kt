@@ -28,6 +28,9 @@ object HudLayout {
     const val HEART_STEP = 8f
     const val HEARTS = 10
     const val XP_HEIGHT = 5f
+
+    /** Ряд брони лежит на 10 пикселей выше сердец, значки те же 9×9 с шагом 8. */
+    const val ARMOUR_OFFSET = 10f
     const val BOSS_BAR_WIDTH = 182f
     const val BOSS_BAR_HEIGHT = 5f
     const val BOSS_BAR_STEP = 19f
@@ -116,11 +119,24 @@ object HudLayout {
         return HudRect((width - 15f * s) / 2f, (height - 15f * s) / 2f, 15f * s, 15f * s)
     }
 
-    /** Название выбранного предмета — над сердцами. */
-    fun itemNameAnchor(width: Int, height: Int): Pair<Float, Float> {
+    /** Ряд значков брони — на 10 пикселей выше сердец, слева, как в ванили. */
+    fun armour(index: Int, width: Int, height: Int): HudRect {
         val s = scale(height).toFloat()
         val row = hearts(width, height)
-        return width / 2f to row.y - 12f * s
+        return HudRect(
+            x = row.x + index * HEART_STEP * s,
+            y = row.y - ARMOUR_OFFSET * s,
+            width = HEART_SIZE * s,
+            height = HEART_SIZE * s,
+        )
+    }
+
+    /** Название выбранного предмета — над сердцами (а если есть броня, то над бронёй). */
+    fun itemNameAnchor(width: Int, height: Int, hasArmour: Boolean = false): Pair<Float, Float> {
+        val s = scale(height).toFloat()
+        val row = hearts(width, height)
+        val top = row.y - 12f * s - (if (hasArmour) ARMOUR_OFFSET * s else 0f)
+        return width / 2f to top
     }
 
     /** Кнопка «возродиться» на экране смерти. */

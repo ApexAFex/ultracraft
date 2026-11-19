@@ -514,9 +514,29 @@ private fun hudCommand(args: List<String>) {
         // разбирает сам Session. Ждём, пока придут обновления.
         open.drain(seconds * 1_000L)
         printVitals(open.vitals)
+        printArmour(open.inventory)
         printBossBars(open)
         printEffects(open)
     }
+}
+
+/**
+ * Надетая броня: очки (по ним HUD рисует ряд значков) и что именно надето.
+ *
+ * Очки берутся из таблицы предметов, потому что на проводе у стека только id.
+ */
+private fun printArmour(inventory: mcplus.net.Inventory) {
+    val names = listOf("шлем", "нагрудник", "штаны", "ботинки")
+    val worn = (0..3).mapNotNull { index ->
+        val stack = inventory.armourStack(index) ?: return@mapNotNull null
+        "%s %s (%d)".format(names[index], inventory.nameOf(stack) ?: "?", inventory.armourOf(stack))
+    }
+    if (worn.isEmpty()) {
+        println("Броня     нет")
+        return
+    }
+    println("Броня     ${inventory.armourPoints()} очков")
+    for (line in worn) println("  $line")
 }
 
 /**
@@ -1046,6 +1066,27 @@ private fun findEffectTable(explicit: String? = null): mcplus.net.EffectTable {
     return mcplus.net.EffectTable.load(file)
 }
 
+/**
+ * Item numbers that are not on the wire: armour points and max damage.
+ *
+ * Generated with `tools/build-item-stats.js`. A missing table is not fatal: armour is simply
+ * not shown, everything else keeps working.
+ */
+private fun findItemStats(explicit: String? = null): mcplus.net.ItemStats {
+    val candidates = buildList {
+        explicit?.let { add(java.io.File(it)) }
+        add(java.io.File("data/item-stats-777.tsv"))
+        add(java.io.File("../data/item-stats-777.tsv"))
+        add(java.io.File("../../data/item-stats-777.tsv"))
+    }
+    val file = candidates.firstOrNull { it.isFile }
+    if (file == null) {
+        System.err.println("Нет таблицы брони (data/item-stats-777.tsv): броня не будет показываться.")
+        return mcplus.net.ItemStats.EMPTY
+    }
+    return mcplus.net.ItemStats.load(file)
+}
+
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
     val account = if (options.online) loadAccount() else null
     val attempts = 3
@@ -1066,6 +1107,7 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session {
                 log = if (options.verbose) { line -> println("  $line") } else { _ -> },
                 itemTable = findItemTable(),
                 effectTable = findEffectTable(),
+                itemStats = findItemStats(),
             ).join()
         } catch (e: ServerDisconnectException) {
             // The session server rate limits joins and propagates them lazily, so a fresh

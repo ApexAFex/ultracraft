@@ -34,10 +34,12 @@ class Hud(
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
 
+        val armourPoints = inventory?.armourPoints() ?: 0
         drawHotbar(inventory, s)
         drawBossBars(bossBars)
         drawEffects(effects, s)
         if (vitals != null) {
+            drawArmour(armourPoints)
             drawHearts(vitals)
             drawFood(vitals)
             drawExperience(vitals)
@@ -52,7 +54,7 @@ class Hud(
         if (labels.isNotEmpty()) text?.drawScreen(labels)
 
         if (itemName != null && itemNameAlpha > 0.01f) {
-            text?.drawScreen(listOf(itemNameLabel(itemName, s)), alpha = itemNameAlpha)
+            text?.drawScreen(listOf(itemNameLabel(itemName, s, armourPoints > 0)), alpha = itemNameAlpha)
         }
     }
 
@@ -194,6 +196,33 @@ class Hud(
                 HudRect(cell.centreX - size / 2f, cell.centreY - size / 2f, size, size),
                 atlas.layerFor(name, TextureAtlas.Kind.SIDE),
             )
+        }
+    }
+
+    /**
+     * Ряд брони над сердцами.
+     *
+     * Очки брони считает [Inventory]: на проводе у стека только id, а очки — компонент
+     * предмета по умолчанию. Каждый значок — два очка, половинка — одно, как в ванили;
+     * пустых значков не рисуем, если брони нет вовсе.
+     */
+    private fun drawArmour(points: Int) {
+        if (points <= 0) return
+        for (index in 0 until HudLayout.HEARTS) {
+            val rect = HudLayout.armour(index, width, height)
+            if (!renderer.sprite("armor_empty", rect)) {
+                renderer.rect(rect, 0x1A1A1A, 0.85f)
+            }
+            val value = points - index * 2
+            when {
+                value >= 2 -> if (!renderer.sprite("armor_full", rect)) {
+                    renderer.rect(rect, 0xC8C8C8, 0.95f)
+                }
+
+                value >= 1 -> if (!renderer.sprite("armor_half", rect)) {
+                    renderer.rect(rect, 0xC8C8C8, 0.95f)
+                }
+            }
         }
     }
 
@@ -360,9 +389,9 @@ class Hud(
         )
     }
 
-    private fun itemNameLabel(itemName: String, s: Float): TextRenderer.ScreenLabel {
+    private fun itemNameLabel(itemName: String, s: Float, hasArmour: Boolean): TextRenderer.ScreenLabel {
         val text = this.text ?: return TextRenderer.ScreenLabel(0f, 0f, "", s)
-        val (centreX, top) = HudLayout.itemNameAnchor(width, height)
+        val (centreX, top) = HudLayout.itemNameAnchor(width, height, hasArmour)
         return TextRenderer.ScreenLabel(
             x = centreX - text.textWidth(itemName, s) / 2f,
             y = top,

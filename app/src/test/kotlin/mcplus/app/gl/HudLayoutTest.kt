@@ -91,6 +91,24 @@ class HudLayoutTest {
     }
 
     @Test
+    fun `armour row sits above the hearts and does not overlap them`() {
+        val s = HudLayout.scale(720).toFloat()
+        val first = HudLayout.armour(0, 1280, 720)
+        val second = HudLayout.armour(1, 1280, 720)
+        val hearts = HudLayout.hearts(1280, 720)
+
+        assertEquals(8f * s, second.x - first.x, 0.01f)
+        assertEquals(hearts.x, first.x, 0.01f)
+        assertTrue(first.bottom <= hearts.y, "броня налезла на сердца")
+
+        // Название предмета при надетой броне поднимается выше её ряда.
+        val (_, withoutArmour) = HudLayout.itemNameAnchor(1280, 720, hasArmour = false)
+        val (_, withArmour) = HudLayout.itemNameAnchor(1280, 720, hasArmour = true)
+        assertTrue(withArmour < withoutArmour, "название предмета не поднялось над бронёй")
+        assertTrue(withArmour < first.y, "название предмета попало на ряд брони")
+    }
+
+    @Test
     fun `beneficial effects form a row at the top right`() {
         val s = HudLayout.scale(720).toFloat()
         val first = HudLayout.effectIcon(beneficial = true, index = 0, width = 1280, height = 720)

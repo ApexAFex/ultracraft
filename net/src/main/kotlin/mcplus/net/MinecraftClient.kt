@@ -48,6 +48,8 @@ class MinecraftClient(
     private val itemTable: ItemTable = ItemTable.EMPTY,
     /** Names for effect ids: the effect registry is built in as well. */
     private val effectTable: EffectTable = EffectTable.EMPTY,
+    /** Default item numbers (armour, durability): they are not sent with the stack. */
+    private val itemStats: ItemStats = ItemStats.EMPTY,
 ) {
 
     private enum class State { LOGIN, CONFIGURATION, PLAY }
@@ -62,7 +64,7 @@ class MinecraftClient(
 
         val connection = Connection(socket)
         return try {
-            Session(connection, handshakeAndLogin(connection), log, itemTable, effectTable)
+            Session(connection, handshakeAndLogin(connection), log, itemTable, effectTable, itemStats)
         } catch (t: Throwable) {
             connection.close()
             throw t

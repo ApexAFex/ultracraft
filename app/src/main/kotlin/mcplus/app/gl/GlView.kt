@@ -760,10 +760,11 @@ object GlView {
                                 val vitalsNow = session?.vitals
                                 val where = "Тик $tickCount: %.2f, %.2f, %.2f — пакетов движения ${moveSender?.movementPackets ?: 0}"
                                     .format(player.x, player.y, player.z)
-                                val state = "здоровье %.1f, еда %d, опыт %d".format(
+                                val state = "здоровье %.1f, еда %d, опыт %d, броня %d".format(
                                     vitalsNow?.health ?: -1f,
                                     vitalsNow?.food ?: -1,
                                     vitalsNow?.level ?: -1,
+                                    session?.inventory?.armourPoints() ?: 0,
                                 )
                                 println("$where, $state")
                             }

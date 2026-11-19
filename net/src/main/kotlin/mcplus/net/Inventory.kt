@@ -20,7 +20,10 @@ import mcplus.protocol.ByteReader
  * slot use the inventory's own numbering, so those are converted on the way in. Mixing the two
  * is silent: items still arrive, they just land 36 slots away from the hand.
  */
-class Inventory(private val items: ItemTable = ItemTable.EMPTY) {
+class Inventory(
+    private val items: ItemTable = ItemTable.EMPTY,
+    private val stats: ItemStats = ItemStats.EMPTY,
+) {
 
     data class Stack(val itemId: Int, val count: Int) {
         val isEmpty: Boolean get() = count <= 0
@@ -73,6 +76,37 @@ class Inventory(private val items: ItemTable = ItemTable.EMPTY) {
             .filter { !it.value.isEmpty }
             .mapNotNull { (menuSlot, stack) -> inventorySlotOfMenu(menuSlot)?.let { it to stack } }
             .sortedBy { it.first }
+
+    /**
+     * Надетое: шлем, нагрудник, штаны, ботинки — в этом порядке.
+     *
+     * Слоты меню 5..8; броня приходит теми же пакетами, что и остальной инвентарь.
+     */
+    fun armour(): List<Stack> = ARMOUR_MENU_SLOTS.mapNotNull { menuSlot ->
+        slots[menuSlot]?.takeIf { !it.isEmpty }
+    }
+
+    /** Одна часть брони по порядку: 0 шлем, 1 нагрудник, 2 штаны, 3 ботинки. */
+    fun armourStack(index: Int): Stack? =
+        slots[ARMOUR_MENU_SLOTS.first + index]?.takeIf { !it.isEmpty }
+
+    /** Сколько очков брони даёт этот предмет (0, если это не броня или таблицы нет). */
+    fun armourOf(stack: Stack?): Int =
+        stack?.takeIf { it.isKnown }?.let { stats.armourOf(it.itemId) } ?: 0
+
+    /**
+     * Сколько очков брони на игроке.
+     *
+     * Очки берутся из таблицы предметов (`ItemStats`): на проводе у стека только id, а
+     * `minecraft:armor` — это компонент предмета по умолчанию, а не часть стека.
+     */
+    fun armourPoints(): Int = ARMOUR_MENU_SLOTS.sumOf { armourOf(slots[it]) }
+
+    /** Прочность надетого: сколько у предмета всего (для будущих полосок). */
+    fun armourMaxDamage(): Int = ARMOUR_MENU_SLOTS.sumOf { menuSlot ->
+        val stack = slots[menuSlot]?.takeIf { it.isKnown } ?: return@sumOf 0
+        stats.of(stack.itemId)?.maxDamage ?: 0
+    }
 
     fun select(slot: Int) {
         if (slot in 0..8) selected = slot
@@ -205,5 +239,8 @@ class Inventory(private val items: ItemTable = ItemTable.EMPTY) {
         const val UNKNOWN_ITEM = -1
 
         const val HOTBAR_MENU_START = 36
+
+        /** Меню-слоты надетой брони: шлем, нагрудник, штаны, ботинки. */
+        val ARMOUR_MENU_SLOTS = 5..8
     }
 }

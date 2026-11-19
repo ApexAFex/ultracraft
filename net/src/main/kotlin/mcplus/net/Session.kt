@@ -27,6 +27,7 @@ class Session internal constructor(
     private val log: (String) -> Unit = {},
     itemTable: ItemTable = ItemTable.EMPTY,
     effectTable: EffectTable = EffectTable.EMPTY,
+    itemStats: ItemStats = ItemStats.EMPTY,
 ) : Closeable {
 
     var playerPosition: PlayerPosition? = null
@@ -47,7 +48,7 @@ class Session internal constructor(
     val players: PlayerList = PlayerList()
 
     /** What the player carries; the server sends it right after the join. */
-    val inventory: Inventory = Inventory(itemTable)
+    val inventory: Inventory = Inventory(itemTable, itemStats)
 
     /** Health, food and experience: numbers the HUD shows, never computed by the client. */
     val vitals: Vitals = Vitals()
