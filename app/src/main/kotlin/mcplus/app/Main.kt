@@ -51,6 +51,7 @@ private fun dispatch(args: List<String>) {
         args[0] == "mine" -> mineCommand(args.drop(1))
         args[0] == "place" -> placeCommand(args.drop(1))
         args[0] == "hotbar" -> hotbarCommand(args.drop(1))
+        args[0] == "click" -> clickCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
         args[0] == "logout" -> logoutCommand(args.drop(1))
@@ -451,21 +452,93 @@ private fun hotbarCommand(args: List<String>) {
         // The slot switch is answered by the server; give the answer time to arrive.
         slot?.let {
             open.selectSlot(it - 1)
-            Thread.sleep(300)
+            open.drain(300)
+        }
+        printInventory(open.inventory)
+    }
+}
+
+/**
+ * Prints the menu the way the server numbered it: crafting result and grid, the cursor, then the
+ * player's slots. Everything here is the server's answer, not a prediction.
+ */
+private fun printInventory(inventory: mcplus.net.Inventory) {
+    fun nameOf(stack: mcplus.net.Inventory.Stack?): String =
+        when {
+            stack == null -> "—"
+            !stack.isKnown -> "? × ${stack.count}"
+            else -> "${inventory.nameOf(stack)} × ${stack.count}"
         }
 
-        val inventory = open.inventory
-        val heldName = inventory.heldName() ?: "пусто"
-        println("Выбран слот ${inventory.selected + 1}: $heldName")
-        println("Слоты:")
-        val contents = inventory.contents()
-        if (contents.isEmpty()) {
-            println("  (инвентарь пуст)")
+    println("Выбран слот ${inventory.selected + 1}: ${inventory.heldName() ?: "пусто"}")
+    println("  курсор: ${nameOf(inventory.carriedOrNull())}")
+    println("  результат крафта (0): ${nameOf(inventory.menuSlot(0))}")
+    for (slot in 1..4) println("  сетка крафта ($slot): ${nameOf(inventory.menuSlot(slot))}")
+
+    val contents = inventory.contents()
+    if (contents.isEmpty()) {
+        println("  (инвентарь пуст)")
+    } else {
+        for ((slot, stack) in contents) {
+            val where = if (slot in 0..8) "хотбар ${slot + 1}" else "слот $slot"
+            println("  $where: ${nameOf(stack)}")
         }
-        for ((slotIndex, stack) in contents) {
-            val where = if (slotIndex in 0..8) "хотбар ${slotIndex + 1}" else "слот $slotIndex"
-            val name = inventory.nameOf(stack) ?: "не читается (составные части предмета)"
-            println("  $where: $name × ${stack.count}")
+    }
+}
+
+/**
+ * Clicks menu slots in order — the only way to move items or craft.
+ *
+ * `--slots 36,1,0,37` takes the stack from the first hotbar slot, puts it into the crafting grid,
+ * takes the result and puts it into the second hotbar slot. Menu numbering: 0 result, 1..4 grid,
+ * 9..35 inventory, 36..44 hotbar, 45 offhand.
+ *
+ * The whole sequence must be one connection: the cursor stack lives in the session, not on disk.
+ */
+private fun clickCommand(args: List<String>) {
+    var slotsArg: String? = null
+    var button = 0
+    var quick = false
+    val rest = ArrayList<String>()
+    var index = 0
+    while (index < args.size) {
+        when (args[index]) {
+            "--slots" -> slotsArg = args.getOrNull(++index) ?: fail("--slots требует список слотов")
+            "--button" -> button = args.getOrNull(++index)?.toIntOrNull() ?: fail("--button требует число")
+            "--quick" -> quick = true
+            else -> rest += args[index]
+        }
+        index++
+    }
+    val slots = (slotsArg ?: fail("--slots обязателен: номера слотов меню через запятую"))
+        .split(',')
+        .map { it.trim().toIntOrNull() ?: fail("В --slots не число: $it") }
+
+    val options = parseLoginArgs(rest) ?: return
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+
+    val session = connect(host, port, options)
+    session.use { open ->
+        WorldCollector(open).collect(maxChunks = 25, durationMs = 1_500)
+        println("Жду загрузки игрока на сервере: 70 тиков…")
+        repeat(70) {
+            Thread.sleep(50)
+            open.send(mcplus.net.PlayerMovement.tickEnd())
+        }
+
+        println("До кликов:")
+        printInventory(open.inventory)
+
+        for (slot in slots) {
+            open.clickSlot(
+                slot,
+                button,
+                if (quick) mcplus.net.ContainerInput.QUICK_MOVE else mcplus.net.ContainerInput.PICKUP,
+            )
+            // The server answers with the slots it changed; drain() lets those answers in.
+            open.drain(400)
+            println("После клика в слот $slot:")
+            printInventory(open.inventory)
         }
     }
 }

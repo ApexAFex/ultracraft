@@ -37,6 +37,16 @@ class Connection(private val socket: Socket) : Closeable {
     var encrypted: Boolean = false
         private set
 
+    /**
+     * Read timeout for [receive], in milliseconds.
+     *
+     * The game keeps a long timeout and treats a timeout as a dead connection; console commands
+     * need the opposite — read what arrived, then carry on — so they set this lower for a while.
+     */
+    fun setReadTimeout(millis: Int) {
+        socket.soTimeout = millis
+    }
+
     fun enableCompression(threshold: Int) {
         compressionThreshold = threshold
     }

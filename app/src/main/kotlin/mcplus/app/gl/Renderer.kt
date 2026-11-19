@@ -30,10 +30,10 @@ class Renderer(
     private val crackVbo = GL30.glGenBuffers()
     private val crackData = FloatArray(6 * 6 * 7)
 
-    /** Nine hotbar icons: 9 cells × 6 vertices × 7 floats. */
+    /** Icons of the hotbar (9) and of the inventory screen (46 share this buffer). */
     private val hotbarVao = GL30.glGenVertexArrays()
     private val hotbarVbo = GL30.glGenBuffers()
-    private val hotbarData = FloatArray(9 * 6 * 7)
+    private val hotbarData = FloatArray(64 * 6 * 7)
 
     private class Part(val vao: Int, val vbo: Int) {
         var count: Int = 0
@@ -190,49 +190,38 @@ class Renderer(
         GL30.glUseProgram(0)
     }
 
+    /** One flat icon in the camera plane: offsets are along `right`/`up` from the plane centre. */
+    data class Icon(val horizontal: Float, val vertical: Float, val size: Float, val layer: Float, val shade: Float = 1f)
+
     /**
-     * The nine hotbar cells as flat block icons in front of the camera.
+     * Flat textured icons in a plane one and a half blocks in front of the camera.
      *
-     * There is no screen-space pass in this client, so the strip is drawn in world space at a
-     * fixed distance, the same way the nicknames are: one and a half blocks ahead reads like a
-     * HUD. A cell without a block is skipped, the selected one is drawn larger and brighter.
+     * There is no screen-space pass in this client, so the HUD and the inventory are drawn in
+     * world space, the same way the nicknames are. Everything that needs to line up with them
+     * (slot plates, hit-testing) uses the same plane geometry, kept in [InventoryScreen].
      */
-    fun drawHotbar(camera: Camera, layers: List<Float?>, selected: Int) {
-        val forward = camera.forward()
+    fun drawIcons(camera: Camera, centreX: Float, centreY: Float, centreZ: Float, icons: List<Icon>) {
+        if (icons.isEmpty()) return
         val right = camera.right()
         val up = camera.up()
-        val distance = 1.2f
-        val centreX = camera.x.toFloat() + forward[0] * distance
-        val centreY = camera.y.toFloat() + forward[1] * distance
-        val centreZ = camera.z.toFloat() + forward[2] * distance
-
-        // Nine cells that take about a third of the screen width, like the real hotbar.
-        val cell = 0.075f
-        val step = 0.085f
-        val vertical = -0.5f
         var offset = 0
 
-        for (index in 0 until 9) {
-            val layer = layers.getOrNull(index) ?: continue
-            val size = if (index == selected) cell * 1.18f else cell
-            val half = size / 2f
-            val horizontal = (index - 4) * step
-            val shade = if (index == selected) 1.0f else 0.78f
+        for (icon in icons) {
+            val half = icon.size / 2f
+            val left = icon.horizontal - half
+            val rightEdge = icon.horizontal + half
+            val bottom = icon.vertical - half
+            val top = icon.vertical + half
 
             fun vertex(h: Float, v: Float, u: Float, w: Float) {
                 hotbarData[offset++] = centreX + right[0] * h + up[0] * v
                 hotbarData[offset++] = centreY + right[1] * h + up[1] * v
                 hotbarData[offset++] = centreZ + right[2] * h + up[2] * v
-                hotbarData[offset++] = shade
-                hotbarData[offset++] = layer
+                hotbarData[offset++] = icon.shade
+                hotbarData[offset++] = icon.layer
                 hotbarData[offset++] = u
                 hotbarData[offset++] = w
             }
-
-            val left = horizontal - half
-            val rightEdge = horizontal + half
-            val bottom = vertical - half
-            val top = vertical + half
 
             vertex(left, top, 0f, 0f)
             vertex(rightEdge, bottom, 1f, 1f)
@@ -242,7 +231,6 @@ class Renderer(
             vertex(left, bottom, 0f, 1f)
             vertex(rightEdge, bottom, 1f, 1f)
         }
-        if (offset == 0) return
 
         val buffer = MemoryUtil.memAllocFloat(offset)
         buffer.put(hotbarData, 0, offset).flip()
@@ -268,8 +256,33 @@ class Renderer(
         GL30.glUseProgram(0)
     }
 
+    /** The nine hotbar cells, with the selected one larger and brighter. */
+    fun drawHotbar(camera: Camera, layers: List<Float?>, selected: Int) {
+        val forward = camera.forward()
+        val up = camera.up()
+        val distance = 1.2f
+        val centreX = camera.x.toFloat() + forward[0] * distance - up[0] * 0.5f
+        val centreY = camera.y.toFloat() + forward[1] * distance - up[1] * 0.5f
+        val centreZ = camera.z.toFloat() + forward[2] * distance - up[2] * 0.5f
+
+        val cell = InventoryScreen.SLOT
+        val step = InventoryScreen.STEP
+        val icons = (0 until 9).mapNotNull { index ->
+            val layer = layers.getOrNull(index) ?: return@mapNotNull null
+            Icon(
+                horizontal = (index - 4) * step,
+                vertical = 0f,
+                size = if (index == selected) cell * 1.18f else cell,
+                layer = layer,
+                shade = if (index == selected) 1.0f else 0.78f,
+            )
+        }
+        drawIcons(camera, centreX, centreY, centreZ, icons)
+    }
+
     /** Wireframe cube around the targeted block. */
-    fun drawOutline(camera: Camera, blockX: Int, blockY: Int, blockZ: Int) {        var offset = 0
+    fun drawOutline(camera: Camera, blockX: Int, blockY: Int, blockZ: Int) {
+        var offset = 0
         for ((start, end) in EDGES) {
             outlineData[offset++] = blockX + start[0]
             outlineData[offset++] = blockY + start[1]

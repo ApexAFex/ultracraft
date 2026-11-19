@@ -5,7 +5,10 @@ import org.lwjgl.glfw.GLFWCursorPosCallbackI
 
 /**
  * Controls: WASD to walk, Space to jump (or rise when flying), Shift to descend,
- * F toggles flying, mouse looks around, Escape quits.
+ * F toggles flying, 1–9 pick a hotbar slot, E opens the inventory, Escape quits.
+ *
+ * While the inventory is open the mouse stops steering the camera and moves a visible cursor:
+ * looking around and dragging items with the same cursor is impossible, so the mode is explicit.
  */
 class Input(private val window: Long, private val camera: Camera) {
 
@@ -20,12 +23,21 @@ class Input(private val window: Long, private val camera: Camera) {
     var deltaSeconds: Double = 0.0
         private set
 
+    /** Cursor position in window pixels (origin top-left), updated every frame. */
+    var mouseX: Double = 0.0
+        private set
+    var mouseY: Double = 0.0
+        private set
+
     private var lastX = 0.0
     private var lastY = 0.0
     private var firstMouse = true
     private var lastTime = System.nanoTime()
     private var flyPressed = false
     private var hotbarPressed = -1
+    private var inventoryPressed = false
+    private var escapePressed = false
+    private var mouseWasDown = false
 
     /** Set once when F is pressed, consumed by the caller to toggle the fly mode. */
     var flyToggleRequested: Boolean = false
@@ -35,19 +47,38 @@ class Input(private val window: Long, private val camera: Camera) {
     var hotbarSlotRequested: Int? = null
         private set
 
+    /** Set once when E is pressed: open or close the inventory screen. */
+    var inventoryToggleRequested: Boolean = false
+        private set
+
+    /** Set once when Escape is pressed; the caller decides what to close. */
+    var escapeRequested: Boolean = false
+        private set
+
+    /** Set once when the left mouse button goes down inside the inventory screen. */
+    var clickRequested: Boolean = false
+        private set
+
+    /** True while the screen owns the mouse. */
+    var cursorVisible: Boolean = false
+        private set
+
     private val cursorCallback = GLFWCursorPosCallbackI { _, x, y ->
         if (firstMouse) {
             lastX = x
             lastY = y
             firstMouse = false
         }
-        val dx = (x - lastX).toFloat()
-        val dy = (y - lastY).toFloat()
+        // Steering only happens while the cursor is captured: with the inventory open the same
+        // mouse motion is used to point at slots, and turning the camera would be a bug.
+        if (!cursorVisible) {
+            val dx = (x - lastX).toFloat()
+            val dy = (y - lastY).toFloat()
+            camera.yaw -= dx * SENSITIVITY
+            camera.pitch = (camera.pitch - dy * SENSITIVITY).coerceIn(-1.55f, 1.55f)
+        }
         lastX = x
         lastY = y
-
-        camera.yaw -= dx * SENSITIVITY
-        camera.pitch = (camera.pitch - dy * SENSITIVITY).coerceIn(-1.55f, 1.55f)
     }
 
     init {
@@ -77,6 +108,14 @@ class Input(private val window: Long, private val camera: Camera) {
         flyToggleRequested = fly && !flyPressed
         flyPressed = fly
 
+        val inventory = pressed(GLFW.GLFW_KEY_E)
+        inventoryToggleRequested = inventory && !inventoryPressed
+        inventoryPressed = inventory
+
+        val escape = pressed(GLFW.GLFW_KEY_ESCAPE)
+        escapeRequested = escape && !escapePressed
+        escapePressed = escape
+
         // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
         // a frame-by-frame repeat would send a packet per frame.
         hotbarSlotRequested = null
@@ -86,7 +125,27 @@ class Input(private val window: Long, private val camera: Camera) {
             hotbarPressed = slotDown
         }
 
-        if (pressed(GLFW.GLFW_KEY_ESCAPE)) GLFW.glfwSetWindowShouldClose(window, true)
+        val cursorX = DoubleArray(1)
+        val cursorY = DoubleArray(1)
+        GLFW.glfwGetCursorPos(window, cursorX, cursorY)
+        mouseX = cursorX[0]
+        mouseY = cursorY[0]
+
+        val down = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
+        clickRequested = down && !mouseWasDown
+        mouseWasDown = down
+    }
+
+    /** Captures the cursor for looking around, or releases it for the inventory screen. */
+    fun setCursorVisible(visible: Boolean) {
+        if (visible == cursorVisible) return
+        cursorVisible = visible
+        GLFW.glfwSetInputMode(
+            window,
+            GLFW.GLFW_CURSOR,
+            if (visible) GLFW.GLFW_CURSOR_NORMAL else GLFW.GLFW_CURSOR_DISABLED,
+        )
+        firstMouse = true
     }
 
     private fun pressed(key: Int): Boolean = GLFW.glfwGetKey(window, key) == GLFW.GLFW_PRESS

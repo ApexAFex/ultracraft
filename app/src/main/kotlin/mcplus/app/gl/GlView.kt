@@ -53,6 +53,13 @@ object GlView {
     private const val DEMO_PLACE_AT = 600
 
     /**
+     * Demo mode opens the inventory screen here, so the self-test also shows it and a screenshot
+     * can prove it: slots, item icons and the panel are otherwise only visible to a person at
+     * the keyboard.
+     */
+    private const val DEMO_INVENTORY_AT = 300
+
+    /**
      * How long a dig may take before the client gives up on it, in ticks beyond its estimate.
      * The server keeps its own progress and breaks the block when it reaches one, so the
      * client holds until the block is really gone; this cap only stops a hopeless attempt.
@@ -355,15 +362,81 @@ object GlView {
                     val startedAt = System.currentTimeMillis()
                     var lastEntityCount = -1
                     var frame = 0
+                    var inventoryOpen = false
+
+                    /** Turns a screen position into a click on the slot under it, if any. */
+                    fun clickInventoryAt(mouseX: Double, mouseY: Double) {
+                        val open = session ?: return
+                        val (horizontal, vertical) = InventoryScreen.panelPoint(
+                            mouseX, mouseY, width, height,
+                        )
+                        val cell = InventoryScreen.slotAt(horizontal, vertical) ?: return
+                        open.clickSlot(cell.menuSlot)
+                        println("Клик по слоту ${cell.menuSlot}")
+                    }
+
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
                         if (demo && frame == DEMO_FLY_ATTEMPT) input.requestFlyToggle()
+                        if (demo && frame == DEMO_INVENTORY_AT) {
+                            inventoryOpen = true
+                            input.setCursorVisible(true)
+                        }
+
+                        // E opens the inventory screen; the mouse stops steering the camera while
+                        // it is open, otherwise the same motion would turn the view.
+                        if (input.inventoryToggleRequested) {
+                            inventoryOpen = !inventoryOpen
+                            input.setCursorVisible(inventoryOpen)
+                        }
+                        if (input.escapeRequested) {
+                            if (inventoryOpen) {
+                                inventoryOpen = false
+                                input.setCursorVisible(false)
+                            } else {
+                                GLFW.glfwSetWindowShouldClose(window, true)
+                            }
+                        }
 
                         // Number keys pick a hotbar slot; the server echoes the choice.
                         input.hotbarSlotRequested?.let { slot ->
                             session?.selectSlot(slot)
                             val name = session?.inventory?.heldName() ?: "пусто"
                             println("Слот ${slot + 1}: $name")
+                        }
+
+                        // Clicking a slot is the only way to move an item: the server applies the
+                        // click and answers with the whole menu, cursor included.
+                        if (inventoryOpen && input.clickRequested) {
+                            clickInventoryAt(input.mouseX, input.mouseY)
+                        }
+
+                        // Self-test of the same path without a hand on the mouse: open the screen,
+                        // click the first hotbar slot, put the stack into the crafting grid and read
+                        // the result. Prints facts, so a screenshot is not the only evidence.
+                        if (demo && inventoryOpen) {
+                            if (frame == DEMO_INVENTORY_AT + 20) {
+                                val (px, py) = InventoryScreen.screenPointOf(
+                                    InventoryScreen.cells.first { it.menuSlot == 36 }, width, height,
+                                )
+                                clickInventoryAt(px, py)
+                            }
+                            if (frame == DEMO_INVENTORY_AT + 60) {
+                                val (px, py) = InventoryScreen.screenPointOf(
+                                    InventoryScreen.cells.first { it.menuSlot == 1 }, width, height,
+                                )
+                                clickInventoryAt(px, py)
+                            }
+                            if (frame == DEMO_INVENTORY_AT + 100) {
+                                val inv = session?.inventory
+                                val result = inv?.nameOf(inv.menuSlot(0)) ?: "пусто"
+                                val grid = inv?.nameOf(inv.menuSlot(1)) ?: "пусто"
+                                println("Инвентарь: сетка крафта $grid, результат $result")
+                            }
+                            if (frame == DEMO_INVENTORY_AT + 130) {
+                                inventoryOpen = false
+                                input.setCursorVisible(false)
+                            }
                         }
 
                         // A kick or a network error must end the game on purpose: continuing to
@@ -593,13 +666,19 @@ object GlView {
                             )
                         }
                         textRenderer?.draw(camera, labels)
-                        if (target != null) renderer.drawOutline(camera, target.x, target.y, target.z)
+                        if (target != null && !inventoryOpen) {
+                            renderer.drawOutline(camera, target.x, target.y, target.z)
+                        }
 
-                        // Hotbar: the icons come from the same atlas the world uses, and the
-                        // selected item's name is written underneath. Without it there is no way
-                        // to tell what is in hand, and placing a block needs exactly that.
+                        // Inventory screen replaces the hotbar while it is open: slots, icons and
+                        // the dragged stack are all drawn on the same world-space panel.
                         val inventory = session?.inventory
-                        if (inventory != null) {
+                        if (inventory != null && inventoryOpen) {
+                            InventoryScreen.draw(
+                                camera, inventory, renderer, textRenderer, atlas,
+                                input.mouseX, input.mouseY, width, height,
+                            )
+                        } else if (inventory != null) {
                             val forward = camera.forward()
                             val up = camera.up()
                             val right = camera.right()
@@ -621,7 +700,7 @@ object GlView {
 
                             val layers = (0 until 9).map { slot ->
                                 val name = inventory.nameOf(inventory.stackIn(slot)) ?: return@map null
-                                atlas.layerFor(name, TextureAtlas.Kind.TOP).toFloat()
+                                atlas.layerFor(name, TextureAtlas.Kind.SIDE).toFloat()
                             }
                             renderer.drawHotbar(camera, layers, inventory.selected)
 
@@ -658,11 +737,12 @@ object GlView {
                         // The demo "holds" the button so the self-test also exercises the progress.
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
-                        holdRequested = leftDown || (demo && frame >= 5 && frame < 900)
-                        aimTarget = miningTarget
+                        // With the inventory open the same button drags items, so it must not mine.
+                        holdRequested = !inventoryOpen && (leftDown || (demo && frame >= 5 && frame < 900))
+                        aimTarget = if (inventoryOpen) null else miningTarget
 
-                        if (rightDown && !rightWasDown && target != null) demoPlace(target)
-                        if (demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
+                        if (!inventoryOpen && rightDown && !rightWasDown && target != null) demoPlace(target)
+                        if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         if (demo && frame == DEMO_AIM_AT) {
                             // Aim at the closest **player** first: nicknames and player models are
                             // what a screenshot needs to check, and a passing mob would hide them.

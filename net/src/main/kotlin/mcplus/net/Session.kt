@@ -102,6 +102,7 @@ class Session internal constructor(
                 Protocol777.Play.CONTAINER_SET_CONTENT,
                 Protocol777.Play.CONTAINER_SET_SLOT,
                 Protocol777.Play.SET_PLAYER_INVENTORY,
+                Protocol777.Play.SET_CURSOR_ITEM,
                 Protocol777.Play.SET_HELD_SLOT ->
                     inventory.onPacket(packet.id, packet.body)
 
@@ -112,6 +113,29 @@ class Session internal constructor(
 
                 else -> return packet
             }
+        }
+    }
+
+    /**
+     * Reads packets for [millis] and throws away the ones the session already handles.
+     *
+     * Console commands need this: after a click the server answers with inventory packets that
+     * [receive] consumes internally, so a plain `receive()` would just block waiting for
+     * something else. A short read timeout turns "nothing arrived yet" into "keep waiting".
+     */
+    fun drain(millis: Long) {
+        val deadline = System.currentTimeMillis() + millis
+        connection.setReadTimeout(POLL_TIMEOUT_MS)
+        try {
+            while (System.currentTimeMillis() < deadline && !isClosed) {
+                try {
+                    receive()
+                } catch (e: java.net.SocketTimeoutException) {
+                    // Nothing yet; keep waiting until the deadline.
+                }
+            }
+        } finally {
+            connection.setReadTimeout(READ_TIMEOUT_MS)
         }
     }
 
@@ -146,6 +170,23 @@ class Session internal constructor(
         if (slot !in 0..8) return
         inventory.select(slot)
         send(Packet(Protocol777.Play.SET_CARRIED_ITEM, ByteWriter().writeShort(slot).toByteArray()))
+    }
+
+    /**
+     * Clicks a menu slot: pick a stack up, put it down, split it, shift-move it.
+     *
+     * The server applies the click itself and answers with the slots that changed — see
+     * [ContainerClicks]. The state id is deliberately wrong: then the server sends the **whole**
+     * menu, cursor included, instead of trusting our (empty) prediction hashes. One small packet
+     * per click buys an exact cursor without reimplementing the item hash the client is supposed
+     * to predict.
+     */
+    fun clickSlot(
+        menuSlot: Int,
+        button: Int = 0,
+        input: Int = ContainerInput.PICKUP,
+    ) {
+        send(ContainerClicks.click(FORCE_FULL_STATE, menuSlot, button, input))
     }
 
     /**
@@ -217,6 +258,15 @@ class Session internal constructor(
 
         /** `Client Status` action: "I died, put me back in the world". */
         const val RESPAWN = 0
+
+        /** How long one poll waits during [drain]; small enough to react quickly. */
+        const val POLL_TIMEOUT_MS = 100
+
+        /** The timeout the game itself runs with (see MinecraftClient). */
+        const val READ_TIMEOUT_MS = 15_000
+
+        /** A menu state id that never matches, so every click is answered with the full menu. */
+        const val FORCE_FULL_STATE = -1
     }
 }
 

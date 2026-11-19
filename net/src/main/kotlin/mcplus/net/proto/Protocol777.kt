@@ -83,10 +83,12 @@ object Protocol777 {
         const val CONTAINER_SET_CONTENT: Int = 0x12
         const val CONTAINER_SET_SLOT: Int = 0x14
         const val SET_HELD_SLOT: Int = 0x6B
+        const val SET_CURSOR_ITEM: Int = 0x62
         const val SET_PLAYER_INVENTORY: Int = 0x6E
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00
+        const val CONTAINER_CLICK: Int = 0x12
         const val CHUNK_BATCH_RECEIVED: Int = 0x0B
         const val CLIENT_STATUS: Int = 0x0C
         const val CLIENT_TICK_END: Int = 0x0D

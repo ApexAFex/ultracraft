@@ -112,4 +112,45 @@ class InventoryTest {
         assertEquals(5, inventory.stackIn(0)?.count)
         assertNull(inventory.heldName())
     }
+
+    @Test
+    fun `the cursor arrives at the end of the whole menu packet`() {
+        val inventory = Inventory(items)
+        val body = ByteWriter().writeVarInt(0).writeVarInt(4).writeVarInt(46)
+        for (slot in 0 until 46) {
+            if (slot == 0) {
+                fullStack(body, 4, 3)   // crafting result
+            } else {
+                body.writeVarInt(0)
+            }
+        }
+        fullStack(body, 2, 1)           // cursor: two stone
+
+        inventory.onPacket(Protocol777.Play.CONTAINER_SET_CONTENT, body.toByteArray())
+
+        assertEquals(3, inventory.menuSlot(0)?.itemId)
+        assertEquals(Inventory.Stack(1, 2), inventory.carriedOrNull())
+        assertEquals(4, inventory.stateId)
+    }
+
+    @Test
+    fun `the cursor can come in its own packet`() {
+        val inventory = Inventory(items)
+        val body = ByteWriter()
+        body.writeVarInt(2).writeVarInt(3).writeVarInt(0).writeVarInt(0)
+
+        inventory.onPacket(Protocol777.Play.SET_CURSOR_ITEM, body.toByteArray())
+
+        assertEquals(Inventory.Stack(3, 2), inventory.carriedOrNull())
+
+        inventory.onPacket(
+            Protocol777.Play.SET_CURSOR_ITEM,
+            ByteWriter().writeVarInt(0).toByteArray(),
+        )
+        assertNull(inventory.carriedOrNull())
+    }
+
+    private fun fullStack(writer: ByteWriter, count: Int, itemId: Int) {
+        writer.writeVarInt(count).writeVarInt(itemId).writeVarInt(0).writeVarInt(0)
+    }
 }
