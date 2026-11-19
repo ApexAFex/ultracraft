@@ -90,9 +90,13 @@ object Protocol777 {
         const val RESPAWN: Int = 0x54
         const val PLAYER_COMBAT_KILL: Int = 0x45
         const val GAME_EVENT: Int = 0x27
+        const val SYSTEM_CHAT: Int = 0x7C
+        const val PLAYER_CHAT: Int = 0x42
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00
+        const val CHAT_COMMAND: Int = 0x07
+        const val CHAT: Int = 0x09
         const val CONTAINER_CLICK: Int = 0x12
         const val CHUNK_BATCH_RECEIVED: Int = 0x0B
         const val CLIENT_STATUS: Int = 0x0C

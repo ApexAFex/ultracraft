@@ -65,6 +65,14 @@ object GlView {
      */
     private const val DEMO_SELECT_AT = 1200
 
+    /** Демо отправляет сообщение и команду: так проверяется чат без рук. */
+    private const val DEMO_CHAT_AT = 1100
+    private const val DEMO_COMMAND_AT = 1150
+
+    /** Демо печатает в строке чата и отправляет её — проверка ввода, а не только вывода. */
+    private const val DEMO_TYPE_AT = 1300
+    private const val DEMO_SUBMIT_AT = 1340
+
     /**
      * How long a dig may take before the client gives up on it, in ticks beyond its estimate.
      * The server keeps its own progress and breaks the block when it reaches one, so the
@@ -237,6 +245,7 @@ object GlView {
                     )
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     val input = Input(window, camera)
+                    val chat = ChatInput()
 
                     val spawnX = centerChunkX * 16 + 8
                     val spawnZ = centerChunkZ * 16 + 8
@@ -424,14 +433,40 @@ object GlView {
                         val vitals = session?.vitals
                         val dead = vitals?.dead == true
 
-                        if (input.inventoryToggleRequested && !dead) {
+                        if (input.inventoryToggleRequested && !dead && !chat.open) {
                             inventoryOpen = !inventoryOpen
                         }
                         if (input.escapeRequested) {
-                            if (inventoryOpen) {
-                                inventoryOpen = false
-                            } else if (!dead) {
-                                GLFW.glfwSetWindowShouldClose(window, true)
+                            when {
+                                chat.open -> chat.close()
+                                inventoryOpen -> inventoryOpen = false
+                                dead -> Unit
+                                else -> GLFW.glfwSetWindowShouldClose(window, true)
+                            }
+                        }
+
+                        // Чат: T открывает строку, «/» — команду. Пока строка открыта, клавиши
+                        // становятся текстом, поэтому движение и хотбар ниже отключаются.
+                        if (chat.open) {
+                            if (input.enterRequested) {
+                                val line = chat.submit()
+                                if (line != null) {
+                                    session?.submitChat(line)
+                                    println("Отправлено: $line")
+                                }
+                            }
+                            if (input.backspaceRequested) chat.backspace()
+                            if (input.historyUpRequested) chat.historyPrevious()
+                            if (input.historyDownRequested) chat.historyNext()
+                            val typed = input.takeTyped()
+                            for (character in typed) chat.type(character)
+                        } else {
+                            // Набранное при закрытой строке никуда не идёт: иначе «t», которой
+                            // открыли чат, тут же оказалась бы первой буквой сообщения.
+                            input.takeTyped()
+                            if (!dead && !inventoryOpen) {
+                                if (input.chatOpenRequested) chat.openChat()
+                                if (input.commandOpenRequested) chat.openCommand()
                             }
                         }
                         // Курсор виден, когда им пользуется экран: инвентарь или экран смерти.
@@ -456,8 +491,9 @@ object GlView {
                             deathNanos = 0L
                         }
 
-                        // Number keys pick a hotbar slot; the server echoes the choice.
-                        input.hotbarSlotRequested?.let { slot ->
+                        // Number keys pick a hotbar slot; the server echoes the choice. Пока
+                        // печатаешь в чат, цифры — это цифры, а не слоты.
+                        if (!chat.open) input.hotbarSlotRequested?.let { slot ->
                             session?.selectSlot(slot)
                             val name = session?.inventory?.heldName() ?: "пусто"
                             println("Слот ${slot + 1}: $name")
@@ -511,10 +547,38 @@ object GlView {
                             }
                         }
 
+                        // Демо проверяет чат без рук: сообщение уходит как player chat, команда —
+                        // как chat command, а ответ сервера должен появиться на экране.
+                        if (demo && frame == DEMO_CHAT_AT) {
+                            session?.sendChat("hello from ultracraft")
+                            println("Демо: отправлено сообщение в чат")
+                        }
+                        if (demo && frame == DEMO_COMMAND_AT) {
+                            session?.sendCommand("list")
+                            println("Демо: отправлена команда /list")
+                        }
+
                         // Демо переключает слот: HUD должен показать название предмета.
                         if (demo && frame == DEMO_SELECT_AT) {
                             session?.selectSlot(1)
                             println("Демо: выбран слот 2 (${session?.inventory?.heldName() ?: "пусто"})")
+                        }
+
+                        // Демо печатает в строке ввода и отправляет её: проверяется не только
+                        // вывод чата, но и путь «набрал — отправил».
+                        if (demo && frame == DEMO_TYPE_AT) {
+                            chat.openChat()
+                            "typed by demo".forEach { chat.type(it) }
+                            println("Демо: строка чата открыта и заполнена")
+                        }
+                        if (demo && frame == DEMO_SUBMIT_AT) {
+                            val line = chat.submit()
+                            if (line != null) {
+                                session?.submitChat(line)
+                                println("Демо: отправлено из строки ввода: $line")
+                            }
+                            chat.openCommand()
+                            "list".forEach { chat.type(it) }
                         }
 
                         // A kick or a network error must end the game on purpose: continuing to
@@ -524,7 +588,7 @@ object GlView {
                             break
                         }
 
-                        if (input.flyToggleRequested) {
+                        if (input.flyToggleRequested && !chat.open) {
                             if (session?.abilities?.mayFly ?: true) {
                                 player.flying = !player.flying
                             } else {
@@ -607,9 +671,13 @@ object GlView {
                                 floor(player.z).toInt() shr 4,
                             )
                             if (ready) {
+                                // Пока открыта строка чата, буквы — это текст, а не движение.
                                 player.move(
                                     TICK_SECONDS, world, blocks,
-                                    forwardInput, input.strafe, input.jump, input.descend,
+                                    if (chat.open) 0.0 else forwardInput,
+                                    if (chat.open) 0.0 else input.strafe,
+                                    if (chat.open) false else input.jump,
+                                    if (chat.open) false else input.descend,
                                 )
                             }
                             if (ready && !playerLoadedSent) {
@@ -769,7 +837,15 @@ object GlView {
                         if (dead) {
                             hud.drawDeathScreen()
                         } else if (!inventoryOpen) {
-                            hud.draw(inventory, vitals, itemName, itemNameAlpha)
+                            val chatLines = session?.chat?.snapshot() ?: emptyList()
+                            if (chat.open) {
+                                // Пока печатаешь, хотбар и сердца уступают место строке ввода.
+                                hud.drawChat(chatLines, System.nanoTime())
+                                hud.drawChatInput(chat.text)
+                            } else {
+                                hud.draw(inventory, vitals, itemName, itemNameAlpha)
+                                hud.drawChat(chatLines, System.nanoTime())
+                            }
                         }
 
                         // Cracks on the block being mined: ten stages, like vanilla.
@@ -785,10 +861,11 @@ object GlView {
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
                         // With the inventory open the same button drags items, so it must not mine.
-                        holdRequested = !inventoryOpen && !dead && (leftDown || (demo && frame >= 5 && frame < 900))
-                        aimTarget = if (inventoryOpen || dead) null else miningTarget
+                        holdRequested = !inventoryOpen && !dead && !chat.open &&
+                            (leftDown || (demo && frame >= 5 && frame < 900))
+                        aimTarget = if (inventoryOpen || dead || chat.open) null else miningTarget
 
-                        if (!inventoryOpen && !dead && rightDown && !rightWasDown && target != null) demoPlace(target)
+                        if (!inventoryOpen && !dead && !chat.open && rightDown && !rightWasDown && target != null) demoPlace(target)
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         if (demo && frame == DEMO_AIM_AT) {
                             // Aim at the closest **player** first: nicknames and player models are

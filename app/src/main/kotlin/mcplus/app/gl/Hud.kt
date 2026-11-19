@@ -1,5 +1,6 @@
 package mcplus.app.gl
 
+import mcplus.net.ChatLine
 import mcplus.net.Inventory
 import mcplus.net.Vitals
 import java.io.Closeable
@@ -88,6 +89,79 @@ class Hud(
 
     /** Прямоугольник кнопки «возродиться» — по нему проверяется клик. */
     fun respawnButton(): HudRect = HudLayout.respawnButton(width, height)
+
+    /**
+     * Строки чата слева над хотбаром: последние [CHAT_LINES] штук, свежие — снизу.
+     *
+     * Как в ванили, старые сообщения гаснут: полностью видны 8 секунд, за следующие две
+     * исчезают. Каждая строка рисуется своим проходом, потому что у неё своя прозрачность.
+     */
+    fun drawChat(lines: List<ChatLine>, nowNanos: Long) {
+        val text = this.text ?: return
+        if (lines.isEmpty()) return
+        val s = HudLayout.scale(height).toFloat()
+        val bar = HudLayout.hotbar(width, height)
+        val maxWidth = minOf(width * 0.6f, 400f * s)
+        var y = bar.y - 30f * s
+        var drawn = 0
+
+        for (line in lines.takeLast(CHAT_LINES).asReversed()) {
+            if (drawn++ >= CHAT_LINES) break
+            val alpha = chatAlpha(line.atNanos, nowNanos)
+            if (alpha <= 0.01f) continue
+            for (part in wrap(line.text, maxWidth, s).asReversed()) {
+                val lineWidth = text.textWidth(part, s)
+                renderer.begin()
+                renderer.rect(bar.x - 2f * s, y - s, lineWidth + 6f * s, 10f * s, 0x000000, 0.32f * alpha)
+                renderer.draw()
+                text.drawScreen(listOf(TextRenderer.ScreenLabel(bar.x, y, part, s)), alpha = alpha)
+                y -= 10f * s
+                if (y < 0f) return
+            }
+        }
+    }
+
+    /** Строка ввода чата: тёмная полоса внизу экрана и текст с курсором. */
+    fun drawChatInput(value: String) {
+        val s = HudLayout.scale(height).toFloat()
+        val y = height - 13f * s
+        renderer.begin()
+        renderer.rect(2f * s, y, width - 4f * s, 11f * s, 0x000000, 0.6f)
+        renderer.draw()
+        text?.drawScreen(listOf(TextRenderer.ScreenLabel(4f * s, y + 2f * s, "$value|", s)))
+    }
+
+    private fun chatAlpha(atNanos: Long, nowNanos: Long): Float {
+        val age = (nowNanos - atNanos) / 1_000_000_000.0
+        return when {
+            age < CHAT_VISIBLE_SECONDS -> 1f
+            age > CHAT_VISIBLE_SECONDS + CHAT_FADE_SECONDS -> 0f
+            else -> ((CHAT_VISIBLE_SECONDS + CHAT_FADE_SECONDS - age) / CHAT_FADE_SECONDS).toFloat()
+        }
+    }
+
+    /** Перенос длинной строки по словам; слово длиннее строки режется по символам. */
+    private fun wrap(value: String, maxWidth: Float, scale: Float): List<String> {
+        val text = this.text ?: return listOf(value)
+        val lines = ArrayList<String>()
+        var current = StringBuilder()
+        for (word in value.split(' ')) {
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (current.isNotEmpty() && text.textWidth(candidate, scale) > maxWidth) {
+                lines += current.toString()
+                current = StringBuilder(word)
+            } else {
+                current = StringBuilder(candidate)
+            }
+            while (current.length > 1 && text.textWidth(current.toString(), scale) > maxWidth) {
+                val cut = current.length / 2
+                lines += current.substring(0, cut)
+                current = StringBuilder(current.substring(cut))
+            }
+        }
+        if (current.isNotEmpty()) lines += current.toString()
+        return lines
+    }
 
     private fun drawHotbar(inventory: Inventory?, s: Float) {
         val bar = HudLayout.hotbar(width, height)
@@ -213,6 +287,13 @@ class Hud(
             text = itemName,
             scale = s,
         )
+    }
+
+    private companion object {
+        /** Сколько строк чата видно одновременно. */
+        const val CHAT_LINES = 10
+        const val CHAT_VISIBLE_SECONDS = 8.0
+        const val CHAT_FADE_SECONDS = 2.0
     }
 
     override fun close() {

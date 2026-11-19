@@ -51,6 +51,9 @@ class Session internal constructor(
     /** Health, food and experience: numbers the HUD shows, never computed by the client. */
     val vitals: Vitals = Vitals()
 
+    /** Chat lines: written by the reader thread, read by the game loop. */
+    val chat: ChatLog = ChatLog()
+
     /** Why the connection ended, or null while it is alive. */
     @Volatile
     var closeReason: String? = null
@@ -113,6 +116,15 @@ class Session internal constructor(
                 Protocol777.Play.SET_EXPERIENCE,
                 Protocol777.Play.RESPAWN ->
                     vitals.onPacket(packet.id, packet.body)
+
+                Protocol777.Play.SYSTEM_CHAT ->
+                    readSystemChat(packet.body)?.let { chat.add(it) }
+
+                Protocol777.Play.PLAYER_CHAT ->
+                    readPlayerChat(packet.body)?.let { (sender, text) ->
+                        val name = players.nameOf(sender) ?: sender.toString().take(8)
+                        chat.add("<$name> $text")
+                    }
 
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 
@@ -195,6 +207,43 @@ class Session internal constructor(
         input: Int = ContainerInput.PICKUP,
     ) {
         send(ContainerClicks.click(FORCE_FULL_STATE, menuSlot, button, input))
+    }
+
+    /**
+     * Sends a chat message.
+     *
+     * No signature is attached: the client has no profile key. Offline servers accept such
+     * messages; an online server with mandatory signing drops them until chat sessions are
+     * implemented (stage 7). The last-seen part acknowledges nothing — see [chatBody].
+     */
+    fun sendChat(message: String) {
+        val text = message.trim()
+        if (text.isEmpty()) return
+        send(Packet(Protocol777.Play.CHAT, chatBody(text)))
+    }
+
+    /**
+     * Sends a command **without** the leading slash.
+     *
+     * `Chat Command` carries just a string: no signature and no acknowledgements, so commands
+     * work even where signed chat does not.
+     */
+    fun sendCommand(command: String) {
+        val text = command.trim().removePrefix("/")
+        if (text.isEmpty()) return
+        send(Packet(Protocol777.Play.CHAT_COMMAND, ByteWriter().writeString(text, MAX_MESSAGE).toByteArray()))
+    }
+
+    /**
+     * Sends a line typed into the chat box: `/…` becomes a command, everything else a message.
+     */
+    fun submitChat(line: String) {
+        val text = line.trim()
+        when {
+            text.isEmpty() -> Unit
+            text.startsWith("/") -> sendCommand(text.substring(1))
+            else -> sendChat(text)
+        }
     }
 
     /**

@@ -1,12 +1,13 @@
 package mcplus.app.gl
 
 import org.lwjgl.glfw.GLFW
+import org.lwjgl.glfw.GLFWCharCallbackI
 import org.lwjgl.glfw.GLFWCursorPosCallbackI
 
 /**
  * Controls: WASD to walk, Space to jump (or rise when flying), Shift to descend,
  * F toggles flying, 1–9 pick a hotbar slot, E opens the inventory, R respawns after death,
- * Escape quits.
+ * T opens chat, / opens a command, Escape quits.
  *
  * While the inventory is open the mouse stops steering the camera and moves a visible cursor:
  * looking around and dragging items with the same cursor is impossible, so the mode is explicit.
@@ -39,7 +40,16 @@ class Input(private val window: Long, private val camera: Camera) {
     private var inventoryPressed = false
     private var escapePressed = false
     private var respawnPressed = false
+    private var chatPressed = false
+    private var commandPressed = false
+    private var enterPressed = false
+    private var backspacePressed = false
+    private var upPressed = false
+    private var downPressed = false
     private var mouseWasDown = false
+
+    /** Символы, набранные с клавиатуры с прошлого кадра (то, что печатает человек). */
+    private val typedBuffer = StringBuilder()
 
     /** Set once when F is pressed, consumed by the caller to toggle the fly mode. */
     var flyToggleRequested: Boolean = false
@@ -59,6 +69,27 @@ class Input(private val window: Long, private val camera: Camera) {
 
     /** Set once when R (or Enter) is pressed — «возродиться» на экране смерти. */
     var respawnRequested: Boolean = false
+        private set
+
+    /** Set once when T is pressed: open the chat line. */
+    var chatOpenRequested: Boolean = false
+        private set
+
+    /** Set once when «/» is pressed: open the chat line as a command. */
+    var commandOpenRequested: Boolean = false
+        private set
+
+    /** Set once when Enter is pressed while the chat line is open. */
+    var enterRequested: Boolean = false
+        private set
+
+    var backspaceRequested: Boolean = false
+        private set
+
+    var historyUpRequested: Boolean = false
+        private set
+
+    var historyDownRequested: Boolean = false
         private set
 
     /** Set once when the left mouse button goes down inside the inventory screen. */
@@ -87,9 +118,26 @@ class Input(private val window: Long, private val camera: Camera) {
         lastY = y
     }
 
+    /**
+     * Текст приходит колбэком, а не опросом клавиш: так работают раскладка, Shift и
+     * повторы клавиш. Управляющие символы отбрасываются — их обрабатывают отдельные клавиши.
+     */
+    private val charCallback = GLFWCharCallbackI { _, codepoint ->
+        if (codepoint >= 32) typedBuffer.appendCodePoint(codepoint)
+    }
+
     init {
         GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED)
         GLFW.glfwSetCursorPosCallback(window, cursorCallback)
+        GLFW.glfwSetCharCallback(window, charCallback)
+    }
+
+    /** Набранные символы с прошлого вызова; буфер очищается. */
+    fun takeTyped(): String {
+        if (typedBuffer.isEmpty()) return ""
+        val text = typedBuffer.toString()
+        typedBuffer.setLength(0)
+        return text
     }
 
     fun update() {
@@ -125,6 +173,30 @@ class Input(private val window: Long, private val camera: Camera) {
         val respawn = pressed(GLFW.GLFW_KEY_R) || pressed(GLFW.GLFW_KEY_ENTER)
         respawnRequested = respawn && !respawnPressed
         respawnPressed = respawn
+
+        val chat = pressed(GLFW.GLFW_KEY_T)
+        chatOpenRequested = chat && !chatPressed
+        chatPressed = chat
+
+        val command = pressed(GLFW.GLFW_KEY_SLASH)
+        commandOpenRequested = command && !commandPressed
+        commandPressed = command
+
+        val enter = pressed(GLFW.GLFW_KEY_ENTER) || pressed(GLFW.GLFW_KEY_KP_ENTER)
+        enterRequested = enter && !enterPressed
+        enterPressed = enter
+
+        val backspace = pressed(GLFW.GLFW_KEY_BACKSPACE)
+        backspaceRequested = backspace && !backspacePressed
+        backspacePressed = backspace
+
+        val up = pressed(GLFW.GLFW_KEY_UP)
+        historyUpRequested = up && !upPressed
+        upPressed = up
+
+        val arrowDown = pressed(GLFW.GLFW_KEY_DOWN)
+        historyDownRequested = arrowDown && !downPressed
+        downPressed = arrowDown
 
         // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
         // a frame-by-frame repeat would send a packet per frame.

@@ -2,9 +2,15 @@ package mcplus.net
 
 import mcplus.protocol.ByteReader
 import mcplus.protocol.ProtocolException
+import mcplus.protocol.nbt.NbtByte
 import mcplus.protocol.nbt.NbtCompound
+import mcplus.protocol.nbt.NbtDouble
+import mcplus.protocol.nbt.NbtFloat
+import mcplus.protocol.nbt.NbtInt
 import mcplus.protocol.nbt.NbtList
+import mcplus.protocol.nbt.NbtLong
 import mcplus.protocol.nbt.NbtReader
+import mcplus.protocol.nbt.NbtShort
 import mcplus.protocol.nbt.NbtString
 import mcplus.protocol.nbt.NbtTag
 import mcplus.protocol.nbt.list
@@ -161,7 +167,7 @@ internal fun rawReason(packetBody: ByteArray): String {
         }
     }
     runCatching {
-        val text = nbtText(NbtReader.read(ByteReader(packetBody))).trim()
+        val text = componentText(NbtReader.read(ByteReader(packetBody))).trim()
         if (text.isNotEmpty()) return text
     }
     return "причина не читается (${packetBody.size} байт)"
@@ -208,16 +214,61 @@ private val DISCONNECT_REASONS = mapOf(
     "multiplayer.disconnect.too_many_pending_chats" to "слишком много неподтверждённых сообщений",
 )
 
-private fun nbtText(tag: NbtTag): String = when (tag) {
+/**
+ * Текст текстового компонента в NBT: `text`, `translate` (с аргументами `with`/`args`) и
+ * `extra`. Цвет и стиль не разбираются: HUD рисует строки одним цветом.
+ */
+internal fun componentText(tag: NbtTag): String = when (tag) {
     is NbtString -> tag.value
-    is NbtCompound -> buildString {
-        tag.string("text")?.let { append(it) }
-        (tag["translate"] as? NbtString)?.let { append(it.value) }
-        tag.list("extra")?.forEach { append(nbtText(it)) }
+    is NbtCompound -> {
+        val extra = tag.list("extra")?.joinToString("") { componentText(it) }.orEmpty()
+        // Числа в аргументах перевода приходят компонентом с пустым именем поля:
+        // `{"": 1}`. Без этой ветки `commands.list.players` терял количества игроков.
+        val text = tag.string("text") ?: tag.entries[""]?.let { componentText(it) }
+        val translate = tag.string("translate")
+        when {
+            text != null -> text + extra
+            translate != null -> translateKey(translate, translateArgs(tag)) + extra
+            else -> extra
+        }
     }
-    is NbtList -> tag.items.joinToString("") { nbtText(it) }
+
+    is NbtList -> tag.items.joinToString("") { componentText(it) }
+    // Числовые аргументы перевода (`commands.list.players`) приходят не строками,
+    // и без этого они превращались бы в пустые места.
+    is NbtByte -> tag.value.toString()
+    is NbtShort -> tag.value.toString()
+    is NbtInt -> tag.value.toString()
+    is NbtLong -> tag.value.toString()
+    is NbtFloat -> tag.value.toString()
+    is NbtDouble -> tag.value.toString()
     else -> ""
 }
+
+private fun translateArgs(tag: NbtCompound): List<String> =
+    (tag.list("with") ?: tag.list("args"))?.map { componentText(it) }.orEmpty()
+
+/**
+ * Ванильные ключи, которые реально приходят в чате, переведены на английский: кириллицы
+ * в шрифте пока нет, и русские строки превратились бы в пустые квадраты. Неизвестный
+ * ключ показывается как есть, чтобы сообщение не пропадало молча.
+ */
+private fun translateKey(key: String, args: List<String>): String {
+    val format = CHAT_TRANSLATIONS[key]
+        ?: return if (args.isEmpty()) key else "$key(${args.joinToString(", ")})"
+    return runCatching { String.format(format, *args.toTypedArray()) }.getOrDefault(key)
+}
+
+private val CHAT_TRANSLATIONS = mapOf(
+    "chat.type.text" to "<%s> %s",
+    "chat.type.announcement" to "[%s] %s",
+    "chat.type.emote" to "* %s %s",
+    "multiplayer.player.joined" to "%s joined the game",
+    "multiplayer.player.left" to "%s left the game",
+    "commands.message.display.incoming" to "%s whispers to you: %s",
+    "commands.message.display.outgoing" to "You whisper to %s: %s",
+    "commands.list.players" to "There are %s of a max of %s players online: %s",
+)
 
 private const val NBT_STRING = 0x08
 
