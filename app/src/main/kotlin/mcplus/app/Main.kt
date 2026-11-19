@@ -895,6 +895,10 @@ private fun windowCommand(args: List<String>) {
     var cameraModeAtStart = 0
     var pitchAtStart: Float? = null
     var captureAfterSeconds: Double? = null
+    var noMenu = false
+    var menuShot: String? = null
+    var menuSettings = false
+    var menuAuto = false
     val pass = ArrayList<String>(args.size)
     var index = 0
     while (index < args.size) {
@@ -905,6 +909,10 @@ private fun windowCommand(args: List<String>) {
             "--particles" -> particleDemo = true
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
+            "--no-menu" -> noMenu = true
+            "--menu-auto" -> menuAuto = true
+            "--menu-settings" -> menuSettings = true
+            "--menu-shot" -> menuShot = args.getOrNull(++index) ?: fail("--menu-shot ждёт путь")
             "--pitch" -> pitchAtStart =
                 args.getOrNull(++index)?.toFloatOrNull() ?: fail("--pitch ждёт число градусов")
             "--after" -> captureAfterSeconds =
@@ -916,7 +924,35 @@ private fun windowCommand(args: List<String>) {
     val options = parseLoginArgs(pass) ?: return
     val size = options.chunks.coerceIn(3, 21)
     val radius = (size - 1) / 2
-    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+    // Без явного адреса и без демо игра начинается с главного меню, как в ванили.
+    val target = when {
+        menuShot != null -> {
+            mcplus.app.gl.MainMenu.run(
+                mcplus.app.gl.Settings.serverAddress,
+                java.io.File(menuShot),
+                openSettings = menuSettings,
+            )
+            return
+        }
+        menuAuto -> {
+            val chosen = mcplus.app.gl.MainMenu.run(
+                mcplus.app.gl.Settings.serverAddress,
+                autoPlayFrames = 30,
+            ) ?: return
+            mcplus.app.gl.Settings.serverAddress = chosen
+            mcplus.app.gl.Settings.save()
+            chosen
+        }
+        options.demo || noMenu -> options.target ?: DEFAULT_TARGET
+        options.target != null -> options.target
+        else -> {
+            val chosen = mcplus.app.gl.MainMenu.run(mcplus.app.gl.Settings.serverAddress) ?: return
+            mcplus.app.gl.Settings.serverAddress = chosen
+            mcplus.app.gl.Settings.save()
+            chosen
+        }
+    }
+    val (host, port) = parseAddress(target)
     val blocks = findBlockTable(options.blocks)
 
     val session = connect(host, port, options)

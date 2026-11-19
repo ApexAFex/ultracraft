@@ -29,6 +29,9 @@ object Settings {
     var entitiesVolume: Float = 1f
     var ambientVolume: Float = 1f
 
+    /** Адрес последнего сервера из главного меню. */
+    var serverAddress: String = "localhost"
+
     private var file: File = File("settings.properties")
     private var loaded = false
 
@@ -56,6 +59,7 @@ object Settings {
             blocksVolume = properties.getProperty("blocksVolume")?.toFloatOrNull() ?: blocksVolume
             entitiesVolume = properties.getProperty("entitiesVolume")?.toFloatOrNull() ?: entitiesVolume
             ambientVolume = properties.getProperty("ambientVolume")?.toFloatOrNull() ?: ambientVolume
+            serverAddress = properties.getProperty("serverAddress") ?: serverAddress
             println("Настройки: ${file.absolutePath}, музыка=$music, обзор=$fov")
         }
     }
@@ -74,6 +78,7 @@ object Settings {
             properties.setProperty("blocksVolume", blocksVolume.toString())
             properties.setProperty("entitiesVolume", entitiesVolume.toString())
             properties.setProperty("ambientVolume", ambientVolume.toString())
+            properties.setProperty("serverAddress", serverAddress)
             file.outputStream().use { properties.store(it, "ultracraft settings") }
         }
     }
