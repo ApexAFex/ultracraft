@@ -2,13 +2,17 @@
 #
 #   .\tools\server-start.ps1                 # start and wait until ready
 #   .\tools\server-start.ps1 -Restart        # stop a running instance first
+#   .\tools\server-start.ps1 -Restart -DebugBlocks
+#                                            # log the server's verdict on every
+#                                            # block-break packet ("Server ACK ...")
 #
 # Requires JDK 25+ (Minecraft 26.3 refuses older runtimes).
 
 param(
     [string]$ServerDir = (Join-Path $PSScriptRoot 'server'),
     [string]$Memory = '1536M',
-    [switch]$Restart
+    [switch]$Restart,
+    [switch]$DebugBlocks
 )
 
 $ErrorActionPreference = 'Stop'
@@ -75,11 +79,21 @@ $java = Find-Jdk -MinimumMajor 25
 $log = Join-Path $ServerDir 'server.log'
 $err = Join-Path $ServerDir 'server.err'
 
+# The debug flags are read by SharedConstants from system properties; the prefix is MC_DEBUG_.
+$javaArgs = @("-Xmx$Memory")
+if ($DebugBlocks) {
+    $config = Join-Path $PSScriptRoot 'server-debug-log4j2.xml'
+    $javaArgs += '-DMC_DEBUG_ENABLED=true', '-DMC_DEBUG_BLOCK_BREAK=true'
+    $javaArgs += "-Dlog4j.configurationFile=$config"
+    Write-Host 'отладка разрушения блоков включена: в лог пойдут строки «Server ACK …»'
+}
+$javaArgs += '-jar', 'server.jar', 'nogui'
+
 Write-Host "java: $java"
 Write-Host "каталог: $ServerDir"
 
 $process = Start-Process -FilePath $java `
-    -ArgumentList "-Xmx$Memory", '-jar', 'server.jar', 'nogui' `
+    -ArgumentList $javaArgs `
     -WorkingDirectory $ServerDir `
     -RedirectStandardOutput $log -RedirectStandardError $err `
     -NoNewWindow -PassThru

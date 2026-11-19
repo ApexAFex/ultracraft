@@ -331,11 +331,16 @@ private fun mineCommand(args: List<String>) {
         val world = WorldCollector(open).collect(maxChunks = 25, durationMs = 2_000)
         val standing = open.playerPosition
         val (x, y, z) = options.at ?: run {
-            // By default dig the block under the player: it is always within reach.
+            // By default dig a block beside the feet, not the one under them: this command
+            // has no physics, so digging the block underfoot leaves the player standing in
+            // the air, and the server kicks for "floating too long" after a few seconds.
             val px = kotlin.math.floor(standing?.x ?: 0.0).toInt()
             val py = kotlin.math.floor(standing?.y ?: 0.0).toInt() - 1
             val pz = kotlin.math.floor(standing?.z ?: 0.0).toInt()
-            Triple(px, py, pz)
+            val beside = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
+                .map { (dx, dz) -> Triple(px + dx, py, pz + dz) }
+                .firstOrNull { world.blockAt(it.first, it.second, it.third) != 0 }
+            beside ?: Triple(px, py, pz)
         }
         val start = world.blockAt(x, y, z)
         println("Игрок в ${standing?.let { "%.1f, %.1f, %.1f".format(it.x, it.y, it.z) }}")
@@ -368,19 +373,28 @@ private fun mineCommand(args: List<String>) {
         open.send(mcplus.net.PlayerMovement.tickEnd())
 
         val deadline = System.currentTimeMillis() + 2_000
-        var answered = false
-        while (System.currentTimeMillis() < deadline) {
-            val packet = open.receive()
-            if (packet.id != mcplus.net.proto.Protocol777.Play.BLOCK_UPDATE) continue
-            val reader = mcplus.protocol.ByteReader(packet.body)
-            val changed = reader.readPosition()
-            val state = reader.readVarInt()
-            if (changed.x != x || changed.y != y || changed.z != z) continue
-            println("Сервер прислал Block Update: ${blocks.nameOf(state)}")
-            answered = true
-            break
+        var answer: Int? = null
+        try {
+            while (System.currentTimeMillis() < deadline) {
+                val packet = open.receive()
+                if (packet.id != mcplus.net.proto.Protocol777.Play.BLOCK_UPDATE) continue
+                val reader = mcplus.protocol.ByteReader(packet.body)
+                val changed = reader.readPosition()
+                val state = reader.readVarInt()
+                if (changed.x != x || changed.y != y || changed.z != z) continue
+                answer = state
+                // Updates about this position can also correct our stale copy of the world,
+                // so only "air" is the final answer; anything else is remembered and waited out.
+                if (state == 0) break
+            }
+        } catch (e: java.net.SocketTimeoutException) {
+            // Silence is a valid answer here, so it must not end the command as a crash.
         }
-        if (!answered) println("Сервер ничего не прислал: скорее всего блок сломан")
+        when (val state = answer) {
+            null -> println("Сервер ничего не прислал за 2 секунды: блок не изменился")
+            0 -> println("Сервер сломал блок: air")
+            else -> println("Сервер вернул блок: ${blocks.nameOf(state)} ($state)")
+        }
     }
 }
 

@@ -45,8 +45,12 @@ object GlView {
     /** Demo mode looks at the ground from here on, to test the mining progress. */
     private const val DEMO_MINE_FROM = 700
 
-    /** A block change the server told us about; the mining code waits for these. */
-    private class BlockChange(val x: Int, val y: Int, val z: Int, val state: Int)
+    /**
+     * How long a dig may take before the client gives up on it, in ticks beyond its estimate.
+     * The server keeps its own progress and breaks the block when it reaches one, so the
+     * client holds until the block is really gone; this cap only stops a hopeless attempt.
+     */
+    private const val MINING_EXTRA_TICKS = 120
 
     /** Nicknames further away than this are not drawn — they would be unreadable dots. */
     private const val NAMETAG_RANGE = 64.0
@@ -129,7 +133,6 @@ object GlView {
             // quietly puts the world back.
             val blockUpdates = java.util.concurrent.atomic.AtomicInteger()
             val chunkFailures = java.util.concurrent.atomic.AtomicInteger()
-            val blockChanges = java.util.concurrent.ConcurrentLinkedQueue<BlockChange>()
 
             /**
              * A chunk's mesh depends on its four neighbours too, but only at the border:
@@ -156,12 +159,8 @@ object GlView {
                     runCatching {
                         val reader = mcplus.protocol.ByteReader(packet.body)
                         val position = reader.readPosition()
-                        val state = reader.readVarInt()
                         world.applyBlockUpdate(packet.body)
                         remeshAround(position.x, position.y, position.z)
-                        // The mining code learns from this: the block coming back means the server
-                        // rejected our release and the time has to grow.
-                        blockChanges.add(BlockChange(position.x, position.y, position.z, state))
                     }
                     return
                 }
@@ -246,10 +245,10 @@ object GlView {
                     )
                     println("WASD — идти, пробел — прыжок, F — полёт, ЛКМ — сломать, ПКМ — поставить, Esc — выход")
 
-                    // Breaking takes time: press once, hold, release when the progress is full.
-                    // The server recomputes the progress itself and only accepts the release
-                    // when its own counter reached one, so pressing and releasing in the same
-                    // tick is answered with "Mismatch in destroy block pos".
+                    // Breaking takes time, and the time is the server's, not ours: it accrues its
+                    // own progress per tick and breaks the block when the progress reaches one.
+                    // The client therefore holds until the block is really gone, and the estimate
+                    // in BreakProgress is only the moment to ask the server to finish now.
                     var miningX = 0
                     var miningY = 0
                     var miningZ = 0
@@ -259,8 +258,8 @@ object GlView {
                     var miningState = 0
                     var mining = false
 
-                    /** Release sent, waiting to see whether the server agrees or puts the block back. */
-                    var pendingBreak: BlockChange? = null
+                    /** The release was sent; from now on only the server's answer matters. */
+                    var miningStopSent = false
 
                     /** Set by the frame loop, consumed by the tick: one mining step per tick. */
                     var holdRequested = false
@@ -285,43 +284,32 @@ object GlView {
                         miningTicks = 0
                         miningNeeded = needed
                         miningState = world.blockAt(hit.x, hit.y, hit.z)
+                        miningStopSent = false
                     }
 
                     fun cancelMining() {
                         if (!mining) return
-                        session?.send(
-                            BlockInteraction.playerAction(
-                                BlockInteraction.ABORT_DESTROY_BLOCK,
-                                miningX, miningY, miningZ, miningFace, sequence++,
-                            ),
-                        )
+                        // Once the release is sent the server has already stopped counting our
+                        // progress: an abort would cancel the delayed destroy it scheduled, and
+                        // the block would survive. So only an unfinished dig is aborted.
+                        if (!miningStopSent) {
+                            session?.send(
+                                BlockInteraction.playerAction(
+                                    BlockInteraction.ABORT_DESTROY_BLOCK,
+                                    miningX, miningY, miningZ, miningFace, sequence++,
+                                ),
+                            )
+                        }
                         mining = false
                     }
 
                     fun finishMining() {
                         if (!mining) return
-                        // An instant block (grass blades, flowers, torches) is gone on the server as
-                        // soon as the press arrives: vanilla sends no release for those, and sending
-                        // one only makes the server complain that nothing was being dug.
-                        //
-                        // For timed blocks the release has to come *after* the server's own counter
-                        // reached one, otherwise the digging is cancelled and the block returns.
-                        // My table is an estimate, so a rejected attempt teaches the client the real
-                        // time (see the block-change handler) and the break is retried.
-                        if (miningNeeded > 1) {
-                            session?.send(
-                                BlockInteraction.playerAction(
-                                    BlockInteraction.STOP_DESTROY_BLOCK,
-                                    miningX, miningY, miningZ, miningFace, sequence++,
-                                ),
-                            )
-                            pendingBreak = BlockChange(miningX, miningY, miningZ, miningState)
-                        }
-                        // The prediction: the server confirms with a Block Update or sends the
-                        // block back, both of which we handle.
-                        world.setBlock(miningX, miningY, miningZ, 0)
                         pipeline.request(miningX shr 4, miningZ shr 4)
-                        println("Сломан блок: $miningX, $miningY, $miningZ (${blocks.nameOf(miningState)}) за $miningTicks тиков")
+                        println(
+                            "Сломан блок: $miningX, $miningY, $miningZ " +
+                                "(${blocks.nameOf(miningState)}) за $miningTicks тиков",
+                        )
                         mining = false
                     }
 
@@ -388,39 +376,46 @@ object GlView {
                             }
 
                             // Mining advances on server ticks, like vanilla: pick the block under
-                            // the crosshair, one damage step per tick, release when it is done.
-                            while (true) {
-                                val change = blockChanges.poll() ?: break
-                                val pending = pendingBreak ?: continue
-                                if (change.x != pending.x || change.y != pending.y || change.z != pending.z) continue
-                                val name = blocks.nameOf(pending.state)
-                                if (change.state == 0) {
-                                    println("Сервер подтвердил слом: $name")
-                                } else {
-                                    val was = BreakProgress.ticksFor(name)
-                                    BreakProgress.recordFailure(name)
-                                    println(
-                                        "Сервер вернул $name: время слома $was → " +
-                                            "${BreakProgress.ticksFor(name)} тиков",
-                                    )
-                                }
-                                pendingBreak = null
-                            }
+                            // the crosshair and hold. The server counts its own progress and
+                            // breaks the block when it reaches one, so the loop ends when the
+                            // block is actually gone, not when our estimate says it should be.
+                            //
+                            // A finished dig is checked first: once the block is gone the crosshair
+                            // moves to the next one behind it, and comparing targets first would
+                            // look like "the player switched blocks" instead of "the dig worked".
+                            if (mining && world.blockAt(miningX, miningY, miningZ) == 0) finishMining()
 
                             val aim = aimTarget
                             if (!holdRequested || aim == null) {
                                 cancelMining()
-                            } else {
-                                val sameBlock = mining &&
-                                    aim.x == miningX && aim.y == miningY && aim.z == miningZ
-                                if (!sameBlock) {
-                                    cancelMining()
-                                    beginMining(aim)
-                                }
+                            } else if (!mining || aim.x != miningX || aim.y != miningY || aim.z != miningZ) {
+                                cancelMining()
+                                beginMining(aim)
                             }
                             if (mining) {
                                 miningTicks++
-                                if (miningTicks >= miningNeeded) finishMining()
+                                if (world.blockAt(miningX, miningY, miningZ) == 0) {
+                                    finishMining()
+                                } else if (!miningStopSent && miningNeeded > 1 && miningTicks >= miningNeeded) {
+                                    // Our estimate is reached: ask the server to finish now. It
+                                    // either breaks the block or schedules the delayed destroy
+                                    // that completes the dig a moment later.
+                                    session?.send(
+                                        BlockInteraction.playerAction(
+                                            BlockInteraction.STOP_DESTROY_BLOCK,
+                                            miningX, miningY, miningZ, miningFace, sequence++,
+                                        ),
+                                    )
+                                    miningStopSent = true
+                                } else if (miningTicks >= miningNeeded + MINING_EXTRA_TICKS) {
+                                    val name = blocks.nameOf(miningState)
+                                    println(
+                                        "Сервер так и не сломал $name за $miningTicks тиков: " +
+                                            "блок остаётся на месте",
+                                    )
+                                    BreakProgress.recordFailure(name)
+                                    mining = false
+                                }
                             }
 
                             previousX = player.x

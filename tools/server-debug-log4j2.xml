@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Log settings for the local oracle server when block breaking is being investigated.
+
+  Vanilla logs at INFO, so the server's own verdict on every Player Action packet
+  ("Server ACK <sequence> <pos> <accepted> <reason>") is invisible. This file raises
+  only net.minecraft.server.level.ServerPlayerGameMode to DEBUG and leaves everything
+  else at INFO, so the log stays readable.
+
+  Debug output is additionally gated in code by -DMC_DEBUG_ENABLED=true
+  and -DMC_DEBUG_BLOCK_BREAK=true; tools/server-start.ps1 -DebugBlocks sets all three.
+-->
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="SysOut" target="SYSTEM_OUT">
+            <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level]: %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Logger name="net.minecraft.server.level.ServerPlayerGameMode" level="debug" additivity="false">
+            <AppenderRef ref="SysOut"/>
+        </Logger>
+        <Root level="info">
+            <AppenderRef ref="SysOut"/>
+        </Root>
+    </Loggers>
+</Configuration>

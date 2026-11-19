@@ -27,7 +27,12 @@ object Raycast {
         dirX: Double,
         dirY: Double,
         dirZ: Double,
-        maxDistance: Double = 6.0,
+        /**
+         * Blocks. Vanilla survival reaches 4.5; the server allows anything within its own
+         * range plus a buffer, and answers "too far" for the rest, so reaching further only
+         * wastes packets and makes the client fight the server.
+         */
+        maxDistance: Double = 4.5,
         /** Blocks to look through, e.g. for a self-test that needs a solid one. */
         skip: (String) -> Boolean = { false },
     ): Hit? {
