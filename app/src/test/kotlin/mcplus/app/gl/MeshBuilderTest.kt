@@ -76,11 +76,23 @@ class MeshBuilderTest {
      * sky through it.
      */
     @Test
-    fun `water is meshed like a solid block`() {
+    fun `water is meshed like a solid block, but into the translucent buffer`() {
         val world = world()
         world.add(chunkWith(intArrayOf(5, 48, 5) to 2))
 
-        assertEquals(6 * 2 * 3, mesh(world).vertexCount)
+        val mesh = mesh(world)
+        assertEquals(0, mesh.vertexCount, "вода не должна попадать в непрозрачный буфер")
+        assertEquals(6 * 2 * 3, mesh.translucentVertexCount)
+    }
+
+    @Test
+    fun `stone and water are split between the two buffers`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 1, intArrayOf(1, 48, 1) to 2))
+
+        val mesh = mesh(world)
+        assertEquals(6 * 2 * 3, mesh.vertexCount)
+        assertEquals(6 * 2 * 3, mesh.translucentVertexCount)
     }
 
     /**

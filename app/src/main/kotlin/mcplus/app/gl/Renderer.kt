@@ -55,6 +55,9 @@ class Renderer(
 
     private val parts = LinkedHashMap<Long, Part>()
 
+    /** Вода и лёд: отдельные буферы, рисуются поверх всего без записи в глубину. */
+    private val translucentParts = LinkedHashMap<Long, Part>()
+
     init {
         GL30.glBindVertexArray(outlineVao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, outlineVbo)
@@ -119,22 +122,27 @@ class Renderer(
         val part = parts.getOrPut(key(mesh.chunkX, mesh.chunkZ)) {
             Part(GL30.glGenVertexArrays(), GL30.glGenBuffers()).also { configure(it) }
         }
-        upload(part, mesh)
+        upload(part, mesh.data, mesh.vertexCount)
+
+        val translucent = translucentParts.getOrPut(key(mesh.chunkX, mesh.chunkZ)) {
+            Part(GL30.glGenVertexArrays(), GL30.glGenBuffers()).also { configure(it) }
+        }
+        upload(translucent, mesh.translucentData, mesh.translucentVertexCount)
     }
 
     val chunkCount: Int get() = parts.size
 
-    private fun upload(part: Part, mesh: ChunkMesh) {
-        if (mesh.data.isEmpty()) {
+    private fun upload(part: Part, data: FloatArray, count: Int) {
+        if (data.isEmpty()) {
             part.count = 0
             return
         }
-        val buffer = MemoryUtil.memAllocFloat(mesh.data.size)
-        buffer.put(mesh.data).flip()
+        val buffer = MemoryUtil.memAllocFloat(data.size)
+        buffer.put(data).flip()
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, part.vbo)
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_DYNAMIC_DRAW)
         MemoryUtil.memFree(buffer)
-        part.count = mesh.vertexCount
+        part.count = count
     }
 
     fun draw(camera: Camera) {
@@ -158,8 +166,34 @@ class Renderer(
             GL30.glBindVertexArray(part.vao)
             GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, part.count)
         }
+
+        // Полупрозрачное — после всего: дальние чанки первыми, иначе ближняя вода
+        // перекроет дальнюю, не смешавшись с ней. В глубину не пишем: за водой видно дно.
+        val translucent = translucentParts.entries
+            .filter { it.value.count > 0 }
+            .sortedByDescending { (chunkKey, _) -> chunkDistanceSquared(chunkKey, camera) }
+        if (translucent.isNotEmpty()) {
+            GL30.glEnable(GL30.GL_BLEND)
+            GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+            GL30.glDepthMask(false)
+            for ((_, part) in translucent) {
+                GL30.glBindVertexArray(part.vao)
+                GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, part.count)
+            }
+            GL30.glDepthMask(true)
+            GL30.glDisable(GL30.GL_BLEND)
+        }
         GL30.glBindVertexArray(0)
         GL30.glUseProgram(0)
+    }
+
+    /** Квадрат расстояния от камеры до центра чанка — для порядка отрисовки воды. */
+    private fun chunkDistanceSquared(chunkKey: Long, camera: Camera): Double {
+        val chunkX = (chunkKey shr 32).toInt()
+        val chunkZ = chunkKey.toInt()
+        val dx = chunkX * 16.0 + 8.0 - camera.x
+        val dz = chunkZ * 16.0 + 8.0 - camera.z
+        return dx * dx + dz * dz
     }
 
     /**
@@ -338,6 +372,10 @@ class Renderer(
             GL30.glDeleteBuffers(part.vbo)
             GL30.glDeleteVertexArrays(part.vao)
         }
+        for (part in translucentParts.values) {
+            GL30.glDeleteBuffers(part.vbo)
+            GL30.glDeleteVertexArrays(part.vao)
+        }
         GL30.glDeleteBuffers(outlineVbo)
         GL30.glDeleteVertexArrays(outlineVao)
         GL30.glDeleteBuffers(crackVbo)
@@ -485,7 +523,7 @@ class Renderer(
 
                 vec3 color = texel.rgb * vShade * brightness;
                 float fog = uUnlit > 0.5 ? 0.0 : clamp((vDistance - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
-                FragColor = vec4(mix(color, uFogColor, fog), 1.0);
+                FragColor = vec4(mix(color, uFogColor, fog), texel.a);
             }
         """
 

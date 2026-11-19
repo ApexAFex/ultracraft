@@ -22,6 +22,9 @@ class ChunkMesh(
     val chunkZ: Int,
     val data: FloatArray,
     val vertexCount: Int,
+    /** Полупрозрачные грани (вода, лёд): рисуются после всего, без записи в глубину. */
+    val translucentData: FloatArray = FloatArray(0),
+    val translucentVertexCount: Int = 0,
 ) {
     val quadCount: Int get() = vertexCount / 6
 }
@@ -35,6 +38,7 @@ object MeshBuilder {
             ?: return ChunkMesh(chunkX, chunkZ, FloatArray(0), 0)
 
         val vertexData = FloatArrayBuilder(1 shl 14)
+        val translucentData = FloatArrayBuilder(1 shl 12)
 
         for (sectionIndex in column.sections.indices) {
             val states = column.sections[sectionIndex].blocks
@@ -49,19 +53,27 @@ object MeshBuilder {
                 val name = blocks.nameOf(state)
                 if (name in PLANTS) continue
 
+                // Вода и лёд уходят в отдельный буфер: их надо рисовать с прозрачностью
+                // и без записи в глубину, иначе за ними не видно дна.
+                val target = if (name in TRANSLUCENT) translucentData else vertexData
                 val shape = blocks.shapeOf(state)
                 if (shape == null) {
-                    emitBox(vertexData, world, blocks, atlas, x, y, z, FULL_CUBE, name, null)
+                    emitBox(target, world, blocks, atlas, x, y, z, FULL_CUBE, name, null)
                 } else {
                     for (box in boxesOf(shape)) {
-                        emitBox(vertexData, world, blocks, atlas, x, y, z, box, name, shape)
+                        emitBox(target, world, blocks, atlas, x, y, z, box, name, shape)
                     }
                 }
             }
         }
 
         val data = vertexData.toArray()
-        return ChunkMesh(chunkX, chunkZ, data, data.size / FLOATS_PER_VERTEX)
+        val translucent = translucentData.toArray()
+        return ChunkMesh(
+            chunkX, chunkZ,
+            data, data.size / FLOATS_PER_VERTEX,
+            translucent, translucent.size / FLOATS_PER_VERTEX,
+        )
     }
 
     /** Коробка внутри клетки блока: координаты от 0 до 1. */
@@ -401,6 +413,15 @@ object MeshBuilder {
         "dandelion", "poppy", "blue_orchid", "allium", "azure_bluet", "oxeye_daisy",
         "cornflower", "lily_of_the_valley", "torchflower", "wheat", "carrots", "potatoes",
         "oak_sapling", "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
+    )
+
+    /**
+     * Блоки, у которых текстура полупрозрачная по-настоящему (альфа около 0.7), а не
+     * вырезанная: вода и лёд. Их грани нельзя рисовать в общем проходе — они должны
+     * смешиваться с тем, что за ними.
+     */
+    private val TRANSLUCENT = setOf(
+        "water", "ice", "frosted_ice", "slime_block", "honey_block", "tinted_glass",
     )
 }
 
