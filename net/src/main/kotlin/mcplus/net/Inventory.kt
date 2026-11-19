@@ -25,7 +25,7 @@ class Inventory(
     private val stats: ItemStats = ItemStats.EMPTY,
 ) {
 
-    data class Stack(val itemId: Int, val count: Int) {
+    data class Stack(val itemId: Int, val count: Int, val damage: Int = 0) {
         val isEmpty: Boolean get() = count <= 0
 
         /** False when the stack is there but its item id could not be read (opaque components). */
@@ -227,7 +227,7 @@ class Inventory(
     }
 }
 
-/** Один стек в меню: count, item id, patch. Бросает [UnreadableStack] на компонентах. */
+/** Один стек в меню: count, item id, патч. Бросает [UnreadableStack] на незнакомых компонентах. */
 internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
     val count = reader.readVarInt()
     if (count <= 0) return null
@@ -235,10 +235,20 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
 
     val added = reader.readVarInt()
     val removed = reader.readVarInt()
-    if (added != 0) throw UnreadableStack(count)
+    // Единственный компонент, который читается точно, — износ инструмента (VarInt).
+    // Любой другой компонент незнаком по длине, поэтому стек помечается неизвестным.
+    var damage = 0
+    repeat(added) {
+        val id = reader.readVarInt()
+        if (ComponentTable.active.nameOf(id) == "damage") {
+            damage = reader.readVarInt()
+        } else {
+            throw UnreadableStack(count)
+        }
+    }
     repeat(removed) { reader.readVarInt() }
 
-    return Inventory.Stack(itemId, count)
+    return Inventory.Stack(itemId, count, damage)
 }
 
 /** То же, но нечитаемый стек превращается в «неизвестный предмет» с количеством. */

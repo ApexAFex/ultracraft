@@ -4,6 +4,7 @@ import mcplus.net.proto.Protocol777
 import mcplus.protocol.ByteWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
@@ -104,13 +105,36 @@ class InventoryTest {
         // added = 1: the payload of that component cannot be skipped, so the item id is unknown.
         val body = ByteWriter()
             .writeVarInt(0)
-            .writeBytes(stack(5, 1, added = 1).toByteArray())
+            .writeBytes(stack(5, 1, added = 1).also { it.writeVarInt(0) }.toByteArray())
             .toByteArray()
 
         inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
 
         assertEquals(5, inventory.stackIn(0)?.count)
         assertNull(inventory.heldName())
+    }
+
+    @Test
+    fun `a damaged tool keeps its name and damage`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = ComponentTable(listOf("custom_data", "", "damage"))
+        try {
+            val inventory = Inventory(items)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)   // один добавленный компонент
+                .writeVarInt(0)   // удалённых нет
+                .writeVarInt(2)   // damage
+                .writeVarInt(37)  // износ 37
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            assertEquals(37, inventory.stackIn(0)?.damage)
+            assertNotNull(inventory.heldName())
+        } finally {
+            ComponentTable.active = previous
+        }
     }
 
     @Test

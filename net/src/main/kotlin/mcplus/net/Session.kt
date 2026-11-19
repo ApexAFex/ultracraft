@@ -27,7 +27,7 @@ class Session internal constructor(
     private val log: (String) -> Unit = {},
     itemTable: ItemTable = ItemTable.EMPTY,
     effectTable: EffectTable = EffectTable.EMPTY,
-    itemStats: ItemStats = ItemStats.EMPTY,
+    private val itemStats: ItemStats = ItemStats.EMPTY,
     private val menuTable: MenuTable = MenuTable.EMPTY,
 ) : Closeable {
 
@@ -292,6 +292,15 @@ class Session internal constructor(
     fun drag(menuSlots: List<Int>, button: Int = 0) {
         val id = container?.id ?: 0
         for (packet in ContainerClicks.drag(menuSlots, button, id)) send(packet)
+    }
+
+    /** Остаток и максимум прочности предмета в руке, если он изношен. */
+    fun heldDurability(): Pair<Int, Int>? {
+        val stack = inventory.held() ?: return null
+        if (!stack.isKnown || stack.damage <= 0) return null
+        val max = itemStats.of(stack.itemId)?.maxDamage ?: return null
+        if (max <= 0) return null
+        return (max - stack.damage) to max
     }
 
     /** Закрывает открытый контейнер: сервер должен убрать окно и у себя. */

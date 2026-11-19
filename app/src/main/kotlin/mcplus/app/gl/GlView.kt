@@ -924,6 +924,19 @@ object GlView {
                         val demoWalking = demo && frame in DEMO_WALK_FROM until DEMO_WALK_TO
                         val forwardInput = if (demoWalking) 1.0 else input.forward
 
+                        // Shift — крадёмся (медленно и ниже глаза), Ctrl — бежим.
+                        val sneakHeld = !chat.open && !inventoryOpen &&
+                            (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
+                                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS)
+                        val sprintHeld = !sneakHeld && !chat.open && !inventoryOpen &&
+                            (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
+                                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS)
+                        val inputScale = when {
+                            sneakHeld -> 0.4
+                            sprintHeld -> 1.35
+                            else -> 1.0
+                        }
+
                         tickAccumulator += input.deltaSeconds
                         var steps = 0
                         while (tickAccumulator >= TICK_SECONDS && steps < MAX_TICKS_PER_FRAME) {
@@ -990,8 +1003,8 @@ object GlView {
                                 // Пока открыта строка чата, буквы — это текст, а не движение.
                                 player.move(
                                     TICK_SECONDS, world, blocks,
-                                    if (chat.open) 0.0 else forwardInput,
-                                    if (chat.open) 0.0 else input.strafe,
+                                    if (chat.open) 0.0 else forwardInput * inputScale,
+                                    if (chat.open) 0.0 else input.strafe * inputScale,
                                     if (chat.open) false else input.jump,
                                     if (chat.open) false else input.descend,
                                 )
@@ -1038,7 +1051,8 @@ object GlView {
                         // position to the current one, otherwise movement looks like 20 fps.
                         val alpha = (tickAccumulator / TICK_SECONDS).coerceIn(0.0, 1.0)
                         camera.x = previousX + (player.x - previousX) * alpha
-                        camera.y = previousY + (player.y - previousY) * alpha + Player.EYE_HEIGHT
+                        camera.y = previousY + (player.y - previousY) * alpha +
+                            Player.EYE_HEIGHT - (if (sneakHeld) 0.15 else 0.0)
                         camera.z = previousZ + (player.z - previousZ) * alpha
 
                         // Upload at most a few finished meshes per frame: the GL calls
@@ -1468,7 +1482,10 @@ object GlView {
                                 hud.drawChat(chatLines, System.nanoTime())
                                 hud.drawChatInput(chat.text)
                             } else {
-                                hud.draw(inventory, vitals, bossBars, effects, itemName, itemNameAlpha)
+                                hud.draw(
+                            inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
+                            durability = session?.heldDurability(),
+                        )
 
                         // Красная вспышка при уроне: гаснет за 0,4 секунды.
                         if (damageFlashNanos != 0L) {
@@ -1482,11 +1499,11 @@ object GlView {
                         if (debug) {
                             hud.drawDebug(
                                 listOf(
-                                    "FPS: $fps",
-                                    "XYZ: %.2f, %.2f, %.2f".format(player.x, player.y, player.z),
-                                    "Chunk: ${kotlin.math.floor(player.x).toInt() shr 4}, ${kotlin.math.floor(player.z).toInt() shr 4}",
-                                    "Entities: ${entities.size}, chunks: ${renderer.chunkCount}",
-                                    "Pitch: %.0f, yaw: %.0f".format(camera.pitch, camera.yaw),
+                                    "Кадров в секунду: $fps",
+                                    "Координаты: %.2f, %.2f, %.2f".format(player.x, player.y, player.z),
+                                    "Чанк: ${kotlin.math.floor(player.x).toInt() shr 4}, ${kotlin.math.floor(player.z).toInt() shr 4}",
+                                    "Сущностей: ${entities.size}, чанков: ${renderer.chunkCount}",
+                                    "Наклон: %.0f, поворот: %.0f".format(camera.pitch, camera.yaw),
                                 ),
                             )
                         }

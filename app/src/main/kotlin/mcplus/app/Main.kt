@@ -1154,7 +1154,20 @@ private fun findParticleTable(): mcplus.net.ParticleTable {
     return mcplus.net.ParticleTable.load(file)
 }
 
+/** Data component names for item patches, generated with `tools/build-component-table.js`. */
+private fun findComponentTable(): mcplus.net.ComponentTable {
+    val candidates = listOf(
+        java.io.File("data/components-777.tsv"),
+        java.io.File("../data/components-777.tsv"),
+        java.io.File("../../data/components-777.tsv"),
+    )
+    val file = candidates.firstOrNull { it.isFile } ?: return mcplus.net.ComponentTable.EMPTY
+    return mcplus.net.ComponentTable.load(file)
+}
+
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
+    // Разбор стеков читает компонент износа; таблица должна быть готова до первого пакета.
+    mcplus.net.ComponentTable.active = findComponentTable()
     val account = if (options.online) loadAccount() else null
     val attempts = 3
 

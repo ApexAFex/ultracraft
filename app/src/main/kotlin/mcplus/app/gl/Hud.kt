@@ -30,12 +30,15 @@ class Hud(
         effects: List<ActiveEffect>,
         itemName: String?,
         itemNameAlpha: Float,
+        /** Остаток и максимум прочности предмета в руке (или null). */
+        durability: Pair<Int, Int>? = null,
     ) {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
 
         val armourPoints = inventory?.armourPoints() ?: 0
         drawHotbar(inventory, s)
+        drawDurability(inventory, durability, s)
         drawBossBars(bossBars)
         drawEffects(effects, s)
         if (vitals != null) {
@@ -110,7 +113,7 @@ class Hud(
         val text = this.text ?: return
         if (names.isEmpty()) return
         val s = HudLayout.scale(height).toFloat()
-        val title = "Players: ${names.size}"
+        val title = "Игроки: ${names.size}"
         val lines = listOf(title) + names
         val widest = lines.maxOf { text.textWidth(it, s) }
         val left = (width - widest) / 2f
@@ -342,6 +345,25 @@ class Hud(
      * пустой полосы оставался бы светящийся хвост меньше пикселя, а на 182 пикселях он
      * заметен. Без спрайтов игры полоса рисуется прямоугольниками цвета полосы.
      */
+    /** Полоска прочности под выбранным слотом: зелёная, жёлтая, красная. */
+    private fun drawDurability(inventory: Inventory?, durability: Pair<Int, Int>?, s: Float) {
+        if (inventory == null || durability == null) return
+        val (left, max) = durability
+        if (max <= 0) return
+        val fraction = (left.toFloat() / max).coerceIn(0f, 1f)
+        val slot = HudLayout.hotbarSlot(inventory.selected, width, height)
+        val y = slot.y + slot.height - 3f * s
+        val color = when {
+            fraction > 0.5f -> 0x35C035
+            fraction > 0.25f -> 0xD0C020
+            else -> 0xD03020
+        }
+        renderer.begin()
+        renderer.rect(slot.x + 1f * s, y, (slot.width - 2f * s), 2f * s, 0x101010, 0.85f)
+        renderer.rect(slot.x + 1f * s, y, (slot.width - 2f * s) * fraction, 2f * s, color, 0.95f)
+        renderer.draw()
+    }
+
     private fun drawBossBars(bars: List<BossBar>) {
         for ((index, bar) in bars.withIndex()) {
             val rect = HudLayout.bossBar(index, width, height)
