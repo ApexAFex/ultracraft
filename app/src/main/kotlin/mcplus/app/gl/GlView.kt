@@ -622,6 +622,8 @@ object GlView {
                     var boundsSaved = false
                     var lastItemTotal = -1
                     var sprintDustNanos = 0L
+                    var lightningUntilNanos = 0L
+                    var nextCaveSoundNanos = 0L
                     var cameraMode = cameraModeAtStart
                     var invMouseSlot = -1
                     var invDragging = false
@@ -1478,6 +1480,16 @@ object GlView {
                                 rainSoundNanos = now
                                 sound.play("weather.rain", player.x, player.y, player.z)
                             }
+                            // Пещерные звуки: под землёй и в темноте, редко.
+                            val light = world.lightAt(
+                                kotlin.math.floor(player.x).toInt(),
+                                kotlin.math.floor(player.y).toInt(),
+                                kotlin.math.floor(player.z).toInt(),
+                            )
+                            if (sound.available && player.y < 50 && light < 6 && now > nextCaveSoundNanos) {
+                                nextCaveSoundNanos = now + 30_000_000_000L
+                                sound.play("ambient.cave", player.x, player.y, player.z)
+                            }
                         }
 
                         // Дальние чанки выгружаются: иначе память растёт всю игру.
@@ -1965,6 +1977,7 @@ object GlView {
                                         kotlin.math.floor(player.y + 1).toInt(),
                                         kotlin.math.floor(player.z).toInt(),
                                     ),
+                                    "Радиус сервера: ${session?.serverChunkRadius ?: -1} чанков",
                                 ),
                             )
                         }
@@ -2036,6 +2049,14 @@ object GlView {
                             sound.masterVolume = volume
                         }
                         if (underwater) hud.drawWaterOverlay(0.3f)
+
+                        // Гроза: редкие белые вспышки и гром.
+                        val thunderNow = session?.sky?.thunder ?: 0f
+                        if (thunderNow > 0f && Math.random() < 0.004) {
+                            lightningUntilNanos = System.nanoTime() + 150_000_000L
+                            sound.play("entity.lightning_bolt.thunder", player.x, player.y, player.z)
+                        }
+                        if (System.nanoTime() < lightningUntilNanos) hud.drawLightning(0.8f)
 
                         // Cracks on the block being mined: ten stages, like vanilla.
                         if (mining) {
@@ -2201,6 +2222,12 @@ object GlView {
                             fps = (fpsFrames * 1_000_000_000.0 / (fpsNow - fpsSinceNanos)).toInt()
                             fpsFrames = 0
                             fpsSinceNanos = fpsNow
+                            GLFW.glfwSetWindowTitle(
+                                window,
+                                "Ultracraft 26.3 — $fps fps — %.0f, %.0f, %.0f".format(
+                                    player.x, player.y, player.z,
+                                ),
+                            )
                         }
                         frame++
                     }

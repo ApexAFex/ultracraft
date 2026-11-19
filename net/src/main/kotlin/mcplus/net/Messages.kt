@@ -218,8 +218,11 @@ private val DISCONNECT_REASONS = mapOf(
  * Текст текстового компонента в NBT: `text`, `translate` (с аргументами `with`/`args`) и
  * `extra`. Цвет и стиль не разбираются: HUD рисует строки одним цветом.
  */
+/** Убирает коды форматирования `§a`, `§l` и подобные: шрифт клиента их не рисует. */
+internal fun stripFormatting(text: String): String = text.replace(Regex("§."), "")
+
 internal fun componentText(tag: NbtTag): String = when (tag) {
-    is NbtString -> tag.value
+    is NbtString -> stripFormatting(tag.value)
     is NbtCompound -> {
         val extra = tag.list("extra")?.joinToString("") { componentText(it) }.orEmpty()
         // Числа в аргументах перевода приходят компонентом с пустым именем поля:

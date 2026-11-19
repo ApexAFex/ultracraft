@@ -90,6 +90,8 @@ object Protocol777 {
         const val SET_TITLE_TEXT: Int = 0x74
         const val SET_SUBTITLE_TEXT: Int = 0x72
         const val CLEAR_TITLES: Int = 0x0E
+        /** Радиус стриминга чанков, который сервер выбрал для клиента. */
+        const val SET_CHUNK_CACHE_RADIUS: Int = 0x61
         const val ACKNOWLEDGE_BLOCK_CHANGE: Int = 0x04
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32

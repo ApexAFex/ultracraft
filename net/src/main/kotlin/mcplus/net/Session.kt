@@ -48,6 +48,11 @@ class Session internal constructor(
     var titleAtNanos: Long = 0L
         private set
 
+    /** Радиус чанков, который сервер держит для этого клиента. */
+    @Volatile
+    var serverChunkRadius: Int = -1
+        private set
+
     var playerPosition: PlayerPosition? = null
         private set
 
@@ -208,6 +213,9 @@ class Session internal constructor(
                     subtitleText = null
                     actionBar = null
                 }
+
+                Protocol777.Play.SET_CHUNK_CACHE_RADIUS ->
+                    serverChunkRadius = runCatching { ByteReader(packet.body).readVarInt() }.getOrDefault(-1)
 
                 Protocol777.Play.SET_OBJECTIVE,
                 Protocol777.Play.SET_SCORE,

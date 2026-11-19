@@ -446,6 +446,14 @@ class Hud(
         renderer.draw()
     }
 
+    /** Белая вспышка молнии. */
+    fun drawLightning(alpha: Float) {
+        if (alpha <= 0.01f) return
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0xFFFFFF, alpha * 0.5f)
+        renderer.draw()
+    }
+
     /** Отладочные строки слева сверху (F3): кадры, координаты, чанки. */
     fun drawDebug(lines: List<String>) {
         val text = this.text ?: return
