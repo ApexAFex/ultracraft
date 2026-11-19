@@ -194,7 +194,7 @@ class Hud(
             val size = 16f * s
             renderer.icon(
                 HudRect(cell.centreX - size / 2f, cell.centreY - size / 2f, size, size),
-                atlas.layerFor(name, TextureAtlas.Kind.SIDE),
+                atlas.layerForItem(name),
             )
         }
     }

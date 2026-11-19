@@ -134,9 +134,8 @@ object InventoryScreen {
                 horizontal = horizontalOf(cell),
                 vertical = verticalOf(cell),
                 size = SLOT * 0.9f,
-                // The side texture: every block has one, while a few (logs among them) have no
-                // separate top texture in the atlas and would show up as the magenta "missing".
-                layer = atlas.layerFor(name, TextureAtlas.Kind.SIDE).toFloat(),
+                // Блоки берут текстуру из модели, остальные предметы — из `textures/item`.
+                layer = atlas.layerForItem(name).toFloat(),
             )
         }
         renderer.drawIcons(camera, centre[0], centre[1], centre[2], icons)
@@ -150,7 +149,7 @@ object InventoryScreen {
                 listOf(
                     Renderer.Icon(
                         horizontal, vertical, SLOT * 0.9f,
-                        atlas.layerFor(carriedName, TextureAtlas.Kind.SIDE).toFloat(), 1.0f,
+                        atlas.layerForItem(carriedName).toFloat(), 1.0f,
                     ),
                 ),
             )

@@ -142,7 +142,8 @@ object GlView {
             println("Буфер глубины: ${GL30.glGetInteger(GL30.GL_DEPTH_BITS)} бит")
 
             val directory = minecraftDirectory ?: TextureAtlas.findMinecraftDirectory()
-            val atlas = directory?.let { TextureAtlas.load(it) } ?: TextureAtlas.colored(blocks.allNames())
+            val atlas = directory?.let { TextureAtlas.load(it, blocks.allNames().toSet()) }
+                ?: TextureAtlas.colored(blocks.allNames())
             println("Текстуры: ${atlas.size} слоёв, источник: ${atlas.source}")
 
             // Цвета биомов: номера приходят в секциях чанка, оттенки — из данных игры.
@@ -936,6 +937,13 @@ object GlView {
                                 camera, inventory, renderer, textRenderer, atlas,
                                 input.mouseX, input.mouseY, width, height,
                             )
+                        }
+
+                        // Предмет в руке — плоскость перед камерой, как «рука» у простых
+                        // клиентов. Настоящей 3D-модели руки в ванили у нас пока нет.
+                        val handItemName = inventory?.heldName()
+                        if (!inventoryOpen && !dead && !chat.open && handItemName != null) {
+                            renderer.drawHandItem(camera, atlas.layerForItem(handItemName).toFloat())
                         }
 
                         // HUD рисуется отдельным проходом поверх сцены. Открытый инвентарь его

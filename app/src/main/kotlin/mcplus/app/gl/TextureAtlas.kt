@@ -69,6 +69,19 @@ class TextureAtlas(
     /** Слой по точному имени текстуры (без `block/`), без подбора по суффиксам. */
     fun layerOf(textureName: String): Int = layers[textureName] ?: missingLayer
 
+    /** Слой для иконки предмета: у блоков — текстура их модели, у остальных — `textures/item`. */
+    fun layerForItem(itemName: String, kind: Kind = Kind.SIDE): Int {
+        appearances[itemName]?.let { faces ->
+            return when (kind) {
+                Kind.TOP -> faces.top
+                Kind.BOTTOM -> faces.bottom
+                Kind.SIDE -> faces.side
+            }
+        }
+        layers["item:$itemName"]?.let { return it }
+        return layerFor(itemName, kind)
+    }
+
     fun tintOf(layer: Int): Int? {
         val name = namesByLayer.getOrNull(layer) ?: return null
         return when {
@@ -94,6 +107,7 @@ class TextureAtlas(
 
         private const val TILE = 16
         private const val BLOCK_TEXTURES = "assets/minecraft/textures/block/"
+        private const val ITEM_TEXTURES = "assets/minecraft/textures/item/"
         private const val BLOCK_STATES = "assets/minecraft/blockstates/"
         private const val BLOCK_MODELS = "assets/minecraft/models/"
 
@@ -103,14 +117,14 @@ class TextureAtlas(
             return directory.takeIf { File(it, "versions").isDirectory }
         }
 
-        fun load(minecraftDirectory: File): TextureAtlas? =
-            fromVersionJar(minecraftDirectory) ?: fromAssetObjects(minecraftDirectory)
+        fun load(minecraftDirectory: File, blockNames: Set<String> = emptySet()): TextureAtlas? =
+            fromVersionJar(minecraftDirectory, blockNames) ?: fromAssetObjects(minecraftDirectory)
 
         /**
          * Modern Minecraft ships block textures inside the version jar; the assets index only
          * carries fonts, panoramas and other loose files.
          */
-        private fun fromVersionJar(directory: File): TextureAtlas? {
+        private fun fromVersionJar(directory: File, blockNames: Set<String>): TextureAtlas? {
             // ImageIO would otherwise spill to a cache file in java.io.tmpdir, which a packaged
             // application may not be allowed to create ("Can't create cache file!").
             ImageIO.setUseCache(false)
@@ -138,6 +152,21 @@ class TextureAtlas(
                                         ?: continue
                                     val texture = name.removePrefix(BLOCK_TEXTURES).removeSuffix(".png")
                                     layers[texture] = images.size
+                                    images += firstFrame(image)
+                                }
+
+                                // Иконки предметов: у 529 предметов без блока своей текстуры
+                                // среди блоков нет, и раньше они рисовались заглушкой.
+                                name.startsWith(ITEM_TEXTURES) && name.endsWith(".png") -> {
+                                    val texture = name.removePrefix(ITEM_TEXTURES).removeSuffix(".png")
+                                    // Если блок с таким именем уже есть, иконка возьмёт его
+                                    // текстуру из модели: дубликат только раздувает атлас,
+                                    // а у видеокарт есть предел числа слоёв (обычно 2048).
+                                    if (layers.containsKey(texture) || texture in blockNames) continue
+                                    val bytes = zip.getInputStream(entry).readBytes()
+                                    val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
+                                        ?: continue
+                                    layers["item:$texture"] = images.size
                                     images += firstFrame(image)
                                 }
 

@@ -321,9 +321,26 @@ class Renderer(
         GL30.glUseProgram(0)
     }
 
-    /** The nine hotbar cells, with the selected one larger and brighter. */
-    fun drawHotbar(camera: Camera, layers: List<Float?>, selected: Int) {
+    /**
+     * Предмет в руке: плоская иконка в правом нижнем углу, в плоскости перед камерой.
+     *
+     * Это не ванильная 3D-модель руки, но именно так игрок видит, что у него в руке:
+     * иконка висит на расстоянии 0.6 блока и не участвует в проверке глубины.
+     */
+    fun drawHandItem(camera: Camera, layer: Float) {
         val forward = camera.forward()
+        val right = camera.right()
+        val up = camera.up()
+        val distance = 0.8f
+        val side = 0.33f
+        val centreX = camera.x.toFloat() + forward[0] * distance + right[0] * side - up[0] * side
+        val centreY = camera.y.toFloat() + forward[1] * distance + right[1] * side - up[1] * side
+        val centreZ = camera.z.toFloat() + forward[2] * distance + right[2] * side - up[2] * side
+        drawIcons(camera, centreX, centreY, centreZ, listOf(Icon(0f, 0f, 0.28f, layer)))
+    }
+
+    /** The nine hotbar cells, with the selected one larger and brighter. */
+    fun drawHotbar(camera: Camera, layers: List<Float?>, selected: Int) {        val forward = camera.forward()
         val up = camera.up()
         val distance = 1.2f
         val centreX = camera.x.toFloat() + forward[0] * distance - up[0] * 0.5f
