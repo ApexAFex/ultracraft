@@ -45,12 +45,19 @@ object MeshBuilder {
                     val neighbour = world.blockAt(x + face.dx, y + face.dy, z + face.dz)
                     if (!isTransparent(neighbour, blocks)) continue
 
-                    // Свет берётся из клетки, в которую смотрит грань: именно она освещает
-                    // поверхность. Упакован как (блоки << 4) | небо.
-                    val light = world.lightAt(x + face.dx, y + face.dy, z + face.dz)
+                    // Свет берётся из клетки, в которую смотрит грань; каждый угол считает
+                    // своё среднее по соседям, поэтому поверхность освещается плавно.
+                    val baseX = x + face.dx
+                    val baseY = y + face.dy
+                    val baseZ = z + face.dz
+                    val base = world.lightAt(baseX, baseY, baseZ)
                     val layer = atlas.layerFor(name, face.kind).toFloat()
                     for (corner in face.quad.indices) {
                         val point = face.quad[corner]
+                        val light = cornerLight(
+                            world, blocks, baseX, baseY, baseZ, base,
+                            face.dx, face.dy, face.dz, point,
+                        )
                         vertexData.add(x + point[0])
                         vertexData.add(y + point[1])
                         vertexData.add(z + point[2])
@@ -76,6 +83,76 @@ object MeshBuilder {
 
         val data = vertexData.toArray()
         return ChunkMesh(chunkX, chunkZ, data, data.size / FLOATS_PER_VERTEX)
+    }
+
+    /**
+     * Свет в углу грани: среднее по четырём клеткам вокруг угла — базовой (та, в которую
+     * смотрит грань) и трём соседним по касательным осям.
+     *
+     * Непрозрачный сосед не участвует и не затемняет угол: иначе на стыке блоков
+     * появились бы тёмные полосы. Небо и блоки усредняются отдельно и только потом
+     * упаковываются обратно в четыре бита.
+     */
+    internal fun cornerLight(
+        world: World,
+        blocks: BlockTable,
+        x: Int,
+        y: Int,
+        z: Int,
+        base: Int,
+        dx: Int,
+        dy: Int,
+        dz: Int,
+        point: FloatArray,
+    ): Int {
+        val alongX = if (point[0] > 0.5f) 1 else -1
+        val alongY = if (point[1] > 0.5f) 1 else -1
+        val alongZ = if (point[2] > 0.5f) 1 else -1
+
+        // Касательные — две оси, по которым грань не смещается.
+        val firstX: Int
+        val firstY: Int
+        val firstZ: Int
+        val secondX: Int
+        val secondY: Int
+        val secondZ: Int
+        when {
+            dx != 0 -> {
+                firstX = 0; firstY = alongY; firstZ = 0
+                secondX = 0; secondY = 0; secondZ = alongZ
+            }
+
+            dy != 0 -> {
+                firstX = alongX; firstY = 0; firstZ = 0
+                secondX = 0; secondY = 0; secondZ = alongZ
+            }
+
+            else -> {
+                firstX = alongX; firstY = 0; firstZ = 0
+                secondX = 0; secondY = alongY; secondZ = 0
+            }
+        }
+
+        var blockSum = (base shr 4) and 0x0F
+        var skySum = base and 0x0F
+        var count = 1
+
+        fun sample(offsetX: Int, offsetY: Int, offsetZ: Int) {
+            val sampleX = x + offsetX
+            val sampleY = y + offsetY
+            val sampleZ = z + offsetZ
+            val state = world.blockAt(sampleX, sampleY, sampleZ)
+            val value = if (isTransparent(state, blocks)) world.lightAt(sampleX, sampleY, sampleZ) else base
+            blockSum += (value shr 4) and 0x0F
+            skySum += value and 0x0F
+            count++
+        }
+
+        sample(firstX, firstY, firstZ)
+        sample(secondX, secondY, secondZ)
+        sample(firstX + secondX, firstY + secondY, firstZ + secondZ)
+
+        return ((blockSum / count) shl 4) or (skySum / count)
     }
 
     /**

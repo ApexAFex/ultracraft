@@ -108,6 +108,55 @@ class MeshBuilderTest {
     }
 
     @Test
+    fun `corners average light from their neighbours`() {
+        val world = world()
+        val sections = List(24) { ChunkSection(IntArray(4096)) }
+        val sky = ByteArray(2048)
+
+        fun setLight(x: Int, y: Int, z: Int, value: Int) {
+            val localY = (y + 64) and 15
+            val index = (localY shl 8) or ((z and 15) shl 4) or (x and 15)
+            val byteIndex = index shr 1
+            val packed = sky[byteIndex].toInt() and 0xFF
+            sky[byteIndex] = if (index and 1 == 0) {
+                ((packed and 0xF0) or value).toByte()
+            } else {
+                ((packed and 0x0F) or (value shl 4)).toByte()
+            }
+        }
+
+        // Вокруг клетки (8, 49, 8): ярко с +X и +Z, темно с −X и −Z.
+        setLight(8, 49, 8, 8)
+        for (x in 8..9) for (z in 8..9) setLight(x, 49, z, if (x == 9 || z == 9) 15 else 8)
+        for (x in 7..8) for (z in 7..8) setLight(x, 49, z, if (x == 8 && z == 8) 8 else 0)
+        sections[7].skyLight = sky
+        world.add(ChunkColumn(0, 0, sections))
+
+        val base = world.lightAt(8, 49, 8)
+        val bright = MeshBuilder.cornerLight(
+            world, blocks, 8, 49, 8, base, 0, 1, 0, floatArrayOf(1f, 1f, 1f),
+        )
+        val dark = MeshBuilder.cornerLight(
+            world, blocks, 8, 49, 8, base, 0, 1, 0, floatArrayOf(0f, 1f, 0f),
+        )
+
+        assertTrue((bright and 0x0F) > (dark and 0x0F), "яркий угол $bright, тёмный $dark")
+    }
+
+    @Test
+    fun `vertices on a uniform light have the same light`() {
+        val world = world()
+        val sections = List(24) { ChunkSection(IntArray(4096)) }
+        sections[7].blocks[0] = 1
+        sections.forEach { it.skyLight = ByteArray(2048) { 0xFF.toByte() } }
+        world.add(ChunkColumn(0, 0, sections))
+
+        val data = mesh(world).data
+        val lights = (0 until data.size step 8).map { data[it + 4] }.distinct()
+        assertEquals(listOf(15f), lights, "при ровном свете все углы одинаковые")
+    }
+
+    @Test
     fun `vertices stay inside the chunk`() {
         val world = world()
         val sections = List(24) { index ->
