@@ -63,6 +63,10 @@ class Renderer(
         val bottom: Int,
         val side: Int,
         val yaw: Float = 0f,
+        /** Цвет-множитель: частицы рисуются белой текстурой, окрашенной в свой цвет. */
+        val red: Float = 1f,
+        val green: Float = 1f,
+        val blue: Float = 1f,
     )
 
     private class Part(val vao: Int, val vbo: Int) {
@@ -248,7 +252,7 @@ class Renderer(
                 data.add(layer.toFloat())
                 data.add(u)
                 data.add(v)
-                data.add(1f); data.add(1f); data.add(1f)
+                data.add(cube.red); data.add(cube.green); data.add(cube.blue)
             }
 
             // Верх и низ.

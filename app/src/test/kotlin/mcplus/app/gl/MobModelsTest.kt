@@ -1,6 +1,5 @@
 package mcplus.app.gl
 
-import java.awt.image.BufferedImage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -49,13 +48,14 @@ class MobModelsTest {
     }
 
     @Test
-    fun `average colour ignores transparent pixels`() {
-        val image = BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB)
-        image.setRGB(0, 0, 0xFFFF0000.toInt())
-        image.setRGB(1, 0, 0xFFFF0000.toInt())
-        image.setRGB(0, 1, 0x00000000)
-        image.setRGB(1, 1, 0x00FF0000)
-
-        assertEquals(0xFF0000, MobRenderer.averageColor(image))
+    fun `every box has a texture origin inside the mob sheet`() {
+        for (family in listOf(MobFamily.QUADRUPED, MobFamily.CHICKEN, MobFamily.CREEPER, MobFamily.SPIDER)) {
+            for (box in MobModels.boxes(family)) {
+                assertTrue(box.u in 0 until 64, "${box.name}: u=${box.u} вне листа")
+                assertTrue(box.v in 0 until 32, "${box.name}: v=${box.v} вне листа")
+            }
+        }
+        val body = MobModels.boxes(MobFamily.QUADRUPED).first { it.name == "body" }
+        assertTrue(body.u > 0 || body.v > 0, "у тела должна быть своя развёртка, а не угол листа")
     }
 }

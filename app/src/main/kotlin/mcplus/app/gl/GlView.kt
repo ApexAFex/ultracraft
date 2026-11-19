@@ -33,6 +33,23 @@ object GlView {
     /** Блок, который только что стал воздухом: из него сыплются кусочки. */
     private class PendingBreak(val x: Int, val y: Int, val z: Int, val state: Int)
 
+    /** Цвет частицы по имени типа: дым серый, огонь оранжевый, искры жёлтые. */
+    private fun particleColor(name: String): Int = when {
+        "flame" in name || "lava" in name || "fire" in name -> 0xFF7A00
+        "smoke" in name || "ash" in name || "white_smoke" in name -> 0x707070
+        "crit" in name -> 0xFFD700
+        "splash" in name || "bubble" in name || "rain" in name || "dripping" in name -> 0x5AA0FF
+        "explo" in name -> 0xFFF0C0
+        "portal" in name || "dragon" in name || "end_rod" in name -> 0xA040FF
+        "heart" in name || "damage" in name -> 0xFF3050
+        "note" in name || "happy" in name -> 0x40FF40
+        "snow" in name || "cloud" in name -> 0xFFFFFF
+        "dust" in name -> 0xCCAA88
+        "soul" in name -> 0x5AD0FF
+        "enchant" in name -> 0x9B70FF
+        else -> 0xDDDDDD
+    }
+
     /** Catch-up limit for one frame — beyond this the backlog is dropped, not simulated. */
     private const val MAX_TICKS_PER_FRAME = 5
 
@@ -132,6 +149,8 @@ object GlView {
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
         /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
         itemTable: mcplus.net.ItemTable = mcplus.net.ItemTable.EMPTY,
+        /** Таблица частиц: номер типа → имя и цвет. */
+        particleTable: mcplus.net.ParticleTable = mcplus.net.ParticleTable.EMPTY,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -211,8 +230,12 @@ object GlView {
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
             val breakEvents = java.util.concurrent.ConcurrentLinkedQueue<PendingBreak>()
+            val pendingParticles = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.ParticleSpawn>()
+            val particlePackets = java.util.concurrent.atomic.AtomicInteger()
+            val seenIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
 
             fun handle(packet: mcplus.protocol.Packet) {
+                if (debug && seenIds.add(packet.id)) println("Пакет id=${packet.id}")
                 // The tab list is the only source of other players' names, so it goes first.
                 if (playerList.onPacket(packet.id, packet.body)) return
                 if (tracker.onPacket(packet)) return
@@ -229,6 +252,21 @@ object GlView {
                         }
                         remeshAround(position.x, position.y, position.z)
                     }
+                    return
+                }
+                if (packet.id == Protocol777.Play.LEVEL_PARTICLES) {
+                    val parsed = runCatching {
+                        mcplus.net.readParticles(packet.body, particleTable)
+                    }
+                    if (particlePackets.getAndIncrement() < 3) {
+                        val count = parsed.getOrNull()?.size
+                        println(
+                            "Частицы: ${count ?: "ошибка"}, байт ${packet.body.size}" +
+                                (parsed.exceptionOrNull()?.let { ", ${it.message}" } ?: "") +
+                                ", " + packet.body.joinToString("") { "%02x".format(it) },
+                        )
+                    }
+                    parsed.getOrNull()?.let { pendingParticles.addAll(it) }
                     return
                 }
                 if (packet.id == Protocol777.Play.LIGHT_UPDATE) {
@@ -275,8 +313,8 @@ object GlView {
                     val skin = GameFiles.readPng(directory, "assets/minecraft/textures/entity/player/wide/steve.png")
                     val playerRenderer = PlayerRenderer(width, height, skin)
                     if (skin == null) println("Скин игрока не найден: игроки рисуются коробками")
-                    // Мобы: простые коробки, окрашенные средним цветом настоящих текстур.
-                    val mobRenderer = MobRenderer(width, height, MobRenderer.loadColors(directory))
+                    // Мобы: коробки с настоящими текстурами.
+                    val mobRenderer = MobRenderer(width, height, directory)
                     // Гуманоидные мобы — та же модель человека, но со своей текстурой.
                     val zombieRenderer = PlayerRenderer(
                         width, height,
@@ -518,6 +556,9 @@ object GlView {
                     var lastHealth = Float.NaN
                     var lastDead = false
 
+                    /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
+                    var damageFlashNanos = 0L
+
                     /** Куски блоков от только что сломанных блоков. */
                     class Debris(
                         var x: Double, var y: Double, var z: Double,
@@ -528,15 +569,36 @@ object GlView {
 
                     val debris = ArrayList<Debris>()
 
+                    /** Частицы из пакета: цвет и скорость зависят от типа. */
+                    class ParticlePiece(
+                        var x: Double, var y: Double, var z: Double,
+                        var vx: Double, var vy: Double, var vz: Double,
+                        var life: Float,
+                        val red: Float, val green: Float, val blue: Float,
+                        val size: Float,
+                    )
+
+                    val particles = ArrayList<ParticlePiece>()
+
                     /** Turns a screen position into a click on the slot under it, if any. */
-                    fun clickInventoryAt(mouseX: Double, mouseY: Double) {
+                    fun clickInventoryAt(
+                        mouseX: Double,
+                        mouseY: Double,
+                        button: Int = 0,
+                        quick: Boolean = false,
+                    ) {
                         val open = session ?: return
                         val (horizontal, vertical) = InventoryScreen.panelPoint(
                             mouseX, mouseY, width, height,
                         )
                         val cell = InventoryScreen.slotAt(horizontal, vertical) ?: return
-                        open.clickSlot(cell.menuSlot)
-                        println("Клик по слоту ${cell.menuSlot}")
+                        val action = if (quick) {
+                            mcplus.net.ContainerInput.QUICK_MOVE
+                        } else {
+                            mcplus.net.ContainerInput.PICKUP
+                        }
+                        open.clickSlot(cell.menuSlot, button = button, input = action)
+                        println("Клик по слоту ${cell.menuSlot}: кнопка $button${if (quick) ", shift" else ""}")
                     }
 
                     while (!GLFW.glfwWindowShouldClose(window)) {
@@ -556,6 +618,7 @@ object GlView {
                             val healthNow = vitals.health
                             if (!lastHealth.isNaN() && healthNow < lastHealth - 0.01f) {
                                 sound.play("entity.player.hurt", player.x, player.y, player.z)
+                                damageFlashNanos = System.nanoTime()
                             }
                             if (dead && !lastDead) {
                                 sound.play("entity.player.death", player.x, player.y, player.z)
@@ -672,8 +735,21 @@ object GlView {
 
                         // Clicking a slot is the only way to move an item: the server applies the
                         // click and answers with the whole menu, cursor included.
-                        if (inventoryOpen && input.clickRequested) {
-                            clickInventoryAt(input.mouseX, input.mouseY)
+                        if (inventoryOpen) {
+                            val shiftHeld = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
+                                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS
+                            val rightHeld = GLFW.glfwGetMouseButton(
+                                window, GLFW.GLFW_MOUSE_BUTTON_RIGHT,
+                            ) == GLFW.GLFW_PRESS
+                            when {
+                                input.clickRequested -> clickInventoryAt(
+                                    input.mouseX, input.mouseY, button = 0, quick = shiftHeld,
+                                )
+
+                                rightHeld && !rightWasDown -> clickInventoryAt(
+                                    input.mouseX, input.mouseY, button = 1,
+                                )
+                            }
                         }
 
                         // Клик по открытому контейнеру: левый — взять или перетащить, правый —
@@ -1121,6 +1197,44 @@ object GlView {
                                 if (piece.life <= 0f) iterator.remove()
                             }
                         }
+
+                        // Частицы из `Level Particles`: у каждой свой цвет и короткая жизнь.
+                        while (true) {
+                            val spawn = pendingParticles.poll() ?: break
+                            val dx = spawn.x - camera.x
+                            val dy = spawn.y - camera.y
+                            val dz = spawn.z - camera.z
+                            if (dx * dx + dy * dy + dz * dz > 576.0) continue
+                            val color = particleColor(spawn.name)
+                            val random = java.util.Random()
+                            repeat(2) {
+                                particles += ParticlePiece(
+                                    spawn.x + (random.nextDouble() - 0.5) * 0.15,
+                                    spawn.y + (random.nextDouble() - 0.5) * 0.15,
+                                    spawn.z + (random.nextDouble() - 0.5) * 0.15,
+                                    (random.nextDouble() - 0.5) * 0.4,
+                                    random.nextDouble() * 0.3,
+                                    (random.nextDouble() - 0.5) * 0.4,
+                                    1.2f,
+                                    ((color shr 16) and 0xFF) / 255f,
+                                    ((color shr 8) and 0xFF) / 255f,
+                                    (color and 0xFF) / 255f,
+                                    0.07f,
+                                )
+                            }
+                        }
+                        if (particles.isNotEmpty()) {
+                            val iterator = particles.iterator()
+                            while (iterator.hasNext()) {
+                                val piece = iterator.next()
+                                piece.vy -= 3.0 * debrisDelta
+                                piece.x += piece.vx * debrisDelta
+                                piece.y += piece.vy * debrisDelta
+                                piece.z += piece.vz * debrisDelta
+                                piece.life -= debrisDelta
+                                if (piece.life <= 0f) iterator.remove()
+                            }
+                        }
                         if (entities.size != lastEntityCount) {
                             val nearest = entities.minByOrNull {
                                 val dx = it.x - player.x; val dy = it.y - player.y; val dz = it.z - player.z
@@ -1225,7 +1339,7 @@ object GlView {
                                         walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                         family = family,
                                         scale = MobModels.scaleOf(name),
-                                        color = mobRenderer.colorOf(name),
+                                        texture = mobRenderer.textureFor(name),
                                     )
                                 }
                             }
@@ -1243,6 +1357,19 @@ object GlView {
                                 )
                             }
                             renderer.drawBlockCubes(camera, debrisCubes)
+                        }
+                        // Частицы из пакета — белой текстурой, окрашенной в цвет типа.
+                        if (particles.isNotEmpty()) {
+                            val white = atlas.layerOf("white_wool")
+                            val pieces = particles.map { piece ->
+                                Renderer.BlockCube(
+                                    piece.x, piece.y, piece.z, piece.size,
+                                    white, white, white,
+                                    yaw = piece.life * 6f,
+                                    red = piece.red, green = piece.green, blue = piece.blue,
+                                )
+                            }
+                            renderer.drawBlockCubes(camera, pieces)
                         }
                         // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
                         if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
@@ -1342,6 +1469,14 @@ object GlView {
                                 hud.drawChatInput(chat.text)
                             } else {
                                 hud.draw(inventory, vitals, bossBars, effects, itemName, itemNameAlpha)
+
+                        // Красная вспышка при уроне: гаснет за 0,4 секунды.
+                        if (damageFlashNanos != 0L) {
+                            val age = (System.nanoTime() - damageFlashNanos) / 400_000_000.0
+                            if (age in 0.0..1.0) {
+                                hud.drawDamageFlash((1.0 - age).toFloat())
+                            }
+                        }
 
                         // Отладка и табло: по флагу (для снимков) или по клавише Tab.
                         if (debug) {

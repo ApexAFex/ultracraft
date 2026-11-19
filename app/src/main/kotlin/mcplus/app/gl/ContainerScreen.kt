@@ -112,8 +112,28 @@ object ContainerScreen {
 
         val cells = cells(container)
         for (cell in cells) {
-            bar(horizontalOf(cell), verticalOf(cell, rows), InventoryScreen.SLOT / 2f, InventoryScreen.SLOT / 2f, 0.85f)
+            val horizontal = horizontalOf(cell)
+            val vertical = verticalOf(cell, rows)
+            // Тёмная рамка и светлая середина — слот читается даже на фоне травы.
+            bar(horizontal, vertical, InventoryScreen.SLOT / 2f + 0.004f, InventoryScreen.SLOT / 2f + 0.004f, 0.9f, 0.12f, 0.12f, 0.14f)
+            bar(horizontal, vertical, InventoryScreen.SLOT / 2f, InventoryScreen.SLOT / 2f, 0.85f, 0.42f, 0.42f, 0.46f)
         }
+
+        // Заголовок окна над панелью: «Chest», «Furnace», «Crafting». Мелкий кегль: обычный
+        // размер подписи в мире здесь был бы в целый блок.
+        val titleY = halfHeight(rows) + 0.05f
+        text?.draw(
+            camera,
+            listOf(
+                TextRenderer.Label(
+                    (centre[0] + up[0] * titleY).toDouble(),
+                    (centre[1] + up[1] * titleY).toDouble(),
+                    (centre[2] + up[2] * titleY).toDouble(),
+                    container.title,
+                ),
+            ),
+            scaleOverride = 0.007f,
+        )
 
         // Прогресс печи: пламя (0/1) и стрелка плавки (2/3) из `Container Set Data`.
         if (container.type in MenuLayout.FURNACES) {

@@ -76,6 +76,8 @@ object Protocol777 {
         const val TELEPORT_ENTITY: Int = 0x23
         const val CHUNK_DATA: Int = 0x2E
         const val BLOCK_UPDATE: Int = 0x08
+        /** Частицы мира: дым, огонь, искры, брызги. */
+        const val LEVEL_PARTICLES: Int = 0x30
         const val ACKNOWLEDGE_BLOCK_CHANGE: Int = 0x04
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32

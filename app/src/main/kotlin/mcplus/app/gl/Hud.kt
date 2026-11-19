@@ -126,6 +126,14 @@ class Hud(
         }
     }
 
+    /** Красная вспышка при получении урона: [alpha] гаснет за доли секунды. */
+    fun drawDamageFlash(alpha: Float) {
+        if (alpha <= 0.01f) return
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0xFF0000, alpha * 0.35f)
+        renderer.draw()
+    }
+
     /** Отладочные строки слева сверху (F3): кадры, координаты, чанки. */
     fun drawDebug(lines: List<String>) {
         val text = this.text ?: return

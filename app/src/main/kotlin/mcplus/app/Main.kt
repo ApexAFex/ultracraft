@@ -943,6 +943,7 @@ private fun windowCommand(args: List<String>) {
             showTab = showTab,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
+            particleTable = findParticleTable(),
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
@@ -1140,6 +1141,17 @@ private fun findEntityTable(explicit: String? = null): mcplus.net.EntityTable {
         return mcplus.net.EntityTable.EMPTY
     }
     return mcplus.net.EntityTable.load(file)
+}
+
+/** Particle type names for `Level Particles`, generated with `tools/build-particle-table.js`. */
+private fun findParticleTable(): mcplus.net.ParticleTable {
+    val candidates = listOf(
+        java.io.File("data/particles-777.tsv"),
+        java.io.File("../data/particles-777.tsv"),
+        java.io.File("../../data/particles-777.tsv"),
+    )
+    val file = candidates.firstOrNull { it.isFile } ?: return mcplus.net.ParticleTable.EMPTY
+    return mcplus.net.ParticleTable.load(file)
 }
 
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
