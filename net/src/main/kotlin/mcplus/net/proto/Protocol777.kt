@@ -128,6 +128,8 @@ object Protocol777 {
         const val SWING_ACTION: Int = 8
         /** Атака сущности: отдельный пакет с одним номером сущности. */
         const val ATTACK_SERVERBOUND: Int = 0x01
+        /** Настройки клиента в игре: дальность прорисовки и прочее. */
+        const val CLIENT_INFORMATION_SERVERBOUND: Int = 0x0E
         const val CHUNK_BATCH_RECEIVED: Int = 0x0B
         const val CLIENT_STATUS: Int = 0x0C
         const val CLIENT_TICK_END: Int = 0x0D

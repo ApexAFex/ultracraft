@@ -337,6 +337,22 @@ class Session internal constructor(
     /** Таблица предметов (прочность, броня) для HUD и экранов. */
     val itemStatsTable: ItemStats get() = itemStats
 
+    /** Сообщает серверу новую дальность прорисовки; он меняет радиус стриминга чанков. */
+    fun sendClientInformation(viewDistance: Int) {
+        val body = mcplus.protocol.ByteWriter()
+            .writeString("en_us")
+            .writeByte(viewDistance.coerceIn(2, 32))
+            .writeVarInt(0)      // чат включён
+            .writeBoolean(true)  // цвета чата
+            .writeByte(0x7F)     // все части скина
+            .writeVarInt(1)      // правая рука
+            .writeBoolean(false) // фильтрация текста выключена
+            .writeBoolean(true)  // показывать в списке серверов
+            .writeVarInt(0)      // все частицы
+            .toByteArray()
+        send(Packet(Protocol777.Play.CLIENT_INFORMATION_SERVERBOUND, body))
+    }
+
     /** Удар по сущности: сервер применяет урон и отбрасывание. */
     fun attack(entityId: Int) {
         send(

@@ -623,6 +623,9 @@ object GlView {
                     var lastItemTotal = -1
                     var sprintDustNanos = 0L
                     var cameraMode = cameraModeAtStart
+                    var invMouseSlot = -1
+                    var invDragging = false
+                    val invDragged = HashSet<Int>()
                     var selfWalkDistance = 0.0
                     var selfSpeed = 0.0
 
@@ -861,7 +864,27 @@ object GlView {
 
                         // Number keys pick a hotbar slot; the server echoes the choice. Пока
                         // печатаешь в чат, цифры — это цифры, а не слоты.
-                        if (!chat.open) input.hotbarSlotRequested?.let { slot ->
+                        // В экранах инвентаря и контейнера цифры меняют местами с хотбаром, а Q
+                        // выбрасывает предмет из слота под курсором.
+                        if (inventoryOpen || openContainer != null) {
+                            val hoveredMenuSlot = if (openContainer != null) {
+                                val (h, v) = InventoryScreen.panelPoint(input.mouseX, input.mouseY, width, height)
+                                ContainerScreen.slotAt(openContainer, h, v)?.menuSlot
+                            } else {
+                                val (h, v) = InventoryScreen.panelPoint(input.mouseX, input.mouseY, width, height)
+                                InventoryScreen.slotAt(h, v)?.menuSlot
+                            }
+                            if (hoveredMenuSlot != null) {
+                                input.hotbarSlotRequested?.let { hotbar ->
+                                    session?.clickSlot(hoveredMenuSlot, button = hotbar, input = mcplus.net.ContainerInput.SWAP)
+                                }
+                                if (input.dropRequested) {
+                                    session?.clickSlot(hoveredMenuSlot, input = mcplus.net.ContainerInput.THROW)
+                                }
+                            }
+                            // Цифры не переключают хотбар, пока открыт экран.
+                            input.hotbarSlotRequested
+                        } else if (!chat.open) input.hotbarSlotRequested?.let { slot ->
                             session?.selectSlot(slot)
                             val name = session?.inventory?.heldName() ?: "пусто"
                             println("Слот ${slot + 1}: $name")
@@ -889,14 +912,49 @@ object GlView {
                             val rightHeld = GLFW.glfwGetMouseButton(
                                 window, GLFW.GLFW_MOUSE_BUTTON_RIGHT,
                             ) == GLFW.GLFW_PRESS
+                            val leftHeld = GLFW.glfwGetMouseButton(
+                                window, GLFW.GLFW_MOUSE_BUTTON_LEFT,
+                            ) == GLFW.GLFW_PRESS
+                            val hovered = run {
+                                val (horizontal, vertical) = InventoryScreen.panelPoint(
+                                    input.mouseX, input.mouseY, width, height,
+                                )
+                                InventoryScreen.slotAt(horizontal, vertical)
+                            }
                             when {
-                                input.clickRequested -> clickInventoryAt(
-                                    input.mouseX, input.mouseY, button = 0, quick = shiftHeld,
+                                shiftHeld && input.clickRequested -> clickInventoryAt(
+                                    input.mouseX, input.mouseY, button = 0, quick = true,
                                 )
 
-                                rightHeld && !rightWasDown -> clickInventoryAt(
-                                    input.mouseX, input.mouseY, button = 1,
-                                )
+                                leftHeld -> {
+                                    if (input.clickRequested && hovered != null) {
+                                        clickInventoryAt(input.mouseX, input.mouseY)
+                                        invMouseSlot = hovered.menuSlot
+                                    }
+                                    if (hovered != null && invMouseSlot >= 0) {
+                                        if (!invDragging && hovered.menuSlot != invMouseSlot) {
+                                            invDragging = true
+                                            invDragged.clear()
+                                            invDragged += invMouseSlot
+                                            session?.dragStart(invMouseSlot)
+                                        }
+                                        if (invDragging && invDragged.add(hovered.menuSlot)) {
+                                            session?.dragAdd(hovered.menuSlot)
+                                        }
+                                    }
+                                }
+
+                                else -> {
+                                    if (invDragging) {
+                                        invDragging = false
+                                        invDragged.clear()
+                                        session?.dragEnd()
+                                    }
+                                    invMouseSlot = -1
+                                    if (rightHeld && !rightWasDown) {
+                                        clickInventoryAt(input.mouseX, input.mouseY, button = 1)
+                                    }
+                                }
                             }
                         }
 
@@ -1208,6 +1266,8 @@ object GlView {
                                 // instead of waiting out its 60-tick grace period.
                                 session?.send(PlayerMovement.playerLoaded())
                                 playerLoadedSent = true
+                                // Дальность из настроек: сервер меняет радиус стриминга чанков.
+                                session?.sendClientInformation(viewDistance)
                                 println("Отправлено Player Loaded")
                             }
 
@@ -1898,8 +1958,13 @@ object GlView {
                                             (skyNow?.rain ?: 0f) > 0f -> "дождь"
                                             else -> "ясно"
                                         }
-                                        "Время: %02d:%02d, погода: %s".format(hours, minutes, weather)
+                                    "Время: %02d:%02d, погода: %s".format(hours, minutes, weather)
                                     },
+                                    "Свет: " + world.lightAt(
+                                        kotlin.math.floor(player.x).toInt(),
+                                        kotlin.math.floor(player.y + 1).toInt(),
+                                        kotlin.math.floor(player.z).toInt(),
+                                    ),
                                 ),
                             )
                         }
@@ -1954,7 +2019,10 @@ object GlView {
                                     0 -> baseFov = (baseFov + 5f * step).coerceIn(40f, 110f)
                                     1 -> volume = (volume + 0.05f * step).coerceIn(0f, 1f)
                                     2 -> input.sensitivity = (input.sensitivity + 0.05f * step).coerceIn(0.2f, 3f)
-                                    3 -> viewDistance = (viewDistance + step).coerceIn(4, 16)
+                                    3 -> {
+                                        viewDistance = (viewDistance + step).coerceIn(4, 16)
+                                        session?.sendClientInformation(viewDistance)
+                                    }
                                     else -> {
                                         musicVolume = (musicVolume + 0.05f * step).coerceIn(0f, 1f)
                                         sound.musicVolume = musicVolume
