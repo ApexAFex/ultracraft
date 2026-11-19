@@ -1,6 +1,7 @@
 package mcplus.app
 
 import mcplus.app.gl.GlView
+import mcplus.app.gl.TextureAtlas
 import mcplus.auth.Account
 import mcplus.auth.AccountStore
 import mcplus.auth.AuthConfig
@@ -52,6 +53,7 @@ private fun dispatch(args: List<String>) {
         args[0] == "place" -> placeCommand(args.drop(1))
         args[0] == "hotbar" -> hotbarCommand(args.drop(1))
         args[0] == "hud" -> hudCommand(args.drop(1))
+        args[0] == "textures" -> texturesCommand(args.drop(1))
         args[0] == "click" -> clickCommand(args.drop(1))
         args[0] == "chunkdump" -> chunkDumpCommand(args.drop(1))
         args[0] == "login" -> loginCommand(args.drop(1))
@@ -1192,7 +1194,8 @@ private fun printUsage() {
           mcplus ping [host[:port]] [--json]        то же, что и без команды
           mcplus window [host[:port]]               открыть окно и играть
           mcplus watch [host[:port]] [--seconds N]  наблюдать, какие сущности двигаются
-          mcplus hud [host[:port]] [--seconds N]    здоровье, голод и опыт (числа для HUD)
+          mcplus hud [host[:port]] [--seconds N]    здоровье, броня, эффекты и боссы (числа HUD)
+          mcplus textures [блок]...                 какие текстуры игра ставит блоку
           mcplus chunkdump [host[:port]]            сохранить сырые пакеты чанков
 
         Флаги:
@@ -1217,6 +1220,34 @@ private fun printUsage() {
           mcplus world play.example.com --online
         """.trimIndent(),
     )
+}
+
+/**
+ * Какие текстуры игра ставит блоку на верх, низ и бок.
+ *
+ * У 600 блоков из 1286 (ступени, плиты, заборы, двери, факелы) нет файла с именем блока —
+ * их текстуры берутся из моделей: `blockstates/<блок>.json` → `models/<модель>.json`. Команда
+ * показывает, что именно нашлось, и работает без окна, поэтому годится для проверки.
+ */
+private fun texturesCommand(args: List<String>) {
+    val directory = TextureAtlas.findMinecraftDirectory()
+        ?: fail("Установка Minecraft не найдена: нужны versions/<id>/<id>.jar")
+    val atlas = TextureAtlas.load(directory) ?: fail("Не удалось прочитать текстуры из установки игры")
+
+    val names = args.ifEmpty {
+        listOf("oak_stairs", "stone_slab", "oak_fence", "oak_door", "torch", "glass", "grass_block", "stone")
+    }
+    println("Атлас: ${atlas.source}, слоёв ${atlas.size}, из моделей ${atlas.appearances.size}")
+    for (name in names) {
+        val block = name.removePrefix("minecraft:")
+        val faces = atlas.appearances[block]
+        if (faces == null) {
+            println("  $block: модели нет, текстура подбирается по имени")
+            continue
+        }
+        fun texture(layer: Int) = atlas.namesByLayer.getOrNull(layer) ?: "слой $layer"
+        println("  $block: верх ${texture(faces.top)}, низ ${texture(faces.bottom)}, бок ${texture(faces.side)}")
+    }
 }
 
 private fun fail(message: String): Nothing {

@@ -23,11 +23,20 @@ class TextureAtlas(
     val images: List<BufferedImage>,
     val source: String,
     val namesByLayer: List<String> = emptyList(),
+    /** Текстуры из моделей игры: у ступеней, плит и заборов своих файлов текстур нет. */
+    val appearances: Map<String, FaceTextures> = emptyMap(),
 ) {
 
     val size: Int get() = images.size
 
     fun layerFor(blockName: String, kind: Kind): Int {
+        appearances[blockName]?.let { faces ->
+            return when (kind) {
+                Kind.TOP -> faces.top
+                Kind.BOTTOM -> faces.bottom
+                Kind.SIDE -> faces.side
+            }
+        }
         val candidates = ArrayList<String>(6)
         when (kind) {
             Kind.TOP -> {
@@ -74,6 +83,8 @@ class TextureAtlas(
     companion object {
         private const val TILE = 16
         private const val BLOCK_TEXTURES = "assets/minecraft/textures/block/"
+        private const val BLOCK_STATES = "assets/minecraft/blockstates/"
+        private const val BLOCK_MODELS = "assets/minecraft/models/"
 
         fun findMinecraftDirectory(): File? {
             val appData = System.getenv("APPDATA") ?: return null
@@ -102,17 +113,33 @@ class TextureAtlas(
             for (jar in jars) {
                 val images = ArrayList<BufferedImage>(1024)
                 val layers = HashMap<String, Int>(1024)
+                val blockStates = HashMap<String, String>(1024)
+                val models = HashMap<String, String>(2048)
 
                 try {
                     ZipFile(jar).use { zip ->
                         for (entry in zip.entries()) {
-                            if (!entry.name.startsWith(BLOCK_TEXTURES) || !entry.name.endsWith(".png")) continue
-                            val bytes = zip.getInputStream(entry).readBytes()
-                            val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
-                                ?: continue
-                            val name = entry.name.removePrefix(BLOCK_TEXTURES).removeSuffix(".png")
-                            layers[name] = images.size
-                            images += firstFrame(image)
+                            val name = entry.name
+                            when {
+                                name.startsWith(BLOCK_TEXTURES) && name.endsWith(".png") -> {
+                                    val bytes = zip.getInputStream(entry).readBytes()
+                                    val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
+                                        ?: continue
+                                    val texture = name.removePrefix(BLOCK_TEXTURES).removeSuffix(".png")
+                                    layers[texture] = images.size
+                                    images += firstFrame(image)
+                                }
+
+                                // Модели и их описания нужны, чтобы узнать текстуры блоков,
+                                // у которых нет одноимённого файла (ступени, плиты, заборы).
+                                name.startsWith(BLOCK_STATES) && name.endsWith(".json") ->
+                                    blockStates[name.removePrefix(BLOCK_STATES).removeSuffix(".json")] =
+                                        zip.getInputStream(entry).readBytes().decodeToString()
+
+                                name.startsWith(BLOCK_MODELS) && name.endsWith(".json") ->
+                                    models[name.removePrefix(BLOCK_MODELS).removeSuffix(".json")] =
+                                        zip.getInputStream(entry).readBytes().decodeToString()
+                            }
                         }
                     }
                 } catch (e: Throwable) {
@@ -122,10 +149,35 @@ class TextureAtlas(
                 if (images.isNotEmpty()) {
                     layers["missing"] = images.size
                     images += missingTile()
-                    return TextureAtlas(layers, images, "jar ${jar.name}", namesByLayer(images.size, layers))
+                    val appearances = resolveAppearances(blockStates, models, layers)
+                    return TextureAtlas(
+                        layers, images, "jar ${jar.name}", namesByLayer(images.size, layers), appearances,
+                    )
                 }
             }
             return null
+        }
+
+        /**
+         * Текстуры блоков из моделей. Блок без модели просто остаётся без записи — тогда
+         * сработает старый подбор по имени.
+         */
+        private fun resolveAppearances(
+            blockStates: Map<String, String>,
+            models: Map<String, String>,
+            layers: Map<String, Int>,
+        ): Map<String, FaceTextures> {
+            if (blockStates.isEmpty() || models.isEmpty()) return emptyMap()
+            val started = System.nanoTime()
+            val result = runCatching {
+                BlockModels.build(blockStates, { models[it] }, { layers[it] })
+            }.getOrElse { error ->
+                System.err.println("модели блоков не разобраны: ${error::class.simpleName}: ${error.message}")
+                BlockModels.Result(emptyMap(), 0)
+            }
+            val millis = (System.nanoTime() - started) / 1_000_000
+            println("Текстуры из моделей: ${result.resolved} блоков из ${blockStates.size} ($millis мс)")
+            return result.byName
         }
 
         private fun fromAssetObjects(minecraftDirectory: File): TextureAtlas? {
