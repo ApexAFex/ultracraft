@@ -56,6 +56,11 @@ class SoundEngine(private val directory: File?) : Closeable {
     /** Громкость музыки отдельно от звуков. */
     var musicVolume: Float = 0.5f
 
+    /** Громкости категорий: блоки, мобы и окружение настраиваются отдельно. */
+    var blocksVolume: Float = 1f
+    var entitiesVolume: Float = 1f
+    var ambientVolume: Float = 1f
+
     private var musicSource = 0
     private var musicBuffer = 0
     private var musicTrack: String? = null
@@ -166,9 +171,16 @@ class SoundEngine(private val directory: File?) : Closeable {
         AL10.alSourceStop(source)
         AL10.alSourcei(source, AL10.AL_BUFFER, buffer)
         AL10.alSource3f(source, AL10.AL_POSITION, x.toFloat(), y.toFloat(), z.toFloat())
-        AL10.alSourcef(source, AL10.AL_GAIN, masterVolume * 0.8f)
+        AL10.alSourcef(source, AL10.AL_GAIN, masterVolume * 0.8f * volumeOf(SoundCategories.of(event)))
         AL10.alSourcePlay(source)
         played++
+    }
+
+    private fun volumeOf(category: SoundCategory): Float = when (category) {
+        SoundCategory.BLOCKS -> blocksVolume
+        SoundCategory.ENTITIES -> entitiesVolume
+        SoundCategory.AMBIENT -> ambientVolume
+        SoundCategory.UI, SoundCategory.OTHER -> 1f
     }
 
     private fun bufferFor(path: String): Int? {
@@ -239,6 +251,20 @@ class StepSoundTimer {
 }
 
 private const val STEP_DISTANCE = 1.8
+
+/** Категория звука: по ней в настройках задаётся отдельная громкость. */
+enum class SoundCategory { BLOCKS, ENTITIES, AMBIENT, UI, OTHER }
+
+object SoundCategories {
+
+    fun of(event: String): SoundCategory = when {
+        event.startsWith("block.") || event.startsWith("item.") -> SoundCategory.BLOCKS
+        event.startsWith("entity.") -> SoundCategory.ENTITIES
+        event.startsWith("ambient.") || event.startsWith("weather.") -> SoundCategory.AMBIENT
+        event.startsWith("ui.") -> SoundCategory.UI
+        else -> SoundCategory.OTHER
+    }
+}
 
 /** Имя события шага по блоку под ногами: `block.grass.step` или запасное. */
 internal fun stepEvent(blockName: String): String {

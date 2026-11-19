@@ -19,16 +19,44 @@ object ContainerScreen {
 
     private const val COLUMNS = 9
 
-    fun containerRows(container: OpenContainer): Int =
-        if (container.type in MenuLayout.FURNACES) 2
+    /**
+     * Раскладки меню, у которых слоты стоят не сеткой: наковальня, торговец, маяк,
+     * камнерез, ткацкий станок, кузнечный стол, точило, картография, чары и варка.
+     * Пары «номер слота → колонка, ряд»; строки считаются по самой нижней ячейке.
+     */
+    private val SPECIAL: Map<String, List<Triple<Int, Int, Int>>> = mapOf(
+        "anvil" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 3, 0)),
+        "merchant" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 3, 0)),
+        "beacon" to listOf(Triple(0, 4, 0)),
+        "stonecutter" to listOf(Triple(0, 0, 0), Triple(1, 2, 0)),
+        "loom" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 0), Triple(3, 4, 0)),
+        "smithing" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 0), Triple(3, 4, 0)),
+        "grindstone" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 1)),
+        "cartography_table" to listOf(Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 3, 0)),
+        "enchantment" to listOf(Triple(0, 0, 0), Triple(1, 0, 1)),
+        "brewing_stand" to listOf(
+            Triple(0, 0, 0), Triple(1, 1, 0), Triple(2, 2, 0), Triple(3, 1, 1), Triple(4, 3, 1),
+        ),
+    )
+
+    private fun special(type: String): List<Triple<Int, Int, Int>>? = SPECIAL[type]
+
+    fun containerRows(container: OpenContainer): Int {
+        val special = special(container.type)
+        if (special != null) return special.maxOf { it.third } + 1
+        return if (container.type in MenuLayout.FURNACES) 2
         else (container.containerSlots + COLUMNS - 1) / COLUMNS
+    }
 
     fun totalRows(container: OpenContainer): Int = containerRows(container) + 3 + 1
 
     fun cells(container: OpenContainer): List<Cell> {
         val cells = ArrayList<Cell>(container.slotCount)
         val playerRow = containerRows(container)
-        if (container.type in MenuLayout.FURNACES) {
+        val special = special(container.type)
+        if (special != null) {
+            for ((slot, column, row) in special) cells += Cell(slot, column, row)
+        } else if (container.type in MenuLayout.FURNACES) {
             // Печь: вход слева сверху, топливо под ним, выход справа — между ними огонь и стрелка.
             cells += Cell(0, 0, 0)
             cells += Cell(1, 0, 1)

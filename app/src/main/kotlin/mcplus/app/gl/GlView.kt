@@ -618,14 +618,20 @@ object GlView {
                     var volume = Settings.volume
                     var viewDistance = Settings.viewDistance
                     var musicVolume = Settings.musicVolume
+                    var blocksVolume = Settings.blocksVolume
+                    var entitiesVolume = Settings.entitiesVolume
+                    var ambientVolume = Settings.ambientVolume
                     sound.musicVolume = musicVolume
+                    sound.blocksVolume = blocksVolume
+                    sound.entitiesVolume = entitiesVolume
+                    sound.ambientVolume = ambientVolume
                     var selectedSetting = 0
                     input.sensitivity = Settings.sensitivity
                     var settingLeftWasDown = false
                     var settingRightWasDown = false
                     var settingUpWasDown = false
                     var settingDownWasDown = false
-                    val settingRowWasDown = BooleanArray(5)
+                    val settingRowWasDown = BooleanArray(8)
                     var ambientNanos = 0L
                     var rainSoundNanos = 0L
                     /** Полный экран и запомненное окно; счётчик предметов для звука подбора. */
@@ -640,6 +646,7 @@ object GlView {
                     var lightningUntilNanos = 0L
                     var nextCaveSoundNanos = 0L
                     var nextElementSoundNanos = 0L
+                    var wasInWater = false
                     var lastAttackNanos = 0L
                     var invLastClickNanos = 0L
                     var invLastClickSlot = -1
@@ -1281,6 +1288,22 @@ object GlView {
                                         miningX + 0.5, miningY + 0.5, miningZ + 0.5,
                                         "block.stone.hit",
                                     )
+                                    // Кусочки летят уже во время ломания, а не только в конце.
+                                    val chipRandom = java.util.Random()
+                                    repeat(2) {
+                                        debris += Debris(
+                                            miningX + 0.2 + chipRandom.nextDouble() * 0.6,
+                                            miningY + 0.2 + chipRandom.nextDouble() * 0.6,
+                                            miningZ + 0.2 + chipRandom.nextDouble() * 0.6,
+                                            (chipRandom.nextDouble() - 0.5) * 1.2,
+                                            0.8 + chipRandom.nextDouble(),
+                                            (chipRandom.nextDouble() - 0.5) * 1.2,
+                                            0.35f,
+                                            atlas.layerFor(hitName, TextureAtlas.Kind.TOP),
+                                            atlas.layerFor(hitName, TextureAtlas.Kind.BOTTOM),
+                                            atlas.layerFor(hitName, TextureAtlas.Kind.SIDE),
+                                        )
+                                    }
                                 }
                                 if (world.blockAt(miningX, miningY, miningZ) == 0) {
                                     finishMining()
@@ -1406,7 +1429,7 @@ object GlView {
                         val alpha = (tickAccumulator / TICK_SECONDS).coerceIn(0.0, 1.0)
                         camera.x = previousX + (player.x - previousX) * alpha
                         camera.y = previousY + (player.y - previousY) * alpha +
-                            Player.EYE_HEIGHT - (if (sneakHeld) 0.15 else 0.0)
+                            Player.EYE_HEIGHT - (if (sneakHeld) 0.3 else 0.0)
                         camera.z = previousZ + (player.z - previousZ) * alpha
 
                         // F5: камера отъезжает назад (или вперёд и разворачивается). Стену
@@ -1491,6 +1514,41 @@ object GlView {
                             ),
                         )
                         val underwater = "water" in eyeBlockName
+                        // Вход в воду: всплеск, брызги и пузыри. Раньше вода была молчаливой.
+                        val feetName = blocks.nameOf(
+                            world.blockAt(
+                                kotlin.math.floor(player.x).toInt(),
+                                kotlin.math.floor(player.y + 0.1).toInt(),
+                                kotlin.math.floor(player.z).toInt(),
+                            ),
+                        )
+                        val inWater = "water" in feetName || underwater
+                        if (inWater != wasInWater) {
+                            sound.play("entity.player.splash", player.x, player.y, player.z)
+                            val particleName = if (inWater) "splash" else "bubble"
+                            repeat(10) {
+                                particles += ParticlePiece(
+                                    player.x + (Math.random() - 0.5) * 0.7,
+                                    player.y + 0.1 + Math.random() * 0.4,
+                                    player.z + (Math.random() - 0.5) * 0.7,
+                                    (Math.random() - 0.5) * 1.2,
+                                    0.6 + Math.random() * 1.2,
+                                    (Math.random() - 0.5) * 1.2,
+                                    0.8f,
+                                    particleName,
+                                    0.16f,
+                                )
+                            }
+                            wasInWater = inWater
+                        }
+                        if (underwater && Math.random() < 0.03) {
+                            particles += ParticlePiece(
+                                camera.x + (Math.random() - 0.5) * 0.8,
+                                camera.y - 0.3,
+                                camera.z + (Math.random() - 0.5) * 0.8,
+                                0.05, 0.4, 0.05, 1.2f, "bubble", 0.12f,
+                            )
+                        }
                         if (underwater) {
                             renderer.fogColor = 0x1A3C6E
                             renderer.fogStart = 0f
@@ -1783,6 +1841,7 @@ object GlView {
                                 } else {
                                     0f
                                 },
+                                sneak = sneakHeld,
                             )
                         }
                         val zombies = ArrayList<PlayerRenderer.Player>()
@@ -1805,6 +1864,7 @@ object GlView {
                                     walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                     swing = entity.swingProgress(System.nanoTime()),
                                     hurt = entity.hurtProgress(System.nanoTime()),
+                                    sneak = entity.sneaking,
                                 )
                             } else {
                                 val name = entityTypes.nameOf(entity.type)
@@ -2059,7 +2119,7 @@ object GlView {
                         // От третьего лица куб висит у правой руки модели, а не у камеры.
                         val handItemName = inventory?.heldName()
                         if (!inventoryOpen && openContainer == null && !dead && !chat.open &&
-                            handItemName != null
+                            !paused && handItemName != null
                         ) {
                             val swingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
                             val handSwing = if (swingAge in 0.0..1.0) {
@@ -2140,7 +2200,7 @@ object GlView {
                                 // Пока печатаешь, хотбар и сердца уступают место строке ввода.
                                 hud.drawChat(chatLines, System.nanoTime(), chatScroll)
                                 hud.drawChatInput(chat.text)
-                            } else if (!hudHidden) {
+                            } else if (!hudHidden && !paused) {
                                 // Строки чата видны и без открытой строки ввода: раньше они
                                 // рисовались только пока печатаешь.
                                 hud.drawChat(chatLines, System.nanoTime(), chatScroll)
@@ -2224,12 +2284,12 @@ object GlView {
 
                         // Табло сервера и меню паузы — поверх HUD.
                         val board = session?.scoreboard?.sidebarLines()
-                        if (!hudHidden && board != null) {
+                        if (!hudHidden && !paused && board != null) {
                             hud.drawScoreboard(board.first, board.second)
                         }
                         // Строка действия и большой заголовок от сервера. Строка держится
                         // две секунды и гаснет за третью, как в ванили, — иначе она висела бы вечно.
-                        if (!hudHidden) {
+                        if (!hudHidden && !paused) {
                             val nowNs = System.nanoTime()
                             session?.actionBar?.takeIf { it.isNotBlank() }?.let { bar ->
                                 val alpha = actionBarAlpha(session?.actionBarAtNanos ?: 0L, nowNs)
@@ -2248,6 +2308,9 @@ object GlView {
                                 baseFov, (volume * 100).toInt(),
                                 (input.sensitivity * 100).toInt(), selectedSetting, viewDistance,
                                 (musicVolume * 100).toInt(),
+                                (blocksVolume * 100).toInt(),
+                                (entitiesVolume * 100).toInt(),
+                                (ambientVolume * 100).toInt(),
                             )
                             if (input.clickRequested) {
                                 when {
@@ -2256,8 +2319,8 @@ object GlView {
                                         GLFW.glfwSetWindowShouldClose(window, true)
                                 }
                             }
-                            // Цифры 1–4 выбирают строку, стрелки меняют её значение.
-                            for (row in 0..4) {
+                            // Цифры 1–8 выбирают строку, стрелки меняют её значение.
+                            for (row in 0..7) {
                                 val pressedRow = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_1 + row) == GLFW.GLFW_PRESS
                                 if (pressedRow && !settingRowWasDown[row]) selectedSetting = row
                                 settingRowWasDown[row] = pressedRow
@@ -2279,8 +2342,24 @@ object GlView {
                                         session?.sendClientInformation(viewDistance)
                                     }
                                     else -> {
-                                        musicVolume = (musicVolume + 0.05f * step).coerceIn(0f, 1f)
-                                        sound.musicVolume = musicVolume
+                                        when (selectedSetting) {
+                                            4 -> {
+                                                musicVolume = (musicVolume + 0.05f * step).coerceIn(0f, 1f)
+                                                sound.musicVolume = musicVolume
+                                            }
+                                            5 -> {
+                                                blocksVolume = (blocksVolume + 0.1f * step).coerceIn(0f, 1f)
+                                                sound.blocksVolume = blocksVolume
+                                            }
+                                            6 -> {
+                                                entitiesVolume = (entitiesVolume + 0.1f * step).coerceIn(0f, 1f)
+                                                sound.entitiesVolume = entitiesVolume
+                                            }
+                                            else -> {
+                                                ambientVolume = (ambientVolume + 0.1f * step).coerceIn(0f, 1f)
+                                                sound.ambientVolume = ambientVolume
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -2495,6 +2574,9 @@ object GlView {
                     Settings.fullscreen = fullscreen
                     Settings.music = sound.musicEnabled
                     Settings.musicVolume = musicVolume
+                    Settings.blocksVolume = blocksVolume
+                    Settings.entitiesVolume = entitiesVolume
+                    Settings.ambientVolume = ambientVolume
                     Settings.save()
                     sound.close()
                     entityRenderer.close()

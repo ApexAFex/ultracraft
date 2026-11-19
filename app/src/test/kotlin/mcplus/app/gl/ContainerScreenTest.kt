@@ -75,4 +75,48 @@ class ContainerScreenTest {
         assertEquals(2, ContainerScreen.containerRows(furnace))
         assertEquals(6, ContainerScreen.totalRows(furnace))
     }
+
+    @Test
+    fun `an anvil has three slots in one row`() {
+        val anvil = OpenContainer(3, "anvil", "Repair & Name", 39)
+        val cells = ContainerScreen.cells(anvil).associateBy { it.menuSlot }
+
+        assertEquals(0, cells.getValue(0).row)
+        assertEquals(0, cells.getValue(0).column)
+        assertEquals(1, cells.getValue(1).column)
+        assertEquals(3, cells.getValue(2).column, "результат правее входов")
+        assertEquals(1, ContainerScreen.containerRows(anvil))
+        assertEquals(5, ContainerScreen.totalRows(anvil))
+    }
+
+    @Test
+    fun `a beacon has one slot in the middle`() {
+        val beacon = OpenContainer(4, "beacon", "Beacon", 37)
+        val cells = ContainerScreen.cells(beacon).associateBy { it.menuSlot }
+
+        assertEquals(4, cells.getValue(0).column)
+        assertEquals(0, cells.getValue(0).row)
+        assertEquals(1, ContainerScreen.containerRows(beacon))
+    }
+
+    @Test
+    fun `a brewing stand puts bottles above the ingredient`() {
+        val brewing = OpenContainer(5, "brewing_stand", "Brewing Stand", 41)
+        val cells = ContainerScreen.cells(brewing).associateBy { it.menuSlot }
+
+        assertEquals(0, cells.getValue(0).row)
+        assertEquals(1, cells.getValue(3).row)
+        assertEquals(2, ContainerScreen.containerRows(brewing))
+    }
+
+    @Test
+    fun `an unknown menu still falls back to a grid`() {
+        val hopper = OpenContainer(6, "hopper", "Item Hopper", 41)
+        val cells = ContainerScreen.cells(hopper).associateBy { it.menuSlot }
+
+        assertEquals(5, cells.keys.count { it < 5 })
+        assertEquals(0, cells.getValue(4).row)
+        assertEquals(4, cells.getValue(4).column)
+        assertEquals(1, ContainerScreen.containerRows(hopper))
+    }
 }

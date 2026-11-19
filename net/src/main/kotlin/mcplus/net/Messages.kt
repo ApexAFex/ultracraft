@@ -401,6 +401,7 @@ private val CHAT_TRANSLATIONS = mapOf(
     "container.beacon" to "Beacon",
     "container.enchant" to "Enchant",
     "container.anvil" to "Repair & Name",
+    "container.repair" to "Repair & Name",
     "container.merchant" to "Villager",
     "container.cartography_table" to "Cartography Table",
     "container.stonecutter" to "Stonecutter",

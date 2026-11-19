@@ -23,4 +23,15 @@ class SoundEventsTest {
         assertEquals("block.grass_block.step", stepEvent("minecraft:grass_block"))
         assertEquals("block.sand.step", stepEvent("sand"))
     }
+
+    @Test
+    fun `events fall into the right volume category`() {
+        assertEquals(SoundCategory.BLOCKS, SoundCategories.of("block.stone.break"))
+        assertEquals(SoundCategory.BLOCKS, SoundCategories.of("item.bucket.fill"))
+        assertEquals(SoundCategory.ENTITIES, SoundCategories.of("entity.cow.ambient"))
+        assertEquals(SoundCategory.AMBIENT, SoundCategories.of("ambient.cave"))
+        assertEquals(SoundCategory.AMBIENT, SoundCategories.of("weather.rain"))
+        assertEquals(SoundCategory.UI, SoundCategories.of("ui.button.click"))
+        assertEquals(SoundCategory.OTHER, SoundCategories.of("music.game"))
+    }
 }

@@ -96,10 +96,10 @@ class Hud(
                 s,
             ),
             TextRenderer.ScreenLabel(
-                button.centreX - (text?.textWidth(hint, s * 0.8f) ?: 0f) / 2f,
+                button.centreX - (text?.textWidth(hint, s * 0.7f) ?: 0f) / 2f,
                 button.bottom + 8f * s,
                 hint,
-                s * 0.8f,
+                s * 0.7f,
             ),
         )
         // Кнопка без шрифта остаётся прямоугольником: без надписи её всё равно видно.
@@ -213,6 +213,9 @@ class Hud(
         selected: Int,
         viewDistance: Int,
         musicVolumePercent: Int = 50,
+        blocksVolumePercent: Int = 100,
+        entitiesVolumePercent: Int = 100,
+        ambientVolumePercent: Int = 100,
     ): List<HudRect> {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
@@ -248,33 +251,51 @@ class Hud(
                 ),
                 TextRenderer.ScreenLabel(
                     firstX,
-                    quit.y + 34f * s,
+                    quit.y + 24f * s,
                     "${if (selected == 0) "> " else ""}Обзор: ${fov.toInt()}°  (1)",
-                    s * 0.8f,
+                    s * 0.7f,
                 ),
                 TextRenderer.ScreenLabel(
                     firstX,
-                    quit.y + 46f * s,
+                    quit.y + 34f * s,
                     "${if (selected == 1) "> " else ""}Громкость: $volume%  (2)",
-                    s * 0.8f,
+                    s * 0.7f,
                 ),
                 TextRenderer.ScreenLabel(
                     firstX,
-                    quit.y + 58f * s,
+                    quit.y + 44f * s,
                     "${if (selected == 2) "> " else ""}Чувствительность: $sensitivityPercent%  (3)",
-                    s * 0.8f,
+                    s * 0.7f,
                 ),
                 TextRenderer.ScreenLabel(
                     firstX,
-                    quit.y + 70f * s,
+                    quit.y + 54f * s,
                     "${if (selected == 3) "> " else ""}Дальность: $viewDistance чанков  (4)",
-                    s * 0.8f,
+                    s * 0.7f,
                 ),
                 TextRenderer.ScreenLabel(
                     firstX,
-                    quit.y + 82f * s,
+                    quit.y + 64f * s,
                     "${if (selected == 4) "> " else ""}Музыка: $musicVolumePercent%  (5)",
-                    s * 0.8f,
+                    s * 0.7f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 74f * s,
+                    "${if (selected == 5) "> " else ""}Блоки: $blocksVolumePercent%  (6)",
+                    s * 0.7f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 84f * s,
+                    "${if (selected == 6) "> " else ""}Мобы: $entitiesVolumePercent%  (7)",
+                    s * 0.7f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 94f * s,
+                    "${if (selected == 7) "> " else ""}Окружение: $ambientVolumePercent%  (8)",
+                    s * 0.7f,
                 ),
             ),
         )
@@ -908,4 +929,5 @@ internal fun actionBarAlpha(atNanos: Long, nowNanos: Long): Float {
         else -> 0f
     }
 }
+
 

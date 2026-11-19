@@ -106,6 +106,10 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     /** Сколько живёт сфера опыта — поле 8 у `experience_orb`. */
     val orbValue: Int? get() = meta[ORB_VALUE_FIELD]?.takeIf { it.type == 1 }?.number?.toInt()
 
+    /** Поза из метаданных: 5 — игрок крадётся (у остальных поза не важна). */
+    val sneaking: Boolean
+        get() = meta[POSE_FIELD]?.number?.toInt() == POSE_SNEAKING
+
     fun applyMetadata(values: Map<Int, MetaEntry>) {
         if (values.isNotEmpty()) meta = values
     }
@@ -372,6 +376,8 @@ private const val HEALTH_FIELD = 9
 /** Поле 8 — предмет для `item` и количество опыта для `experience_orb`. */
 private const val DROPPED_ITEM_FIELD = 8
 private const val ORB_VALUE_FIELD = 8
+private const val POSE_FIELD = 6
+private const val POSE_SNEAKING = 5
 
 /** Длительность взмаха рукой в секундах. */
 private const val SWING_SECONDS = 0.3

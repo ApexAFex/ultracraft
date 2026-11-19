@@ -58,8 +58,24 @@ class EntityMetadataTest {
     }
 
     @Test
-    fun `an unknown field type stops the parse but keeps earlier fields`() {
-        val packet = body(
+    fun `pose 5 marks a sneaking player`() {
+        val packet = body(9, field(6, 20, ByteWriter().writeVarInt(5).toByteArray()))
+        val (_, meta) = readEntityMetadata(packet)
+        val entity = TrackedEntity(9, java.util.UUID.randomUUID(), 155)
+        entity.applyMetadata(meta)
+        assertTrue(entity.sneaking)
+    }
+
+    @Test
+    fun `a standing player is not sneaking`() {
+        val packet = body(9, field(6, 20, ByteWriter().writeVarInt(0).toByteArray()))
+        val entity = TrackedEntity(9, java.util.UUID.randomUUID(), 155)
+        entity.applyMetadata(readEntityMetadata(packet).second)
+        assertTrue(!entity.sneaking)
+    }
+
+    @Test
+    fun `an unknown field type stops the parse but keeps earlier fields`() {        val packet = body(
             7,
             field(9, 3, ByteWriter().writeFloat(20f).toByteArray()),
             field(10, 16, ByteWriter().writeVarInt(1).toByteArray()), // частица: неизвестно

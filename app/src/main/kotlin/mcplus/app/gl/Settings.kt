@@ -24,6 +24,11 @@ object Settings {
     /** Громкость музыки отдельно от звуков. */
     var musicVolume: Float = 0.5f
 
+    /** Отдельные громкости категорий: блоки, мобы, окружение. */
+    var blocksVolume: Float = 1f
+    var entitiesVolume: Float = 1f
+    var ambientVolume: Float = 1f
+
     private var file: File = File("settings.properties")
     private var loaded = false
 
@@ -48,6 +53,9 @@ object Settings {
             fullscreen = properties.getProperty("fullscreen")?.toBooleanStrictOrNull() ?: fullscreen
             music = properties.getProperty("music")?.toBooleanStrictOrNull() ?: music
             musicVolume = properties.getProperty("musicVolume")?.toFloatOrNull() ?: musicVolume
+            blocksVolume = properties.getProperty("blocksVolume")?.toFloatOrNull() ?: blocksVolume
+            entitiesVolume = properties.getProperty("entitiesVolume")?.toFloatOrNull() ?: entitiesVolume
+            ambientVolume = properties.getProperty("ambientVolume")?.toFloatOrNull() ?: ambientVolume
             println("Настройки: ${file.absolutePath}, музыка=$music, обзор=$fov")
         }
     }
@@ -63,6 +71,9 @@ object Settings {
             properties.setProperty("fullscreen", fullscreen.toString())
             properties.setProperty("music", music.toString())
             properties.setProperty("musicVolume", musicVolume.toString())
+            properties.setProperty("blocksVolume", blocksVolume.toString())
+            properties.setProperty("entitiesVolume", entitiesVolume.toString())
+            properties.setProperty("ambientVolume", ambientVolume.toString())
             file.outputStream().use { properties.store(it, "ultracraft settings") }
         }
     }

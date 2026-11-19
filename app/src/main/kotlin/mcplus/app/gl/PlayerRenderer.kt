@@ -34,6 +34,8 @@ class PlayerRenderer(
         val swing: Float = 0f,
         /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
         val hurt: Float = 0f,
+        /** Игрок крадётся: модель ниже, как в ванили. */
+        val sneak: Boolean = false,
     )
 
     private val program = createProgram()
@@ -133,7 +135,7 @@ class PlayerRenderer(
         model[4] = 0f; model[5] = 1f; model[6] = 0f; model[7] = 0f
         model[8] = s; model[9] = 0f; model[10] = c; model[11] = 0f
         model[12] = player.x.toFloat()
-        model[13] = player.y.toFloat()
+        model[13] = player.y.toFloat() - if (player.sneak) CROUCH_DROP else 0f
         model[14] = player.z.toFloat()
         model[15] = 1f
     }
@@ -201,6 +203,9 @@ class PlayerRenderer(
     private companion object {
         /** Насколько рука поднимается в взмахе, радианы. */
         const val SWING_ANGLE = 1.1f
+
+        /** На сколько модель приседает: глаза в ванили опускаются на 0.3 блока. */
+        const val CROUCH_DROP = 0.22f
 
         const val VERTEX_SHADER = """
             #version 330 core
