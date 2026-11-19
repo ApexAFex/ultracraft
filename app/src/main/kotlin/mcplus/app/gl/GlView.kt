@@ -284,6 +284,11 @@ object GlView {
                         GameFiles.readPng(directory, "assets/minecraft/textures/entity/skeleton/skeleton.png"),
                         classic = true,
                     )
+                    // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
+                    val sound = SoundEngine(directory)
+                    val stepTimer = StepSoundTimer()
+                    var lastStepX = Double.NaN
+                    var lastStepZ = Double.NaN
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -488,6 +493,8 @@ object GlView {
                             ),
                         )
                         println("Поставлен блок: $nextX, $nextY, $nextZ")
+                        val (placeSound, placeFallback) = placeEvent(blocks.nameOf(state))
+                        sound.play(placeSound, nextX + 0.5, nextY + 0.5, nextZ + 0.5, placeFallback)
                         session?.send(mcplus.net.PlayerMovement.swingArm())
                         swingNanos = System.nanoTime()
                     }
@@ -498,6 +505,10 @@ object GlView {
                     var lastEntityCount = -1
                     var frame = 0
                     var inventoryOpen = false
+
+                    /** Здоровье и смерть в прошлом кадре — чтобы звук был один раз. */
+                    var lastHealth = Float.NaN
+                    var lastDead = false
 
                     /** Куски блоков от только что сломанных блоков. */
                     class Debris(
@@ -532,6 +543,18 @@ object GlView {
                         // it is open, otherwise the same motion would turn the view.
                         val vitals = session?.vitals
                         val dead = vitals?.dead == true
+                        // Боль и смерть слышны: здоровье падает — звук удара, ноль — смерть.
+                        if (vitals != null) {
+                            val healthNow = vitals.health
+                            if (!lastHealth.isNaN() && healthNow < lastHealth - 0.01f) {
+                                sound.play("entity.player.hurt", player.x, player.y, player.z)
+                            }
+                            if (dead && !lastDead) {
+                                sound.play("entity.player.death", player.x, player.y, player.z)
+                            }
+                            lastHealth = healthNow
+                            lastDead = dead
+                        }
                         val bossBars = session?.bossBars?.snapshot() ?: emptyList()
                         val effects = session?.effects?.snapshot() ?: emptyList()
                         val openContainer = session?.container
@@ -1010,6 +1033,30 @@ object GlView {
                         tracker.tick(input.deltaSeconds)
                         val entities = tracker.snapshot()
 
+                        // Слушатель — в камере, шаги — по пройденному пути и блоку под ногами.
+                        run {
+                            val forward = camera.forward()
+                            val up = camera.up()
+                            sound.updateListener(
+                                camera.x, camera.y, camera.z,
+                                forward[0], forward[1], forward[2],
+                                up[0], up[1], up[2],
+                            )
+                            if (!lastStepX.isNaN()) {
+                                val travelled = kotlin.math.hypot(player.x - lastStepX, player.z - lastStepZ)
+                                if (travelled > 0.01 && stepTimer.advance(travelled)) {
+                                    val ground = blockUnderName(blocks, world, player.x, player.y, player.z)
+                                    sound.play(
+                                        stepEvent(ground),
+                                        player.x, player.y, player.z,
+                                        "block.stone.step",
+                                    )
+                                }
+                            }
+                            lastStepX = player.x
+                            lastStepZ = player.z
+                        }
+
                         // Куски только что сломанных блоков: короткая вспышка вместо пустоты.
                         while (true) {
                             val event = breakEvents.poll() ?: break
@@ -1022,6 +1069,8 @@ object GlView {
                             val bottom = atlas.layerFor(blockName, TextureAtlas.Kind.BOTTOM)
                             val side = atlas.layerFor(blockName, TextureAtlas.Kind.SIDE)
                             val random = java.util.Random(event.x * 31L + event.y * 17L + event.z)
+                            val (breakSound, breakFallback) = breakEvent(blockName)
+                            sound.play(breakSound, event.x + 0.5, event.y + 0.5, event.z + 0.5, breakFallback)
                             repeat(10) {
                                 debris += Debris(
                                     event.x + 0.15 + random.nextDouble() * 0.7,
@@ -1356,6 +1405,8 @@ object GlView {
                         GLFW.glfwPollEvents()
                         frame++
                     }
+                    println("Звук: событий ${sound.events}, доступен ${sound.available}, сыграно ${sound.played} из ${sound.requested}")
+                    sound.close()
                     entityRenderer.close()
                     mobRenderer.close()
                     zombieRenderer.close()
@@ -1368,6 +1419,7 @@ object GlView {
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
                     println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}")
                     println("Игроков в списке: ${playerList.size}")
+                    println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available})")
                 }
             }
         } finally {

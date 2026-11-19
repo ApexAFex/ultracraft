@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.zip.ZipFile
 import javax.imageio.ImageIO
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Files taken from the player's own Minecraft installation.
@@ -42,6 +43,44 @@ object GameFiles {
             return image.toRgba()
         }
         return null
+    }
+
+    /** Reads one binary file (OGG sound) from the newest jar that has it. */
+    fun readBytes(directory: File?, path: String): ByteArray? {
+        val root = directory ?: minecraftDirectory() ?: return null
+        for (jar in versionJars(root)) {
+            val bytes = runCatching {
+                ZipFile(jar).use { zip ->
+                    val entry = zip.getEntry(path) ?: return@use null
+                    zip.getInputStream(entry).readBytes()
+                }
+            }.getOrNull() ?: continue
+            return bytes
+        }
+        return null
+    }
+
+    /**
+     * Reads one asset by its index name (`minecraft/sounds.json`).
+     *
+     * Modern Minecraft keeps sounds and most assets in `assets/objects`, not in the version
+     * jar; the mapping lives in `assets/indexes/<id>.json`. The launcher normally downloads
+     * them, so an incomplete installation simply returns null.
+     */
+    fun readAsset(directory: File?, path: String): ByteArray? {
+        val root = directory ?: minecraftDirectory() ?: return null
+        val index = File(root, "assets/indexes").listFiles { file -> file.extension == "json" }
+            ?.maxByOrNull { it.lastModified() }
+            ?: return null
+        val objects = runCatching {
+            kotlinx.serialization.json.Json.parseToJsonElement(index.readText())
+                .jsonObject["objects"]?.jsonObject
+        }.getOrNull() ?: return null
+        val hash = objects[path]?.jsonObject?.get("hash")
+            ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+            ?: return null
+        val file = File(root, "assets/objects/${hash.take(2)}/$hash")
+        return if (file.isFile) file.readBytes() else null
     }
 
     /** Reads one text file (JSON, mcmeta) from the newest jar that has it. */
