@@ -218,7 +218,10 @@ class MeshBuilderTest {
                     "17\toak_sign\trotation=0,waterlogged=false\n" +
                     "18\toak_wall_sign\tfacing=north,waterlogged=false\n" +
                     "19\twhite_banner\trotation=0\n" +
-                    "20\twhite_wall_banner\tfacing=south\n",
+                    "20\twhite_wall_banner\tfacing=south\n" +
+                    "21\twheat\tage=0\n" +
+                    "22\twheat\tage=7\n" +
+                    "23\tcarrots\tage=3\n",
             )
         },
     )
@@ -227,7 +230,7 @@ class MeshBuilderTest {
         listOf(
             "air", "stone", "oak_slab", "oak_stairs", "oak_fence", "oak_door",
             "torch", "oak_trapdoor", "white_carpet", "snow", "cobblestone_wall", "short_grass",
-            "oak_planks", "white_wool",
+            "oak_planks", "white_wool", "wheat_stage0", "wheat_stage7", "carrots_stage3",
         ),
     )
 
@@ -443,6 +446,27 @@ class MeshBuilderTest {
         val xs = axisValues(shapeMesh(world), 0)
         assertEquals(1f / 16f, xs.min(), 0.001f)
         assertEquals(15f / 16f, xs.max(), 0.001f)
+    }
+
+    @Test
+    fun `a young crop is shorter than a ripe one`() {
+        val young = world().also { it.add(chunkWith(intArrayOf(0, 48, 0) to 21)) }
+        val ripe = world().also { it.add(chunkWith(intArrayOf(0, 48, 0) to 22)) }
+
+        val youngTop = axisValues(shapeMesh(young), 1).max()
+        val ripeTop = axisValues(shapeMesh(ripe), 1).max()
+        assertEquals(48.2f, youngTop, 0.001f)
+        assertEquals(49f, ripeTop, 0.001f)
+        // Оба — крест из двух плоскостей, а не куб.
+        assertEquals(12, shapeMesh(young).vertexCount)
+    }
+
+    @Test
+    fun `a crop texture follows its age`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 23))
+        // У моркови три стадии: age=3 — последняя.
+        assertEquals(48f + 0.8f, axisValues(shapeMesh(world), 1).max(), 0.001f)
     }
 }
 

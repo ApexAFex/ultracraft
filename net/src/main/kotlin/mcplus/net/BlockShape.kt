@@ -54,7 +54,12 @@ sealed interface BlockShape {
      * Растение крестом: две диагональные плоскости. [texture] — имя файла текстуры
      * (у высоких растений верх и низ разные), [tinted] — красится ли биомом.
      */
-    data class Cross(val texture: String, val tinted: Boolean) : BlockShape
+    data class Cross(
+        val texture: String,
+        val tinted: Boolean,
+        /** Высота растения в клетке: у ростков пшеницы она меньше, чем у спелой. */
+        val height: Float = 1f,
+    ) : BlockShape
 
     /** Факел: [wall] — сторона, на которой он висит, или null для стоящего на полу. */
     data class Torch(val wall: ShapeDirection? = null) : BlockShape
@@ -156,6 +161,11 @@ sealed interface BlockShape {
 
                 name in CROSS_PLANTS -> Cross(crossTexture(name, values["half"]), name in TINTED_PLANTS)
 
+                name in CROPS -> {
+                    val age = values["age"]?.toIntOrNull() ?: 0
+                    Cross(cropTexture(name, age), false, cropHeight(name, age))
+                }
+
                 // Таблички и знамёна: доска у стены или столб с доской. Наклон стоящей
                 // таблички (16 поворотов) пока не учитывается — доска смотрит на юг.
                 name.endsWith("_wall_sign") ->
@@ -185,6 +195,31 @@ sealed interface BlockShape {
         private val TINTED_PLANTS = setOf(
             "short_grass", "tall_grass", "fern", "large_fern", "sugar_cane",
         )
+
+        /** Посевы: у них текстура зависит от стадии роста `age`. */
+        val CROPS = setOf(
+            "wheat", "carrots", "potatoes", "beetroots", "nether_wart",
+            "torchflower_crop", "melon_stem", "pumpkin_stem",
+        )
+
+        /** Имя текстуры посева по стадии: `wheat_stage3`, `carrots_stage2`. */
+        private fun cropTexture(name: String, age: Int): String = when (name) {
+            "wheat" -> "wheat_stage${age.coerceIn(0, 7)}"
+            "carrots", "potatoes", "beetroots" -> "${name}_stage${age.coerceIn(0, 3)}"
+            "nether_wart" -> "nether_wart_stage${age.coerceIn(0, 2)}"
+            "torchflower_crop" -> "torchflower_crop_stage${age.coerceIn(0, 1)}"
+            "melon_stem" -> "melon_stem_stage${age.coerceIn(0, 7)}"
+            "pumpkin_stem" -> "pumpkin_stem_stage${age.coerceIn(0, 7)}"
+            else -> name
+        }
+
+        /** Чем старше посев, тем выше крест: от четверти клетки до полной. */
+        private fun cropHeight(name: String, age: Int): Float = when (name) {
+            "wheat" -> 0.2f + age.coerceIn(0, 7) / 7f * 0.8f
+            "carrots", "potatoes", "beetroots" -> 0.25f + age.coerceIn(0, 3) / 3f * 0.55f
+            "nether_wart" -> 0.3f + age.coerceIn(0, 2) / 2f * 0.4f
+            else -> 0.2f + age.coerceIn(0, 7) / 7f * 0.6f
+        }
 
         /** У высоких растений верх и низ — разные текстуры. */
         private fun crossTexture(name: String, half: String?): String = when {

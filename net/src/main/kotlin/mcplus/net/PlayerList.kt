@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 class PlayerList {
 
     private val names = ConcurrentHashMap<UUID, String>()
+    private val latency = ConcurrentHashMap<UUID, Int>()
 
     val size: Int get() = names.size
 
@@ -28,6 +29,10 @@ class PlayerList {
 
     /** Имена игроков для табло (Tab). */
     fun names(): List<String> = names.values.sorted()
+
+    /** Имена с задержкой из `Player Info Update`; null — сервер ещё не присылал её. */
+    fun namesWithLatency(): List<Pair<String, Int?>> =
+        names.entries.sortedBy { it.value }.map { (uuid, name) -> name to latency[uuid] }
 
     /** @return true when the packet was understood. */
     fun onPacket(packetId: Int, body: ByteArray): Boolean = when (packetId) {
@@ -49,10 +54,11 @@ class PlayerList {
         val count = reader.readVarInt()
         if (count < 0 || count > 1024) return false
 
-        val entries = ArrayList<Pair<UUID, String?>>(count)
+        val entries = ArrayList<Triple<UUID, String?, Int?>>(count)
         repeat(count) {
             val uuid = reader.readUuid()
             var name: String? = null
+            var ping: Int? = null
 
             if (actions and ADD_PLAYER != 0) {
                 name = reader.readString(16)
@@ -72,20 +78,21 @@ class PlayerList {
             }
             if (actions and UPDATE_GAME_MODE != 0) reader.readVarInt()
             if (actions and UPDATE_LISTED != 0) reader.readVarInt()
-            if (actions and UPDATE_LATENCY != 0) reader.readVarInt()
+            if (actions and UPDATE_LATENCY != 0) ping = reader.readVarInt()
             if (actions and UPDATE_DISPLAY_NAME != 0 && reader.readBoolean()) {
                 NbtReader.read(reader) // custom name component, unused for now
             }
             if (actions and UPDATE_LIST_ORDER != 0) reader.readVarInt()
             if (actions and UPDATE_HAT != 0) reader.readBoolean()
 
-            entries += uuid to name
+            entries += Triple(uuid, name, ping)
         }
 
         // Only touch the map once the whole packet decoded: a half-read list is worse than
         // no update at all.
-        for ((uuid, name) in entries) {
+        for ((uuid, name, ping) in entries) {
             if (name != null) names[uuid] = name
+            if (ping != null) latency[uuid] = ping
         }
         return true
     }

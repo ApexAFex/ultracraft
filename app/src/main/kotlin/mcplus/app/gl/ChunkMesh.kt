@@ -266,7 +266,7 @@ object MeshBuilder {
 
         fun vertex(px: Float, py: Float, pz: Float, u: Float, v: Float) {
             data.add(x + px)
-            data.add(y + py)
+            data.add(y + py * shape.height)
             data.add(z + pz)
             data.add(1f)
             data.add(light)
@@ -651,8 +651,7 @@ object MeshBuilder {
      * имени блока, поэтому крест получился бы клетчатым.
      */
     private val UNMESHED = setOf(
-        "wheat", "carrots", "potatoes", "beetroots", "torchflower_crop", "pitcher_crop",
-        "melon_stem", "pumpkin_stem", "nether_wart", "cave_vines", "cave_vines_plant",
+        "pitcher_crop", "cave_vines", "cave_vines_plant",
     )
 
     /**

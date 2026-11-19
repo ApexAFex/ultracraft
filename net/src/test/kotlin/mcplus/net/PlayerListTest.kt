@@ -79,6 +79,24 @@ class PlayerListTest {
     }
 
     @Test
+    fun `latency is kept for the tab list`() {
+        val list = PlayerList()
+        list.onPacket(Protocol777.Play.PLAYER_INFO, joinPacket())
+        assertEquals(0, list.namesWithLatency().single().second)
+
+        val latency = ByteWriter()
+            .writeByte(0x10)      // only UPDATE_LATENCY
+            .writeVarInt(1)
+            .writeUuid(sid)
+            .writeVarInt(42)
+            .toByteArray()
+        list.onPacket(Protocol777.Play.PLAYER_INFO, latency)
+
+        assertEquals("probe2", list.namesWithLatency().single().first)
+        assertEquals(42, list.namesWithLatency().single().second)
+    }
+
+    @Test
     fun `other packets are left alone`() {
         val list = PlayerList()
 

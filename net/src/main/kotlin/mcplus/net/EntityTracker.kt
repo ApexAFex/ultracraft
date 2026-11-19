@@ -110,6 +110,15 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     val sneaking: Boolean
         get() = meta[POSE_FIELD]?.number?.toInt() == POSE_SNEAKING
 
+    /** Экипировка из `Set Equipment`: номер слота → id предмета (0 — пусто). */
+    private val equipment = ConcurrentHashMap<Int, Int>()
+
+    fun equipmentItem(slot: Int): Int = equipment[slot] ?: 0
+
+    fun applyEquipment(slot: Int, itemId: Int) {
+        if (itemId > 0) equipment[slot] = itemId else equipment.remove(slot)
+    }
+
     fun applyMetadata(values: Map<Int, MetaEntry>) {
         if (values.isNotEmpty()) meta = values
     }
@@ -243,6 +252,11 @@ class EntityTracker {
                 return true
             }
 
+            Protocol777.Play.SET_EQUIPMENT -> {
+                runCatching { readEquipment(packet.body) }
+                return true
+            }
+
             Protocol777.Play.ANIMATE -> {
                 runCatching {
                     val reader = ByteReader(packet.body)
@@ -266,6 +280,24 @@ class EntityTracker {
             }
 
             else -> return false
+        }
+    }
+
+    /**
+     * `Set Equipment` (0x68): номер сущности, затем пары «слот, предмет». Старший бит байта
+     * слота означает «дальше есть ещё», младшие семь — номер слота (0 — основная рука).
+     */
+    private fun readEquipment(body: ByteArray) {
+        val reader = ByteReader(body)
+        val id = reader.readVarInt()
+        val entity = entities[id] ?: return
+        var guard = 0
+        while (guard++ < 16) {
+            val slotByte = reader.readByte().toInt() and 0xFF
+            val slot = slotByte and 0x7F
+            val stack = readMenuStackOrUnknown(reader)
+            entity.applyEquipment(slot, stack?.itemId ?: 0)
+            if (slotByte and 0x80 == 0) break
         }
     }
 

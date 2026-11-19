@@ -1807,6 +1807,28 @@ object GlView {
                                         0.8f, "rain", 0.14f,
                                     )
                                 }
+                                // Всплески на земле: ищем твёрдый блок под случайной точкой.
+                                repeat(3) {
+                                    val splashX = kotlin.math.floor(player.x).toInt() + (Math.random() * 12 - 6).toInt()
+                                    val splashZ = kotlin.math.floor(player.z).toInt() + (Math.random() * 12 - 6).toInt()
+                                    var groundY = kotlin.math.floor(player.y).toInt() + 2
+                                    var found = false
+                                    while (groundY > kotlin.math.floor(player.y).toInt() - 5) {
+                                        val state = world.blockAt(splashX, groundY, splashZ)
+                                        if (state != 0 && state != World.UNKNOWN) {
+                                            found = true
+                                            break
+                                        }
+                                        groundY--
+                                    }
+                                    if (found) {
+                                        particles += ParticlePiece(
+                                            splashX + 0.5, groundY + 1.02, splashZ + 0.5,
+                                            0.0, 0.35, 0.0,
+                                            0.3f, "splash", 0.12f,
+                                        )
+                                    }
+                                }
                             }
                         }
                         if (entities.size != lastEntityCount) {
@@ -1959,6 +1981,40 @@ object GlView {
                                         scale = MobModels.scaleOf(name),
                                         texture = mobRenderer.textureFor(name),
                                         hurt = entity.hurtProgress(System.nanoTime()),
+                                    )
+                                }
+                            }
+
+                            // Что держит сущность: `Set Equipment` (0x68) даёт id предмета.
+                            // Блок рисуется кубом у правой руки, инструмент — иконкой.
+                            val heldId = entity.equipmentItem(0)
+                            val heldName = if (heldId > 0) itemTable.nameOf(heldId) else null
+                            if (heldName != null) {
+                                val typeName = entityTypes.nameOf(entity.type)
+                                val isHumanoid = playerList.nameOf(entity.uuid) != null ||
+                                    typeName in ZOMBIE_TYPES || typeName in SKELETON_TYPES ||
+                                    typeName in ENDERMAN_TYPES || typeName in PIGLIN_TYPES
+                                val height = if (isHumanoid) 1.8f else EntityRay.boxOf(typeName).second
+                                val yawRad = Math.toRadians(entity.yaw.toDouble())
+                                val forwardX = kotlin.math.sin(yawRad).toFloat()
+                                val forwardZ = kotlin.math.cos(yawRad).toFloat()
+                                val side = if (isHumanoid) 0.36f else 0.12f
+                                val ahead = if (isHumanoid) 0.26f else 0.42f
+                                val handX = entity.x + forwardX * ahead - forwardZ * side
+                                val handZ = entity.z + forwardZ * ahead + forwardX * side
+                                val handY = entity.y + height * 0.55
+                                val blockState = blocks.firstStateOf(heldName) ?: 0
+                                if (blockState != 0) {
+                                    cubes += Renderer.BlockCube(
+                                        handX, handY, handZ, 0.28f,
+                                        atlas.layerFor(heldName, TextureAtlas.Kind.TOP),
+                                        atlas.layerFor(heldName, TextureAtlas.Kind.BOTTOM),
+                                        atlas.layerFor(heldName, TextureAtlas.Kind.SIDE),
+                                        yaw = -yawRad.toFloat() + 0.5f,
+                                    )
+                                } else {
+                                    worldIcons += Renderer.WorldIcon(
+                                        handX, handY, handZ, 0.3f, atlas.layerForItem(heldName),
                                     )
                                 }
                             }
@@ -2279,7 +2335,11 @@ object GlView {
                             )
                         }
                         if (showTab || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_TAB) == GLFW.GLFW_PRESS) {
-                            hud.drawTabList(playerList.names())
+                            hud.drawTabList(
+                                playerList.namesWithLatency().map { (name, ping) ->
+                                    if (ping != null && ping >= 0) "$name  $ping ms" else name
+                                },
+                            )
                         }
 
                         // Табло сервера и меню паузы — поверх HUD.
