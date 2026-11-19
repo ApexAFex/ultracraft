@@ -46,6 +46,9 @@ class Input(private val window: Long, private val camera: Camera) {
     private var backspacePressed = false
     private var upPressed = false
     private var downPressed = false
+    private var pageUpPressed = false
+    private var pageDownPressed = false
+    private var hudKeyPressed = false
     private var mouseWasDown = false
 
     /** Символы, набранные с клавиатуры с прошлого кадра (то, что печатает человек). */
@@ -90,6 +93,17 @@ class Input(private val window: Long, private val camera: Camera) {
         private set
 
     var historyDownRequested: Boolean = false
+        private set
+
+    /** Прокрутка чата: PageUp — старые строки, PageDown — к свежим. */
+    var chatScrollUpRequested: Boolean = false
+        private set
+
+    var chatScrollDownRequested: Boolean = false
+        private set
+
+    /** F1 прячет HUD и предмет в руке. */
+    var hudToggleRequested: Boolean = false
         private set
 
     /** Set once when the left mouse button goes down inside the inventory screen. */
@@ -138,6 +152,13 @@ class Input(private val window: Long, private val camera: Camera) {
         val text = typedBuffer.toString()
         typedBuffer.setLength(0)
         return text
+    }
+
+    /** Переставляет курсор (для демо-снимков и подсказок). */
+    fun warpCursor(x: Double, y: Double) {
+        GLFW.glfwSetCursorPos(window, x, y)
+        mouseX = x
+        mouseY = y
     }
 
     fun update() {
@@ -197,6 +218,18 @@ class Input(private val window: Long, private val camera: Camera) {
         val arrowDown = pressed(GLFW.GLFW_KEY_DOWN)
         historyDownRequested = arrowDown && !downPressed
         downPressed = arrowDown
+
+        val pageUp = pressed(GLFW.GLFW_KEY_PAGE_UP)
+        chatScrollUpRequested = pageUp && !pageUpPressed
+        pageUpPressed = pageUp
+
+        val pageDown = pressed(GLFW.GLFW_KEY_PAGE_DOWN)
+        chatScrollDownRequested = pageDown && !pageDownPressed
+        pageDownPressed = pageDown
+
+        val hudKey = pressed(GLFW.GLFW_KEY_F1)
+        hudToggleRequested = hudKey && !hudKeyPressed
+        hudKeyPressed = hudKey
 
         // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
         // a frame-by-frame repeat would send a packet per frame.

@@ -339,6 +339,7 @@ object GlView {
                     val hud = Hud(
                         HudRenderer(hudSprites, textures, width, height),
                         textRenderer, atlas, width, height,
+                        itemStats = session?.itemStatsTable ?: mcplus.net.ItemStats.EMPTY,
                     )
                     // Небо: своя маленькая текстура (солнце, фазы луны, облака).
                     val skyTextures = SkyTextures.load(directory)
@@ -556,6 +557,10 @@ object GlView {
                     var lastHealth = Float.NaN
                     var lastDead = false
 
+                    /** Прокрутка чата (PageUp/PageDown) и скрытый F1 интерфейс. */
+                    var chatScroll = 0
+                    var hudHidden = false
+
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
 
@@ -655,6 +660,9 @@ object GlView {
                             if (openContainer != null) session?.closeContainer()
                             else inventoryOpen = !inventoryOpen
                         }
+                        if (input.hudToggleRequested && !chat.open) {
+                            hudHidden = !hudHidden
+                        }
                         if (input.escapeRequested) {
                             when {
                                 chat.open -> chat.close()
@@ -668,6 +676,13 @@ object GlView {
                         // Чат: T открывает строку, «/» — команду. Пока строка открыта, клавиши
                         // становятся текстом, поэтому движение и хотбар ниже отключаются.
                         if (chat.open) {
+                            // PageUp листает историю вверх, PageDown — обратно к свежим строкам.
+                            if (input.chatScrollUpRequested) {
+                                chatScroll = minOf(chatScroll + 5, session?.chat?.size ?: 0)
+                            }
+                            if (input.chatScrollDownRequested) {
+                                chatScroll = maxOf(0, chatScroll - 5)
+                            }
                             if (input.enterRequested) {
                                 val line = chat.submit()
                                 if (line != null) {
@@ -681,6 +696,7 @@ object GlView {
                             val typed = input.takeTyped()
                             for (character in typed) chat.type(character)
                         } else {
+                            chatScroll = 0
                             // Набранное при закрытой строке никуда не идёт: иначе «t», которой
                             // открыли чат, тут же оказалась бы первой буквой сообщения.
                             input.takeTyped()
@@ -1423,15 +1439,21 @@ object GlView {
                         // the dragged stack are all drawn on the same world-space panel.
                         val inventory = session?.inventory
                         if (openContainer != null && inventory != null) {
+                            // Интерфейс не должен прятаться за блоком, если камера внутри него.
+                            GL30.glDisable(GL30.GL_DEPTH_TEST)
                             ContainerScreen.draw(
                                 camera, openContainer, inventory, renderer, textRenderer, atlas,
                                 input.mouseX, input.mouseY, width, height,
                             )
+                            GL30.glEnable(GL30.GL_DEPTH_TEST)
                         } else if (inventory != null && inventoryOpen) {
+                            GL30.glDisable(GL30.GL_DEPTH_TEST)
                             InventoryScreen.draw(
                                 camera, inventory, renderer, textRenderer, atlas,
                                 input.mouseX, input.mouseY, width, height,
                             )
+                            hud.drawInventoryOverlay(inventory, input.mouseX, input.mouseY)
+                            GL30.glEnable(GL30.GL_DEPTH_TEST)
                         }
 
                         // Предмет в руке: блок — настоящим мини-кубом с лёгким наклоном,
@@ -1479,22 +1501,23 @@ object GlView {
                             val chatLines = session?.chat?.snapshot() ?: emptyList()
                             if (chat.open) {
                                 // Пока печатаешь, хотбар и сердца уступают место строке ввода.
-                                hud.drawChat(chatLines, System.nanoTime())
+                                hud.drawChat(chatLines, System.nanoTime(), chatScroll)
                                 hud.drawChatInput(chat.text)
-                            } else {
+                            } else if (!hudHidden) {
                                 hud.draw(
-                            inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
-                            durability = session?.heldDurability(),
-                        )
+                                    inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
+                                    durability = session?.heldDurability(),
+                                )
 
-                        // Красная вспышка при уроне: гаснет за 0,4 секунды.
-                        if (damageFlashNanos != 0L) {
-                            val age = (System.nanoTime() - damageFlashNanos) / 400_000_000.0
-                            if (age in 0.0..1.0) {
-                                hud.drawDamageFlash((1.0 - age).toFloat())
+                                // Красная вспышка при уроне: гаснет за 0,4 секунды.
+                                if (damageFlashNanos != 0L) {
+                                    val age = (System.nanoTime() - damageFlashNanos) / 400_000_000.0
+                                    if (age in 0.0..1.0) {
+                                        hud.drawDamageFlash((1.0 - age).toFloat())
+                                    }
+                                }
                             }
                         }
-
                         // Отладка и табло: по флагу (для снимков) или по клавише Tab.
                         if (debug) {
                             hud.drawDebug(
@@ -1509,9 +1532,6 @@ object GlView {
                         }
                         if (showTab || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_TAB) == GLFW.GLFW_PRESS) {
                             hud.drawTabList(playerList.names())
-                        }
-                                hud.drawChat(chatLines, System.nanoTime())
-                            }
                         }
 
                         // Cracks on the block being mined: ten stages, like vanilla.

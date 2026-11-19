@@ -4,8 +4,10 @@ import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
 import mcplus.net.ChatLine
 import mcplus.net.Inventory
+import mcplus.net.ItemStats
 import mcplus.net.Vitals
 import java.io.Closeable
+import kotlin.math.abs
 import kotlin.math.floor
 
 /**
@@ -21,6 +23,7 @@ class Hud(
     private val atlas: TextureAtlas,
     private val width: Int,
     private val height: Int,
+    private val itemStats: ItemStats = ItemStats.EMPTY,
 ) : Closeable {
 
     fun draw(
@@ -104,6 +107,82 @@ class Hud(
     fun respawnButton(): HudRect = HudLayout.respawnButton(width, height)
 
     /**
+     * Подписи поверх открытого инвентаря: количество в стопке, полоска износа и подсказка
+     * с названием предмета под курсором. Рисуется в экранных координатах, потому что панель
+     * инвентаря живёт в мире, а цифры должны быть пиксельными.
+     */
+    fun drawInventoryOverlay(inventory: Inventory, mouseX: Double, mouseY: Double) {
+        val text = this.text ?: return
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        var hoveredName: String? = null
+        var hoverX = 0f
+        var hoverY = 0f
+
+        val (firstX, firstY) = InventoryScreen.screenPointOf(InventoryScreen.cells[0], width, height)
+        val (nextX, _) = InventoryScreen.screenPointOf(InventoryScreen.cells[1], width, height)
+        val slotPixels = abs(nextX - firstX).toFloat()
+        val scale = (slotPixels / 20f).coerceIn(0.7f, 2.0f)
+        if (slotPixels <= 1f) return
+
+        for (cell in InventoryScreen.cells) {
+            val stack = inventory.menuSlot(cell.menuSlot) ?: continue
+            if (!stack.isKnown) continue
+            val (screenX, screenY) = InventoryScreen.screenPointOf(cell, width, height)
+            val px = screenX.toFloat()
+            val py = screenY.toFloat()
+            if (stack.count > 1) {
+                labels += TextRenderer.ScreenLabel(
+                    px + slotPixels * 0.4f,
+                    py + slotPixels * 0.1f,
+                    stack.count.toString(),
+                    scale,
+                )
+            }
+            val max = itemStats.of(stack.itemId)?.maxDamage ?: 0
+            if (max > 0 && stack.damage > 0) {
+                val fraction = ((max - stack.damage).toFloat() / max).coerceIn(0f, 1f)
+                val barX = (px - slotPixels / 2 + 2f)
+                val barY = (py + slotPixels / 2 - 4f)
+                val color = when {
+                    fraction > 0.5f -> 0x35C035
+                    fraction > 0.25f -> 0xD0C020
+                    else -> 0xD03020
+                }
+                renderer.begin()
+                renderer.rect(barX, barY, slotPixels - 4f, 3f, 0x101010, 0.85f)
+                renderer.rect(barX, barY, (slotPixels - 4f) * fraction, 3f, color, 0.95f)
+                renderer.draw()
+            }
+            if (mouseX >= px - slotPixels / 2 && mouseX <= px + slotPixels / 2 &&
+                mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
+            ) {
+                hoveredName = inventory.nameOf(stack)
+                hoverX = mouseX.toFloat()
+                hoverY = mouseY.toFloat()
+            }
+        }
+
+        if (labels.isNotEmpty()) text.drawScreen(labels)
+        hoveredName?.let { drawTooltip(it, hoverX, hoverY) }
+    }
+
+    /** Подсказка с названием предмета рядом с курсором, с зажимом по краям экрана. */
+    fun drawTooltip(value: String, mouseX: Float, mouseY: Float) {
+        val text = this.text ?: return
+        val scale = 1.5f
+        val textWidth = text.textWidth(value, scale)
+        val textHeight = 9f * scale
+        var left = mouseX + 8f
+        var top = mouseY + 8f
+        if (left + textWidth + 6f > width) left = mouseX - textWidth - 10f
+        if (top + textHeight + 4f > height) top = mouseY - textHeight - 8f
+        renderer.begin()
+        renderer.rect(left - 3f, top - 2f, textWidth + 6f, textHeight + 4f, 0x100010, 0.9f)
+        renderer.draw()
+        text.drawScreen(listOf(TextRenderer.ScreenLabel(left, top, value, scale)))
+    }
+
+    /**
      * Список игроков по Tab: тёмная панель по центру сверху.
      *
      * Ширина панели считается по самой длинной строке, поэтому короткие имена не растягивают
@@ -157,7 +236,7 @@ class Hud(
      * Как в ванили, старые сообщения гаснут: полностью видны 8 секунд, за следующие две
      * исчезают. Каждая строка рисуется своим проходом, потому что у неё своя прозрачность.
      */
-    fun drawChat(lines: List<ChatLine>, nowNanos: Long) {
+    fun drawChat(lines: List<ChatLine>, nowNanos: Long, scroll: Int = 0) {
         val text = this.text ?: return
         if (lines.isEmpty()) return
         val s = HudLayout.scale(height).toFloat()
@@ -165,8 +244,9 @@ class Hud(
         val maxWidth = minOf(width * 0.6f, 400f * s)
         var y = bar.y - 30f * s
         var drawn = 0
+        val visible = if (scroll <= 0) lines else lines.dropLast(scroll.coerceAtMost(lines.size))
 
-        for (line in lines.takeLast(CHAT_LINES).asReversed()) {
+        for (line in visible.takeLast(CHAT_LINES).asReversed()) {
             if (drawn++ >= CHAT_LINES) break
             val alpha = chatAlpha(line.atNanos, nowNanos)
             if (alpha <= 0.01f) continue

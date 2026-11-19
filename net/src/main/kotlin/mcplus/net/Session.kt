@@ -294,6 +294,9 @@ class Session internal constructor(
         for (packet in ContainerClicks.drag(menuSlots, button, id)) send(packet)
     }
 
+    /** Таблица предметов (прочность, броня) для HUD и экранов. */
+    val itemStatsTable: ItemStats get() = itemStats
+
     /** Остаток и максимум прочности предмета в руке, если он изношен. */
     fun heldDurability(): Pair<Int, Int>? {
         val stack = inventory.held() ?: return null
