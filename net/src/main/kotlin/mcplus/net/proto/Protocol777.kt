@@ -78,6 +78,11 @@ object Protocol777 {
         const val BLOCK_UPDATE: Int = 0x08
         /** Частицы мира: дым, огонь, искры, брызги. */
         const val LEVEL_PARTICLES: Int = 0x30
+        /** Табло сервера: цели, очки и выбранная боковая панель. */
+        const val SET_OBJECTIVE: Int = 0x6C
+        const val SET_SCORE: Int = 0x70
+        const val SET_DISPLAY_OBJECTIVE: Int = 0x64
+        const val RESET_SCORE: Int = 0x50
         const val ACKNOWLEDGE_BLOCK_CHANGE: Int = 0x04
         const val KEEP_ALIVE: Int = 0x2D
         const val LOGIN: Int = 0x32

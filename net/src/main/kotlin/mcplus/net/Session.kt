@@ -31,6 +31,9 @@ class Session internal constructor(
     private val menuTable: MenuTable = MenuTable.EMPTY,
 ) : Closeable {
 
+    /** Табло сервера: цели и очки, выбранная боковая панель. */
+    val scoreboard = Scoreboard()
+
     var playerPosition: PlayerPosition? = null
         private set
 
@@ -174,6 +177,12 @@ class Session internal constructor(
                     sky.onPacket(packet.id, packet.body) { joinResult.registries.worldClock(it) }
 
                 Protocol777.Play.BOSS_EVENT -> bossBars.onPacket(packet.body)
+
+                Protocol777.Play.SET_OBJECTIVE,
+                Protocol777.Play.SET_SCORE,
+                Protocol777.Play.SET_DISPLAY_OBJECTIVE,
+                Protocol777.Play.RESET_SCORE ->
+                    scoreboard.onPacket(packet.id, packet.body)
 
                 Protocol777.Play.SYNCHRONIZE_POSITION -> confirmTeleport(packet)
 

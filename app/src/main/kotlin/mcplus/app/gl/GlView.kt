@@ -147,6 +147,8 @@ object GlView {
         showTab: Boolean = false,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
         particleDemo: Boolean = false,
+        /** Открыть меню паузы сразу (для снимка). */
+        pauseAtStart: Boolean = false,
         /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
         /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
@@ -565,6 +567,10 @@ object GlView {
                     var chatScroll = 0
                     var hudHidden = false
 
+                    /** Меню паузы (Escape) и таймер звуков мобов. */
+                    var paused = pauseAtStart
+                    var ambientNanos = 0L
+
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
 
@@ -667,7 +673,7 @@ object GlView {
                         if (input.hudToggleRequested && !chat.open) {
                             hudHidden = !hudHidden
                         }
-                        if (!chat.open && !inventoryOpen && openContainer == null) {
+                        if (!chat.open && !inventoryOpen && openContainer == null && !paused) {
                             if (input.dropRequested) session?.send(mcplus.net.PlayerMovement.drop(all = false))
                             if (input.dropStackRequested) session?.send(mcplus.net.PlayerMovement.drop(all = true))
                         }
@@ -677,7 +683,8 @@ object GlView {
                                 openContainer != null -> session?.closeContainer()
                                 inventoryOpen -> inventoryOpen = false
                                 dead -> Unit
-                                else -> GLFW.glfwSetWindowShouldClose(window, true)
+                                paused -> paused = false
+                                else -> paused = true
                             }
                         }
 
@@ -1025,7 +1032,7 @@ object GlView {
                                 floor(player.x).toInt() shr 4,
                                 floor(player.z).toInt() shr 4,
                             )
-                            if (ready) {
+                            if (ready && !paused) {
                                 // Пока открыта строка чата, буквы — это текст, а не движение.
                                 player.move(
                                     TICK_SECONDS, world, blocks,
@@ -1180,6 +1187,24 @@ object GlView {
                             }
                             lastStepX = player.x
                             lastStepZ = player.z
+
+                            // Звуки мобов: раз в несколько секунд ближайший живой подаёт голос.
+                            val now = System.nanoTime()
+                            if (sound.available && now - ambientNanos > 4_000_000_000L) {
+                                ambientNanos = now
+                                val nearby = entities.filter { entity ->
+                                    val name = entityTypes.nameOf(entity.type)
+                                    EntityRay.isLiving(name) && name != "player" &&
+                                        (entity.x - player.x) * (entity.x - player.x) +
+                                        (entity.z - player.z) * (entity.z - player.z) < 256.0
+                                }
+                                nearby.randomOrNull()?.let { entity ->
+                                    sound.play(
+                                        "entity.${entityTypes.nameOf(entity.type)}.ambient",
+                                        entity.x, entity.y + 0.8, entity.z,
+                                    )
+                                }
+                            }
                         }
 
                         // Дальние чанки выгружаются: иначе память растёт всю игру.
@@ -1271,6 +1296,28 @@ object GlView {
                                 piece.z += piece.vz * debrisDelta
                                 piece.life -= debrisDelta
                                 if (piece.life <= 0f) iterator.remove()
+                            }
+                        }
+
+                        // Снег в холодном биоме: те же спрайты, что у частиц, но свои.
+                        val raining = (session?.sky?.rain ?: 0f) > 0f
+                        if (raining) {
+                            val biomeId = world.biomeAt(
+                                kotlin.math.floor(player.x).toInt(),
+                                kotlin.math.floor(player.y).toInt(),
+                                kotlin.math.floor(player.z).toInt(),
+                            )
+                            val biomeName = biomeNames.getOrNull(biomeId) ?: ""
+                            if ("snow" in biomeName || "frozen" in biomeName || "ice" in biomeName) {
+                                repeat(2) {
+                                    particles += ParticlePiece(
+                                        player.x + (Math.random() - 0.5) * 12,
+                                        player.y + 3 + Math.random() * 5,
+                                        player.z + (Math.random() - 0.5) * 12,
+                                        0.1, -1.2, 0.1,
+                                        2.2f, "snowflake", 0.12f,
+                                    )
+                                }
                             }
                         }
                         if (entities.size != lastEntityCount) {
@@ -1453,6 +1500,14 @@ object GlView {
                             val (_, boxHeight, _) = EntityRay.boxOf(entityTypes.nameOf(entity.type))
                             labels += TextRenderer.Label(entity.x, entity.y + boxHeight + 0.35, entity.z, custom)
                         }
+                        // Количество в выпавшей стопке.
+                        for (entity in entities) {
+                            if (entityTypes.nameOf(entity.type) != "item") continue
+                            val count = entity.droppedItem?.itemCount ?: continue
+                            if (count > 1) {
+                                labels += TextRenderer.Label(entity.x, entity.y + 0.55, entity.z, "×$count")
+                            }
+                        }
 
                         if (demo) {
                             // The self-test needs a tag it can read: the nearest player is usually
@@ -1581,6 +1636,22 @@ object GlView {
                             hud.drawTabList(playerList.names())
                         }
 
+                        // Табло сервера и меню паузы — поверх HUD.
+                        val board = session?.scoreboard?.sidebarLines()
+                        if (!hudHidden && board != null) {
+                            hud.drawScoreboard(board.first, board.second)
+                        }
+                        if (paused) {
+                            val buttons = hud.drawPauseMenu()
+                            if (input.clickRequested) {
+                                when {
+                                    buttons[0].contains(input.mouseX, input.mouseY) -> paused = false
+                                    buttons[1].contains(input.mouseX, input.mouseY) ->
+                                        GLFW.glfwSetWindowShouldClose(window, true)
+                                }
+                            }
+                        }
+
                         // Cracks on the block being mined: ten stages, like vanilla.
                         if (mining) {
                             val stage = ((miningTicks * 10) / miningNeeded).coerceIn(0, 9)
@@ -1594,12 +1665,12 @@ object GlView {
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
                         // With the inventory open the same button drags items, so it must not mine.
-                        holdRequested = !inventoryOpen && openContainer == null && !dead && !chat.open &&
+                        holdRequested = !inventoryOpen && openContainer == null && !dead && !chat.open && !paused &&
                             (leftDown || (demo && frame >= 5 && frame < 900))
 
                         // Удар по сущности: если под прицелом моб ближе блока — бьём его.
                         if (input.clickRequested && !inventoryOpen && openContainer == null &&
-                            !dead && !chat.open && !demo
+                            !dead && !chat.open && !demo && !paused
                         ) {
                             val direction = camera.forward()
                             var hitId = -1

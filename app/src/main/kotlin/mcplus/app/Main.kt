@@ -890,6 +890,7 @@ private fun windowCommand(args: List<String>) {
     var debug = false
     var showTab = false
     var particleDemo = false
+    var pauseAtStart = false
     val pass = ArrayList<String>(args.size)
     var index = 0
     while (index < args.size) {
@@ -898,6 +899,7 @@ private fun windowCommand(args: List<String>) {
             "--debug" -> debug = true
             "--tab" -> showTab = true
             "--particles" -> particleDemo = true
+            "--pause" -> pauseAtStart = true
             else -> pass += args[index]
         }
         index++
@@ -944,6 +946,7 @@ private fun windowCommand(args: List<String>) {
             debug = debug,
             showTab = showTab,
             particleDemo = particleDemo,
+            pauseAtStart = pauseAtStart,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
             particleTable = findParticleTable(),

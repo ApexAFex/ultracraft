@@ -106,6 +106,70 @@ class Hud(
     /** Прямоугольник кнопки «возродиться» — по нему проверяется клик. */
     fun respawnButton(): HudRect = HudLayout.respawnButton(width, height)
 
+    /** Боковая панель табло: заголовок и строки «имя — очки» справа сверху. */
+    fun drawScoreboard(title: String, entries: List<Pair<String, Int>>) {
+        val text = this.text ?: return
+        if (entries.isEmpty()) return
+        val s = HudLayout.scale(height).toFloat()
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        val titleWidth = text.textWidth(title, s)
+        val rows = entries.map { (name, value) -> "$name  $value" }
+        val widest = maxOf(titleWidth, rows.maxOf { text.textWidth(it, s) })
+        val right = width - 4f * s
+        val left = right - widest - 6f * s
+        var y = height * 0.08f
+
+        renderer.begin()
+        renderer.rect(left - 3f * s, y - 2f * s, widest + 10f * s, (rows.size + 1) * 10f * s + 4f * s, 0x000000, 0.45f)
+        renderer.draw()
+        labels += TextRenderer.ScreenLabel(left, y, title, s)
+        y += 10f * s
+        for (row in rows) {
+            labels += TextRenderer.ScreenLabel(left, y, row, s)
+            y += 10f * s
+        }
+        text.drawScreen(labels)
+    }
+
+    /** Меню паузы: затемнение, заголовок и две кнопки; их прямоугольники нужны клику. */
+    fun drawPauseMenu(): List<HudRect> {
+        val s = HudLayout.scale(height).toFloat()
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x101018, 0.55f)
+        val buttonWidth = 220f * s
+        val buttonHeight = 18f * s
+        val firstX = (width - buttonWidth) / 2f
+        val firstY = height * 0.42f
+        val resume = HudRect(firstX, firstY, buttonWidth, buttonHeight)
+        val quit = HudRect(firstX, firstY + 26f * s, buttonWidth, buttonHeight)
+        renderer.rect(resume, 0x2A2A2A, 0.92f)
+        renderer.rect(quit, 0x2A2A2A, 0.92f)
+        renderer.draw()
+        text?.drawScreen(
+            listOf(
+                TextRenderer.ScreenLabel(
+                    (width - (text.textWidth("Пауза", s * 2f))) / 2f,
+                    height * 0.30f,
+                    "Пауза",
+                    s * 2f,
+                ),
+                TextRenderer.ScreenLabel(
+                    resume.x + (resume.width - text.textWidth("Продолжить", s)) / 2f,
+                    resume.y + 5f * s,
+                    "Продолжить",
+                    s,
+                ),
+                TextRenderer.ScreenLabel(
+                    quit.x + (quit.width - text.textWidth("Выйти", s)) / 2f,
+                    quit.y + 5f * s,
+                    "Выйти",
+                    s,
+                ),
+            ),
+        )
+        return listOf(resume, quit)
+    }
+
     /**
      * Подписи поверх открытого инвентаря: количество в стопке, полоска износа и подсказка
      * с названием предмета под курсором. Рисуется в экранных координатах, потому что панель
