@@ -151,6 +151,8 @@ object GlView {
         particleDemo: Boolean = false,
         /** Открыть меню паузы сразу (для снимка). */
         pauseAtStart: Boolean = false,
+        /** Начать с вида от третьего лица (для снимка): 0 — от первого, 1 — сзади, 2 — спереди. */
+        cameraModeAtStart: Int = 0,
         /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
         /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
@@ -609,6 +611,9 @@ object GlView {
                     var boundsSaved = false
                     var lastItemTotal = -1
                     var sprintDustNanos = 0L
+                    var cameraMode = cameraModeAtStart
+                    var selfWalkDistance = 0.0
+                    var selfSpeed = 0.0
 
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
@@ -712,6 +717,10 @@ object GlView {
                         if (input.hudToggleRequested && !chat.open) {
                             hudHidden = !hudHidden
                         }
+                        if (input.cameraModeRequested) {
+                            cameraMode = (cameraMode + 1) % 3
+                            println(if (cameraMode == 0) "Вид от первого лица" else "Вид от третьего лица")
+                        }
                         // F11 — полный экран; границы окна запоминаются для возврата.
                         if (input.fullscreenToggleRequested) {
                             if (!boundsSaved) {
@@ -766,6 +775,7 @@ object GlView {
                         // Чат: T открывает строку, «/» — команду. Пока строка открыта, клавиши
                         // становятся текстом, поэтому движение и хотбар ниже отключаются.
                         if (chat.open) {
+                            if (input.tabCompleteRequested) chat.complete(playerList.names())
                             // PageUp листает историю вверх, PageDown — обратно к свежим строкам.
                             if (input.chatScrollUpRequested) {
                                 chatScroll = minOf(chatScroll + 5, session?.chat?.size ?: 0)
@@ -1157,6 +1167,9 @@ object GlView {
                                         "generic",
                                     )
                                 }
+                                val moved = kotlin.math.hypot(player.x - previousX, player.z - previousZ)
+                                selfWalkDistance += moved
+                                selfSpeed = moved / TICK_SECONDS
                             }
                             if (ready && !playerLoadedSent) {
                                 // "My terrain is up" — lets the server start ticking us now
@@ -1203,6 +1216,19 @@ object GlView {
                         camera.y = previousY + (player.y - previousY) * alpha +
                             Player.EYE_HEIGHT - (if (sneakHeld) 0.15 else 0.0)
                         camera.z = previousZ + (player.z - previousZ) * alpha
+
+                        // F5: камера отъезжает назад (или вперёд и разворачивается).
+                        if (cameraMode != 0) {
+                            val direction = camera.forward()
+                            val offset = if (cameraMode == 1) -4.0f else 4.0f
+                            camera.x += direction[0] * offset
+                            camera.y += direction[1] * offset + 0.3f
+                            camera.z += direction[2] * offset
+                            if (cameraMode == 2) {
+                                camera.yaw += 180f
+                                camera.pitch = -camera.pitch
+                            }
+                        }
 
                         // Upload at most a few finished meshes per frame: the GL calls
                         // themselves cost time, and a burst would be just another stutter.
@@ -1474,6 +1500,16 @@ object GlView {
                         // Players get a humanoid with a skin; common mobs get simple box models;
                         // everything else stays a coloured box.
                         val players = ArrayList<PlayerRenderer.Player>()
+                        if (cameraMode > 0) {
+                            players += PlayerRenderer.Player(
+                                x = player.x,
+                                y = player.y,
+                                z = player.z,
+                                yaw = player.yaw,
+                                walkPhase = (selfWalkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
+                                walkAmount = (selfSpeed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                            )
+                        }
                         val zombies = ArrayList<PlayerRenderer.Player>()
                         val skeletons = ArrayList<PlayerRenderer.Player>()
                         val endermen = ArrayList<PlayerRenderer.Player>()
@@ -1706,7 +1742,9 @@ object GlView {
                         // Предмет в руке: блок — настоящим мини-кубом с лёгким наклоном,
                         // остальное — плоской иконкой. Взмах при ударе сдвигает и опускает куб.
                         val handItemName = inventory?.heldName()
-                        if (!inventoryOpen && openContainer == null && !dead && !chat.open && handItemName != null) {
+                        if (!inventoryOpen && openContainer == null && !dead && !chat.open &&
+                            cameraMode == 0 && handItemName != null
+                        ) {
                             val handState = blocks.firstStateOf(handItemName)
                             if (handState != null) {
                                 val swingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
@@ -1800,6 +1838,17 @@ object GlView {
                         val board = session?.scoreboard?.sidebarLines()
                         if (!hudHidden && board != null) {
                             hud.drawScoreboard(board.first, board.second)
+                        }
+                        // Строка действия и большой заголовок от сервера.
+                        if (!hudHidden) {
+                            session?.actionBar?.takeIf { it.isNotBlank() }?.let { hud.drawActionBar(it) }
+                            val title = session?.titleText
+                            if (title != null) {
+                                val age = (System.nanoTime() - (session?.titleAtNanos ?: 0L)) / 1_000_000_000.0
+                                if (age in 0.0..3.0) {
+                                    hud.drawTitle(title, session?.subtitleText, (1.0 - age / 3.0).toFloat())
+                                }
+                            }
                         }
                         if (paused) {
                             val buttons = hud.drawPauseMenu(

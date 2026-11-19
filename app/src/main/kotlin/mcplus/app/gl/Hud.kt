@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
@@ -41,6 +41,7 @@ class Hud(
 
         val armourPoints = inventory?.armourPoints() ?: 0
         drawHotbar(inventory, s)
+        drawOffhand(inventory, s)
         drawDurability(inventory, durability, s)
         drawBossBars(bossBars)
         drawEffects(effects, s)
@@ -137,6 +138,42 @@ class Hud(
         renderer.begin()
         renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x1A3C6E, alpha)
         renderer.draw()
+    }
+
+    /** Строка действия над хотбаром (например, «Нажмите, чтобы продолжить»). */
+    fun drawActionBar(value: String) {
+        val text = this.text ?: return
+        val s = HudLayout.scale(height).toFloat()
+        val bar = HudLayout.hotbar(width, height)
+        val scale = s * 0.9f
+        val widthPx = text.textWidth(value, scale)
+        text.drawScreen(
+            listOf(TextRenderer.ScreenLabel((width - widthPx) / 2f, bar.y - 40f * s, value, scale)),
+        )
+    }
+
+    /** Большой заголовок и подзаголовок по центру, гаснут через несколько секунд. */
+    fun drawTitle(title: String, subtitle: String?, alpha: Float) {
+        val text = this.text ?: return
+        if (alpha <= 0.01f) return
+        val s = HudLayout.scale(height).toFloat()
+        val titleScale = s * 2.4f
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        labels += TextRenderer.ScreenLabel(
+            (width - text.textWidth(title, titleScale)) / 2f,
+            height * 0.28f,
+            title,
+            titleScale,
+        )
+        if (subtitle != null) {
+            labels += TextRenderer.ScreenLabel(
+                (width - text.textWidth(subtitle, s * 1.2f)) / 2f,
+                height * 0.28f + 18f * s,
+                subtitle,
+                s * 1.2f,
+            )
+        }
+        text.drawScreen(labels, alpha = alpha)
     }
 
     /** Меню паузы: затемнение, заголовок, кнопки и настройки; их прямоугольники нужны клику. */
@@ -611,6 +648,17 @@ class Hud(
      * пустой полосы оставался бы светящийся хвост меньше пикселя, а на 182 пикселях он
      * заметен. Без спрайтов игры полоса рисуется прямоугольниками цвета полосы.
      */
+    /** Предмет в левой руке — слева от хотбара, как в ванили. */
+    private fun drawOffhand(inventory: Inventory?, s: Float) {
+        if (inventory == null) return
+        val stack = inventory.menuSlot(45) ?: return
+        val name = inventory.nameOf(stack) ?: return
+        val slot = HudLayout.hotbarSlot(0, width, height)
+        val rect = HudRect(slot.x - slot.width - 4f * s, slot.y, slot.width, slot.height)
+        renderer.rect(rect, 0x101010, 0.55f)
+        renderer.icon(rect, atlas.layerForItem(name))
+    }
+
     /** Полоска прочности под выбранным слотом: зелёная, жёлтая, красная. */
     private fun drawDurability(inventory: Inventory?, durability: Pair<Int, Int>?, s: Float) {
         if (inventory == null || durability == null) return

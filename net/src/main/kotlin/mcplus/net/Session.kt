@@ -4,6 +4,7 @@ import mcplus.net.proto.Protocol777
 import mcplus.protocol.ByteReader
 import mcplus.protocol.ByteWriter
 import mcplus.protocol.Packet
+import mcplus.protocol.nbt.NbtReader
 import java.io.Closeable
 import java.io.EOFException
 
@@ -33,6 +34,19 @@ class Session internal constructor(
 
     /** Табло сервера: цели и очки, выбранная боковая панель. */
     val scoreboard = Scoreboard()
+
+    /** Строка над хотбаром и большой заголовок: приходят компонентами. */    @Volatile
+    var actionBar: String? = null
+        private set
+    @Volatile
+    var titleText: String? = null
+        private set
+    @Volatile
+    var subtitleText: String? = null
+        private set
+    @Volatile
+    var titleAtNanos: Long = 0L
+        private set
 
     var playerPosition: PlayerPosition? = null
         private set
@@ -177,6 +191,23 @@ class Session internal constructor(
                     sky.onPacket(packet.id, packet.body) { joinResult.registries.worldClock(it) }
 
                 Protocol777.Play.BOSS_EVENT -> bossBars.onPacket(packet.body)
+
+                Protocol777.Play.SET_ACTION_BAR_TEXT ->
+                    actionBar = readComponentText(packet.body)
+
+                Protocol777.Play.SET_TITLE_TEXT -> {
+                    titleText = readComponentText(packet.body)
+                    titleAtNanos = System.nanoTime()
+                }
+
+                Protocol777.Play.SET_SUBTITLE_TEXT ->
+                    subtitleText = readComponentText(packet.body)
+
+                Protocol777.Play.CLEAR_TITLES -> {
+                    titleText = null
+                    subtitleText = null
+                    actionBar = null
+                }
 
                 Protocol777.Play.SET_OBJECTIVE,
                 Protocol777.Play.SET_SCORE,
@@ -434,6 +465,10 @@ class Session internal constructor(
         markClosed("соединение закрыто клиентом", byServer = false)
         connection.close()
     }
+
+    /** Компонент из пакета заголовка или строки действия. */
+    private fun readComponentText(body: ByteArray): String? =
+        runCatching { componentText(NbtReader.read(ByteReader(body))) }.getOrNull()
 
     private fun markClosed(reason: String, byServer: Boolean) {
         if (closeReason != null) return

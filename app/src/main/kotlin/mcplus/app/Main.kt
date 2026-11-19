@@ -892,6 +892,7 @@ private fun windowCommand(args: List<String>) {
     var showTab = false
     var particleDemo = false
     var pauseAtStart = false
+    var cameraModeAtStart = 0
     val pass = ArrayList<String>(args.size)
     var index = 0
     while (index < args.size) {
@@ -901,6 +902,7 @@ private fun windowCommand(args: List<String>) {
             "--tab" -> showTab = true
             "--particles" -> particleDemo = true
             "--pause" -> pauseAtStart = true
+            "--third" -> cameraModeAtStart = 1
             else -> pass += args[index]
         }
         index++
@@ -948,6 +950,7 @@ private fun windowCommand(args: List<String>) {
             showTab = showTab,
             particleDemo = particleDemo,
             pauseAtStart = pauseAtStart,
+            cameraModeAtStart = cameraModeAtStart,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
             particleTable = findParticleTable(),

@@ -66,10 +66,10 @@ class InventoryScreenTest {
     fun `no two slots share a place`() {
         val keys = InventoryScreen.cells.map { it.column to it.row }
         assertEquals(keys.size, keys.toSet().size)
-        // 41 drawn slots: the menu has 46, but armor (5..8) and offhand (45) are not in this screen.
-        assertEquals(41, InventoryScreen.cells.size)
+        // 46 slots: весь экран меню, включая броню (5..8) и оффхенд (45).
+        assertEquals(46, InventoryScreen.cells.size)
         val menuSlots = InventoryScreen.cells.map { it.menuSlot }.toSet()
-        for (armor in 5..8) assertTrue(armor !in menuSlots, "броня $armor не рисуется")
-        assertTrue(45 !in menuSlots)
+        for (armor in 5..8) assertTrue(armor in menuSlots, "броня $armor рисуется")
+        assertTrue(45 in menuSlots, "оффхенд рисуется")
     }
 }

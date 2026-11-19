@@ -62,6 +62,18 @@ class ChatInput(private val maxLength: Int = 256) {
         text = text.dropLast(1)
     }
 
+    /** Дополняет последнее слово по кандидатам; true, если текст изменился. */
+    fun complete(candidates: List<String>): Boolean {
+        if (!open) return false
+        val start = text.lastIndexOf(' ') + 1
+        val prefix = text.substring(start)
+        if (prefix.isEmpty()) return false
+        val matches = candidates.filter { it.startsWith(prefix, ignoreCase = true) }
+        if (matches.size != 1) return false
+        text = text.substring(0, start) + matches.first() + " "
+        return true
+    }
+
     /** Стрелка вверх: прошлая отправленная строка (сначала сохраняется текущий черновик). */
     fun historyPrevious() {
         if (!open || history.isEmpty()) return

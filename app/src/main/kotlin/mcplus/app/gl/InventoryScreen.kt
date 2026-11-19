@@ -39,6 +39,9 @@ object InventoryScreen {
         for (index in 0 until 9) {              // hotbar
             add(Cell(36 + index, index, 5))
         }
+        // Броня и оффхенд: свободные клетки верхней части панели.
+        add(Cell(5, 5, 0)); add(Cell(6, 6, 0)); add(Cell(7, 7, 0)); add(Cell(8, 8, 0))
+        add(Cell(45, 8, 1))
     }
 
     /** Panel half-extents in panel units, for the plate behind the slots. */

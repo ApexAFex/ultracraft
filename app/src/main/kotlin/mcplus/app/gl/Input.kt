@@ -54,6 +54,8 @@ class Input(private val window: Long, private val camera: Camera) {
     private var dropPressed = false
     private var screenshotPressed = false
     private var fullscreenPressed = false
+    private var tabPressed = false
+    private var cameraModePressed = false
     private var scrollY = 0.0
     private var mouseWasDown = false
 
@@ -128,6 +130,14 @@ class Input(private val window: Long, private val camera: Camera) {
         private set
 
     var fullscreenToggleRequested: Boolean = false
+        private set
+
+    /** Tab в строке чата дополняет имя игрока. */
+    var tabCompleteRequested: Boolean = false
+        private set
+
+    /** F5 переключает вид от третьего лица. */
+    var cameraModeRequested: Boolean = false
         private set
 
     /** Чувствительность мыши (1.0 — обычная) и выбор слота колесом. */
@@ -283,6 +293,14 @@ class Input(private val window: Long, private val camera: Camera) {
         val fullscreen = pressed(GLFW.GLFW_KEY_F11)
         fullscreenToggleRequested = fullscreen && !fullscreenPressed
         fullscreenPressed = fullscreen
+
+        val tabKey = pressed(GLFW.GLFW_KEY_TAB)
+        tabCompleteRequested = tabKey && !tabPressed
+        tabPressed = tabKey
+
+        val cameraKey = pressed(GLFW.GLFW_KEY_F5)
+        cameraModeRequested = cameraKey && !cameraModePressed
+        cameraModePressed = cameraKey
 
         // 1..9 choose the hotbar slot. Reported once per press, not every frame the key is held:
         // a frame-by-frame repeat would send a packet per frame.
