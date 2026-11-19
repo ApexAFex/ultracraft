@@ -118,6 +118,8 @@ object GlView {
         replay: List<mcplus.protocol.Packet> = emptyList(),
         /** Блок, по которому кликнуть правой кнопкой на 30-м кадре (проверка контейнеров). */
         openAt: Triple<Int, Int, Int>? = null,
+        /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
+        entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -254,6 +256,8 @@ object GlView {
                     val skin = GameFiles.readPng(directory, "assets/minecraft/textures/entity/player/wide/steve.png")
                     val playerRenderer = PlayerRenderer(width, height, skin)
                     if (skin == null) println("Скин игрока не найден: игроки рисуются коробками")
+                    // Мобы: простые коробки, окрашенные средним цветом настоящих текстур.
+                    val mobRenderer = MobRenderer(width, height, MobRenderer.loadColors(directory))
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -935,12 +939,15 @@ object GlView {
                                 dx * dx + dy * dy + dz * dz
                             }
                             println("Сущностей: ${entities.size}, ближайшая: " + (nearest?.let {
-                                "id=${it.id} type=${it.type} (%.1f, %.1f, %.1f)".format(it.x, it.y, it.z)
+                                "id=${it.id} type=${it.type} ${entityTypes.nameOf(it.type)} (%.1f, %.1f, %.1f)"
+                                    .format(it.x, it.y, it.z)
                             } ?: "нет"))
                             lastEntityCount = entities.size
                         }
-                        // Players get a humanoid with a skin, everything else stays a box.
+                        // Players get a humanoid with a skin; common mobs get simple box models;
+                        // everything else stays a coloured box.
                         val players = ArrayList<PlayerRenderer.Player>()
+                        val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         for (entity in entities) {
                             if (playerList.nameOf(entity.uuid) != null) {
@@ -953,10 +960,27 @@ object GlView {
                                     walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                 )
                             } else {
-                                boxes += entity
+                                val name = entityTypes.nameOf(entity.type)
+                                val family = MobModels.familyOf(name)
+                                if (family == MobFamily.NONE) {
+                                    boxes += entity
+                                } else {
+                                    mobs += MobRenderer.Mob(
+                                        x = entity.x,
+                                        y = entity.y,
+                                        z = entity.z,
+                                        yaw = entity.yaw,
+                                        walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
+                                        walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                        family = family,
+                                        scale = MobModels.scaleOf(name),
+                                        color = mobRenderer.colorOf(name),
+                                    )
+                                }
                             }
                         }
                         playerRenderer.draw(camera, players)
+                        mobRenderer.draw(camera, mobs)
                         entityRenderer.draw(camera, boxes)
                         // Only players are in the tab list, so only they get a nametag.
                         val labels = entities.mapNotNull { entity ->
@@ -1124,6 +1148,7 @@ object GlView {
                         frame++
                     }
                     entityRenderer.close()
+                    mobRenderer.close()
                     playerRenderer.close()
                     skyRenderer.close()
                     hud.close()

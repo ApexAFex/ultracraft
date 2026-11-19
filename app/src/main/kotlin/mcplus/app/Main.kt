@@ -936,6 +936,7 @@ private fun windowCommand(args: List<String>) {
             meshThreads = options.threads,
             replay = replay,
             openAt = openAt,
+            entityTypes = findEntityTable(),
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
@@ -1117,6 +1118,22 @@ private fun findMenuTable(explicit: String? = null): mcplus.net.MenuTable {
         return mcplus.net.MenuTable.EMPTY
     }
     return mcplus.net.MenuTable.load(file)
+}
+
+/** Entity type names for `Spawn Entity`, generated with `tools/build-entity-table.js`. */
+private fun findEntityTable(explicit: String? = null): mcplus.net.EntityTable {
+    val candidates = buildList {
+        explicit?.let { add(java.io.File(it)) }
+        add(java.io.File("data/entities-777.tsv"))
+        add(java.io.File("../data/entities-777.tsv"))
+        add(java.io.File("../../data/entities-777.tsv"))
+    }
+    val file = candidates.firstOrNull { it.isFile }
+    if (file == null) {
+        System.err.println("Нет таблицы сущностей (data/entities-777.tsv): мобы будут коробками.")
+        return mcplus.net.EntityTable.EMPTY
+    }
+    return mcplus.net.EntityTable.load(file)
 }
 
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
