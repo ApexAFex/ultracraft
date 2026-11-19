@@ -1,6 +1,7 @@
 package mcplus.app.gl
 
 import mcplus.net.Inventory
+import mcplus.net.MenuLayout
 import mcplus.net.OpenContainer
 import kotlin.math.abs
 
@@ -19,17 +20,25 @@ object ContainerScreen {
     private const val COLUMNS = 9
 
     fun containerRows(container: OpenContainer): Int =
-        (container.containerSlots + COLUMNS - 1) / COLUMNS
+        if (container.type in MenuLayout.FURNACES) 2
+        else (container.containerSlots + COLUMNS - 1) / COLUMNS
 
     fun totalRows(container: OpenContainer): Int = containerRows(container) + 3 + 1
 
     fun cells(container: OpenContainer): List<Cell> {
         val cells = ArrayList<Cell>(container.slotCount)
-        val containerSlots = container.containerSlots
-        for (index in 0 until containerSlots) {
-            cells += Cell(index, index % COLUMNS, index / COLUMNS)
-        }
         val playerRow = containerRows(container)
+        if (container.type in MenuLayout.FURNACES) {
+            // Печь: вход слева сверху, топливо под ним, выход справа — между ними огонь и стрелка.
+            cells += Cell(0, 0, 0)
+            cells += Cell(1, 0, 1)
+            cells += Cell(2, 2, 1)
+        } else {
+            val containerSlots = container.containerSlots
+            for (index in 0 until containerSlots) {
+                cells += Cell(index, index % COLUMNS, index / COLUMNS)
+            }
+        }
         val playerStart = container.playerStart
         for (index in 0 until 27) {
             cells += Cell(playerStart + index, index % COLUMNS, playerRow + index / COLUMNS)
@@ -77,13 +86,22 @@ object ContainerScreen {
         val up = camera.up()
         val rows = totalRows(container)
 
-        fun bar(horizontal: Float, vertical: Float, halfW: Float, halfH: Float, alpha: Float) {
+        fun bar(
+            horizontal: Float,
+            vertical: Float,
+            halfW: Float,
+            halfH: Float,
+            alpha: Float,
+            red: Float = 0.34f,
+            green: Float = 0.34f,
+            blue: Float = 0.34f,
+        ) {
             text?.drawBar(
                 camera,
                 (centre[0] + right[0] * horizontal + up[0] * vertical).toDouble(),
                 (centre[1] + right[1] * horizontal + up[1] * vertical).toDouble(),
                 (centre[2] + right[2] * horizontal + up[2] * vertical).toDouble(),
-                halfW, halfH, 0.34f, 0.34f, 0.34f, alpha,
+                halfW, halfH, red, green, blue, alpha,
             )
         }
 
@@ -95,6 +113,30 @@ object ContainerScreen {
         val cells = cells(container)
         for (cell in cells) {
             bar(horizontalOf(cell), verticalOf(cell, rows), InventoryScreen.SLOT / 2f, InventoryScreen.SLOT / 2f, 0.85f)
+        }
+
+        // Прогресс печи: пламя (0/1) и стрелка плавки (2/3) из `Container Set Data`.
+        if (container.type in MenuLayout.FURNACES) {
+            val burn = container.dataValue(0) ?: 0
+            val burnTotal = container.dataValue(1) ?: 1
+            val cook = container.dataValue(2) ?: 0
+            val cookTotal = container.dataValue(3) ?: 1
+            val flame = (burn.toFloat() / burnTotal.coerceAtLeast(1)).coerceIn(0f, 1f)
+            if (flame > 0f) {
+                bar(
+                    InventoryScreen.STEP / 2f, 0f,
+                    InventoryScreen.STEP / 2f, InventoryScreen.SLOT * 0.15f * flame,
+                    0.9f, red = 1f, green = 0.55f, blue = 0.1f,
+                )
+            }
+            val arrow = (cook.toFloat() / cookTotal.coerceAtLeast(1)).coerceIn(0f, 1f)
+            if (arrow > 0f) {
+                bar(
+                    InventoryScreen.STEP, -InventoryScreen.STEP / 2f,
+                    InventoryScreen.SLOT / 2f * arrow, InventoryScreen.SLOT * 0.08f,
+                    0.9f, red = 0.9f, green = 0.9f, blue = 0.9f,
+                )
+            }
         }
 
         val icons = cells.mapNotNull { cell ->

@@ -593,16 +593,36 @@ object GlView {
                             clickInventoryAt(input.mouseX, input.mouseY)
                         }
 
-                        // Клик по открытому контейнеру: слоты те же, но номер окна другой,
-                        // и сервер применяет клик именно к своему меню.
-                        if (openContainer != null && input.clickRequested) {
-                            val (horizontal, vertical) = InventoryScreen.panelPoint(
-                                input.mouseX, input.mouseY, width, height,
-                            )
-                            val cell = ContainerScreen.slotAt(openContainer, horizontal, vertical)
-                            if (cell != null) {
-                                session?.clickSlot(cell.menuSlot)
-                                println("Клик по слоту меню ${cell.menuSlot}")
+                        // Клик по открытому контейнеру: левый — взять/положить, правый — половину,
+                        // shift+левый — быстро переложить. Номер окна уходит серверу в пакете.
+                        if (openContainer != null) {
+                            val rightPressed = GLFW.glfwGetMouseButton(
+                                window, GLFW.GLFW_MOUSE_BUTTON_RIGHT,
+                            ) == GLFW.GLFW_PRESS
+                            val shift = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS ||
+                                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS
+                            val button = when {
+                                rightPressed && !rightWasDown -> 1
+                                input.clickRequested -> 0
+                                else -> -1
+                            }
+                            if (button >= 0) {
+                                val (horizontal, vertical) = InventoryScreen.panelPoint(
+                                    input.mouseX, input.mouseY, width, height,
+                                )
+                                val cell = ContainerScreen.slotAt(openContainer, horizontal, vertical)
+                                if (cell != null) {
+                                    val action = if (button == 0 && shift) {
+                                        mcplus.net.ContainerInput.QUICK_MOVE
+                                    } else {
+                                        mcplus.net.ContainerInput.PICKUP
+                                    }
+                                    session?.clickSlot(cell.menuSlot, button = button, input = action)
+                                    println(
+                                        "Клик по слоту меню ${cell.menuSlot}: кнопка $button" +
+                                            if (action == mcplus.net.ContainerInput.QUICK_MOVE) ", shift" else "",
+                                    )
+                                }
                             }
                         }
 

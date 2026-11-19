@@ -1292,6 +1292,8 @@ private fun texturesCommand(args: List<String>) {
 private fun containerCommand(args: List<String>) {
     var at: Triple<Int, Int, Int>? = null
     var click: Int? = null
+    var button = 0
+    var quick = false
     var seconds = 2
     val rest = ArrayList<String>()
     var index = 0
@@ -1299,6 +1301,8 @@ private fun containerCommand(args: List<String>) {
         when (args[index]) {
             "--at" -> at = parsePosition(args.getOrNull(++index) ?: fail("--at требует x,y,z"))
             "--click" -> click = args.getOrNull(++index)?.toIntOrNull() ?: fail("--click требует номер слота")
+            "--button" -> button = args.getOrNull(++index)?.toIntOrNull() ?: fail("--button требует число")
+            "--quick" -> quick = true
             "--seconds" -> seconds = args.getOrNull(++index)?.toIntOrNull() ?: fail("--seconds требует число")
             else -> rest += args[index]
         }
@@ -1326,9 +1330,10 @@ private fun containerCommand(args: List<String>) {
         printContainer(open, container)
 
         if (click != null) {
-            open.clickSlot(click)
+            val action = if (quick) mcplus.net.ContainerInput.QUICK_MOVE else mcplus.net.ContainerInput.PICKUP
+            open.clickSlot(click, button = button, input = action)
             open.drain(1_500)
-            println("После клика по слоту $click:")
+            println("После клика по слоту $click (кнопка $button${if (quick) ", shift" else ""}):")
             printContainer(open, container)
         }
         open.closeContainer()

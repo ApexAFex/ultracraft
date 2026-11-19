@@ -60,4 +60,19 @@ class ContainerScreenTest {
     fun `a single chest row is narrower than a double chest`() {
         assertTrue(ContainerScreen.totalRows(chest(1)) < ContainerScreen.totalRows(chest(6)))
     }
+
+    @Test
+    fun `a furnace puts input above fuel and output to the right`() {
+        val furnace = OpenContainer(2, "furnace", "Furnace", 39)
+        val cells = ContainerScreen.cells(furnace).associateBy { it.menuSlot }
+
+        assertEquals(0, cells.getValue(0).row); assertEquals(0, cells.getValue(0).column)
+        assertEquals(1, cells.getValue(1).row); assertEquals(0, cells.getValue(1).column)
+        assertEquals(1, cells.getValue(2).row); assertEquals(2, cells.getValue(2).column)
+
+        // Инвентарь игрока начинается под печью: 3 слота печи, затем 36 слотов игрока.
+        assertEquals(2, cells.getValue(3).row)
+        assertEquals(2, ContainerScreen.containerRows(furnace))
+        assertEquals(6, ContainerScreen.totalRows(furnace))
+    }
 }
