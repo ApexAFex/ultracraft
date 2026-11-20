@@ -32,8 +32,8 @@ sealed interface BlockShape {
     /** Плита: нижняя, верхняя (double сюда не попадает — это полный куб). */
     data class Slab(val half: SlabHalf) : BlockShape
 
-    /** Кровать: низкая рама и матрас, а не куб. */
-    data object Bed : BlockShape
+    /** Кровать: матрас и ножки со стороны изголовья или изножья. */
+    data class Bed(val part: String? = null) : BlockShape
 
     /** Рельсы: плоская полоса в 1/16 блока над землёй. */
     data object Rail : BlockShape
@@ -137,7 +137,7 @@ sealed interface BlockShape {
                     Stairs(facing, half, shape)
                 }
 
-                name.endsWith("_bed") -> Bed
+                name.endsWith("_bed") -> Bed(part = values["part"])
 
                 name == "rail" || name.endsWith("_rail") -> Rail
 

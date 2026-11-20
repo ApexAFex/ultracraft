@@ -80,6 +80,8 @@ object Protocol777 {
         const val BLOCK_UPDATE: Int = 0x08
         /** Чужое ломание блока: стадии трещин. */
         const val BLOCK_DESTRUCTION: Int = 0x05
+        /** Заголовок и подвал списка игроков (два компонента NBT). */
+        const val TAB_LIST: Int = 0x7D
         /** Частицы мира: дым, огонь, искры, брызги. */
         const val LEVEL_PARTICLES: Int = 0x30
         /** Звук в точке мира (ломание, двери, взрывы, мобы). */

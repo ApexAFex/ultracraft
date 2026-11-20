@@ -188,8 +188,14 @@ object MeshBuilder {
 
         BlockShape.Carpet -> listOf(Box(0f, 0f, 0f, 1f, 1f / 16f, 1f))
 
-        // Кровать: рама и матрас одной низкой коробкой в 9/16 блока.
-        BlockShape.Bed -> listOf(Box(0f, 0f, 0f, 1f, 9f / 16f, 1f))
+        // Кровать: матрас 3/16…9/16 и две ножки 3×3×3 со стороны изголовья/изножья.
+        is BlockShape.Bed -> {
+            val boxes = arrayListOf(Box(0f, 3f / 16f, 0f, 1f, 9f / 16f, 1f))
+            val legZ = if (shape.part == "head") 0f else 13f / 16f
+            boxes += Box(0f, 0f, legZ, 3f / 16f, 3f / 16f, legZ + 3f / 16f)
+            boxes += Box(13f / 16f, 0f, legZ, 1f, 3f / 16f, legZ + 3f / 16f)
+            boxes
+        }
 
         // Рельсы: плоская полоса в 1/16 блока, а не куб.
         BlockShape.Rail -> listOf(Box(0f, 0f, 0f, 1f, 1f / 16f, 1f))
@@ -355,7 +361,7 @@ object MeshBuilder {
 
         // Кровати рисуются текстурой шерсти своего цвета: файла `block/*_bed` нет,
         // а `entity/bed/*` в атлас блоков не попадает.
-        BlockShape.Bed -> name.removeSuffix("_bed") + "_wool"
+        is BlockShape.Bed -> name.removeSuffix("_bed") + "_wool"
 
         else -> name
     }

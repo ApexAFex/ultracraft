@@ -2695,6 +2695,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         name to pingColor(-1)
                                     }
                                 },
+                                header = session?.tabHeader,
+                                footer = session?.tabFooter,
                             )
                         }
 

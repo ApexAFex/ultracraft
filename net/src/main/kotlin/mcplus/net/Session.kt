@@ -59,6 +59,14 @@ class Session internal constructor(
     var actionBarAtNanos: Long = 0L
         private set
 
+    /** Заголовок и подвал списка игроков из `Tab List`. */
+    @Volatile
+    var tabHeader: String? = null
+        private set
+    @Volatile
+    var tabFooter: String? = null
+        private set
+
     /** Радиус чанков, который сервер держит для этого клиента. */
     @Volatile
     var serverChunkRadius: Int = -1
@@ -225,6 +233,12 @@ class Session internal constructor(
                     titleText = null
                     subtitleText = null
                     actionBar = null
+                }
+
+                Protocol777.Play.TAB_LIST -> runCatching {
+                    val (header, footer) = readTabList(packet.body)
+                    tabHeader = header
+                    tabFooter = footer
                 }
 
                 Protocol777.Play.SET_CHUNK_CACHE_RADIUS ->

@@ -848,11 +848,19 @@ class Hud(
      * Ширина панели считается по самой длинной строке, поэтому короткие имена не растягивают
      * её на весь экран.
      */
-    fun drawTabList(entries: List<Pair<String, Int>>) {
+    fun drawTabList(
+        entries: List<Pair<String, Int>>,
+        header: String? = null,
+        footer: String? = null,
+    ) {
         val text = this.text ?: return
         if (entries.isEmpty()) return
         val s = HudLayout.scale(height).toFloat()
-        val lines = listOf("Игроки: ${entries.size}" to 0xFFFFFF) + entries
+        val lines = ArrayList<Pair<String, Int>>()
+        if (!header.isNullOrBlank()) lines += header to 0xFFFFFF
+        lines += "Игроки: ${entries.size}" to 0xFFFFFF
+        lines += entries
+        if (!footer.isNullOrBlank()) lines += footer to 0xFFFFFF
         var y = height * 0.08f
 
         for ((line, color) in lines) {

@@ -18,8 +18,8 @@ class BlockShapesTest {
 
     @Test
     fun `bed and rails are not cubes`() {
-        assertEquals(BlockShape.Bed, BlockShape.parse("oak_bed", "facing=north,part=head"))
-        assertEquals(BlockShape.Bed, BlockShape.parse("red_bed", "facing=east,part=foot"))
+        assertEquals(BlockShape.Bed(part = "head"), BlockShape.parse("oak_bed", "facing=north,part=head"))
+        assertEquals(BlockShape.Bed(part = "foot"), BlockShape.parse("red_bed", "facing=east,part=foot"))
         assertEquals(BlockShape.Rail, BlockShape.parse("rail", "shape=north_south"))
         assertEquals(BlockShape.Rail, BlockShape.parse("powered_rail", "powered=true"))
         assertEquals(BlockShape.Rail, BlockShape.parse("detector_rail", ""))
