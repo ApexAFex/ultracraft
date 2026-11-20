@@ -35,7 +35,7 @@ class BlockShapeTest {
     @Test
     fun `door reads its facing and half`() {
         assertEquals(
-            BlockShape.Door(ShapeDirection.WEST, upper = true),
+            BlockShape.Door(ShapeDirection.WEST, upper = true, hinge = "left"),
             BlockShape.parse("oak_door", "facing=west,half=upper,hinge=left,open=false"),
         )
     }
@@ -71,7 +71,7 @@ class BlockShapeTest {
             BlockShape.parse("oak_trapdoor", "facing=south,half=top,open=true,powered=false"),
         )
         assertEquals(
-            BlockShape.Door(ShapeDirection.EAST, upper = false, open = true),
+            BlockShape.Door(ShapeDirection.EAST, upper = false, open = true, hinge = "left"),
             BlockShape.parse("oak_door", "facing=east,half=lower,hinge=left,open=true"),
         )
     }

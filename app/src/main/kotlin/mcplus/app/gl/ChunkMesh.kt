@@ -159,9 +159,21 @@ object MeshBuilder {
         }
 
         is BlockShape.Door -> {
-            // Открытая дверь повёрнута на 90°: панель уходит на соседнюю сторону.
-            val facing = if (shape.open) rotateClockwise(shape.facing) else shape.facing
-            listOf(panel(facing))
+            // Развёртка ванильных моделей: закрытая дверь стоит на «своём» краю
+            // (у восточной и западной — на противоположном), а открытая поворачивается
+            // от этого края на 90° в сторону петли.
+            val closedEdge = when (shape.facing) {
+                ShapeDirection.NORTH -> ShapeDirection.NORTH
+                ShapeDirection.SOUTH -> ShapeDirection.SOUTH
+                ShapeDirection.EAST -> ShapeDirection.WEST
+                ShapeDirection.WEST -> ShapeDirection.EAST
+            }
+            val edge = when {
+                !shape.open -> closedEdge
+                shape.hinge == "right" -> rotateClockwise(closedEdge)
+                else -> rotateCounterClockwise(closedEdge)
+            }
+            listOf(panel(edge))
         }
 
         is BlockShape.Trapdoor -> {
@@ -175,6 +187,12 @@ object MeshBuilder {
         }
 
         BlockShape.Carpet -> listOf(Box(0f, 0f, 0f, 1f, 1f / 16f, 1f))
+
+        // Кровать: рама и матрас одной низкой коробкой в 9/16 блока.
+        BlockShape.Bed -> listOf(Box(0f, 0f, 0f, 1f, 9f / 16f, 1f))
+
+        // Рельсы: плоская полоса в 1/16 блока, а не куб.
+        BlockShape.Rail -> listOf(Box(0f, 0f, 0f, 1f, 1f / 16f, 1f))
 
         is BlockShape.Sign -> {
             val wall = shape.wall
@@ -335,6 +353,10 @@ object MeshBuilder {
 
         is BlockShape.Chest -> if (name == "ender_chest") "obsidian" else "oak_planks"
 
+        // Кровати рисуются текстурой шерсти своего цвета: файла `block/*_bed` нет,
+        // а `entity/bed/*` в атлас блоков не попадает.
+        BlockShape.Bed -> name.removeSuffix("_bed") + "_wool"
+
         else -> name
     }
 
@@ -343,6 +365,14 @@ object MeshBuilder {
         ShapeDirection.EAST -> ShapeDirection.SOUTH
         ShapeDirection.SOUTH -> ShapeDirection.WEST
         ShapeDirection.WEST -> ShapeDirection.NORTH
+    }
+
+    /** Поворот против часовой: открытая дверь с правой петлёй уходит в другую сторону. */
+    private fun rotateCounterClockwise(facing: ShapeDirection): ShapeDirection = when (facing) {
+        ShapeDirection.NORTH -> ShapeDirection.WEST
+        ShapeDirection.WEST -> ShapeDirection.SOUTH
+        ShapeDirection.SOUTH -> ShapeDirection.EAST
+        ShapeDirection.EAST -> ShapeDirection.NORTH
     }
 
     private fun torchBox(wall: ShapeDirection?): Box {

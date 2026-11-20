@@ -2689,7 +2689,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         if (showTab || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_TAB) == GLFW.GLFW_PRESS) {
                             hud.drawTabList(
                                 playerList.namesWithLatency().map { (name, ping) ->
-                                    if (ping != null && ping >= 0) "$name  $ping ms" else name
+                                    if (ping != null && ping >= 0) {
+                                        "$name  $ping ms" to pingColor(ping)
+                                    } else {
+                                        name to pingColor(-1)
+                                    }
                                 },
                             )
                         }

@@ -848,25 +848,26 @@ class Hud(
      * Ширина панели считается по самой длинной строке, поэтому короткие имена не растягивают
      * её на весь экран.
      */
-    fun drawTabList(names: List<String>) {
+    fun drawTabList(entries: List<Pair<String, Int>>) {
         val text = this.text ?: return
-        if (names.isEmpty()) return
+        if (entries.isEmpty()) return
         val s = HudLayout.scale(height).toFloat()
-        val title = "Игроки: ${names.size}"
-        val lines = listOf(title) + names
-        val widest = lines.maxOf { text.textWidth(it, s) }
-        val left = (width - widest) / 2f
+        val lines = listOf("Игроки: ${entries.size}" to 0xFFFFFF) + entries
         var y = height * 0.08f
 
-        for (line in lines) {
+        for ((line, color) in lines) {
             val lineWidth = text.textWidth(line, s)
             renderer.begin()
             renderer.rect((width - lineWidth) / 2f - 3f * s, y - 2f * s, lineWidth + 6f * s, 10f * s, 0x000000, 0.45f)
             renderer.draw()
-            text.drawScreen(listOf(TextRenderer.ScreenLabel((width - lineWidth) / 2f, y, line, s)))
+            text.drawScreen(
+                listOf(TextRenderer.ScreenLabel((width - lineWidth) / 2f, y, line, s, color)),
+            )
             y += 10f * s
         }
     }
+
+
 
     /** Красная вспышка при получении урона: [alpha] гаснет за доли секунды. */
     fun drawDamageFlash(alpha: Float) {
@@ -1304,3 +1305,12 @@ internal fun actionBarAlpha(atNanos: Long, nowNanos: Long): Float {
 }
 
 
+
+/** Цвет задержки в списке игроков: зелёный, жёлтый, оранжевый, красный. */
+fun pingColor(ping: Int): Int = when {
+    ping < 0 -> 0xAAAAAA
+    ping < 150 -> 0x55FF55
+    ping < 300 -> 0xFFFF55
+    ping < 600 -> 0xFFAA00
+    else -> 0xFF5555
+}

@@ -306,8 +306,9 @@ class MeshBuilderTest {
         val world = world()
         world.add(chunkWith(intArrayOf(0, 48, 0) to 6))
 
+        // facing=west: ванильная модель повёрнута на 180°, полотно стоит у восточной стороны.
         val xs = axisValues(shapeMesh(world), 0)
-        assertTrue(xs.all { it <= 3f / 16f + 0.001f }, "дверь должна стоять у западной стороны: $xs")
+        assertTrue(xs.all { it >= 1f - 3f / 16f - 0.001f }, "дверь должна стоять у восточной стороны: $xs")
     }
 
     @Test

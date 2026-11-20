@@ -32,6 +32,12 @@ sealed interface BlockShape {
     /** Плита: нижняя, верхняя (double сюда не попадает — это полный куб). */
     data class Slab(val half: SlabHalf) : BlockShape
 
+    /** Кровать: низкая рама и матрас, а не куб. */
+    data object Bed : BlockShape
+
+    /** Рельсы: плоская полоса в 1/16 блока над землёй. */
+    data object Rail : BlockShape
+
     /** Ступень: базовая плита и ступенька со стороны [facing]. */
     data class Stairs(
         val facing: ShapeDirection,
@@ -40,7 +46,13 @@ sealed interface BlockShape {
     ) : BlockShape
 
     /** Дверь: тонкая панель у стороны [facing]; открытая повёрнута на 90°. */
-    data class Door(val facing: ShapeDirection, val upper: Boolean, val open: Boolean = false) : BlockShape
+    data class Door(
+    val facing: ShapeDirection,
+    val upper: Boolean,
+    val open: Boolean = false,
+    /** Петля: "left" или "right". От неё зависит, в какую сторону уходит открытая дверь. */
+    val hinge: String? = null,
+) : BlockShape
 
     /** Забор: столб и перекладины к соседям, заданные свойствами состояния. */
     data class Fence(
@@ -125,9 +137,18 @@ sealed interface BlockShape {
                     Stairs(facing, half, shape)
                 }
 
+                name.endsWith("_bed") -> Bed
+
+                name == "rail" || name.endsWith("_rail") -> Rail
+
                 name.endsWith("_door") -> {
                     val facing = ShapeDirection.byName(values["facing"]) ?: return null
-                    Door(facing, upper = values["half"] == "upper", open = values["open"] == "true")
+                    Door(
+                        facing,
+                        upper = values["half"] == "upper",
+                        open = values["open"] == "true",
+                        hinge = values["hinge"],
+                    )
                 }
 
                 name.endsWith("_fence") -> Fence(
