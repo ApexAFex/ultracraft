@@ -39,6 +39,8 @@ class Hud(
         itemNameAlpha: Float,
         /** Остаток и максимум прочности предмета в руке (или null). */
         durability: Pair<Int, Int>? = null,
+        /** Готовность удара: 0 сразу после удара, 1 когда перезарядка прошла. */
+        attackCooldown: Float = 1f,
     ) {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
@@ -46,6 +48,11 @@ class Hud(
         val armourPoints = inventory?.armourPoints() ?: 0
         drawHotbar(inventory, s)
         drawOffhand(inventory, s)
+        if (attackCooldown < 1f && inventory != null) {
+            // Слот в руке темнеет, пока идёт перезарядка удара: так видно, что рано бить.
+            val slot = HudLayout.hotbarSlot(inventory.selected, width, height)
+            renderer.rect(slot, 0x000000, (1f - attackCooldown.coerceIn(0f, 1f)) * 0.55f)
+        }
         drawDurability(inventory, durability, s)
         drawBossBars(bossBars)
         drawEffects(effects, s)
@@ -1321,4 +1328,9 @@ fun pingColor(ping: Int): Int = when {
     ping < 300 -> 0xFFFF55
     ping < 600 -> 0xFFAA00
     else -> 0xFF5555
+}
+/** Готовность удара по времени с последнего удара: 0.5 с на полный замах. */
+fun attackCooldown(elapsedNanos: Long): Float {
+    if (elapsedNanos < 0L) return 1f
+    return (elapsedNanos / 500_000_000.0).coerceIn(0.0, 1.0).toFloat()
 }

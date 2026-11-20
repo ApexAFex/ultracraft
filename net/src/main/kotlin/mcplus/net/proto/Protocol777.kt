@@ -82,6 +82,8 @@ object Protocol777 {
         const val BLOCK_DESTRUCTION: Int = 0x05
         /** Заголовок и подвал списка игроков (два компонента NBT). */
         const val TAB_LIST: Int = 0x7D
+        /** Предмет подобран: кто, кем и сколько. */
+        const val TAKE_ITEM: Int = 0x7F
         /** Частицы мира: дым, огонь, искры, брызги. */
         const val LEVEL_PARTICLES: Int = 0x30
         /** Звук в точке мира (ломание, двери, взрывы, мобы). */

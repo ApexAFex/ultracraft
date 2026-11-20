@@ -48,6 +48,15 @@ object GlView {
 /** Чужие трещины на блоке: стадия 0..9 и время, до которого их рисуем. */
 private class RemoteCrack(val stage: Int, val untilNanos: Long)
 
+/** Подобранный предмет: иконка летит от места подбора к игроку. */
+private class Pickup(
+    val icon: String,
+    val fromX: Double,
+    val fromY: Double,
+    val fromZ: Double,
+    val startNanos: Long,
+)
+
 /** Ключ блока для карты трещин: 26 бит на x и z, 12 бит на y. */
 fun blockKey(x: Int, y: Int, z: Int): Long =
     ((x.toLong() and 0x3FFFFFF) shl 38) or
@@ -290,6 +299,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             /** Чужие трещины: ключ — упакованная позиция блока. */
             val remoteCracks = java.util.concurrent.ConcurrentHashMap<Long, RemoteCrack>()
             val remoteCrackPackets = java.util.concurrent.atomic.AtomicInteger()
+            /** Подбор предметов: очередь из сетевого потока и счётчик для отчёта. */
+            val pendingPickups = java.util.concurrent.ConcurrentLinkedQueue<Pickup>()
+            val pickupsCount = java.util.concurrent.atomic.AtomicInteger()
             val soundPackets = java.util.concurrent.atomic.AtomicInteger()
             val serverSounds = java.util.concurrent.atomic.AtomicInteger()
             val particlePackets = java.util.concurrent.atomic.AtomicInteger()
@@ -329,6 +341,20 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 )
                             }
                         }
+                    return
+                }
+                if (packet.id == Protocol777.Play.TAKE_ITEM) {
+                    pickupsCount.incrementAndGet()
+                    runCatching { mcplus.net.readTakeItem(packet.body) }.getOrNull()?.let { take ->
+                        val entity = tracker.byId(take.itemEntityId) ?: return@let
+                        val name = entity.droppedItem?.takeIf { it.itemId >= 0 }
+                            ?.let { itemTable.nameOf(it.itemId) } ?: return@let
+                        pendingPickups += Pickup(
+                            name,
+                            entity.x, entity.y + 0.28, entity.z,
+                            System.nanoTime(),
+                        )
+                    }
                     return
                 }
                 if (packet.id == Protocol777.Play.LEVEL_PARTICLES) {
@@ -619,6 +645,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     )
 
                     val crumbs = ArrayList<Crumb>()
+
+                    /** Летящие к игроку иконки подобранных предметов. */
+                    val pickups = ArrayList<Pickup>()
 
                     /** Начать использование предмета в руке: уходит пакет, включается поза. */
                     fun beginUseItem() {
@@ -2455,6 +2484,31 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
                         if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
+                        // Подбор: иконка предмета летит от места подбора к игроку и тает.
+                        while (true) {
+                            val pickup = pendingPickups.poll() ?: break
+                            pickups += pickup
+                        }
+                        if (pickups.isNotEmpty()) {
+                            val nowPickup = System.nanoTime()
+                            val iterator = pickups.iterator()
+                            while (iterator.hasNext()) {
+                                val pickup = iterator.next()
+                                val t = ((nowPickup - pickup.startNanos) / 250_000_000.0).toFloat()
+                                if (t >= 1f) {
+                                    iterator.remove()
+                                    continue
+                                }
+                                val ease = t * t
+                                worldIcons += Renderer.WorldIcon(
+                                    pickup.fromX + (camera.x - pickup.fromX) * ease,
+                                    pickup.fromY + (camera.y - 0.2 - pickup.fromY) * ease,
+                                    pickup.fromZ + (camera.z - pickup.fromZ) * ease,
+                                    0.3f * (1f - 0.5f * ease),
+                                    atlas.layerForItem(pickup.icon),
+                                )
+                            }
+                        }
                         // Крошки от еды: маленькие иконки самого предмета.
                         for (crumb in crumbs) {
                             worldIcons += Renderer.WorldIcon(
@@ -2661,6 +2715,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 hud.draw(
                                     inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
                                     durability = session?.heldDurability(),
+                                    attackCooldown = if (lastAttackNanos == 0L) {
+                                        1f
+                                    } else {
+                                        attackCooldown(System.nanoTime() - lastAttackNanos)
+                                    },
                                 )
                                 // Индикатор перезарядки удара.
                                 if (lastAttackNanos != 0L) {
@@ -3145,7 +3204,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     textRenderer?.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
-                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}, чужих трещин ${remoteCrackPackets.get()}")
+                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}, чужих трещин ${remoteCrackPackets.get()}, подобрано предметов ${pickupsCount.get()}")
                     println("Игроков в списке: ${playerList.size}, частиц от блоков: $ambientParticles")
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                 }
