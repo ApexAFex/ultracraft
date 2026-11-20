@@ -29,6 +29,9 @@ object Settings {
     var entitiesVolume: Float = 1f
     var ambientVolume: Float = 1f
 
+    /** Субтитры: подпись последнего звука над хотбаром. */
+    var subtitles: Boolean = true
+
     /** Адрес последнего сервера из главного меню. */
     var serverAddress: String = "localhost"
 
@@ -59,6 +62,7 @@ object Settings {
             blocksVolume = properties.getProperty("blocksVolume")?.toFloatOrNull() ?: blocksVolume
             entitiesVolume = properties.getProperty("entitiesVolume")?.toFloatOrNull() ?: entitiesVolume
             ambientVolume = properties.getProperty("ambientVolume")?.toFloatOrNull() ?: ambientVolume
+            subtitles = properties.getProperty("subtitles")?.toBooleanStrictOrNull() ?: subtitles
             serverAddress = properties.getProperty("serverAddress") ?: serverAddress
             println("Настройки: ${file.absolutePath}, музыка=$music, обзор=$fov")
         }
@@ -78,6 +82,7 @@ object Settings {
             properties.setProperty("blocksVolume", blocksVolume.toString())
             properties.setProperty("entitiesVolume", entitiesVolume.toString())
             properties.setProperty("ambientVolume", ambientVolume.toString())
+            properties.setProperty("subtitles", subtitles.toString())
             properties.setProperty("serverAddress", serverAddress)
             file.outputStream().use { properties.store(it, "ultracraft settings") }
         }

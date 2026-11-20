@@ -45,6 +45,20 @@ object GlView {
     /** Блок, который только что стал воздухом: из него сыплются кусочки. */
     private class PendingBreak(val x: Int, val y: Int, val z: Int, val state: Int)
 
+/** Чужие трещины на блоке: стадия 0..9 и время, до которого их рисуем. */
+private class RemoteCrack(val stage: Int, val untilNanos: Long)
+
+/** Ключ блока для карты трещин: 26 бит на x и z, 12 бит на y. */
+fun blockKey(x: Int, y: Int, z: Int): Long =
+    ((x.toLong() and 0x3FFFFFF) shl 38) or
+        ((y.toLong() and 0xFFF) shl 26) or
+        (z.toLong() and 0x3FFFFFF)
+
+fun blockXOf(key: Long): Int = (((key ushr 38) and 0x3FFFFFFL).toInt() shl 6) shr 6
+// Высота мира от -64 до 320: двенадцать бит со знаком, как в позиции протокола.
+fun blockYOf(key: Long): Int = (((key ushr 26) and 0xFFFL).toInt() shl 20) shr 20
+fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
+
     /** Цвет частицы по имени типа: дым серый, огонь оранжевый, искры жёлтые. */
     private fun particleColor(name: String): Int = when {
         "flame" in name || "lava" in name || "fire" in name -> 0xFF7A00
@@ -189,6 +203,8 @@ object GlView {
         heldSlotAtStart: Int = -1,
         /** Снять снимок через столько секунд после первого субтитра. */
         captureAfterSoundSeconds: Double? = null,
+        /** Возродиться сразу после входа, если игрок умер в прошлый раз. */
+        respawnAtStart: Boolean = false,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -271,6 +287,9 @@ object GlView {
             val pendingParticles = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.ParticleSpawn>()
             val pendingSounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.SoundSpawn>()
             val pendingEntitySounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.EntitySoundSpawn>()
+            /** Чужие трещины: ключ — упакованная позиция блока. */
+            val remoteCracks = java.util.concurrent.ConcurrentHashMap<Long, RemoteCrack>()
+            val remoteCrackPackets = java.util.concurrent.atomic.AtomicInteger()
             val soundPackets = java.util.concurrent.atomic.AtomicInteger()
             val serverSounds = java.util.concurrent.atomic.AtomicInteger()
             val particlePackets = java.util.concurrent.atomic.AtomicInteger()
@@ -294,6 +313,22 @@ object GlView {
                         }
                         remeshAround(position.x, position.y, position.z)
                     }
+                    return
+                }
+                if (packet.id == Protocol777.Play.BLOCK_DESTRUCTION) {
+                    remoteCrackPackets.incrementAndGet()
+                    runCatching { mcplus.net.readBlockDestruction(packet.body) }.getOrNull()
+                        ?.let { crack ->
+                            val key = blockKey(crack.x, crack.y, crack.z)
+                            if (crack.stage >= 10) {
+                                remoteCracks.remove(key)
+                            } else {
+                                remoteCracks[key] = RemoteCrack(
+                                    crack.stage.coerceIn(0, 9),
+                                    System.nanoTime() + 1_000_000_000L,
+                                )
+                            }
+                        }
                     return
                 }
                 if (packet.id == Protocol777.Play.LEVEL_PARTICLES) {
@@ -488,6 +523,7 @@ object GlView {
                     // по часам (не по кадрам: скрытое окно рисует без vsync и кадры бегут
                     // вразы быстрее секунд), чтобы самопроверку можно было прогнать без рук.
                     var deathNanos = 0L
+                    var respawnedOnce = false
 
                     /** Сколько полос босса было в прошлом кадре — чтобы напечатать их один раз. */
                     var knownBossBars = -1
@@ -736,7 +772,7 @@ object GlView {
                     var settingRightWasDown = false
                     var settingUpWasDown = false
                     var settingDownWasDown = false
-                    val settingRowWasDown = BooleanArray(8)
+                    val settingRowWasDown = BooleanArray(9)
                     var ambientNanos = 0L
                     var rainSoundNanos = 0L
                     /** Полный экран и запомненное окно; счётчик предметов для звука подбора. */
@@ -1054,7 +1090,11 @@ object GlView {
                             val clicked = input.clickRequested &&
                                 hud.respawnButton().contains(input.mouseX, input.mouseY)
                             val demoRespawn = demo && System.nanoTime() - deathNanos > DEMO_RESPAWN_NANOS
-                            if (input.respawnRequested || clicked || demoRespawn) {
+                            // Для снимков: игрок мог умереть в прошлый заход, и здоровье
+                            // ноль приходит с сервера — тогда возрождаемся без нажатий.
+                            val startRespawn = respawnAtStart && !respawnedOnce
+                            if (input.respawnRequested || clicked || demoRespawn || startRespawn) {
+                                respawnedOnce = true
                                 requestRespawn()
                             }
                         } else {
@@ -2098,6 +2138,7 @@ object GlView {
                         val endermen = ArrayList<PlayerRenderer.Player>()
                         val piglins = ArrayList<PlayerRenderer.Player>()
                         val traders = ArrayList<PlayerRenderer.Player>()
+
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
@@ -2135,6 +2176,7 @@ object GlView {
                                     name in ENDERMAN_TYPES -> endermen += humanoid
                                     name in PIGLIN_TYPES -> piglins += humanoid
                                     name == "wandering_trader" -> traders += humanoid
+
                                     name == "item" -> {                                        // Выпавший предмет: мини-куб блока, если это блок.
                                         val stack = entity.droppedItem
                                         val itemName = stack?.takeIf { it.itemId >= 0 }
@@ -2292,6 +2334,7 @@ object GlView {
                         endermanRenderer.draw(camera, endermen)
                         piglinRenderer.draw(camera, piglins)
                         traderRenderer.draw(camera, traders)
+
                         mobRenderer.draw(camera, mobs)
                         entityRenderer.draw(camera, boxes)
                         if (debris.isNotEmpty()) {
@@ -2366,14 +2409,8 @@ object GlView {
                             val (_, boxHeight, _) = EntityRay.boxOf(entityTypes.nameOf(entity.type))
                             labels += TextRenderer.Label(entity.x, entity.y + boxHeight + 0.35, entity.z, custom)
                         }
-                        // Количество в выпавшей стопке.
-                        for (entity in entities) {
-                            if (entityTypes.nameOf(entity.type) != "item") continue
-                            val count = entity.droppedItem?.itemCount ?: continue
-                            if (count > 1) {
-                                labels += TextRenderer.Label(entity.x, entity.y + 0.55, entity.z, "×$count")
-                            }
-                        }
+                        // Количество выпавшей стопки в мире не пишем: в ванили его видно
+                        // только в слоте, а подпись «×N» поверх предмета закрывала сам предмет.
 
                         if (demo) {
                             // The self-test needs a tag it can read: the nearest player is usually
@@ -2646,6 +2683,11 @@ object GlView {
                             session?.advancements?.poll()?.let {
                                 toastItem = it
                                 toastUntilNanos = nowNs + 4_000_000_000L
+                                // Звук тоста: у испытания он свой, как в ванили.
+                                sound.play(
+                                    if (it.type == 1) "ui.toast.challenge_complete" else "ui.toast.in",
+                                    player.x, player.y, player.z,
+                                )
                             }
                             val toast = toastItem
                             if (toast != null) {
@@ -2662,7 +2704,7 @@ object GlView {
                             }
                             // Субтитры: подпись последнего звука живёт две секунды.
                             val subtitleId = subtitleKey
-                            if (subtitleId != null) {
+                            if (subtitleId != null && Settings.subtitles) {
                                 val age = (nowNs - subtitleAtNanos) / 1_000_000_000.0
                                 if (age in 0.0..2.0) {
                                     val label = mcplus.net.Language.translate(subtitleId) ?: subtitleId
@@ -2687,6 +2729,7 @@ object GlView {
                                 (blocksVolume * 100).toInt(),
                                 (entitiesVolume * 100).toInt(),
                                 (ambientVolume * 100).toInt(),
+                                Settings.subtitles,
                             )
                             if (input.clickRequested) {
                                 when {
@@ -2695,8 +2738,8 @@ object GlView {
                                         GLFW.glfwSetWindowShouldClose(window, true)
                                 }
                             }
-                            // Цифры 1–8 выбирают строку, стрелки меняют её значение.
-                            for (row in 0..7) {
+                            // Цифры 1–9 выбирают строку, стрелки меняют её значение.
+                            for (row in 0..8) {
                                 val pressedRow = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_1 + row) == GLFW.GLFW_PRESS
                                 if (pressedRow && !settingRowWasDown[row]) selectedSetting = row
                                 settingRowWasDown[row] = pressedRow
@@ -2731,6 +2774,10 @@ object GlView {
                                                 entitiesVolume = (entitiesVolume + 0.1f * step).coerceIn(0f, 1f)
                                                 sound.entitiesVolume = entitiesVolume
                                             }
+                                            8 -> {
+                                                Settings.subtitles = step > 0
+                                                Settings.save()
+                                            }
                                             else -> {
                                                 ambientVolume = (ambientVolume + 0.1f * step).coerceIn(0f, 1f)
                                                 sound.ambientVolume = ambientVolume
@@ -2760,6 +2807,28 @@ object GlView {
                             val stage = ((miningTicks * 10) / miningNeeded).coerceIn(0, 9)
                             val layer = atlas.layerFor("destroy_stage_$stage", TextureAtlas.Kind.SIDE)
                             renderer.drawCracks(camera, miningX, miningY, miningZ, layer.toFloat())
+                        }
+                        // Чужие трещины: сервер присылает их пакетом `Block Destruction`.
+                        if (remoteCracks.isNotEmpty()) {
+                            val cracksNow = System.nanoTime()
+                            val iterator = remoteCracks.entries.iterator()
+                            while (iterator.hasNext()) {
+                                val entry = iterator.next()
+                                if (cracksNow > entry.value.untilNanos) {
+                                    iterator.remove()
+                                    continue
+                                }
+                                val key = entry.key
+                                val layer = atlas.layerFor(
+                                    "destroy_stage_${entry.value.stage}",
+                                    TextureAtlas.Kind.SIDE,
+                                )
+                                renderer.drawCracks(
+                                    camera,
+                                    blockXOf(key), blockYOf(key), blockZOf(key),
+                                    layer.toFloat(),
+                                )
+                            }
                         }
 
                         val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
@@ -2998,7 +3067,7 @@ object GlView {
                     textRenderer?.close()
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
-                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}")
+                    println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}, чужих трещин ${remoteCrackPackets.get()}")
                     println("Игроков в списке: ${playerList.size}")
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                 }

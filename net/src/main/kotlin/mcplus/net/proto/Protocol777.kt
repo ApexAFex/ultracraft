@@ -78,6 +78,8 @@ object Protocol777 {
         const val TELEPORT_ENTITY: Int = 0x23
         const val CHUNK_DATA: Int = 0x2E
         const val BLOCK_UPDATE: Int = 0x08
+        /** Чужое ломание блока: стадии трещин. */
+        const val BLOCK_DESTRUCTION: Int = 0x05
         /** Частицы мира: дым, огонь, искры, брызги. */
         const val LEVEL_PARTICLES: Int = 0x30
         /** Звук в точке мира (ломание, двери, взрывы, мобы). */

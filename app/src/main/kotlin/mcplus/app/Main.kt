@@ -941,6 +941,7 @@ private fun windowCommand(args: List<String>) {
     var captureAfterUseSeconds: Double? = null
     var heldSlotAtStart = -1
     var captureAfterSoundSeconds: Double? = null
+    var respawnAtStart = false
     var particleDemo = false
     var pauseAtStart = false
     var cameraModeAtStart = 0
@@ -967,6 +968,7 @@ private fun windowCommand(args: List<String>) {
                 (args.getOrNull(++index)?.toIntOrNull() ?: fail("--held ждёт номер 1..9")) - 1
             "--after-sound" -> captureAfterSoundSeconds =
                 args.getOrNull(++index)?.toDoubleOrNull() ?: fail("--after-sound ждёт секунды")
+            "--respawn" -> respawnAtStart = true
             "--particles" -> particleDemo = true
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
@@ -1090,6 +1092,7 @@ private fun windowCommand(args: List<String>) {
             captureAfterUseSeconds = captureAfterUseSeconds,
             heldSlotAtStart = heldSlotAtStart,
             captureAfterSoundSeconds = captureAfterSoundSeconds,
+            respawnAtStart = respawnAtStart,
             particleDemo = particleDemo,
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
@@ -1521,6 +1524,7 @@ private fun printUsage() {
     --after-use N  снять снимок через N секунд после начала еды
     --held N       выбрать слот хотбара 1..9 после входа
     --after-sound N снять снимок через N секунд после первого субтитра
+    --respawn      возродиться сразу после входа (если умер в прошлый раз)
           --yaw N, --pitch N  повернуть камеру для снимка (градусы)
           --open x,y,z   (window) кликнуть правой кнопкой по блоку — проверка контейнеров
           --frames N     выйти после N кадров, сохранив снимок в --out

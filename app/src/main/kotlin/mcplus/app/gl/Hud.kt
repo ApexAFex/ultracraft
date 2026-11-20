@@ -486,6 +486,7 @@ class Hud(
         blocksVolumePercent: Int = 100,
         entitiesVolumePercent: Int = 100,
         ambientVolumePercent: Int = 100,
+        subtitles: Boolean = true,
     ): List<HudRect> {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
@@ -565,6 +566,12 @@ class Hud(
                     firstX,
                     quit.y + 94f * s,
                     "${if (selected == 7) "> " else ""}Окружение: $ambientVolumePercent%  (8)",
+                    s * 0.7f,
+                ),
+                TextRenderer.ScreenLabel(
+                    firstX,
+                    quit.y + 104f * s,
+                    "${if (selected == 8) "> " else ""}Субтитры: ${if (subtitles) "вкл" else "выкл"}  (9)",
                     s * 0.7f,
                 ),
             ),
