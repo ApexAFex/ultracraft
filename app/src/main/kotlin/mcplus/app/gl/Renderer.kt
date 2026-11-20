@@ -549,16 +549,21 @@ class Renderer(
      * Это не ванильная 3D-модель руки, но именно так игрок видит, что у него в руке:
      * иконка висит на расстоянии 0.6 блока и не участвует в проверке глубины.
      */
-    fun drawHandItem(camera: Camera, layer: Float) {
+    fun drawHandItem(camera: Camera, layer: Float, raise: Float = 0f, bob: Float = 0f) {
         val forward = camera.forward()
         val right = camera.right()
         val up = camera.up()
         val distance = 0.8f
         val side = 0.33f
-        val centreX = camera.x.toFloat() + forward[0] * distance + right[0] * side - up[0] * side
-        val centreY = camera.y.toFloat() + forward[1] * distance + right[1] * side - up[1] * side
-        val centreZ = camera.z.toFloat() + forward[2] * distance + right[2] * side - up[2] * side
-        drawIcons(camera, centreX, centreY, centreZ, listOf(Icon(0f, 0f, 0.28f, layer)))
+        // Обычная рука — справа снизу; во время еды предмет уходит к середине лица.
+        val r = raise.coerceIn(0f, 1f)
+        val x = camera.x.toFloat() + forward[0] * (distance - 0.3f * r) +
+            right[0] * (side - 0.23f * r) - up[0] * (side + bob - 0.27f * r)
+        val y = camera.y.toFloat() + forward[1] * (distance - 0.3f * r) +
+            right[1] * (side - 0.23f * r) - up[1] * (side + bob - 0.27f * r)
+        val z = camera.z.toFloat() + forward[2] * (distance - 0.3f * r) +
+            right[2] * (side - 0.23f * r) - up[2] * (side + bob - 0.27f * r)
+        drawIcons(camera, x, y, z, listOf(Icon(0f, 0f, 0.28f, layer)))
     }
 
     /** Wireframe cube around the targeted block. */

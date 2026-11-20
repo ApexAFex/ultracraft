@@ -179,6 +179,16 @@ object GlView {
         particleTable: mcplus.net.ParticleTable = mcplus.net.ParticleTable.EMPTY,
         /** Таблица звуков: номер из реестра → имя события для `sounds.json`. */
         soundEvents: mcplus.net.SoundEventTable = mcplus.net.SoundEventTable.EMPTY,
+        /** Предметы с анимацией использования: что едят, что пьют и сколько это длится. */
+        consumables: mcplus.net.Consumables = mcplus.net.Consumables.EMPTY,
+        /** На каком кадре нажать «использовать предмет» — проверка еды без мыши. */
+        useItemAtFrame: Int = -1,
+        /** Снять снимок через столько секунд после начала еды (проверка позы). */
+        captureAfterUseSeconds: Double? = null,
+        /** Какой слот хотбара выбрать после входа (0..8), -1 — не трогать. */
+        heldSlotAtStart: Int = -1,
+        /** Снять снимок через столько секунд после первого субтитра. */
+        captureAfterSoundSeconds: Double? = null,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -398,6 +408,13 @@ object GlView {
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
                     sound.musicEnabled = Settings.music
+                    // Субтитры: последняя подпись звука и время её показа.
+                    var subtitleKey: String? = null
+                    var subtitleAtNanos = 0L
+                    sound.onSubtitle = { key ->
+                        subtitleKey = key
+                        subtitleAtNanos = System.nanoTime()
+                    }
                     println("Музыка: включена=${sound.musicEnabled}, треков=${sound.musicTracks}")
                     var musicKeyWasDown = false
                     var containerWasOpen = false
@@ -531,6 +548,48 @@ object GlView {
 
                     /** Время последнего взмаха рукой — от него идёт анимация кисти. */
                     var swingNanos = 0L
+
+                    /**
+                     * Еда и питьё: когда начали, когда закончим и когда следующий звук.
+                     *
+                     * Сервер сам съедает предмет за то же время, поэтому анимация живёт
+                     * столько же и не ждёт никакого ответа: ответ придёт эффектами.
+                     */
+                    var useStartNanos = 0L
+                    var useEndNanos = 0L
+                    var useSoundNanos = 0L
+                    var usingItem: String? = null
+                    var usingKind: mcplus.net.Consumable? = null
+                    var useTriggered = false
+
+                    /** Крошки от еды: маленькие иконки предмета, падающие на землю. */
+                    class Crumb(
+                        var x: Double,
+                        var y: Double,
+                        var z: Double,
+                        var vx: Double,
+                        var vy: Double,
+                        var vz: Double,
+                        var life: Float,
+                        val layer: Int,
+                    )
+
+                    val crumbs = ArrayList<Crumb>()
+
+                    /** Начать использование предмета в руке: уходит пакет, включается поза. */
+                    fun beginUseItem() {
+                        val name = session?.inventory?.heldName() ?: return
+                        session?.send(
+                            mcplus.net.BlockInteraction.useItem(sequence++, -player.yaw, -player.pitch),
+                        )
+                        val kind = consumables.of(name)
+                        if (kind == null) return
+                        usingItem = name
+                        usingKind = kind
+                        useStartNanos = System.nanoTime()
+                        useEndNanos = useStartNanos + (kind.seconds * 1_000_000_000.0).toLong()
+                        useSoundNanos = useStartNanos
+                    }
 
                     /** Set by the frame loop, consumed by the tick: one mining step per tick. */
                     var holdRequested = false
@@ -1464,6 +1523,9 @@ object GlView {
                                 playerLoadedSent = true
                                 // Дальность из настроек: сервер меняет радиус стриминга чанков.
                                 session?.sendClientInformation(viewDistance)
+                                // Слот для снимков: еду выдают уже после входа, и она
+                                // попадает в первый свободный слот — значит, его и держим.
+                                if (heldSlotAtStart in 0..8) session?.selectSlot(heldSlotAtStart)
                                 println("Отправлено Player Loaded")
                             }
 
@@ -1825,6 +1887,61 @@ object GlView {
                             }
                         }
 
+                        // Еда и питьё: пока рука поднята, через каждые 0.2 с слышно жевание
+                        // и летят крошки. Длительность пришла из данных игры, а не из головы.
+                        val nowUseNanos = System.nanoTime()
+                        val kind = usingKind
+                        val itemName = usingItem
+                        if (kind != null && itemName != null) {
+                            if (nowUseNanos >= useEndNanos ||
+                                session?.inventory?.heldName() != itemName
+                            ) {
+                                usingKind = null
+                                usingItem = null
+                            } else {
+                                if (nowUseNanos >= useSoundNanos) {
+                                    useSoundNanos = nowUseNanos + 200_000_000L
+                                    if (kind.sound.isNotEmpty()) {
+                                        sound.play(kind.sound, player.x, player.y, player.z)
+                                    }
+                                    if (kind.particles) {
+                                        val layer = atlas.layerForItem(itemName)
+                                        repeat(2) {
+                                            val random = java.util.Random()
+                                            val forward = camera.forward()
+                                            val right = camera.right()
+                                            val up = camera.up()
+                                            crumbs += Crumb(
+                                                camera.x + forward[0] * 0.45 + right[0] * 0.1 -
+                                                    up[0] * 0.05,
+                                                camera.y + forward[1] * 0.45 + right[1] * 0.1 -
+                                                    up[1] * 0.05,
+                                                camera.z + forward[2] * 0.45 + right[2] * 0.1 -
+                                                    up[2] * 0.05,
+                                                (random.nextDouble() - 0.5) * 0.6,
+                                                -0.4 - random.nextDouble() * 0.5,
+                                                (random.nextDouble() - 0.5) * 0.6,
+                                                0.6f,
+                                                layer,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (crumbs.isNotEmpty()) {
+                            val iterator = crumbs.iterator()
+                            while (iterator.hasNext()) {
+                                val piece = iterator.next()
+                                piece.vy -= 9.0 * debrisDelta
+                                piece.x += piece.vx * debrisDelta
+                                piece.y += piece.vy * debrisDelta
+                                piece.z += piece.vz * debrisDelta
+                                piece.life -= debrisDelta
+                                if (piece.life <= 0f) iterator.remove()
+                            }
+                        }
+
                         // Частицы из `Level Particles`: у каждой свой цвет и короткая жизнь.
                         while (true) {
                             val spawn = pendingParticles.poll() ?: break
@@ -2036,20 +2153,19 @@ object GlView {
                                                 yaw = (nowNanos / 1_000_000_000.0 * 1.4 + entity.id).toFloat(),
                                             )
                                         } else if (itemName != null) {
-                                            // Инструмент, еда, слиток: парящий кубик с иконкой
-                                            // на гранях, как предмет в ванили, а не плоская
-                                            // наклейка у самой земли.
-                                            val layer = atlas.layerForItem(itemName)
-                                            val bob = kotlin.math.sin(nowNanos / 1_000_000_000.0 * 2 + entity.id) * 0.07
-                                            cubes += Renderer.BlockCube(
+                                            // Инструмент, еда, слиток: плоская иконка,
+                                            // поднятая над землёй. Куб из такой текстуры
+                                            // выглядит рваным: у иконок прозрачные поля,
+                                            // и вместо предмета видна его вырезанная тень.
+                                            val bob = kotlin.math.sin(
+                                                nowNanos / 1_000_000_000.0 * 2 + entity.id,
+                                            ) * 0.07
+                                            worldIcons += Renderer.WorldIcon(
                                                 entity.x,
-                                                entity.y + 0.22 + bob,
+                                                entity.y + 0.28 + bob,
                                                 entity.z,
-                                                0.3f,
-                                                layer,
-                                                layer,
-                                                layer,
-                                                yaw = (nowNanos / 1_000_000_000.0 * 1.6 + entity.id).toFloat(),
+                                                0.34f,
+                                                atlas.layerForItem(itemName),
                                             )
                                         }
                                     }
@@ -2224,6 +2340,12 @@ object GlView {
                         }
                         // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
                         if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
+                        // Крошки от еды: маленькие иконки самого предмета.
+                        for (crumb in crumbs) {
+                            worldIcons += Renderer.WorldIcon(
+                                crumb.x, crumb.y, crumb.z, 0.09f, crumb.layer,
+                            )
+                        }
                         if (worldIcons.isNotEmpty()) renderer.drawWorldIcons(camera, worldIcons)
                         // Only players are in the tab list, so only they get a nametag.
                         val labels = entities.mapNotNull { entity ->
@@ -2317,6 +2439,16 @@ object GlView {
                             } else {
                                 0f
                             }
+                            // Еда и питьё: поза зависит от времени, а не от кадров.
+                            val usePose = if (usingItem == handItemName && usingKind != null) {
+                                val seconds = (useEndNanos - useStartNanos) / 1_000_000_000.0
+                                UsePoseMath.pose(
+                                    ((System.nanoTime() - useStartNanos) / 1_000_000_000.0).toFloat(),
+                                    seconds.toFloat(),
+                                )
+                            } else {
+                                UsePose(0f, 0f)
+                            }
                             val handState = blocks.firstStateOf(handItemName)
                             if (cameraMode == 0) {
                                 if (handState != null) {
@@ -2344,7 +2476,12 @@ object GlView {
                                         depthTest = false,
                                     )
                                 } else {
-                                    renderer.drawHandItem(camera, atlas.layerForItem(handItemName).toFloat())
+                                    renderer.drawHandItem(
+                                        camera,
+                                        atlas.layerForItem(handItemName).toFloat(),
+                                        usePose.raise,
+                                        usePose.bob,
+                                    )
                                 }
                             } else if (handState != null) {
                                 // Рука сбоку от тела: вперёд и вправо от лица игрока.
@@ -2523,6 +2660,17 @@ object GlView {
                                 val alpha = actionBarAlpha(session?.actionBarAtNanos ?: 0L, nowNs)
                                 hud.drawActionBar(bar, alpha)
                             }
+                            // Субтитры: подпись последнего звука живёт две секунды.
+                            val subtitleId = subtitleKey
+                            if (subtitleId != null) {
+                                val age = (nowNs - subtitleAtNanos) / 1_000_000_000.0
+                                if (age in 0.0..2.0) {
+                                    val label = mcplus.net.Language.translate(subtitleId) ?: subtitleId
+                                    hud.drawSubtitle(label, (1.0 - age / 2.0).toFloat())
+                                } else {
+                                    subtitleKey = null
+                                }
+                            }
                             val title = session?.titleText
                             if (title != null) {
                                 val age = (System.nanoTime() - (session?.titleAtNanos ?: 0L)) / 1_000_000_000.0
@@ -2682,9 +2830,17 @@ object GlView {
                         if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
                             rightDown && !rightWasDown && target == null
                         ) {
-                            session?.send(
-                                mcplus.net.BlockInteraction.useItem(sequence++, -player.yaw, -player.pitch),
-                            )
+                            beginUseItem()
+                        }
+                        // Проверка без мыши: щелчок мимо блока на заданном кадре. Ждём,
+                        // пока в руке появится предмет, — он приходит от сервера позже.
+                        if (useItemAtFrame >= 0 && frame >= useItemAtFrame && !useTriggered &&
+                            !inventoryOpen && !advancementsOpen && openContainer == null && !dead &&
+                            session?.inventory?.heldName() != null
+                        ) {
+                            useTriggered = true
+                            println("Использовать предмет: ${session?.inventory?.heldName() ?: "пусто"}")
+                            beginUseItem()
                         }
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         // Демо бьёт ближайшую сущность, если она в пределах руки.
@@ -2753,8 +2909,21 @@ object GlView {
                         middleWasDown = middleDown
 
                         val elapsedSeconds = (System.nanoTime() - windowStartedAt) / 1_000_000_000.0
-                        val captureNow = (captureAfterSeconds != null && elapsedSeconds >= captureAfterSeconds) ||
-                            (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames)
+                        // Снимок позы еды: отсчёт идёт от начала использования предмета,
+                        // а не от открытия окна, иначе время зависит от скорости входа.
+                        val useSeconds = if (useStartNanos != 0L) {
+                            (System.nanoTime() - useStartNanos) / 1_000_000_000.0
+                        } else {
+                            -1.0
+                        }
+                        val captureNow =
+                            (captureAfterSeconds != null && elapsedSeconds >= captureAfterSeconds) ||
+                                (captureAfterFrames > 0 && frame + 1 >= captureAfterFrames) ||
+                                (captureAfterUseSeconds != null && useSeconds >= 0.0 &&
+                                    useSeconds >= captureAfterUseSeconds) ||
+                                (captureAfterSoundSeconds != null && subtitleAtNanos != 0L &&
+                                    (System.nanoTime() - subtitleAtNanos) / 1_000_000_000.0 >=
+                                    captureAfterSoundSeconds)
                         if (captureNow) {
                             // Self-test: report what the walk animation saw, so a screenshot can be
                             // checked against numbers instead of guesswork.

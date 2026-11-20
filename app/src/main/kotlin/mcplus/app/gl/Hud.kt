@@ -199,6 +199,27 @@ class Hud(
         )
     }
 
+    /** Строка субтитров: что именно прозвучало, над хотбаром. */
+    fun drawSubtitle(value: String, alpha: Float = 1f) {
+        if (alpha <= 0.01f) return
+        val text = this.text ?: return
+        val s = HudLayout.scale(height).toFloat()
+        val bar = HudLayout.hotbar(width, height)
+        val scale = s * 0.85f
+        val widthPx = text.textWidth(value, scale)
+        text.drawScreen(
+            listOf(
+                TextRenderer.ScreenLabel(
+                    (width - widthPx) / 2f,
+                    bar.y - 24f * s,
+                    value,
+                    scale,
+                ),
+            ),
+            alpha = alpha,
+        )
+    }
+
     /** Большой заголовок и подзаголовок по центру, гаснут через несколько секунд. */
     fun drawTitle(title: String, subtitle: String?, alpha: Float) {
         val text = this.text ?: return

@@ -937,6 +937,10 @@ private fun windowCommand(args: List<String>) {
     var debug = false
     var showTab = false
     var startAdvancements = false
+    var useItemAtFrame = -1
+    var captureAfterUseSeconds: Double? = null
+    var heldSlotAtStart = -1
+    var captureAfterSoundSeconds: Double? = null
     var particleDemo = false
     var pauseAtStart = false
     var cameraModeAtStart = 0
@@ -955,6 +959,14 @@ private fun windowCommand(args: List<String>) {
             "--debug" -> debug = true
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
+            "--use-item" -> useItemAtFrame =
+                args.getOrNull(++index)?.toIntOrNull() ?: fail("--use-item ждёт номер кадра")
+            "--after-use" -> captureAfterUseSeconds =
+                args.getOrNull(++index)?.toDoubleOrNull() ?: fail("--after-use ждёт секунды")
+            "--held" -> heldSlotAtStart =
+                (args.getOrNull(++index)?.toIntOrNull() ?: fail("--held ждёт номер 1..9")) - 1
+            "--after-sound" -> captureAfterSoundSeconds =
+                args.getOrNull(++index)?.toDoubleOrNull() ?: fail("--after-sound ждёт секунды")
             "--particles" -> particleDemo = true
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
@@ -1074,6 +1086,10 @@ private fun windowCommand(args: List<String>) {
             debug = debug,
             showTab = showTab,
             startAdvancements = startAdvancements,
+            useItemAtFrame = useItemAtFrame,
+            captureAfterUseSeconds = captureAfterUseSeconds,
+            heldSlotAtStart = heldSlotAtStart,
+            captureAfterSoundSeconds = captureAfterSoundSeconds,
             particleDemo = particleDemo,
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
@@ -1084,6 +1100,7 @@ private fun windowCommand(args: List<String>) {
             itemTable = findItemTable(),
             particleTable = findParticleTable(),
             soundEvents = findSoundEventTable(),
+            consumables = findConsumables(),
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
@@ -1324,6 +1341,13 @@ private fun findSoundEventTable(): mcplus.net.SoundEventTable {
     return table
 }
 
+/** Предметы с анимацией использования, сгенерированы `tools/build-consumable-table.js`. */
+private fun findConsumables(): mcplus.net.Consumables {
+    val file = tableCandidates("consumables-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.Consumables.EMPTY
+    return mcplus.net.Consumables.load(file)
+}
+
 /** Data component names for item patches, generated with `tools/build-component-table.js`. */
 private fun findComponentTable(): mcplus.net.ComponentTable {
     val file = tableCandidates("components-777.tsv").firstOrNull { it.isFile }
@@ -1493,6 +1517,10 @@ private fun printUsage() {
           --debug        отладочные строки F3 (FPS, координаты, чанки)
           --tab          список игроков по Tab
           --advancements открыть экран достижений (клавиша L в игре)
+    --use-item N   нажать «использовать предмет» на кадре N (проверка еды)
+    --after-use N  снять снимок через N секунд после начала еды
+    --held N       выбрать слот хотбара 1..9 после входа
+    --after-sound N снять снимок через N секунд после первого субтитра
           --yaw N, --pitch N  повернуть камеру для снимка (градусы)
           --open x,y,z   (window) кликнуть правой кнопкой по блоку — проверка контейнеров
           --frames N     выйти после N кадров, сохранив снимок в --out

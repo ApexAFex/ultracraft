@@ -60,5 +60,33 @@ object SoundCatalog {
         }
     }
 
+    /**
+     * Ключи субтитров: событие → `subtitles.…`.
+     *
+     * `sounds.json` держит подпись рядом с событием, поэтому её не надо придумывать.
+     * У событий-ссылок (`type: event`) своей подписи обычно нет — берём подпись цели.
+     */
+    fun subtitles(json: String): Map<String, String> {
+        val root = runCatching { Json.parseToJsonElement(json).jsonObject }.getOrNull()
+            ?: return emptyMap()
+        val direct = HashMap<String, String>()
+        val references = HashMap<String, String>()
+        for ((event, value) in root) {
+            val obj = runCatching { value.jsonObject }.getOrNull() ?: continue
+            obj["subtitle"]?.let { subtitle ->
+                val key = runCatching { subtitle.jsonPrimitive.content }.getOrNull()
+                if (!key.isNullOrBlank()) direct[event] = key
+            }
+            val first = obj["sounds"]?.jsonArray?.firstOrNull() as? JsonObject
+            val type = first?.get("type")?.let { (it as? JsonPrimitive)?.content }
+            val target = first?.get("name")?.let { (it as? JsonPrimitive)?.content }
+            if (type == "event" && target != null) references[event] = target
+        }
+        for ((event, target) in references) {
+            if (event !in direct) direct[target]?.let { direct[event] = it }
+        }
+        return direct
+    }
+
     private const val MAX_DEPTH = 5
 }

@@ -23,3 +23,6 @@ ultracraft-error.txt
 settings.properties
 app/settings.properties
 logs/
+generated/
+libraries/
+versions/

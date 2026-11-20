@@ -24,11 +24,25 @@ import kotlin.math.floor
  */
 class SoundEngine(private val directory: File?) : Closeable {
 
+    private val soundsJson: String? =
+        GameFiles.readAsset(directory, "minecraft/sounds.json")?.decodeToString()
+
     private val catalog: Map<String, List<String>> =
-        GameFiles.readAsset(directory, "minecraft/sounds.json")
-            ?.decodeToString()
-            ?.let { SoundCatalog.parse(it) }
-            ?: emptyMap()
+        soundsJson?.let { SoundCatalog.parse(it) } ?: emptyMap()
+
+    private val subtitles: Map<String, String> =
+        soundsJson?.let { SoundCatalog.subtitles(it) } ?: emptyMap()
+
+    /** Подпись звука (`subtitles.…`), если событие её описало. */
+    fun subtitleOf(event: String): String? = subtitles[event]
+
+    /**
+     * Куда сообщать подпись сыгранного звука.
+     *
+     * Движок не знает про экран: он лишь говорит, что именно прозвучало, а строка
+     * субтитров живёт в HUD.
+     */
+    var onSubtitle: ((String) -> Unit)? = null
 
     private val random = Random()
     private val buffers = HashMap<String, Int>()
@@ -186,6 +200,7 @@ class SoundEngine(private val directory: File?) : Closeable {
         AL10.alSourcef(source, AL10.AL_PITCH, pitch.coerceIn(0.5f, 2f))
         AL10.alSourcePlay(source)
         played++
+        subtitleOf(event)?.let { key -> onSubtitle?.invoke(key) }
     }
 
     private fun volumeOf(category: SoundCategory): Float = when (category) {
