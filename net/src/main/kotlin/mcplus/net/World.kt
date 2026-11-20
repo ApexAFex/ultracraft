@@ -82,10 +82,40 @@ class World(val minY: Int) {
     // Concurrent: the render thread reads blocks while worker threads build meshes.
     private val chunks = ConcurrentHashMap<Long, ChunkColumn>()
 
+    /**
+     * Сырые тела `Chunk Data` для дискового кэша.
+     *
+     * Хранятся не для всех чанков: [pruneRaw] оставляет только окрестность игрока, иначе
+     * память растёт вместе с исследованным миром (тело чанка — это ещё и свет, ~100 КБ).
+     */
+    private val rawBodies = ConcurrentHashMap<Long, ByteArray>()
+
     val chunkCount: Int get() = chunks.size
 
     fun add(column: ChunkColumn) {
         chunks[key(column.x, column.z)] = column
+    }
+
+    /** Запоминает чанк вместе с исходным телом пакета — из него потом пишется кэш. */
+    fun addChunkRaw(body: ByteArray, sectionCount: Int): ChunkColumn {
+        val column = addChunk(body, sectionCount)
+        rawBodies[key(column.x, column.z)] = body
+        return column
+    }
+
+    /** Тело уже разобранного чанка (сборщик начальных чанков). */
+    fun keepRaw(column: ChunkColumn, body: ByteArray) {
+        rawBodies[key(column.x, column.z)] = body
+    }
+
+    fun rawChunks(): Map<Long, ByteArray> = HashMap(rawBodies)
+
+    /** Оставляет сырые тела только вокруг точки: всё остальное и так есть в памяти чанков. */
+    fun pruneRaw(chunkX: Int, chunkZ: Int, radius: Int) {
+        rawBodies.keys.removeIf { key ->
+            kotlin.math.abs(chunkOfX(key) - chunkX) > radius ||
+                kotlin.math.abs(chunkOfZ(key) - chunkZ) > radius
+        }
     }
 
     fun column(chunkX: Int, chunkZ: Int): ChunkColumn? = chunks[key(chunkX, chunkZ)]

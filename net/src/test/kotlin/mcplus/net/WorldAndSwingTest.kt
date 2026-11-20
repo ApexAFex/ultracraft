@@ -27,6 +27,20 @@ class WorldAndSwingTest {
     }
 
     @Test
+    fun `raw chunk bodies are pruned to a radius`() {
+        val world = World(minY = 0)
+        world.add(ChunkColumn(0, 0, emptyList()))
+        world.add(ChunkColumn(8, 0, emptyList()))
+        world.keepRaw(world.column(0, 0)!!, byteArrayOf(1))
+        world.keepRaw(world.column(8, 0)!!, byteArrayOf(2))
+        assertEquals(2, world.rawChunks().size)
+
+        world.pruneRaw(0, 0, radius = 2)
+        assertEquals(1, world.rawChunks().size)
+        assertEquals(1.toByte(), world.rawChunks()[World.key(0, 0)]!!.single())
+    }
+
+    @Test
     fun `swing progress goes from zero to one`() {
         val entity = TrackedEntity(7, UUID.randomUUID(), 0)
         assertEquals(0f, entity.swingProgress(System.nanoTime()))

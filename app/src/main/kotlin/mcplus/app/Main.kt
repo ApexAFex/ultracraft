@@ -959,11 +959,39 @@ private fun windowCommand(args: List<String>) {
     val session = connect(host, port, options)
 
     session.use {
+        val collector = WorldCollector(it)
+        val world = mcplus.net.World(collector.minY)
+        val dimension = it.joinResult.joinGame.dimensionName
+        val cache = mcplus.app.ChunkCache(worldCacheDirectory(host, port))
+
+        // Нальём кэш в мир до ожидания сервера. Позиция игрока приходит вместе с чанками,
+        // поэтому центр берётся из прошлой сессии; уточним его после сбора.
+        fun seedCache(from: Pair<Int, Int>): Int {
+            var added = 0
+            for (body in cache.load(dimension, from.first, from.second, CACHE_RADIUS)) {
+                runCatching {
+                    val reader = mcplus.protocol.ByteReader(body)
+                    val chunkX = reader.readInt()
+                    val chunkZ = reader.readInt()
+                    if (world.isLoaded(chunkX, chunkZ)) return@runCatching
+                    val column = world.addChunkRaw(body, collector.chunkSections)
+                    for (entity in column.blockEntities) {
+                        it.signs.accept(entity.x, entity.y, entity.z, entity.tag)
+                    }
+                    added++
+                }
+            }
+            return added
+        }
+
+        val savedCenter = cache.lastCenter(dimension)
+        var seeded = savedCenter?.let { seedCache(it) } ?: 0
+
         // Only a small area is awaited; the rest streams in while the window is open.
         // Everything else read meanwhile is replayed into the client: the server announces
         // entities and the player list once, and those packets must not be thrown away.
         val replay = ArrayList<mcplus.protocol.Packet>()
-        val world = WorldCollector(it).collect(maxChunks = 25, durationMs = 1_500) { packet ->
+        collector.collect(world, maxChunks = 25, durationMs = 1_500) { packet ->
             replay += packet
         }
         if (world.chunkCount == 0) fail("Сервер не прислал ни одного чанка за отведённое время")
@@ -971,6 +999,10 @@ private fun windowCommand(args: List<String>) {
         val position = it.playerPosition
         val centerChunkX = if (position != null) floor(position.x / 16.0).toInt() else 0
         val centerChunkZ = if (position != null) floor(position.z / 16.0).toInt() else 0
+        if (savedCenter != null && (savedCenter.first != centerChunkX || savedCenter.second != centerChunkZ)) {
+            seeded += seedCache(centerChunkX to centerChunkZ)
+        }
+        if (seeded > 0) println("Из кэша мира: $seeded чанков")
 
         println("Профиль: ${it.joinResult.profile.name} (${it.joinResult.profile.uuid})")
 
@@ -1003,6 +1035,14 @@ private fun windowCommand(args: List<String>) {
 
         // The window is gone by now; if the server kicked us, say so instead of ending
         // silently — a bare console window closing looks exactly like a crash.
+        val savedChunks = cache.save(
+            dimension,
+            it.playerPosition?.let { pos -> floor(pos.x / 16.0).toInt() } ?: 0,
+            it.playerPosition?.let { pos -> floor(pos.z / 16.0).toInt() } ?: 0,
+            world.rawChunks(),
+        )
+        println("Кэш мира: $savedChunks чанков ($dimension)")
+
         val closedByServer = it.closedByServer
         val reason = it.closeReason
         if (closedByServer && reason != null) {
@@ -1242,6 +1282,21 @@ private fun loadLanguage() {
         println("Строк перевода: ${texts.size}")
     }.onFailure { println("Языковой файл не прочитан: ${it.message}") }
 }
+
+/**
+ * Где лежит кэш чанков для этого сервера: `.mcplus/world-cache/<host>_<port>`.
+ *
+ * Рядом с настройками (`resolveStoreFile`), а не в текущем каталоге: иначе запуск из
+ * `app/` и из `dist/ultracraft/` писал бы разные кэши для одного и того же мира.
+ */
+private fun worldCacheDirectory(host: String, port: Int): java.io.File {
+    val base = resolveStoreFile(null).parentFile ?: java.io.File(".mcplus")
+    val slug = (host + "_" + port).replace(Regex("[^A-Za-z0-9_.-]"), "_")
+    return java.io.File(java.io.File(base, "world-cache"), slug)
+}
+
+/** Радиус кэша в чанках: 13×13 вокруг игрока — это мгновенно видимые окрестности. */
+private const val CACHE_RADIUS = 6
 
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
     // Разбор стеков читает компонент износа; таблица должна быть готова до первого пакета.

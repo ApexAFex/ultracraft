@@ -18,19 +18,24 @@ class WorldCollector(private val session: Session) {
 
     private val sectionCount: Int = dimension?.sectionCount ?: 24
 
+    /** Сколько секций в чанке этого измерения: нужно и кэшу, и разбору. */
+    val chunkSections: Int get() = sectionCount
+
     val minY: Int = dimension?.minY ?: -64
 
     /**
+     * @param world мир, куда складывать чанки. Передаётся заранее, чтобы налить в него
+     *        дисковый кэш до ожидания сервера.
      * @param onPacket everything except chunk data, in arrival order. The server announces
      *        entities and the player list **once**, so packets read while waiting for the first
      *        chunks must not be dropped: the caller replays them into its trackers.
      */
     fun collect(
+        world: World = World(minY),
         maxChunks: Int = 441,
         durationMs: Long = 6_000,
         onPacket: (mcplus.protocol.Packet) -> Unit = {},
     ): World {
-        val world = World(minY)
         val startedAt = System.currentTimeMillis()
         var deadline = startedAt + durationMs
         var askedForRespawn = false
@@ -51,8 +56,7 @@ class WorldCollector(private val session: Session) {
                     continue
                 }
                 if (packet.id == Protocol777.Play.CHUNK_DATA) {
-                    val column = readChunkColumn(packet.body, sectionCount)
-                    world.add(column)
+                    val column = world.addChunkRaw(packet.body, sectionCount)
                     // Таблички в чанке: текст лежит в блок-сущностях, отдельного пакета для
                     // уже стоящих табличек сервер не шлёт.
                     for (entity in column.blockEntities) {

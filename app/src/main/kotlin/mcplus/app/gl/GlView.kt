@@ -304,7 +304,7 @@ object GlView {
                     // A chunk that fails to parse is a hole in the world, so say so instead of
                     // swallowing the exception: silent holes are impossible to diagnose.
                     runCatching {
-                        val column = world.addChunk(packet.body, sectionCount)
+                        val column = world.addChunkRaw(packet.body, sectionCount)
                         // Faces towards an unloaded chunk are drawn (see MeshBuilder), so the
                         // neighbours do not have to be re-meshed when a chunk arrives; the
                         // duplicate faces are coplanar and invisible.
@@ -1415,6 +1415,16 @@ object GlView {
                             tickCount++
                             steps++
                             tickAccumulator -= TICK_SECONDS
+
+                            // Сырые тела чанков нужны только для кэша: держим окрестность,
+                            // иначе исследованный мир копил бы по ~100 КБ на чанк.
+                            if (tickCount % 20L == 0L) {
+                                world.pruneRaw(
+                                    kotlin.math.floor(player.x).toInt() shr 4,
+                                    kotlin.math.floor(player.z).toInt() shr 4,
+                                    6,
+                                )
+                            }
 
                             if (demo && tickCount % 20L == 0L) {
                                 val vitalsNow = session?.vitals
