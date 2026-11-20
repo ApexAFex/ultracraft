@@ -61,6 +61,22 @@ object BlockInteraction {
             .toByteArray()
         return Packet(Protocol777.Play.USE_ITEM_ON, body)
     }
+
+    /**
+     * `Use Item` — правый клик по воздуху: еда, лук, жемчуг, зелье.
+     *
+     * Формат 26.3: рука, sequence, поворот по горизонтали и вертикали. Углы — в тех же
+     * единицах, что у движения (наш yaw инвертирован относительно протокола).
+     */
+    fun useItem(sequence: Int, yaw: Float, pitch: Float, hand: Int = 0): Packet {
+        val body = ByteWriter()
+            .writeVarInt(hand)
+            .writeVarInt(sequence)
+            .writeFloat(yaw)
+            .writeFloat(pitch)
+            .toByteArray()
+        return Packet(Protocol777.Play.USE_ITEM, body)
+    }
 }
 
 

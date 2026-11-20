@@ -39,4 +39,17 @@ class PlayerActionCodesTest {
         assertEquals(1, reader.readByte().toInt())
         assertEquals(7, reader.readVarInt())
     }
+
+    @Test
+    fun `use item carries hand, sequence and both angles`() {
+        val packet = BlockInteraction.useItem(sequence = 5, yaw = 90f, pitch = -10f)
+        assertEquals(mcplus.net.proto.Protocol777.Play.USE_ITEM, packet.id)
+        val reader = ByteReader(packet.body)
+
+        assertEquals(0, reader.readVarInt(), "основная рука")
+        assertEquals(5, reader.readVarInt())
+        assertEquals(90f, reader.readFloat())
+        assertEquals(-10f, reader.readFloat())
+        assertEquals(0, reader.remaining)
+    }
 }

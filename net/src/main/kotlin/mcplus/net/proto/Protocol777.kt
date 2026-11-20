@@ -150,6 +150,7 @@ object Protocol777 {
         const val SET_CARRIED_ITEM: Int = 0x36
         const val SWING_ARM: Int = 0x3F
         const val USE_ITEM_ON: Int = 0x42
+        const val USE_ITEM: Int = 0x43
     }
 }
 

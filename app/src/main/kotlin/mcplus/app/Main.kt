@@ -51,6 +51,7 @@ private fun dispatch(args: List<String>) {
         args[0] == "watch" -> watchCommand(args.drop(1))
         args[0] == "mine" -> mineCommand(args.drop(1))
         args[0] == "place" -> placeCommand(args.drop(1))
+        args[0] == "use" -> useItemCommand(args.drop(1))
         args[0] == "hotbar" -> hotbarCommand(args.drop(1))
         args[0] == "hud" -> hudCommand(args.drop(1))
         args[0] == "textures" -> texturesCommand(args.drop(1))
@@ -785,6 +786,50 @@ private fun placeCommand(args: List<String>) {
     }
 }
 
+// ---------------------------------------------------------------- use
+
+/**
+ * Проверка `Use Item`: правый клик по воздуху (еда, лук, жемчуг).
+ *
+ * Клиент шлёт пакет несколько раз за секунду и печатает еду и эффекты: так видно, принял
+ * ли сервер действие. В окне тот же пакет уходит по правому клику мимо блока.
+ */
+private fun useItemCommand(args: List<String>) {
+    var seconds = 8
+    var slot = 0
+    val rest = ArrayList<String>()
+    var index = 0
+    while (index < args.size) {
+        when (args[index]) {
+            "--seconds" -> seconds = args.getOrNull(++index)?.toIntOrNull() ?: fail("--seconds требует число")
+            "--slot" -> slot = args.getOrNull(++index)?.toIntOrNull()?.minus(1) ?: fail("--slot требует число 1..9")
+            else -> rest += args[index]
+        }
+        index++
+    }
+    if (slot !in 0..8) fail("--slot ждёт число от 1 до 9")
+    val options = parseLoginArgs(rest) ?: return
+    val (host, port) = parseAddress(options.target ?: DEFAULT_TARGET)
+    val session = connect(host, port, options)
+
+    session.use { open ->
+        open.startReading { }
+        // В руке должен быть нужный предмет, иначе сервер просто проигнорирует действие.
+        open.selectSlot(slot)
+        Thread.sleep(600)
+        val until = System.currentTimeMillis() + seconds * 1000L
+        var sequence = 0
+        println("Жму «использовать предмет» $seconds с; в руке: ${open.inventory.heldName() ?: "пусто"}")
+        println("Еда: ${open.vitals.food}, эффекты: ${open.effects.snapshot().joinToString { it.name }}")
+        while (System.currentTimeMillis() < until) {
+            open.send(mcplus.net.BlockInteraction.useItem(sequence++, 0f, 0f))
+            Thread.sleep(400)
+        }
+        println("Еда: ${open.vitals.food}, эффекты: ${open.effects.snapshot().joinToString { it.name }}")
+        println("В руке: ${open.inventory.heldName() ?: "пусто"}")
+    }
+}
+
 // ---------------------------------------------------------------- login
 
 private fun loginCommand(args: List<String>) {
@@ -1413,6 +1458,7 @@ private fun printUsage() {
           mcplus textures [блок]...                 какие текстуры игра ставит блоку
           mcplus container --at x,y,z [--click N]   открыть сундук/верстак и показать слоты
           mcplus chunkdump [host[:port]]            сохранить сырые пакеты чанков
+          mcplus use [--slot N] [--seconds N]      нажать «использовать предмет» и показать еду/эффекты
 
         Флаги:
           --protocol N   версия протокола, по умолчанию 777

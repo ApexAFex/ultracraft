@@ -615,6 +615,7 @@ object GlView {
                     /** Здоровье и смерть в прошлом кадре — чтобы звук был один раз. */
                     var lastHealth = Float.NaN
                     var lastDead = false
+                    var lastFood = -1
 
                     /** Прокрутка чата (PageUp/PageDown) и скрытый F1 интерфейс. */
                     var chatScroll = 0
@@ -775,6 +776,13 @@ object GlView {
                             lastLevel = levelNow
                             lastHealth = healthNow
                             lastDead = dead
+                            // Еда выросла — значит, поели: сытый звук, как в ванили.
+                            val foodNow = vitals.food
+                            if (lastFood >= 0 && foodNow > lastFood) {
+                                sound.play("entity.player.burp", player.x, player.y, player.z)
+                                println("Еда: $lastFood → $foodNow")
+                            }
+                            lastFood = foodNow
                         }
                         val bossBars = session?.bossBars?.snapshot() ?: emptyList()
                         val effects = session?.effects?.snapshot() ?: emptyList()
@@ -2593,6 +2601,15 @@ object GlView {
                             rightDown && !rightWasDown && target != null
                         ) {
                             demoPlace(target)
+                        }
+                        // Правый клик по воздуху — `Use Item`: так едят, натягивают лук и
+                        // бросают жемчуг. Раньше клик мимо блока просто пропадал.
+                        if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
+                            rightDown && !rightWasDown && target == null
+                        ) {
+                            session?.send(
+                                mcplus.net.BlockInteraction.useItem(sequence++, -player.yaw, -player.pitch),
+                            )
                         }
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         // Демо бьёт ближайшую сущность, если она в пределах руки.
