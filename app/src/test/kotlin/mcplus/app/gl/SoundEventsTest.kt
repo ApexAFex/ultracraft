@@ -25,6 +25,18 @@ class SoundEventsTest {
     }
 
     @Test
+    fun `server sound source maps to a volume category`() {
+        assertEquals(SoundCategory.BLOCKS, SoundCategories.ofSource(4))
+        assertEquals(SoundCategory.ENTITIES, SoundCategories.ofSource(5))
+        assertEquals(SoundCategory.ENTITIES, SoundCategories.ofSource(6))
+        assertEquals(SoundCategory.ENTITIES, SoundCategories.ofSource(7))
+        assertEquals(SoundCategory.AMBIENT, SoundCategories.ofSource(8))
+        assertEquals(SoundCategory.MUSIC, SoundCategories.ofSource(2))
+        assertEquals(SoundCategory.UI, SoundCategories.ofSource(10))
+        assertEquals(SoundCategory.OTHER, SoundCategories.ofSource(0))
+    }
+
+    @Test
     fun `events fall into the right volume category`() {
         assertEquals(SoundCategory.BLOCKS, SoundCategories.of("block.stone.break"))
         assertEquals(SoundCategory.BLOCKS, SoundCategories.of("item.bucket.fill"))

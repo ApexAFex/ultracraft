@@ -43,20 +43,22 @@ data class SoundSpawn(
     val z: Double,
     val volume: Float,
     val pitch: Float,
+    /** Категория из пакета: блоки, мобы, окружение, игроки, музыка. */
+    val source: Int,
 )
 
 /** `Sound` (0x77): реестровый номер звука, категория, точка, громкость, высота, seed. */
 fun readSound(body: ByteArray, table: SoundEventTable): SoundSpawn? {
     val reader = ByteReader(body)
     val name = readSoundEvent(reader, table) ?: return null
-    reader.readVarInt() // категория: громкость уже есть в пакете, для игры она не важна
+    val source = reader.readVarInt()
     val x = reader.readInt() / 8.0
     val y = reader.readInt() / 8.0
     val z = reader.readInt() / 8.0
     val volume = reader.readFloat()
     val pitch = reader.readFloat()
     reader.readLong() // seed выбора варианта
-    return SoundSpawn(name, x, y, z, volume, pitch)
+    return SoundSpawn(name, x, y, z, volume, pitch, source)
 }
 
 /**
@@ -67,12 +69,12 @@ fun readSound(body: ByteArray, table: SoundEventTable): SoundSpawn? {
 fun readEntitySound(body: ByteArray, table: SoundEventTable): EntitySoundSpawn? {
     val reader = ByteReader(body)
     val name = readSoundEvent(reader, table) ?: return null
-    reader.readVarInt() // категория
+    val source = reader.readVarInt()
     val entityId = reader.readVarInt()
     val volume = reader.readFloat()
     val pitch = reader.readFloat()
     reader.readLong() // seed
-    return EntitySoundSpawn(name, entityId, volume, pitch)
+    return EntitySoundSpawn(name, entityId, volume, pitch, source)
 }
 
 /** Звук сущности: id и громкость; позиция подставляется трекером. */
@@ -81,6 +83,7 @@ data class EntitySoundSpawn(
     val entityId: Int,
     val volume: Float,
     val pitch: Float,
+    val source: Int,
 )
 
 /**

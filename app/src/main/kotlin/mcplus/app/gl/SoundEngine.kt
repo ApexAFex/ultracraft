@@ -182,6 +182,7 @@ class SoundEngine(private val directory: File?) : Closeable {
         fallback: String? = null,
         volume: Float = 1f,
         pitch: Float = 1f,
+        source: Int? = null,
     ) {
         if (!available) return
         requested++
@@ -193,8 +194,8 @@ class SoundEngine(private val directory: File?) : Closeable {
         AL10.alSourceStop(source)
         AL10.alSourcei(source, AL10.AL_BUFFER, buffer)
         AL10.alSource3f(source, AL10.AL_POSITION, x.toFloat(), y.toFloat(), z.toFloat())
-        val gain = masterVolume * 0.8f * volumeOf(SoundCategories.of(event)) *
-            volume.coerceIn(0f, 1f)
+        val category = source?.let { SoundCategories.ofSource(it) } ?: SoundCategories.of(event)
+        val gain = masterVolume * 0.8f * volumeOf(category) * volume.coerceIn(0f, 1f)
         AL10.alSourcef(source, AL10.AL_GAIN, gain)
         // Ванильная высота: 0.5…2.0. OpenAL сам растягивает время, менять его не нужно.
         AL10.alSourcef(source, AL10.AL_PITCH, pitch.coerceIn(0.5f, 2f))
@@ -207,6 +208,7 @@ class SoundEngine(private val directory: File?) : Closeable {
         SoundCategory.BLOCKS -> blocksVolume
         SoundCategory.ENTITIES -> entitiesVolume
         SoundCategory.AMBIENT -> ambientVolume
+        SoundCategory.MUSIC -> musicVolume
         SoundCategory.UI, SoundCategory.OTHER -> 1f
     }
 
@@ -280,9 +282,24 @@ class StepSoundTimer {
 private const val STEP_DISTANCE = 1.8
 
 /** Категория звука: по ней в настройках задаётся отдельная громкость. */
-enum class SoundCategory { BLOCKS, ENTITIES, AMBIENT, UI, OTHER }
+enum class SoundCategory { BLOCKS, ENTITIES, AMBIENT, MUSIC, UI, OTHER }
 
 object SoundCategories {
+
+    /**
+     * Категория из пакета `Sound`: `SoundSource.ordinal()`.
+     *
+     * Порядок ванильных источников: master, music, records, weather, blocks, hostile,
+     * neutral, players, ambient, voice, ui.
+     */
+    fun ofSource(ordinal: Int): SoundCategory = when (ordinal) {
+        4 -> SoundCategory.BLOCKS
+        5, 6, 7 -> SoundCategory.ENTITIES
+        3, 8 -> SoundCategory.AMBIENT
+        1, 2 -> SoundCategory.MUSIC
+        10 -> SoundCategory.UI
+        else -> SoundCategory.OTHER
+    }
 
     fun of(event: String): SoundCategory = when {
         event.startsWith("block.") || event.startsWith("item.") -> SoundCategory.BLOCKS

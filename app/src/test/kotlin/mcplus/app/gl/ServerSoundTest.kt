@@ -45,6 +45,7 @@ class ServerSoundTest {
         assertEquals(-10.0, sound.z, 0.0001)
         assertEquals(0.8f, sound.volume, 0.0001f)
         assertEquals(1.2f, sound.pitch, 0.0001f)
+        assertEquals(4, sound.source) // блоки
     }
 
     @Test
@@ -106,5 +107,6 @@ class ServerSoundTest {
         assertEquals(1234, sound.entityId)
         assertEquals(0.7f, sound.volume, 0.0001f)
         assertEquals(0.9f, sound.pitch, 0.0001f)
+        assertEquals(6, sound.source) // нейтральные мобы
     }
 }

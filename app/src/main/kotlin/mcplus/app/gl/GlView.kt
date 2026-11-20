@@ -523,6 +523,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     // по часам (не по кадрам: скрытое окно рисует без vsync и кадры бегут
                     // вразы быстрее секунд), чтобы самопроверку можно было прогнать без рук.
                     var deathNanos = 0L
+                    /** Фаза покачивания вида при ходьбе и время последнего урона. */
+                    var walkBobPhase = 0.0
+                    var hurtTiltNanos = 0L
                     var respawnedOnce = false
 
                     /** Сколько полос босса было в прошлом кадре — чтобы напечатать их один раз. */
@@ -897,6 +900,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             if (!lastHealth.isNaN() && healthNow < lastHealth - 0.01f) {
                                 sound.play("entity.player.hurt", player.x, player.y, player.z)
                                 damageFlashNanos = System.nanoTime()
+                                hurtTiltNanos = System.nanoTime()
                             }
                             if (dead && !lastDead) {
                                 sound.play("entity.player.death", player.x, player.y, player.z)
@@ -1555,6 +1559,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val moved = kotlin.math.hypot(player.x - previousX, player.z - previousZ)
                                 selfWalkDistance += moved
                                 selfSpeed = moved / TICK_SECONDS
+                                // Фаза покачивания вида растёт от пройденного пути, а не от
+                                // времени: стоя на месте картинка не должна дёргаться.
+                                if (player.onGround) walkBobPhase += moved * 2.4
                             }
                             if (ready && !playerLoadedSent) {
                                 // "My terrain is up" — lets the server start ticking us now
@@ -1616,6 +1623,21 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         camera.y = previousY + (player.y - previousY) * alpha +
                             Player.EYE_HEIGHT - (if (sneakHeld) 0.3 else 0.0)
                         camera.z = previousZ + (player.z - previousZ) * alpha
+
+                        // Покачивание вида при ходьбе и крен от урона: формулы в CameraFeel.
+                        val feel = CameraFeel.bob(walkBobPhase, selfSpeed, player.onGround)
+                        if (feel.up != 0f || feel.sway != 0f) {
+                            val rightNow = camera.right()
+                            camera.x += rightNow[0] * feel.sway
+                            camera.z += rightNow[2] * feel.sway
+                            camera.y += feel.up
+                        }
+                        // Крен от урона: короткий наклон камеры, как в ванили.
+                        if (hurtTiltNanos != 0L) {
+                            val tiltAge = (System.nanoTime() - hurtTiltNanos) / 1_000_000_000.0
+                            camera.pitch += CameraFeel.hurtTilt(tiltAge)
+                            if (tiltAge > 0.4) hurtTiltNanos = 0L
+                        }
 
                         // F5: камера отъезжает назад (или вперёд и разворачивается). Стену
                         // она не проходит: расстояние укорачивается до первого твёрдого блока.
@@ -2030,6 +2052,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 spawn.name, spawn.x, spawn.y, spawn.z,
                                 volume = spawn.volume,
                                 pitch = spawn.pitch,
+                                source = spawn.source,
                             )
                             playedThisFrame++
                         }
@@ -2040,6 +2063,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 spawn.name, entity.x, entity.y, entity.z,
                                 volume = spawn.volume,
                                 pitch = spawn.pitch,
+                                source = spawn.source,
                             )
                             playedThisFrame++
                         }
