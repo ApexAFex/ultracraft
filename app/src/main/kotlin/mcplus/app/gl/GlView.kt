@@ -169,6 +169,8 @@ object GlView {
         cameraModeAtStart: Int = 0,
         /** Наклон камеры в градусах на старте: для снимков, где нужен ровный горизонт. */
         pitchAtStart: Float? = null,
+        /** Начальный поворот камеры в градусах (для снимков: сервер и клиент считают yaw по-разному). */
+        yawAtStart: Float? = null,
         /** Таблица типов сущностей: без неё мобы остаются безымянными коробками. */
         entityTypes: mcplus.net.EntityTable = mcplus.net.EntityTable.EMPTY,
         /** Таблица предметов: по id выпавшего предмета находит блок для мини-куба. */
@@ -361,6 +363,11 @@ object GlView {
                         width, height,
                         GameFiles.readPng(directory, "assets/minecraft/textures/entity/piglin/piglin.png"),
                     )
+                    // Странствующий торговец — тот же гуманоид, но в синем халате.
+                    val traderRenderer = PlayerRenderer(
+                        width, height,
+                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/wandering_trader/wandering_trader.png"),
+                    )
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
                     sound.musicEnabled = Settings.music
@@ -395,6 +402,9 @@ object GlView {
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     if (pitchAtStart != null) {
                         camera.pitch = Math.toRadians(pitchAtStart.toDouble()).toFloat()
+                    }
+                    if (yawAtStart != null) {
+                        camera.yaw = Math.toRadians(yawAtStart.toDouble()).toFloat()
                     }
                     val input = Input(window, camera)
                     val chat = ChatInput()
@@ -1916,6 +1926,7 @@ object GlView {
                         val skeletons = ArrayList<PlayerRenderer.Player>()
                         val endermen = ArrayList<PlayerRenderer.Player>()
                         val piglins = ArrayList<PlayerRenderer.Player>()
+                        val traders = ArrayList<PlayerRenderer.Player>()
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
@@ -1952,6 +1963,7 @@ object GlView {
                                     name in SKELETON_TYPES -> skeletons += humanoid
                                     name in ENDERMAN_TYPES -> endermen += humanoid
                                     name in PIGLIN_TYPES -> piglins += humanoid
+                                    name == "wandering_trader" -> traders += humanoid
                                     name == "item" -> {                                        // Выпавший предмет: мини-куб блока, если это блок.
                                         val stack = entity.droppedItem
                                         val itemName = stack?.takeIf { it.itemId >= 0 }
@@ -2039,7 +2051,8 @@ object GlView {
                                 val typeName = entityTypes.nameOf(entity.type)
                                 val isHumanoid = playerList.nameOf(entity.uuid) != null ||
                                     typeName in ZOMBIE_TYPES || typeName in SKELETON_TYPES ||
-                                    typeName in ENDERMAN_TYPES || typeName in PIGLIN_TYPES
+                                    typeName in ENDERMAN_TYPES || typeName in PIGLIN_TYPES ||
+                                    typeName == "wandering_trader"
                                 val height = if (isHumanoid) 1.8f else EntityRay.boxOf(typeName).second
                                 val yawRad = Math.toRadians(entity.yaw.toDouble())
                                 val forwardX = kotlin.math.sin(yawRad).toFloat()
@@ -2101,6 +2114,7 @@ object GlView {
                         skeletonRenderer.draw(camera, skeletons)
                         endermanRenderer.draw(camera, endermen)
                         piglinRenderer.draw(camera, piglins)
+                        traderRenderer.draw(camera, traders)
                         mobRenderer.draw(camera, mobs)
                         entityRenderer.draw(camera, boxes)
                         if (debris.isNotEmpty()) {

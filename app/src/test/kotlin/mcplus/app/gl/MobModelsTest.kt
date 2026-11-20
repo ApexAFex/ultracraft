@@ -38,6 +38,25 @@ class MobModelsTest {
     }
 
     @Test
+    fun `llamas use the quadruped model and are a little taller`() {
+        assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("llama"))
+        assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("trader_llama"))
+        assertTrue(MobModels.scaleOf("llama") > MobModels.scaleOf("cow"))
+    }
+
+    @Test
+    fun `every modelled animal has a texture path`() {
+        for (name in listOf(
+            "cow", "mooshroom", "pig", "sheep", "chicken", "creeper", "spider",
+            "wolf", "fox", "goat", "horse", "donkey", "mule", "llama", "trader_llama",
+            "cat", "ocelot", "rabbit",
+        )) {
+            val path = MobRenderer.TEXTURES[name]
+            assertTrue(path != null && path.endsWith(".png"), "$name без текстуры")
+        }
+    }
+
+    @Test
     fun `legs swing in opposite directions`() {
         val left = MobModels.limbAngle("legFL", phase = 1f, amount = 1f)
         val right = MobModels.limbAngle("legFR", phase = 1f, amount = 1f)

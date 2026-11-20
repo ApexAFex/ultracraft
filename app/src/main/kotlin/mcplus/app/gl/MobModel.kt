@@ -31,7 +31,7 @@ object MobModels {
 
     fun familyOf(entityName: String): MobFamily = when (entityName) {
         "cow", "mooshroom", "pig", "sheep", "goat", "wolf", "fox", "rabbit",
-        "horse", "donkey", "mule", "llama", "ocelot", "cat" -> MobFamily.QUADRUPED
+        "horse", "donkey", "mule", "llama", "trader_llama", "ocelot", "cat" -> MobFamily.QUADRUPED
 
         "chicken", "parrot" -> MobFamily.CHICKEN
         "creeper" -> MobFamily.CREEPER
@@ -48,6 +48,7 @@ object MobModels {
         "fox" -> 0.7f
         "chicken" -> 0.7f
         "parrot" -> 0.6f
+        "llama", "trader_llama" -> 1.2f
         else -> 1f
     }
 

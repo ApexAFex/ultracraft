@@ -941,6 +941,7 @@ private fun windowCommand(args: List<String>) {
     var pauseAtStart = false
     var cameraModeAtStart = 0
     var pitchAtStart: Float? = null
+    var yawAtStart: Float? = null
     var captureAfterSeconds: Double? = null
     var noMenu = false
     var menuShot: String? = null
@@ -963,6 +964,8 @@ private fun windowCommand(args: List<String>) {
             "--menu-shot" -> menuShot = args.getOrNull(++index) ?: fail("--menu-shot ждёт путь")
             "--pitch" -> pitchAtStart =
                 args.getOrNull(++index)?.toFloatOrNull() ?: fail("--pitch ждёт число градусов")
+            "--yaw" -> yawAtStart =
+                args.getOrNull(++index)?.toFloatOrNull() ?: fail("--yaw ждёт число градусов")
             "--after" -> captureAfterSeconds =
                 args.getOrNull(++index)?.toDoubleOrNull() ?: fail("--after ждёт число секунд")
             else -> pass += args[index]
@@ -1075,6 +1078,7 @@ private fun windowCommand(args: List<String>) {
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
             pitchAtStart = pitchAtStart,
+            yawAtStart = yawAtStart,
             captureAfterSeconds = captureAfterSeconds,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
@@ -1470,6 +1474,7 @@ private fun printUsage() {
           --debug        отладочные строки F3 (FPS, координаты, чанки)
           --tab          список игроков по Tab
           --advancements открыть экран достижений (клавиша L в игре)
+          --yaw N, --pitch N  повернуть камеру для снимка (градусы)
           --open x,y,z   (window) кликнуть правой кнопкой по блоку — проверка контейнеров
           --frames N     выйти после N кадров, сохранив снимок в --out
           --demo         самопроверка: ломает и ставит блок, идёт вперёд

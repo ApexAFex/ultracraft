@@ -292,14 +292,32 @@ class MobRenderer(
     }
 
     companion object {
-        /** Породы, для которых есть текстура моба. */
+        /**
+         * Породы, для которых есть текстура моба.
+         *
+         * В 26.3 у коровы, свиньи и курицы нет файлов `cow.png`/`pig.png`/`chicken.png`:
+         * текстуры разложены по климату (`cow_temperate`, `pig_warm`, …). Старые пути
+         * молча давали белую заглушку, поэтому здесь только существующие файлы.
+         */
         val TEXTURES = mapOf(
-            "cow" to "entity/cow/cow.png",
-            "pig" to "entity/pig/pig.png",
+            "cow" to "entity/cow/cow_temperate.png",
+            "mooshroom" to "entity/cow/mooshroom_red.png",
+            "pig" to "entity/pig/pig_temperate.png",
             "sheep" to "entity/sheep/sheep.png",
-            "chicken" to "entity/chicken.png",
+            "chicken" to "entity/chicken/chicken_temperate.png",
             "creeper" to "entity/creeper/creeper.png",
             "spider" to "entity/spider/spider.png",
+            "wolf" to "entity/wolf/wolf.png",
+            "fox" to "entity/fox/fox.png",
+            "goat" to "entity/goat/goat.png",
+            "horse" to "entity/horse/horse_brown.png",
+            "donkey" to "entity/horse/donkey.png",
+            "mule" to "entity/horse/mule.png",
+            "llama" to "entity/llama/llama_creamy.png",
+            "trader_llama" to "entity/llama/llama_creamy.png",
+            "cat" to "entity/cat/cat_tabby.png",
+            "ocelot" to "entity/cat/ocelot.png",
+            "rabbit" to "entity/rabbit/rabbit_brown.png",
         )
 
         /** Сколько чисел на вершину: x, y, z, u, v, shade. */
