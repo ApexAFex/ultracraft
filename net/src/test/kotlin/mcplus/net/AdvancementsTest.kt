@@ -28,12 +28,19 @@ class AdvancementsTest {
         showToast: Boolean = true,
         reset: Boolean = false,
         type: Int = 0,
+        parent: String? = null,
+        x: Float = 0f,
+        y: Float = 0f,
     ): ByteArray {
         val writer = ByteWriter()
         writer.writeBoolean(reset)             // reset
         writer.writeVarInt(1)                  // added
         writer.writeString("minecraft:story/test")
-        writer.writeBoolean(false)             // parent absent
+        if (parent == null) {
+            writer.writeBoolean(false)         // parent absent
+        } else {
+            writer.writeBoolean(true).writeString(parent)
+        }
         writer.writeBoolean(true)              // display present
         writer.writeBytes(nbtText("Test"))
         writer.writeBytes(nbtText("desc"))
@@ -46,7 +53,7 @@ class AdvancementsTest {
         writer.writeVarInt(1)                  // one criterion
         writer.writeString("crit")
         writer.writeBoolean(false)             // telemetry
-        writer.writeFloat(0f).writeFloat(0f)   // position
+        writer.writeFloat(x).writeFloat(y)     // position
         writer.writeVarInt(0)                  // removed
         writer.writeVarInt(1)                  // progress entries
         writer.writeString("minecraft:story/test")
@@ -86,6 +93,33 @@ class AdvancementsTest {
         val advancements = Advancements()
         advancements.onPacket(Protocol777.Play.UPDATE_ADVANCEMENTS, packet(done = true, showToast = false))
         assertNull(advancements.poll())
+    }
+
+    @Test
+    fun `the screen list keeps title, description, icon and position`() {
+        val advancements = Advancements()
+        advancements.onPacket(
+            Protocol777.Play.UPDATE_ADVANCEMENTS,
+            packet(done = true, parent = "minecraft:story/root", x = 1.5f, y = 2f),
+        )
+        val node = advancements.nodes().single()
+        assertEquals("Test", node.title.text)
+        assertEquals("desc", node.description.text)
+        assertEquals(1, node.iconId)
+        assertEquals("minecraft:story/root", node.parent)
+        assertEquals(1.5f, node.x)
+        assertEquals(2f, node.y)
+        assertEquals(true, node.done)
+    }
+
+    @Test
+    fun `an unfinished achievement is not marked done`() {
+        val advancements = Advancements()
+        advancements.onPacket(
+            Protocol777.Play.UPDATE_ADVANCEMENTS,
+            packet(done = false, reset = true),
+        )
+        assertEquals(false, advancements.nodes().single().done)
     }
 
     @Test

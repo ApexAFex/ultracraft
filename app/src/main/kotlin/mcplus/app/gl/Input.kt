@@ -38,6 +38,7 @@ class Input(private val window: Long, private val camera: Camera) {
     private var flyPressed = false
     private var hotbarPressed = -1
     private var inventoryPressed = false
+    private var advancementsPressed = false
     private var escapePressed = false
     private var respawnPressed = false
     private var chatPressed = false
@@ -72,6 +73,10 @@ class Input(private val window: Long, private val camera: Camera) {
 
     /** Set once when E is pressed: open or close the inventory screen. */
     var inventoryToggleRequested: Boolean = false
+        private set
+
+    /** Set once when L is pressed: открыть или закрыть экран достижений. */
+    var advancementsToggleRequested: Boolean = false
         private set
 
     /** Set once when Escape is pressed; the caller decides what to close. */
@@ -236,6 +241,10 @@ class Input(private val window: Long, private val camera: Camera) {
         val inventory = pressed(GLFW.GLFW_KEY_E)
         inventoryToggleRequested = inventory && !inventoryPressed
         inventoryPressed = inventory
+
+        val advancements = pressed(GLFW.GLFW_KEY_L)
+        advancementsToggleRequested = advancements && !advancementsPressed
+        advancementsPressed = advancements
 
         val escape = pressed(GLFW.GLFW_KEY_ESCAPE)
         escapeRequested = escape && !escapePressed

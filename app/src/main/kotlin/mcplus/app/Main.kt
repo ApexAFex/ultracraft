@@ -891,6 +891,7 @@ private fun windowCommand(args: List<String>) {
     var openAt: Triple<Int, Int, Int>? = null
     var debug = false
     var showTab = false
+    var startAdvancements = false
     var particleDemo = false
     var pauseAtStart = false
     var cameraModeAtStart = 0
@@ -907,6 +908,7 @@ private fun windowCommand(args: List<String>) {
             "--open" -> openAt = parsePosition(args.getOrNull(++index) ?: fail("--open требует x,y,z"))
             "--debug" -> debug = true
             "--tab" -> showTab = true
+            "--advancements" -> startAdvancements = true
             "--particles" -> particleDemo = true
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
@@ -1023,6 +1025,7 @@ private fun windowCommand(args: List<String>) {
             openAt = openAt,
             debug = debug,
             showTab = showTab,
+            startAdvancements = startAdvancements,
             particleDemo = particleDemo,
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
@@ -1420,6 +1423,7 @@ private fun printUsage() {
           --hidden       окно без рамки (для снимков)
           --debug        отладочные строки F3 (FPS, координаты, чанки)
           --tab          список игроков по Tab
+          --advancements открыть экран достижений (клавиша L в игре)
           --open x,y,z   (window) кликнуть правой кнопкой по блоку — проверка контейнеров
           --frames N     выйти после N кадров, сохранив снимок в --out
           --demo         самопроверка: ломает и ставит блок, идёт вперёд

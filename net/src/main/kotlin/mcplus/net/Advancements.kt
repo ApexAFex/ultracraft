@@ -29,17 +29,62 @@ class Advancements {
      */
     data class Toast(val title: StyledText, val type: Int)
 
+    /**
+     * Достижение для экрана: то, что нужно нарисовать и показать в подсказке.
+     *
+     * [parent] — родитель в дереве (null у корня вкладки), [x]/[y] — место в сетке
+     * достижений из пакета, [done] — все требования выполнены.
+     */
+    data class Node(
+        val id: String,
+        val parent: String?,
+        val title: StyledText,
+        val description: StyledText,
+        val iconId: Int,
+        val x: Float,
+        val y: Float,
+        val type: Int,
+        val done: Boolean,
+        val hidden: Boolean,
+    )
+
     private data class Entry(
         val title: StyledText,
+        val description: StyledText,
+        val iconId: Int,
+        val parent: String?,
+        val x: Float,
+        val y: Float,
         val type: Int,
+        val hidden: Boolean,
         val showToast: Boolean,
         val requirements: List<List<String>>,
         val criteria: MutableSet<String> = HashSet(),
         var toasted: Boolean = false,
-    )
+    ) {
+        val done: Boolean get() = criteria.isNotEmpty() && requirements.all { group -> group.any { it in criteria } }
+    }
 
     private val entries = ConcurrentHashMap<String, Entry>()
     private val queue = ConcurrentLinkedQueue<Toast>()
+
+    /** Все достижения для экрана, по идентификатору: порядок вкладок задаёт вызывающий. */
+    fun nodes(): List<Node> = entries.entries
+        .sortedBy { it.key }
+        .map { (id, entry) ->
+            Node(
+                id = id,
+                parent = entry.parent,
+                title = entry.title,
+                description = entry.description,
+                iconId = entry.iconId,
+                x = entry.x,
+                y = entry.y,
+                type = entry.type,
+                done = entry.done,
+                hidden = entry.hidden,
+            )
+        }
 
     /** Забрать следующий тост или null. */
     fun poll(): Toast? = queue.poll()
@@ -58,14 +103,9 @@ class Advancements {
         val added = reader.readVarInt()
         repeat(added) {
             val id = reader.readString()
-            val title = readAdvancement(reader) ?: run {
-                reader.readFloat(); reader.readFloat()
-                return@repeat
-            }
-            reader.readFloat()
-            reader.readFloat()
+            val entry = readAdvancement(reader) ?: return@repeat
             // Повторный пакет не должен показывать тот же тост второй раз.
-            entries[id] = title.copy(toasted = entries[id]?.toasted ?: false)
+            entries[id] = entry.copy(toasted = entries[id]?.toasted ?: false)
         }
         val removed = reader.readVarInt()
         repeat(removed) { entries.remove(reader.readString()) }
@@ -79,7 +119,7 @@ class Advancements {
 
     /** @return запись или null, если у достижения нет отображаемой информации. */
     private fun readAdvancement(reader: ByteReader): Entry? {
-        if (reader.readBoolean()) reader.readString() // parent
+        val parent = if (reader.readBoolean()) reader.readString() else null
         val entry = if (reader.readBoolean()) readDisplay(reader) else null
         val groups = reader.readVarInt()
         val requirements = ArrayList<List<String>>(groups)
@@ -88,24 +128,38 @@ class Advancements {
             requirements += List(count) { reader.readString() }
         }
         reader.readBoolean() // sendsTelemetryEvent
-        return entry?.copy(requirements = requirements)
+        val x = reader.readFloat()
+        val y = reader.readFloat()
+        return entry?.copy(parent = parent, x = x, y = y, requirements = requirements)
     }
 
     private fun readDisplay(reader: ByteReader): Entry {
         val title = StyledText(componentRuns(NbtReader.read(reader)))
-        NbtReader.read(reader) // description
-        skipItemTemplate(reader) // иконка; её компоненты нужны только для картинки
+        val description = StyledText(componentRuns(NbtReader.read(reader)))
+        val iconId = skipItemTemplate(reader)
         val type = reader.readVarInt()
         val flags = reader.readInt()
         if (flags and 1 != 0) reader.readString() // background
-        return Entry(title, type = type, showToast = flags and 2 != 0, requirements = emptyList())
+        return Entry(
+            title = title,
+            description = description,
+            iconId = iconId,
+            parent = null,
+            x = 0f,
+            y = 0f,
+            type = type,
+            hidden = flags and 4 != 0,
+            showToast = flags and 2 != 0,
+            requirements = emptyList(),
+        )
     }
 
     /** Иконка — ItemStackTemplate: предмет, количество и набор компонентов. */
-    private fun skipItemTemplate(reader: ByteReader) {
-        reader.readVarInt() // предмет
+    private fun skipItemTemplate(reader: ByteReader): Int {
+        val itemId = reader.readVarInt()
         reader.readVarInt() // количество
         skipComponentPatch(reader)
+        return itemId
     }
 
     /**

@@ -254,6 +254,206 @@ class Hud(
         else -> mcplus.net.Language.translate("advancements.toast.task") ?: "Advancement Made!"
     }
 
+    /**
+     * Экран достижений: вкладки, дерево, значки и подсказка под курсором.
+     *
+     * @return прямоугольники вкладок — по ним кликает вызывающий.
+     */
+    fun drawAdvancementsScreen(
+        tabs: List<AdvancementsScreen.Tab>,
+        selected: Int,
+        itemName: (Int) -> String?,
+        mouseX: Double,
+        mouseY: Double,
+    ): List<HudRect> {
+        val text = this.text ?: return emptyList()
+        if (tabs.isEmpty()) {
+            val s = HudLayout.scale(height).toFloat()
+            renderer.begin()
+            renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x06090F, 0.9f)
+            renderer.draw()
+            text.drawScreen(
+                listOf(
+                    TextRenderer.ScreenLabel(
+                        (width - text.textWidth("Достижения ещё не пришли", s)) / 2f,
+                        height * 0.45f,
+                        "Достижения ещё не пришли",
+                        s,
+                        0x9FB8D0,
+                    ),
+                ),
+            )
+            return emptyList()
+        }
+        val s = HudLayout.scale(height).toFloat()
+        val panel = HudRect(20f * s, 16f * s, width - 40f * s, height - 32f * s)
+        val tabWidth = 40f * s
+        val tabHeight = 16f * s
+        val tabY = panel.y + 30f * s
+        val tabRects = ArrayList<HudRect>(tabs.size)
+        for (index in tabs.indices) {
+            tabRects += HudRect(panel.x + 6f * s + index * (tabWidth + 5f * s), tabY, tabWidth, tabHeight)
+        }
+
+        val index = selected.coerceIn(0, tabs.lastIndex)
+        val tab = tabs[index]
+        val treeArea = HudRect(
+            panel.x + 8f * s,
+            tabY + tabHeight + 8f * s,
+            panel.width - 16f * s,
+            panel.bottom - (tabY + tabHeight + 8f * s) - 8f * s,
+        )
+        val layout = AdvancementsScreen.layoutFor(tab.nodes, treeArea, s)
+        val step = layout.step
+        val icon = layout.icon
+        val centerX = layout.centerX
+        val centerY = layout.centerY
+        val visible = tab.nodes.filter(AdvancementsScreen::visible)
+        val byId = visible.associateBy { it.id }
+        val hovered = AdvancementsScreen.hit(visible, centerX, centerY, step, icon, mouseX, mouseY)
+
+        // Панель и вкладки.
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x06090F, 0.9f)
+        renderer.rect(panel, 0x121821, 0.97f)
+        for ((tabIndex, rect) in tabRects.withIndex()) {
+            val color = when {
+                tabIndex == index -> 0x2F4E6B
+                rect.contains(mouseX, mouseY) -> 0x24384C
+                else -> 0x1A2430
+            }
+            renderer.rect(rect, color, 1f)
+        }
+        renderer.draw()
+
+        // Линии дерева и значки: сначала связи, затем иконки.
+        renderer.begin()
+        for (node in visible) {
+            val parent = node.parent?.let { byId[it] } ?: continue
+            val from = AdvancementsScreen.nodeRect(parent, centerX, centerY, step, icon)
+            val to = AdvancementsScreen.nodeRect(node, centerX, centerY, step, icon)
+            // Связь рисуется точками: у мелочи нет шейдера линий, а сплошной прямоугольник
+            // под произвольным углом здесь не повернуть.
+            val color = if (node.done) 0x8FD46A else 0x5A6570
+            val dots = 8
+            for (dot in 1 until dots) {
+                val t = dot.toFloat() / dots
+                val dotX = from.centreX + (to.centreX - from.centreX) * t
+                val dotY = from.centreY + (to.centreY - from.centreY) * t
+                renderer.rect(dotX - 1.5f * s, dotY - 1.5f * s, 3f * s, 3f * s, color, 0.9f)
+            }
+        }
+        for (node in visible) {
+            val rect = AdvancementsScreen.nodeRect(node, centerX, centerY, step, icon)
+            val name = itemName(node.iconId)
+            val layer = name?.let { atlas.layerForItem(it) } ?: -1
+            if (layer >= 0) renderer.icon(rect, layer) else renderer.rect(rect, 0x3A4450, 1f)
+        }
+        renderer.draw()
+
+        // Рамки: выполненное — зелёное, остальное притемнено.
+        renderer.begin()
+        for (node in visible) {
+            val rect = AdvancementsScreen.nodeRect(node, centerX, centerY, step, icon)
+            if (node.done) {
+                val border = 2f * s
+                renderer.rect(rect.x - border, rect.y - border, rect.width + border * 2f, border, 0x8FD46A, 1f)
+                renderer.rect(rect.x - border, rect.bottom, rect.width + border * 2f, border, 0x8FD46A, 1f)
+                renderer.rect(rect.x - border, rect.y, border, rect.height, 0x8FD46A, 1f)
+                renderer.rect(rect.right, rect.y, border, rect.height, 0x8FD46A, 1f)
+            } else {
+                renderer.rect(rect, 0x000000, 0.45f)
+            }
+        }
+        renderer.draw()
+
+        // Текст: заголовок, вкладки, счётчик.
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        labels += TextRenderer.ScreenLabel(panel.x + 8f * s, panel.y + 7f * s, "Достижения", s * 0.9f)
+        val done = tab.done
+        val total = visible.size
+        val counter = "Выполнено: $done / $total"
+        labels += TextRenderer.ScreenLabel(
+            panel.right - 8f * s - text.textWidth(counter, s * 0.7f),
+            panel.y + 8f * s,
+            counter,
+            s * 0.7f,
+            0x9FB8D0,
+        )
+        for ((tabIndex, rect) in tabRects.withIndex()) {
+            val value = tabs[tabIndex].root.title.text
+            labels += TextRenderer.ScreenLabel(
+                rect.x + 4f * s,
+                rect.y + 4f * s,
+                ellipsize(text, value, rect.width - 8f * s, s * 0.5f),
+                s * 0.5f,
+                if (tabIndex == index) 0xFFFFFF else 0x9FB8D0,
+            )
+        }
+        if (hovered != null) {
+            val tooltipWidth = 170f * s
+            val lines = wrapText(text, hovered.description.text, tooltipWidth - 10f * s, s * 0.55f)
+            val status = if (hovered.done) "Выполнено" else "Не выполнено"
+            val tooltipHeight = (20f + lines.size * 10f + 12f) * s
+            val tooltipX = (mouseX.toFloat() + 10f * s).coerceAtMost(width - tooltipWidth - 4f * s)
+            val tooltipY = (mouseY.toFloat() + 8f * s)
+                .coerceAtMost(height - tooltipHeight - 4f * s)
+                .coerceAtLeast(4f * s)
+            val tip = HudRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight)
+            renderer.begin()
+            renderer.rect(tip, 0x0A0F16, 0.97f)
+            renderer.rect(tip.x, tip.y, 2f * s, tip.height, if (hovered.done) 0x8FD46A else 0x5A6570, 1f)
+            renderer.draw()
+
+            var penX = tip.x + 6f * s
+            for (run in hovered.title.runs) {
+                labels += TextRenderer.ScreenLabel(penX, tip.y + 5f * s, run.text, s * 0.7f, run.color)
+                penX += text.textWidth(run.text, s * 0.7f)
+            }
+            for ((lineIndex, line) in lines.withIndex()) {
+                labels += TextRenderer.ScreenLabel(
+                    tip.x + 6f * s,
+                    tip.y + (18f + lineIndex * 10f) * s,
+                    line,
+                    s * 0.55f,
+                    0x9FB8D0,
+                )
+            }
+            labels += TextRenderer.ScreenLabel(
+                tip.x + 6f * s,
+                tip.bottom - 11f * s,
+                status,
+                s * 0.55f,
+                if (hovered.done) 0x8FD46A else 0x8090A0,
+            )
+        }
+        text.drawScreen(labels)
+        return tabRects
+    }
+
+    private fun ellipsize(text: TextRenderer, value: String, maxWidth: Float, scale: Float): String {
+        if (text.textWidth(value, scale) <= maxWidth) return value
+        var cut = value
+        while (cut.isNotEmpty() && text.textWidth("$cut…", scale) > maxWidth) cut = cut.dropLast(1)
+        return "$cut…"
+    }
+
+    private fun wrapText(text: TextRenderer, value: String, maxWidth: Float, scale: Float): List<String> {
+        val result = ArrayList<String>()
+        var line = StringBuilder()
+        for (word in value.split(' ')) {
+            val candidate = if (line.isEmpty()) word else "$line $word"
+            if (text.textWidth(candidate, scale) <= maxWidth) {
+                line = StringBuilder(candidate)
+            } else {
+                if (line.isNotEmpty()) result += line.toString()
+                line = StringBuilder(word)
+            }
+        }
+        if (line.isNotEmpty()) result += line.toString()
+        return result.take(5)
+    }
+
     /** Меню паузы: затемнение, заголовок, кнопки и настройки; их прямоугольники нужны клику. */
     fun drawPauseMenu(
         fov: Float,

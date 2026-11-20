@@ -159,6 +159,8 @@ object GlView {
         /** Показать отладочные строки (F3) и список игроков (Tab). */
         debug: Boolean = false,
         showTab: Boolean = false,
+        /** Открыть экран достижений сразу (проверка без клавиатуры). */
+        startAdvancements: Boolean = false,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
         particleDemo: Boolean = false,
         /** Открыть меню паузы сразу (для снимка). */
@@ -472,7 +474,7 @@ object GlView {
                             null -> "неизвестно, сервер не сообщил"
                         },
                     )
-                    println("WASD — идти, пробел — прыжок, F — полёт, ЛКМ — сломать, ПКМ — поставить, Esc — выход")
+                    println("WASD — идти, пробел — прыжок, F — полёт, E — инвентарь, L — достижения, ЛКМ — сломать, ПКМ — поставить, Esc — выход")
 
                     // Breaking takes time, and the time is the server's, not ours: it accrues its
                     // own progress per tick and breaks the block when the progress reaches one.
@@ -598,6 +600,12 @@ object GlView {
                     var frame = 0
                     val windowStartedAt = System.nanoTime()
                     var inventoryOpen = false
+
+                    /** Экран достижений (L): вкладки, дерево и подсказка. */
+                    var advancementsOpen = startAdvancements
+                    var advancementTab = 0
+                    var advancementTabRects: List<HudRect> = emptyList()
+                    if (startAdvancements) input.warpCursor(width * 0.5, height * 0.56)
 
                     /** Кадров в секунду для отладочной строки. */
                     var fps = 0
@@ -804,6 +812,16 @@ object GlView {
                             if (openContainer != null) session?.closeContainer()
                             else inventoryOpen = !inventoryOpen
                         }
+                        // L — экран достижений; он не открывается поверх инвентаря и контейнера.
+                        if (input.advancementsToggleRequested && !dead && !chat.open) {
+                            if (openContainer == null && !inventoryOpen) advancementsOpen = !advancementsOpen
+                        }
+                        if (advancementsOpen && input.clickRequested) {
+                            val index = advancementTabRects.indexOfFirst {
+                                it.contains(input.mouseX, input.mouseY)
+                            }
+                            if (index >= 0) advancementTab = index
+                        }
                         if (input.hudToggleRequested && !chat.open) {
                             hudHidden = !hudHidden
                         }
@@ -865,6 +883,7 @@ object GlView {
                                 chat.open -> chat.close()
                                 openContainer != null -> session?.closeContainer()
                                 inventoryOpen -> inventoryOpen = false
+                                advancementsOpen -> advancementsOpen = false
                                 dead -> Unit
                                 paused -> paused = false
                                 else -> paused = true
@@ -911,14 +930,14 @@ object GlView {
                             // Набранное при закрытой строке никуда не идёт: иначе «t», которой
                             // открыли чат, тут же оказалась бы первой буквой сообщения.
                             input.takeTyped()
-                            if (!dead && !inventoryOpen) {
+                            if (!dead && !inventoryOpen && !advancementsOpen) {
                                 if (input.chatOpenRequested) chat.openChat()
                                 if (input.commandOpenRequested) chat.openCommand()
                             }
                         }
                         // Курсор виден, когда им пользуется экран: инвентарь или экран смерти.
                         // Иначе он снова захвачен и управляет камерой.
-                        input.setCursorVisible(inventoryOpen || dead || openContainer != null)
+                        input.setCursorVisible(inventoryOpen || advancementsOpen || dead || openContainer != null)
 
                         // Смерть: сервер выставил здоровье в ноль и перестал стримить мир.
                         // Пока игрок не возродился, ходить и копать некуда — экран смерти
@@ -1354,10 +1373,10 @@ object GlView {
                                 val wasOnGround = player.onGround
                                 player.move(
                                     TICK_SECONDS, world, blocks,
-                                    if (chat.open) 0.0 else forwardInput * inputScale,
-                                    if (chat.open) 0.0 else input.strafe * inputScale,
-                                    if (chat.open) false else input.jump,
-                                    if (chat.open) false else input.descend,
+                                    if (chat.open || advancementsOpen) 0.0 else forwardInput * inputScale,
+                                    if (chat.open || advancementsOpen) 0.0 else input.strafe * inputScale,
+                                    if (chat.open || advancementsOpen) false else input.jump,
+                                    if (chat.open || advancementsOpen) false else input.descend,
                                     sneak = sneakHeld,
                                 )
                                 // Приземление после падения: пыль под ногами и звук шага.
@@ -2290,6 +2309,16 @@ object GlView {
                                 where = "Координаты: %.1f, %.1f, %.1f".format(player.x, player.y, player.z),
                                 worldName = session?.joinResult?.joinGame?.dimensionName,
                             )
+                        } else if (advancementsOpen) {
+                            // Экран достижений: вкладки и дерево; клик по вкладке — выше.
+                            val nodes = session?.advancements?.nodes() ?: emptyList()
+                            advancementTabRects = hud.drawAdvancementsScreen(
+                                AdvancementsScreen.tabs(nodes),
+                                advancementTab,
+                                itemName = { id -> itemTable.nameOf(id) },
+                                mouseX = input.mouseX,
+                                mouseY = input.mouseY,
+                            )
                         } else if (!inventoryOpen && openContainer == null) {
                             val chatLines = session?.chat?.snapshot() ?: emptyList()
                             if (chat.open) {
@@ -2386,7 +2415,7 @@ object GlView {
 
                         // Табло сервера и меню паузы — поверх HUD.
                         val board = session?.scoreboard?.sidebarLines()
-                        if (!hudHidden && !paused && board != null) {
+                        if (!hudHidden && !paused && !advancementsOpen && board != null) {
                             hud.drawScoreboard(board.first, board.second)
                         }
                         // Строка действия и большой заголовок от сервера. Строка держится
@@ -2509,11 +2538,11 @@ object GlView {
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
                         // With the inventory open the same button drags items, so it must not mine.
-                        holdRequested = !inventoryOpen && openContainer == null && !dead && !chat.open && !paused &&
+                        holdRequested = !inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open && !paused &&
                             (leftDown || (demo && frame >= 5 && frame < 900))
 
                         // Удар по сущности: если под прицелом моб ближе блока — бьём его.
-                        if (input.clickRequested && !inventoryOpen && openContainer == null &&
+                        if (input.clickRequested && !inventoryOpen && !advancementsOpen && openContainer == null &&
                             !dead && !chat.open && !demo && !paused
                         ) {
                             val direction = camera.forward()
@@ -2558,9 +2587,9 @@ object GlView {
                                 holdRequested = false
                             }
                         }
-                        aimTarget = if (inventoryOpen || openContainer != null || dead || chat.open) null else miningTarget
+                        aimTarget = if (inventoryOpen || advancementsOpen || openContainer != null || dead || chat.open) null else miningTarget
 
-                        if (!inventoryOpen && openContainer == null && !dead && !chat.open &&
+                        if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
                             rightDown && !rightWasDown && target != null
                         ) {
                             demoPlace(target)
