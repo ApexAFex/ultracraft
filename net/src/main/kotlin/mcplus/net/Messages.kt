@@ -364,11 +364,12 @@ private fun translateArgs(tag: NbtCompound): List<String> =
 
 /**
  * Ванильные ключи, которые реально приходят в чате, переведены на английский: кириллицы
- * в шрифте пока нет, и русские строки превратились бы в пустые квадраты. Неизвестный
- * ключ показывается как есть, чтобы сообщение не пропадало молча.
+ * в шрифте пока нет, и русские строки превратились бы в пустые квадраты. Сначала ищем
+ * ключ в своём словаре, затем в языковом файле игры. Неизвестный ключ показывается как
+ * есть, чтобы сообщение не пропадало молча.
  */
 private fun translateKey(key: String, args: List<String>): String {
-    val format = CHAT_TRANSLATIONS[key]
+    val format = CHAT_TRANSLATIONS[key] ?: Language.translate(key)
         ?: return if (args.isEmpty()) key else "$key(${args.joinToString(", ")})"
     return runCatching { String.format(format, *args.toTypedArray()) }.getOrDefault(key)
 }

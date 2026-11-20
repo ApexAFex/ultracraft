@@ -122,6 +122,7 @@ object Protocol777 {
         const val REMOVE_MOB_EFFECT: Int = 0x4F
         const val SET_ENTITY_DATA: Int = 0x65
         const val SET_EQUIPMENT: Int = 0x68
+        const val UPDATE_ADVANCEMENTS: Int = 0x85
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00

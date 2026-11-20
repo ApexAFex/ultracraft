@@ -886,6 +886,7 @@ private fun resolveStoreFile(explicit: String?): java.io.File {
 
 private fun windowCommand(args: List<String>) {
     mcplus.app.gl.Settings.load()
+    loadLanguage()
     // `--open x,y,z` — проверка контейнеров; `--debug` и `--tab` — снимки отладки и табло.
     var openAt: Triple<Int, Int, Int>? = null
     var debug = false
@@ -1217,6 +1218,29 @@ private fun findComponentTable(): mcplus.net.ComponentTable {
     )
     val file = candidates.firstOrNull { it.isFile } ?: return mcplus.net.ComponentTable.EMPTY
     return mcplus.net.ComponentTable.load(file)
+}
+
+/**
+ * Строки игры для ключей перевода (`advancements.story.mine_stone.title` и подобных).
+ * Файл лежит в jar установленного клиента; если его нет — остаются встроенные переводы,
+ * а незнакомые ключи показываются как есть.
+ */
+private fun loadLanguage() {
+    val bytes = mcplus.app.gl.GameFiles.readBytes(
+        null,
+        "assets/minecraft/lang/en_us.json",
+    ) ?: return
+    runCatching {
+        val root = kotlinx.serialization.json.Json.parseToJsonElement(bytes.toString(Charsets.UTF_8))
+            .let { it as kotlinx.serialization.json.JsonObject }
+        val texts = HashMap<String, String>(root.size)
+        for ((key, value) in root) {
+            val text = (value as? kotlinx.serialization.json.JsonPrimitive)?.content ?: continue
+            texts[key] = text
+        }
+        mcplus.net.Language.load(texts)
+        println("Строк перевода: ${texts.size}")
+    }.onFailure { println("Языковой файл не прочитан: ${it.message}") }
 }
 
 private fun connect(host: String, port: Int, options: LoginOptions): Session {

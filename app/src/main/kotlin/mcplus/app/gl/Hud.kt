@@ -143,10 +143,12 @@ class Hud(
         )
         val right = width - 4f * s
         val left = right - widest - 6f * s
-        var y = height * 0.08f
+        // Табло стоит по центру справа, как в ванили, — иначе тост достижения ложится на него.
+        val panelHeight = (rows.size + 1) * 10f * s + 4f * s
+        var y = (height - panelHeight) / 2f + 2f * s
 
         renderer.begin()
-        renderer.rect(left - 3f * s, y - 2f * s, widest + 10f * s, (rows.size + 1) * 10f * s + 4f * s, 0x000000, 0.45f)
+        renderer.rect(left - 3f * s, y - 2f * s, widest + 10f * s, panelHeight, 0x000000, 0.45f)
         renderer.draw()
 
         /** Кладёт куски строки подряд, начиная с [startX], и возвращает конец. */
@@ -219,6 +221,37 @@ class Hud(
             )
         }
         text.drawScreen(labels, alpha = alpha)
+    }
+
+    /** Тост достижения справа сверху: заголовок с цветами и подпись вида достижения. */
+    fun drawToast(toast: mcplus.net.Advancements.Toast, alpha: Float) {
+        if (alpha <= 0.01f) return
+        val text = this.text ?: return
+        val title = toast.title
+        val s = HudLayout.scale(height).toFloat()
+        val titleWidth = title.runs.sumOf { text.textWidth(it.text, s * 0.85f).toDouble() }.toFloat()
+        val boxWidth = maxOf(150f * s, titleWidth + 16f * s)
+        val x = width - boxWidth - 6f * s
+        val y = height * 0.08f
+        renderer.begin()
+        renderer.rect(x, y, boxWidth, 34f * s, 0x101018, 0.92f * alpha)
+        renderer.rect(x, y, 3f * s, 34f * s, 0xFFD24A, alpha)
+        renderer.draw()
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        labels += TextRenderer.ScreenLabel(x + 8f * s, y + 4f * s, toastLabel(toast.type), s * 0.65f, 0xFFD24A)
+        var pen = x + 8f * s
+        for (run in title.runs) {
+            labels += TextRenderer.ScreenLabel(pen, y + 18f * s, run.text, s * 0.85f, run.color)
+            pen += text.textWidth(run.text, s * 0.85f)
+        }
+        text.drawScreen(labels, alpha = alpha)
+    }
+
+    /** Подпись тоста: вид достижения задаёт текст, как в ванили. */
+    private fun toastLabel(type: Int): String = when (type) {
+        1 -> mcplus.net.Language.translate("advancements.toast.challenge") ?: "Challenge Complete!"
+        2 -> mcplus.net.Language.translate("advancements.toast.goal") ?: "Goal Reached!"
+        else -> mcplus.net.Language.translate("advancements.toast.task") ?: "Advancement Made!"
     }
 
     /** Меню паузы: затемнение, заголовок, кнопки и настройки; их прямоугольники нужны клику. */

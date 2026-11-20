@@ -680,6 +680,8 @@ object GlView {
 
                     /** Когда игрок получил урон: красная вспышка гаснет за 0.4 с. */
                     var damageFlashNanos = 0L
+                    var toastItem: mcplus.net.Advancements.Toast? = null
+                    var toastUntilNanos = 0L
 
                     /** Куски блоков от только что сломанных блоков. */
                     class Debris(
@@ -2381,6 +2383,20 @@ object GlView {
                         // две секунды и гаснет за третью, как в ванили, — иначе она висела бы вечно.
                         if (!hudHidden && !paused) {
                             val nowNs = System.nanoTime()
+                            // Тост достижения живёт четыре секунды и гаснет за последнюю.
+                            session?.advancements?.poll()?.let {
+                                toastItem = it
+                                toastUntilNanos = nowNs + 4_000_000_000L
+                            }
+                            val toast = toastItem
+                            if (toast != null) {
+                                val left = (toastUntilNanos - nowNs) / 1_000_000_000.0
+                                if (left <= 0.0) {
+                                    toastItem = null
+                                } else {
+                                    hud.drawToast(toast, left.coerceIn(0.0, 1.0).toFloat())
+                                }
+                            }
                             session?.actionBar?.takeIf { it.isNotBlank() }?.let { bar ->
                                 val alpha = actionBarAlpha(session?.actionBarAtNanos ?: 0L, nowNs)
                                 hud.drawActionBar(bar, alpha)

@@ -38,6 +38,9 @@ class Session internal constructor(
     /** Тексты табличек по координатам. */
     val signs = Signs()
 
+    /** Достижения и очередь тостов. */
+    val advancements = Advancements()
+
     /** Строка над хотбаром и большой заголовок: приходят компонентами. */    @Volatile
     var actionBar: String? = null
         private set
@@ -228,6 +231,8 @@ class Session internal constructor(
                     serverChunkRadius = runCatching { ByteReader(packet.body).readVarInt() }.getOrDefault(-1)
 
                 Protocol777.Play.BLOCK_ENTITY_DATA -> signs.onPacket(packet.id, packet.body)
+
+                Protocol777.Play.UPDATE_ADVANCEMENTS -> advancements.onPacket(packet.id, packet.body)
 
                 Protocol777.Play.SET_OBJECTIVE,
                 Protocol777.Play.SET_SCORE,
