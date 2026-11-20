@@ -132,6 +132,9 @@ object MainMenu {
                     }
                 }
             }
+            // Кнопка «Играть» только записывает адрес: без break меню оставалось на экране,
+            // и клик выглядел как «ничего не произошло».
+            if (result != null) break
 
             GL30.glClearColor(0.06f, 0.07f, 0.10f, 1f)
             GL30.glClear(GL30.GL_COLOR_BUFFER_BIT)
@@ -232,6 +235,9 @@ object MainMenu {
                 break
             }
             GLFW.glfwSwapBuffers(window)
+            // Без этого окно не получает события: мышь и клавиши не доходят, и Windows
+            // рисует «Не отвечает». Заодно ограничивает меню ~60 кадрами в секунду.
+            GLFW.glfwWaitEventsTimeout(0.016)
         }
 
         if (settingsChanged) {

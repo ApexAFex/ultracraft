@@ -194,9 +194,10 @@ class Input(private val window: Long, private val camera: Camera) {
         return text
     }
 
-    /** Переставляет курсор (для демо-снимков и подсказок). */
+    /** Переставляет курсор (для демо-снимков и подсказок). Координаты — в пикселях кадра. */
     fun warpCursor(x: Double, y: Double) {
-        GLFW.glfwSetCursorPos(window, x, y)
+        val (scaleX, scaleY) = framebufferScale()
+        GLFW.glfwSetCursorPos(window, x / scaleX, y / scaleY)
         mouseX = x
         mouseY = y
     }
@@ -322,12 +323,29 @@ class Input(private val window: Long, private val camera: Camera) {
         val cursorX = DoubleArray(1)
         val cursorY = DoubleArray(1)
         GLFW.glfwGetCursorPos(window, cursorX, cursorY)
-        mouseX = cursorX[0]
-        mouseY = cursorY[0]
+        // Windows с масштабом 125 % даёт окно 1024×576 при кадре 1280×720: GLFW отдаёт
+        // координаты окна, а HUD и меню считают в пикселях кадра. Без пересчёта клики
+        // уходят мимо кнопок (и это было видно только на таких экранах).
+        val (scaleX, scaleY) = framebufferScale()
+        mouseX = cursorX[0] * scaleX
+        mouseY = cursorY[0] * scaleY
 
         val down = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
         clickRequested = down && !mouseWasDown
         mouseWasDown = down
+    }
+
+    /** Отношение размера кадра к размеру окна: 1.0 без масштаба Windows, 1.25 при 125 %. */
+    private fun framebufferScale(): Pair<Double, Double> {
+        val frameWidth = IntArray(1)
+        val frameHeight = IntArray(1)
+        val windowWidth = IntArray(1)
+        val windowHeight = IntArray(1)
+        GLFW.glfwGetFramebufferSize(window, frameWidth, frameHeight)
+        GLFW.glfwGetWindowSize(window, windowWidth, windowHeight)
+        if (windowWidth[0] <= 0 || windowHeight[0] <= 0) return 1.0 to 1.0
+        return (frameWidth[0].toDouble() / windowWidth[0]) to
+            (frameHeight[0].toDouble() / windowHeight[0])
     }
 
     /** Captures the cursor for looking around, or releases it for the inventory screen. */
