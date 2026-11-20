@@ -526,6 +526,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     /** Фаза покачивания вида при ходьбе и время последнего урона. */
                     var walkBobPhase = 0.0
                     var hurtTiltNanos = 0L
+                    /** Сколько частиц дали факелы, огонь и костры за сеанс. */
+                    var ambientParticles = 0
+                    /** Плавные переходы: высота глаз при приседании и обзор при беге. */
+                    var eyeOffset = 0f
+                    var fovNow = Settings.fov
                     var respawnedOnce = false
 
                     /** Сколько полос босса было в прошлом кадре — чтобы напечатать их один раз. */
@@ -1421,7 +1426,14 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
                                 GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS ||
                                 input.sprintDoubleTap)
-                        camera.fovDegrees = if (sprintHeld) baseFov + 8f else baseFov
+                        // Обзор меняется плавно: мгновенный скачок на 8° выглядит рывком.
+                        fovNow = CameraFeel.approach(
+                            fovNow,
+                            if (sprintHeld) baseFov + 8f else baseFov,
+                            input.deltaSeconds.toFloat(),
+                            0.18f,
+                        )
+                        camera.fovDegrees = fovNow
                         val inputScale = when {
                             sneakHeld -> 0.4
                             sprintHeld -> 1.35
@@ -1589,6 +1601,35 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             steps++
                             tickAccumulator -= TICK_SECONDS
 
+                            // Пламя и дым от факелов, огня и костров: сервер такие частицы
+                            // не присылает, их рисует клиент. Сканируем окрестность раз
+                            // в десять тиков, чтобы не проверять блоки каждый кадр.
+                            if (tickCount % 10L == 0L) {
+                                val px = kotlin.math.floor(player.x).toInt()
+                                val py = kotlin.math.floor(player.y).toInt()
+                                val pz = kotlin.math.floor(player.z).toInt()
+                                val random = java.util.Random()
+                                for (dx in -8..8) for (dz in -8..8) for (dy in -4..4) {
+                                    val name = blocks.nameOf(world.blockAt(px + dx, py + dy, pz + dz))
+                                    val particle = Ambience.particleFor(name) ?: continue
+                                    val period = Ambience.periodTicks(name)
+                                    if (random.nextInt(10) >= (10 / period).coerceAtLeast(1)) continue
+                                    ambientParticles++
+                                    particles += ParticlePiece(
+                                        px + dx + 0.3 + random.nextDouble() * 0.4,
+                                        py + dy + Ambience.particleHeight(name) +
+                                            random.nextDouble() * 0.15,
+                                        pz + dz + 0.3 + random.nextDouble() * 0.4,
+                                        (random.nextDouble() - 0.5) * 0.05,
+                                        0.12 + random.nextDouble() * 0.1,
+                                        (random.nextDouble() - 0.5) * 0.05,
+                                        0.8f,
+                                        particle,
+                                        0.1f,
+                                    )
+                                }
+                            }
+
                             // Сырые тела чанков нужны только для кэша: держим окрестность,
                             // иначе исследованный мир копил бы по ~100 КБ на чанк.
                             if (tickCount % 20L == 0L) {
@@ -1620,8 +1661,14 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // position to the current one, otherwise movement looks like 20 fps.
                         val alpha = (tickAccumulator / TICK_SECONDS).coerceIn(0.0, 1.0)
                         camera.x = previousX + (player.x - previousX) * alpha
+                        eyeOffset = CameraFeel.approach(
+                            eyeOffset,
+                            if (sneakHeld) -0.3f else 0f,
+                            input.deltaSeconds.toFloat(),
+                            0.12f,
+                        )
                         camera.y = previousY + (player.y - previousY) * alpha +
-                            Player.EYE_HEIGHT - (if (sneakHeld) 0.3 else 0.0)
+                            Player.EYE_HEIGHT + eyeOffset
                         camera.z = previousZ + (player.z - previousZ) * alpha
 
                         // Покачивание вида при ходьбе и крен от урона: формулы в CameraFeel.
@@ -1636,6 +1683,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         if (hurtTiltNanos != 0L) {
                             val tiltAge = (System.nanoTime() - hurtTiltNanos) / 1_000_000_000.0
                             camera.pitch += CameraFeel.hurtTilt(tiltAge)
+                            camera.yaw += CameraFeel.hurtShake(tiltAge)
                             if (tiltAge > 0.4) hurtTiltNanos = 0L
                         }
 
@@ -3098,7 +3146,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     pipeline.close()
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
                     println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}, чужих трещин ${remoteCrackPackets.get()}")
-                    println("Игроков в списке: ${playerList.size}")
+                    println("Игроков в списке: ${playerList.size}, частиц от блоков: $ambientParticles")
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                 }
             }

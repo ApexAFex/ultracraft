@@ -32,6 +32,23 @@ object CameraFeel {
         return (kotlin.math.sin(ageSeconds / 0.4 * Math.PI) * 0.16).toFloat()
     }
 
+    /** Боковое качание камеры от урона: короткий рывок в сторону, тоже на 0.4 с. */
+    fun hurtShake(ageSeconds: Double): Float {
+        if (ageSeconds !in 0.0..0.4) return 0f
+        val t = ageSeconds / 0.4
+        return (kotlin.math.sin(t * Math.PI * 2.0) * (1.0 - t) * 0.06).toFloat()
+    }
+
+    /**
+     * Плавное приближение значения к цели: так меняются обзор при беге и высота глаз
+     * при приседании. [halfLife] — время, за которое проходит половина пути.
+     */
+    fun approach(current: Float, target: Float, dtSeconds: Float, halfLife: Float): Float {
+        if (dtSeconds <= 0f || halfLife <= 0f) return current
+        val alpha = 1f - kotlin.math.exp(-dtSeconds * kotlin.math.ln(2f) / halfLife)
+        return current + (target - current) * alpha
+    }
+
     /** Скорость бега: по ней нормируется сила покачивания. */
     const val SPRINT_SPEED = 4.3
 }

@@ -35,6 +35,30 @@ class CameraFeelTest {
     }
 
     @Test
+    fun `approach halves the distance in one half-life`() {
+        var value = 0f
+        var elapsed = 0f
+        repeat(60) {
+            value = CameraFeel.approach(value, 1f, 1f / 60f, 0.1f)
+            elapsed += 1f / 60f
+        }
+        assertTrue(value > 0.9f, "за 0,1 с прошло больше половины: $value")
+        assertEquals(1f, CameraFeel.approach(1f, 1f, 0.1f, 0.1f), 0.0001f)
+        // Никакого перелёта за цель.
+        assertTrue(CameraFeel.approach(0f, 1f, 10f, 0.1f) <= 1f)
+    }
+
+    @Test
+    fun `hurt shake goes both ways and dies out`() {
+        assertEquals(0f, CameraFeel.hurtShake(0.0), 0.0001f)
+        assertEquals(0f, CameraFeel.hurtShake(0.4), 0.0001f)
+        val peak = CameraFeel.hurtShake(0.1)
+        val later = CameraFeel.hurtShake(0.3)
+        assertTrue(kotlin.math.abs(peak) > 0.01f)
+        assertTrue(kotlin.math.abs(later) < kotlin.math.abs(peak))
+    }
+
+    @Test
     fun `hurt tilt rises and fades to zero`() {
         assertEquals(0f, CameraFeel.hurtTilt(0.0), 0.0001f)
         assertEquals(0.16f, CameraFeel.hurtTilt(0.2), 0.0001f)
