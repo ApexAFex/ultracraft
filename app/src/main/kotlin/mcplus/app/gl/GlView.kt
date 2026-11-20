@@ -177,6 +177,8 @@ object GlView {
         itemTable: mcplus.net.ItemTable = mcplus.net.ItemTable.EMPTY,
         /** Таблица частиц: номер типа → имя и цвет. */
         particleTable: mcplus.net.ParticleTable = mcplus.net.ParticleTable.EMPTY,
+        /** Таблица звуков: номер из реестра → имя события для `sounds.json`. */
+        soundEvents: mcplus.net.SoundEventTable = mcplus.net.SoundEventTable.EMPTY,
     ) {
         if (!GLFW.glfwInit()) error("Не удалось инициализировать GLFW")
 
@@ -257,6 +259,10 @@ object GlView {
             // background instead of blocking the start.
             val breakEvents = java.util.concurrent.ConcurrentLinkedQueue<PendingBreak>()
             val pendingParticles = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.ParticleSpawn>()
+            val pendingSounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.SoundSpawn>()
+            val pendingEntitySounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.EntitySoundSpawn>()
+            val soundPackets = java.util.concurrent.atomic.AtomicInteger()
+            val serverSounds = java.util.concurrent.atomic.AtomicInteger()
             val particlePackets = java.util.concurrent.atomic.AtomicInteger()
             val seenIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
 
@@ -293,6 +299,27 @@ object GlView {
                         )
                     }
                     parsed.getOrNull()?.let { pendingParticles.addAll(it) }
+                    return
+                }
+                if (packet.id == Protocol777.Play.SOUND ||
+                    packet.id == Protocol777.Play.ENTITY_SOUND
+                ) {
+                    val soundBody = packet.body
+                    serverSounds.incrementAndGet()
+                    if (packet.id == Protocol777.Play.SOUND) {
+                        runCatching { mcplus.net.readSound(soundBody, soundEvents) }
+                            .getOrNull()
+                            ?.let {
+                                if (soundPackets.getAndIncrement() < 2) {
+                                    println("Звук сервера: ${it.name} (${it.x}, ${it.y}, ${it.z})")
+                                }
+                                pendingSounds += it
+                            }
+                    } else {
+                        runCatching { mcplus.net.readEntitySound(soundBody, soundEvents) }
+                            .getOrNull()
+                            ?.let { pendingEntitySounds += it }
+                    }
                     return
                 }
                 if (packet.id == Protocol777.Play.LIGHT_UPDATE) {
@@ -1833,6 +1860,33 @@ object GlView {
                             }
                         }
 
+                        // Звуки от сервера: раньше клиент слышал только то, что
+                        // делал сам. Теперь — мобы, двери, взрывы, чужие шаги.
+                        var playedThisFrame = 0
+                        while (playedThisFrame < 12) {
+                            val spawn = pendingSounds.poll() ?: break
+                            val dx = spawn.x - camera.x
+                            val dy = spawn.y - camera.y
+                            val dz = spawn.z - camera.z
+                            if (dx * dx + dy * dy + dz * dz > 4096.0) continue
+                            sound.play(
+                                spawn.name, spawn.x, spawn.y, spawn.z,
+                                volume = spawn.volume,
+                                pitch = spawn.pitch,
+                            )
+                            playedThisFrame++
+                        }
+                        while (playedThisFrame < 16) {
+                            val spawn = pendingEntitySounds.poll() ?: break
+                            val entity = tracker.byId(spawn.entityId) ?: continue
+                            sound.play(
+                                spawn.name, entity.x, entity.y, entity.z,
+                                volume = spawn.volume,
+                                pitch = spawn.pitch,
+                            )
+                            playedThisFrame++
+                        }
+
                         // Снег в холодном биоме: те же спрайты, что у частиц, но свои.
                         val raining = (session?.sky?.rain ?: 0f) > 0f
                         if (raining) {
@@ -1982,13 +2036,20 @@ object GlView {
                                                 yaw = (nowNanos / 1_000_000_000.0 * 1.4 + entity.id).toFloat(),
                                             )
                                         } else if (itemName != null) {
-                                            // Инструмент, еда, слиток: плоская иконка к камере.
-                                            worldIcons += Renderer.WorldIcon(
+                                            // Инструмент, еда, слиток: парящий кубик с иконкой
+                                            // на гранях, как предмет в ванили, а не плоская
+                                            // наклейка у самой земли.
+                                            val layer = atlas.layerForItem(itemName)
+                                            val bob = kotlin.math.sin(nowNanos / 1_000_000_000.0 * 2 + entity.id) * 0.07
+                                            cubes += Renderer.BlockCube(
                                                 entity.x,
-                                                entity.y + 0.2,
+                                                entity.y + 0.22 + bob,
                                                 entity.z,
-                                                0.32f,
-                                                atlas.layerForItem(itemName),
+                                                0.3f,
+                                                layer,
+                                                layer,
+                                                layer,
+                                                yaw = (nowNanos / 1_000_000_000.0 * 1.6 + entity.id).toFloat(),
                                             )
                                         }
                                     }
@@ -2770,7 +2831,7 @@ object GlView {
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
                     println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}")
                     println("Игроков в списке: ${playerList.size}")
-                    println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available})")
+                    println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                 }
             }
         } finally {

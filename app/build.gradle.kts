@@ -104,6 +104,14 @@ val packageExe = tasks.register<Exec>("packageExe") {
                 zip.getInputStream(entry).use { input -> out.outputStream().use { input.copyTo(it) } }
             }
         }
+
+        // Таблицы игры (блоки, предметы, звуки) генерируются из данных сервера и лежат
+        // вне jar. Без них exe показывает номера вместо имён, поэтому data едет рядом.
+        val dataSource = File(rootProject.projectDir, "data")
+        val dataTarget = File(rootProject.projectDir, "dist/ultracraft/data")
+        if (dataSource.isDirectory) {
+            dataSource.copyRecursively(dataTarget, overwrite = true)
+        }
     }
 
     commandLine(

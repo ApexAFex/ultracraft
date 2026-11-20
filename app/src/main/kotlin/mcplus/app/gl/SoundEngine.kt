@@ -160,7 +160,15 @@ class SoundEngine(private val directory: File?) : Closeable {
      * Если события нет, пробует запасное (`fallback`), чтобы незнакомый блок не оказался
      * беззвучным.
      */
-    fun play(event: String, x: Double, y: Double, z: Double, fallback: String? = null) {
+    fun play(
+        event: String,
+        x: Double,
+        y: Double,
+        z: Double,
+        fallback: String? = null,
+        volume: Float = 1f,
+        pitch: Float = 1f,
+    ) {
         if (!available) return
         requested++
         val files = catalog[event] ?: fallback?.let { catalog[it] } ?: return
@@ -171,7 +179,11 @@ class SoundEngine(private val directory: File?) : Closeable {
         AL10.alSourceStop(source)
         AL10.alSourcei(source, AL10.AL_BUFFER, buffer)
         AL10.alSource3f(source, AL10.AL_POSITION, x.toFloat(), y.toFloat(), z.toFloat())
-        AL10.alSourcef(source, AL10.AL_GAIN, masterVolume * 0.8f * volumeOf(SoundCategories.of(event)))
+        val gain = masterVolume * 0.8f * volumeOf(SoundCategories.of(event)) *
+            volume.coerceIn(0f, 1f)
+        AL10.alSourcef(source, AL10.AL_GAIN, gain)
+        // Ванильная высота: 0.5…2.0. OpenAL сам растягивает время, менять его не нужно.
+        AL10.alSourcef(source, AL10.AL_PITCH, pitch.coerceIn(0.5f, 2f))
         AL10.alSourcePlay(source)
         played++
     }

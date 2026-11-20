@@ -191,6 +191,9 @@ class EntityTracker {
 
     fun snapshot(): List<TrackedEntity> = entities.values.toList()
 
+    /** Одна сущность по id: нужна звукам, которые приходят без координат. */
+    fun byId(id: Int): TrackedEntity? = entities[id]
+
     /** Called once per frame on the render thread. */
     fun tick(dtSeconds: Double) {
         for (entity in entities.values) entity.interpolate(dtSeconds)

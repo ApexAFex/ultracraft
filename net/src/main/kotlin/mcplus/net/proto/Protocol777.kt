@@ -80,6 +80,10 @@ object Protocol777 {
         const val BLOCK_UPDATE: Int = 0x08
         /** Частицы мира: дым, огонь, искры, брызги. */
         const val LEVEL_PARTICLES: Int = 0x30
+        /** Звук в точке мира (ломание, двери, взрывы, мобы). */
+        const val SOUND: Int = 0x77
+        /** Звук, привязанный к сущности: шаги мобов, крики, лай. */
+        const val ENTITY_SOUND: Int = 0x76
         /** Табло сервера: цели, очки и выбранная боковая панель. */
         const val SET_OBJECTIVE: Int = 0x6C
         const val SET_SCORE: Int = 0x70

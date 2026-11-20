@@ -1083,6 +1083,7 @@ private fun windowCommand(args: List<String>) {
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
             particleTable = findParticleTable(),
+            soundEvents = findSoundEventTable(),
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
@@ -1177,15 +1178,40 @@ private fun parsePosition(text: String): Triple<Int, Int, Int> {
 }
 
 /**
+ * Где искать сгенерированную таблицу: рядом с исходниками, рядом с jar и рядом с exe.
+ *
+ * `data/` не лежит в jar: таблицы генерируются из данных игры. Поэтому запуск из
+ * репозитория ищет их в `data/`, а собранный exe — в `data/` рядом с `app/ultracraft.jar`.
+ */
+private fun tableCandidates(name: String): List<java.io.File> {
+    val roots = LinkedHashSet<java.io.File>()
+    roots += java.io.File(".")
+    roots += java.io.File("..")
+    roots += java.io.File("../..")
+    runCatching {
+        // Класс этого файла: по нему видно, откуда запущен клиент — из классов или из jar.
+        val location = Class.forName("mcplus.app.MainKt").protectionDomain.codeSource.location
+        if (location != null) {
+            val jar = java.io.File(location.toURI())
+            val dir = if (jar.isDirectory) jar else jar.parentFile
+            if (dir != null) {
+                roots += dir
+                roots += dir.parentFile
+                dir.parentFile?.parentFile?.let { roots += it }
+            }
+        }
+    }
+    return roots.filterNotNull().map { java.io.File(it, "data/$name") }
+}
+
+/**
  * The block table is generated from the game's own data (see tools/build-block-table.js),
  * so it is not part of the repository and is searched for next to the sources.
  */
 private fun findBlockTable(explicit: String?): BlockTable {
     val candidates = buildList {
         explicit?.let { add(java.io.File(it)) }
-        add(java.io.File("data/blocks-777.tsv"))
-        add(java.io.File("../data/blocks-777.tsv"))
-        add(java.io.File("../../data/blocks-777.tsv"))
+        addAll(tableCandidates("blocks-777.tsv"))
     }
     val file = candidates.firstOrNull { it.isFile }
         ?: fail(
@@ -1204,9 +1230,7 @@ private fun findBlockTable(explicit: String?): BlockTable {
 private fun findItemTable(explicit: String? = null): mcplus.net.ItemTable {
     val candidates = buildList {
         explicit?.let { add(java.io.File(it)) }
-        add(java.io.File("data/items-777.tsv"))
-        add(java.io.File("../data/items-777.tsv"))
-        add(java.io.File("../../data/items-777.tsv"))
+        addAll(tableCandidates("items-777.tsv"))
     }
     val file = candidates.firstOrNull { it.isFile }
     if (file == null) {
@@ -1225,9 +1249,7 @@ private fun findItemTable(explicit: String? = null): mcplus.net.ItemTable {
 private fun findEffectTable(explicit: String? = null): mcplus.net.EffectTable {
     val candidates = buildList {
         explicit?.let { add(java.io.File(it)) }
-        add(java.io.File("data/effects-777.tsv"))
-        add(java.io.File("../data/effects-777.tsv"))
-        add(java.io.File("../../data/effects-777.tsv"))
+        addAll(tableCandidates("effects-777.tsv"))
     }
     val file = candidates.firstOrNull { it.isFile }
     if (file == null) {
@@ -1246,9 +1268,7 @@ private fun findEffectTable(explicit: String? = null): mcplus.net.EffectTable {
 private fun findItemStats(explicit: String? = null): mcplus.net.ItemStats {
     val candidates = buildList {
         explicit?.let { add(java.io.File(it)) }
-        add(java.io.File("data/item-stats-777.tsv"))
-        add(java.io.File("../data/item-stats-777.tsv"))
-        add(java.io.File("../../data/item-stats-777.tsv"))
+        addAll(tableCandidates("item-stats-777.tsv"))
     }
     val file = candidates.firstOrNull { it.isFile }
     if (file == null) {
@@ -1262,9 +1282,7 @@ private fun findItemStats(explicit: String? = null): mcplus.net.ItemStats {
 private fun findMenuTable(explicit: String? = null): mcplus.net.MenuTable {
     val candidates = buildList {
         explicit?.let { add(java.io.File(it)) }
-        add(java.io.File("data/menus-777.tsv"))
-        add(java.io.File("../data/menus-777.tsv"))
-        add(java.io.File("../../data/menus-777.tsv"))
+        addAll(tableCandidates("menus-777.tsv"))
     }
     val file = candidates.firstOrNull { it.isFile }
     if (file == null) {
@@ -1278,9 +1296,7 @@ private fun findMenuTable(explicit: String? = null): mcplus.net.MenuTable {
 private fun findEntityTable(explicit: String? = null): mcplus.net.EntityTable {
     val candidates = buildList {
         explicit?.let { add(java.io.File(it)) }
-        add(java.io.File("data/entities-777.tsv"))
-        add(java.io.File("../data/entities-777.tsv"))
-        add(java.io.File("../../data/entities-777.tsv"))
+        addAll(tableCandidates("entities-777.tsv"))
     }
     val file = candidates.firstOrNull { it.isFile }
     if (file == null) {
@@ -1292,23 +1308,26 @@ private fun findEntityTable(explicit: String? = null): mcplus.net.EntityTable {
 
 /** Particle type names for `Level Particles`, generated with `tools/build-particle-table.js`. */
 private fun findParticleTable(): mcplus.net.ParticleTable {
-    val candidates = listOf(
-        java.io.File("data/particles-777.tsv"),
-        java.io.File("../data/particles-777.tsv"),
-        java.io.File("../../data/particles-777.tsv"),
-    )
-    val file = candidates.firstOrNull { it.isFile } ?: return mcplus.net.ParticleTable.EMPTY
+    val file = tableCandidates("particles-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.ParticleTable.EMPTY
     return mcplus.net.ParticleTable.load(file)
+}
+
+/** Sound event names for `Sound`/`Entity Sound`, generated with `tools/sound-ids.java`. */
+private fun findSoundEventTable(): mcplus.net.SoundEventTable {
+    val file = tableCandidates("sound-events-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.SoundEventTable.EMPTY
+    val table = mcplus.net.SoundEventTable.load(file)
+    if (table.size == 0) {
+        System.err.println("Таблица звуков пуста (data/sound-events-777.tsv): звуки сервера молчат.")
+    }
+    return table
 }
 
 /** Data component names for item patches, generated with `tools/build-component-table.js`. */
 private fun findComponentTable(): mcplus.net.ComponentTable {
-    val candidates = listOf(
-        java.io.File("data/components-777.tsv"),
-        java.io.File("../data/components-777.tsv"),
-        java.io.File("../../data/components-777.tsv"),
-    )
-    val file = candidates.firstOrNull { it.isFile } ?: return mcplus.net.ComponentTable.EMPTY
+    val file = tableCandidates("components-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.ComponentTable.EMPTY
     return mcplus.net.ComponentTable.load(file)
 }
 
