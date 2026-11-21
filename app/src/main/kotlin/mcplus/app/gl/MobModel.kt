@@ -5,7 +5,7 @@ import mcplus.net.MetaEntry
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
-    GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, BOAT, MINECART, NONE,
+    GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, BOAT, MINECART, NONE,
 }
 
 /**
@@ -35,6 +35,14 @@ data class MobBox(
     val rotX: Float = 0f,
     val rotY: Float = 0f,
     val rotZ: Float = 0f,
+    /**
+     * Готовая матрица части (16 чисел, по столбцам) вместо смещения и трёх поворотов.
+     *
+     * Нужна там, где у модели повёрнуты *родительские* части (лошадь, осёл, мул): цепочку
+     * «поворот внутри поворота» нельзя выразить парой «смещение + три угла». Матрица уже
+     * в наших координатах (Y вверх), её печатает `tools/build-mob-model.js`.
+     */
+    val matrix: FloatArray? = null,
 )
 
 /**
@@ -48,8 +56,7 @@ data class MobBox(
 object MobModels {
 
     fun familyOf(entityName: String): MobFamily = when (entityName) {
-        "cow", "mooshroom", "pig", "sheep", "goat", "rabbit",
-        "llama", "trader_llama" -> MobFamily.QUADRUPED
+        "cow", "mooshroom", "pig", "sheep", "goat", "rabbit" -> MobFamily.QUADRUPED
 
         "chicken", "parrot" -> MobFamily.CHICKEN
         "creeper" -> MobFamily.CREEPER
@@ -75,8 +82,11 @@ object MobModels {
         "wolf" -> MobFamily.WOLF
         "cat", "ocelot" -> MobFamily.CAT
         "fox" -> MobFamily.FOX
-        // Лошадь, осёл и мул пока коробками: у их модели повёрнуты родительские части,
-        // а плоский список коробок такие вложения не выражает.
+        // Лама и торговец ламой: своя модель с длинной шеей, лист 128×64.
+        "llama", "trader_llama" -> MobFamily.LLAMA
+        // Лошадь, осёл, мул, скелетная и зомби-лошадь: одна модель, разные текстуры.
+        // У головы повёрнута родительская часть, поэтому её коробки несут матрицу.
+        "horse", "donkey", "mule", "skeleton_horse", "zombie_horse" -> MobFamily.HORSE
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -137,6 +147,8 @@ object MobModels {
         MobFamily.WOLF -> 64 to 32
         MobFamily.CAT -> 64 to 64
         MobFamily.FOX -> 48 to 32
+        MobFamily.LLAMA -> 128 to 64
+        MobFamily.HORSE -> 128 to 128
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -162,6 +174,8 @@ object MobModels {
         MobFamily.WOLF -> WOLF
         MobFamily.CAT -> CAT
         MobFamily.FOX -> FOX
+        MobFamily.LLAMA -> LLAMA
+        MobFamily.HORSE -> HORSE
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -443,6 +457,53 @@ object MobModels {
      * Эта же модель у осла, мула, скелетной и зомби-лошади — отличается только текстура.
      * Лист 128×128.
      */
+    /**
+     * Лошадь (AbstractEquineModel): тело, голова с ушами и гривой, хвост и четыре ноги.
+     *
+     * У головы повёрнута родительская часть, поэтому коробки головы, ушей и гривы несут
+     * готовую матрицу, а не смещение с углами. Эта же модель у осла, мула, скелетной и
+     * зомби-лошади — отличается только текстура. Лист 128×128.
+     */
+    /**
+     * Лошадь (AbstractEquineModel): тело, голова с ушами и гривой, хвост и четыре ноги.
+     *
+     * У головы повёрнута родительская часть, поэтому её коробки несут готовую матрицу,
+     * а не смещение с углами. Эта же модель у осла, мула, скелетной и зомби-лошади.
+     * Лист 128×128.
+     */
+    private val HORSE = listOf(
+        MobBox("right_front_leg", -0.0625f, -0.6244f, -0.1187f, 0.1875f, 0.0631f, 0.1313f, u = 48, v = 21, offsetX = -0.25f, offsetY = 0.6244f, offsetZ = -0.625f),
+        MobBox("right_hind_leg", -0.0625f, -0.6244f, -0.0625f, 0.1875f, 0.0631f, 0.1875f, u = 48, v = 21, offsetX = -0.25f, offsetY = 0.6244f, offsetZ = 0.4375f),
+        MobBox("head_parts", -0.1281f, -0.375f, -0.125f, 0.1219f, 0.375f, 0.3125f, u = 0, v = 35, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8658f, -0.5003f, 0f, 0f, 0.5003f, 0.8658f, 0f, 0f, 1.2494f, -0.75f, 1f)),
+        MobBox("head", -0.1875f, 0.375f, -0.125f, 0.1875f, 0.6875f, 0.3125f, u = 0, v = 13, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8658f, -0.5003f, 0f, 0f, 0.5003f, 0.8658f, 0f, 0f, 1.2494f, -0.75f, 1f)),
+        MobBox("right_ear", -0.1594f, 0.625f, 0.25f, -0.0344f, 0.8125f, 0.3125f, u = 19, v = 16, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8658f, -0.5003f, 0f, 0f, 0.5003f, 0.8658f, 0f, 0f, 1.2494f, -0.75f, 1f)),
+        MobBox("left_ear", 0.0344f, 0.625f, 0.25f, 0.1594f, 0.8125f, 0.3125f, u = 19, v = 16, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8658f, -0.5003f, 0f, 0f, 0.5003f, 0.8658f, 0f, 0f, 1.2494f, -0.75f, 1f)),
+        MobBox("mane", -0.0625f, -0.3125f, 0.3131f, 0.0625f, 0.6875f, 0.4381f, u = 56, v = 36, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8658f, -0.5003f, 0f, 0f, 0.5003f, 0.8658f, 0f, 0f, 1.2494f, -0.75f, 1f)),
+        MobBox("upper_mouth", -0.125f, 0.375f, -0.4375f, 0.125f, 0.6875f, -0.125f, u = 0, v = 25, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8658f, -0.5003f, 0f, 0f, 0.5003f, 0.8658f, 0f, 0f, 1.2494f, -0.75f, 1f)),
+        MobBox("left_hind_leg", -0.1875f, -0.6244f, -0.0625f, 0.0625f, 0.0631f, 0.1875f, u = 48, v = 21, offsetX = 0.25f, offsetY = 0.6244f, offsetZ = 0.4375f),
+        MobBox("body", -0.3125f, -0.125f, -1.0625f, 0.3125f, 0.5f, 0.3125f, u = 0, v = 32, offsetY = 0.8119f, offsetZ = 0.3125f),
+        MobBox("tail", -0.0937f, -0.875f, 0f, 0.0938f, 0f, 0.25f, u = 42, v = 36, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8658f, -0.5003f, 0f, 0f, 0.5003f, 0.8658f, 0f, 0f, 1.1244f, 0.4375f, 1f)),
+        MobBox("left_front_leg", -0.1875f, -0.6244f, -0.1187f, 0.0625f, 0.0631f, 0.1313f, u = 48, v = 21, offsetX = 0.25f, offsetY = 0.6244f, offsetZ = -0.625f),
+    )
+    /**
+     * Лама (LlamaModel): тело, длинная шея с головой и ушами, четыре ноги.
+     *
+     * Модель плоская (родительских поворотов нет), лист 128×64. Та же модель у
+     * торговца ламой — отличается цветом.
+     */
+    private val LLAMA = listOf(
+        MobBox("head", -0.125f, 0.625f, -0.625f, 0.125f, 0.875f, -0.0625f, u = 0, v = 0, offsetY = 1.0625f, offsetZ = -0.375f),
+        MobBox("head", -0.25f, -0.125f, -0.375f, 0.25f, 1f, 0f, u = 0, v = 14, offsetY = 1.0625f, offsetZ = -0.375f),
+        MobBox("head", -0.25f, 1f, -0.25f, -0.0625f, 1.1875f, -0.125f, u = 17, v = 0, offsetY = 1.0625f, offsetZ = -0.375f),
+        MobBox("head", 0.0625f, 1f, -0.25f, 0.25f, 1.1875f, -0.125f, u = 17, v = 0, offsetY = 1.0625f, offsetZ = -0.375f),
+        MobBox("right_front_leg", -0.125f, -0.875f, -0.125f, 0.125f, 0f, 0.125f, u = 29, v = 29, offsetX = -0.2187f, offsetY = 0.875f, offsetZ = -0.3125f),
+        MobBox("right_hind_leg", -0.125f, -0.875f, -0.125f, 0.125f, 0f, 0.125f, u = 29, v = 29, offsetX = -0.2187f, offsetY = 0.875f, offsetZ = 0.375f),
+        MobBox("right_chest", -0.1875f, -0.5f, 0f, 0.3125f, 0f, 0.1875f, u = 45, v = 28, matrix = floatArrayOf(-0.0002f, 0f, -1f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, -0.0002f, 0f, -0.5312f, 1.3125f, 0.1875f, 1f)),
+        MobBox("left_hind_leg", -0.125f, -0.875f, -0.125f, 0.125f, 0f, 0.125f, u = 29, v = 29, offsetX = 0.2188f, offsetY = 0.875f, offsetZ = 0.375f),
+        MobBox("body", -0.375f, -0.5f, -0.4375f, 0.375f, 0.625f, 0.1875f, u = 29, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.1875f, 0.125f, 1f)),
+        MobBox("left_front_leg", -0.125f, -0.875f, -0.125f, 0.125f, 0f, 0.125f, u = 29, v = 29, offsetX = 0.2188f, offsetY = 0.875f, offsetZ = -0.3125f),
+        MobBox("left_chest", -0.1875f, -0.5f, 0f, 0.3125f, 0f, 0.1875f, u = 45, v = 41, matrix = floatArrayOf(-0.0002f, 0f, -1f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, -0.0002f, 0f, 0.3438f, 1.3125f, 0.1875f, 1f)),
+    )
     /**
      * Странник (AdultStriderModel): тело, две ноги и семь щетинок.
      *

@@ -246,6 +246,8 @@ class MobRenderer(
      * лежат). Для остальных коробок возвращается null, и вершины идут как есть.
      */
     private fun partTransform(box: MobBox): FloatArray? {
+        // Готовая матрица: вложенные повороты (лошадь) иначе не выразить.
+        box.matrix?.let { return it }
         if (box.rotX == 0f && box.rotY == 0f && box.rotZ == 0f &&
             box.offsetX == 0f && box.offsetY == 0f && box.offsetZ == 0f
         ) {
@@ -383,6 +385,8 @@ class MobRenderer(
             "horse" to "entity/horse/horse_brown.png",
             "donkey" to "entity/horse/donkey.png",
             "mule" to "entity/horse/mule.png",
+            "skeleton_horse" to "entity/horse/horse_skeleton.png",
+            "zombie_horse" to "entity/horse/horse_zombie.png",
             "llama" to "entity/llama/llama_creamy.png",
             "trader_llama" to "entity/llama/llama_creamy.png",
             "cat" to "entity/cat/cat_tabby.png",

@@ -40,10 +40,38 @@ class MobModelsTest {
     }
 
     @Test
-    fun `llamas use the quadruped model and are a little taller`() {
-        assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("llama"))
-        assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("trader_llama"))
-        assertTrue(MobModels.scaleOf("llama") > MobModels.scaleOf("cow"))
+    fun `llamas and horses have their own models`() {
+        assertEquals(MobFamily.LLAMA, MobModels.familyOf("llama"))
+        assertEquals(MobFamily.LLAMA, MobModels.familyOf("trader_llama"))
+        assertEquals(128 to 64, MobModels.textureSize(MobFamily.LLAMA))
+        val llama = MobModels.boxes(MobFamily.LLAMA)
+        assertEquals(11, llama.size, "тело, шея, голова, уши и четыре ноги")
+        assertEquals(4, llama.count { it.name.contains("leg") }, "лама: не четыре ноги")
+        assertTrue(llama.any { it.name == "head" })
+        assertTrue(MobRenderer.TEXTURES["llama"] != null)
+        assertTrue(MobModels.scaleOf("llama") > 0f)
+
+        // Лошадь: у головы повёрнут родитель, поэтому коробки головы несут матрицу.
+        assertEquals(MobFamily.HORSE, MobModels.familyOf("horse"))
+        for (name in listOf("donkey", "mule", "skeleton_horse", "zombie_horse")) {
+            assertEquals(MobFamily.HORSE, MobModels.familyOf(name), "$name: модель лошади")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+        assertEquals(128 to 128, MobModels.textureSize(MobFamily.HORSE))
+        val horse = MobModels.boxes(MobFamily.HORSE)
+        assertEquals(12, horse.size, "тело, голова, уши, грива, хвост и четыре ноги")
+        assertEquals(4, horse.count { it.name.contains("leg") }, "лошадь: не четыре ноги")
+        val withMatrix = horse.filter { it.matrix != null }
+        assertTrue(withMatrix.isNotEmpty(), "у головы лошади должна быть матрица")
+        for (box in withMatrix) {
+            val matrix = box.matrix!!
+            assertEquals(16, matrix.size)
+            assertTrue(matrix.all { it.isFinite() }, "${box.name}: в матрице не число")
+        }
+        // Матрица наклоняет голову: без поворота все числа были бы 0 или ±1.
+        assertTrue(withMatrix.first().matrix!!.any { kotlin.math.abs(it) in 0.01f..0.99f })
+        // Голова и грива высоко: матрица несёт и подъём на высоту родителя.
+        assertTrue(withMatrix.all { it.matrix!![13] > 0.3f }, "голова лошади должна быть высоко")
     }
 
     @Test
@@ -389,9 +417,6 @@ class MobModelsTest {
             assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
             assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
         }
-        // Лошади пока остаются коробками: у их модели повёрнуты родительские части.
-        assertEquals(MobFamily.NONE, MobModels.familyOf("horse"))
-
         assertEquals(11, MobModels.boxes(MobFamily.WOLF).size, "голова, уши, морда, тело, хвост и лапы")
         // У всех трёх есть хвост и четыре лапы, а голова — наверху, а не в центре модели.
         for (family in listOf(MobFamily.WOLF, MobFamily.CAT, MobFamily.FOX)) {
