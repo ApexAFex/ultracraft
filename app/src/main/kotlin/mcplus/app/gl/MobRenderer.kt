@@ -396,6 +396,11 @@ class MobRenderer(
             "magma_cube" to "entity/slime/magmacube.png",
             "ghast" to "entity/ghast/ghast.png",
             "blaze" to "entity/blaze/blaze.png",
+            "strider" to "entity/strider/strider.png",
+            "hoglin" to "entity/hoglin/hoglin.png",
+            "zoglin" to "entity/hoglin/zoglin.png",
+            "bee" to "entity/bee/bee.png",
+            "turtle" to "entity/turtle/turtle.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

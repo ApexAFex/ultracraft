@@ -1,0 +1,8 @@
+﻿        MobBox("head", -0.1875f, -0.25f, -0.1875f, 0.1875f, 0.0625f, 0.1875f, u = 3, v = 0, offsetY = 0.25f, offsetZ = -0.625f),
+        MobBox("right_front_leg", -0.8125f, -0.0625f, -0.125f, 0f, 0f, 0.1875f, u = 27, v = 30, offsetX = -0.3125f, offsetY = 0.125f, offsetZ = -0.25f),
+        MobBox("right_hind_leg", -0.125f, -0.0625f, 0f, 0.125f, 0f, 0.625f, u = 1, v = 23, offsetX = -0.2187f, offsetY = 0.0625f, offsetZ = 0.6875f),
+        MobBox("egg_belly", -0.2812f, -1.3125f, -0.875f, 0.2813f, -0.1875f, -0.8125f, u = 70, v = 33, offsetY = 0.75f, offsetZ = -0.625f, rotX = -1.571f),
+        MobBox("left_hind_leg", -0.125f, -0.0625f, 0f, 0.125f, 0f, 0.625f, u = 1, v = 12, offsetX = 0.2188f, offsetY = 0.0625f, offsetZ = 0.6875f),
+        MobBox("body", -0.5937f, -1.4375f, -0.625f, 0.5938f, -0.1875f, -0.25f, u = 7, v = 37, offsetY = 0.75f, offsetZ = -0.625f, rotX = -1.571f),
+        MobBox("body", -0.3437f, -1.3125f, -0.8125f, 0.3438f, -0.1875f, -0.625f, u = 31, v = 1, offsetY = 0.75f, offsetZ = -0.625f, rotX = -1.571f),
+        MobBox("left_front_leg", 0f, -0.0625f, -0.125f, 0.8125f, 0f, 0.1875f, u = 27, v = 24, offsetX = 0.3125f, offsetY = 0.125f, offsetZ = -0.25f),

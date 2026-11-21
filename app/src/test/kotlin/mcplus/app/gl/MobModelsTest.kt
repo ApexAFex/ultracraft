@@ -351,6 +351,32 @@ class MobModelsTest {
     }
 
     @Test
+    fun `strider, hoglin, bee and turtle have their boxes and textures`() {
+        val cases = listOf(
+            Triple("strider", MobFamily.STRIDER, 64 to 128),
+            Triple("hoglin", MobFamily.HOGLIN, 128 to 64),
+            Triple("zoglin", MobFamily.HOGLIN, 128 to 64),
+            Triple("bee", MobFamily.BEE, 64 to 64),
+            Triple("turtle", MobFamily.TURTLE, 128 to 64),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobModels.boxes(family).isNotEmpty(), "$name без коробок")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+
+        // У странника щетинки повёрнуты, у хоглина — уши, у пчелы — крылья.
+        assertTrue(MobModels.boxes(MobFamily.STRIDER).any { it.rotZ != 0f })
+        assertTrue(MobModels.boxes(MobFamily.HOGLIN).any { it.rotZ != 0f && it.name.contains("ear") })
+        assertTrue(MobModels.boxes(MobFamily.BEE).any { it.rotY != 0f })
+        // Панцирь черепахи — повёрнутая коробка, а низ модели считается по лапам.
+        assertTrue(MobModels.boxes(MobFamily.TURTLE).any { it.rotX != 0f })
+        val legs = MobModels.boxes(MobFamily.TURTLE).filter { it.name.contains("leg") }
+        assertTrue(legs.all { it.offsetY < 0.2f }, "лапы черепахи стоят на земле")
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }

@@ -1,11 +1,11 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
-    GHAST, BLAZE, BOAT, MINECART, NONE,
+    GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, BOAT, MINECART, NONE,
 }
 
 /**
@@ -68,6 +68,10 @@ object MobModels {
         "magma_cube" -> MobFamily.MAGMA_CUBE
         "ghast" -> MobFamily.GHAST
         "blaze" -> MobFamily.BLAZE
+        "strider" -> MobFamily.STRIDER
+        "hoglin", "zoglin" -> MobFamily.HOGLIN
+        "bee" -> MobFamily.BEE
+        "turtle" -> MobFamily.TURTLE
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -121,6 +125,10 @@ object MobModels {
         MobFamily.MAGMA_CUBE -> 64 to 64
         MobFamily.GHAST -> 64 to 32
         MobFamily.BLAZE -> 64 to 32
+        MobFamily.STRIDER -> 64 to 128
+        MobFamily.HOGLIN -> 128 to 64
+        MobFamily.BEE -> 64 to 64
+        MobFamily.TURTLE -> 128 to 64
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -139,6 +147,10 @@ object MobModels {
         MobFamily.MAGMA_CUBE -> MAGMA_CUBE
         MobFamily.GHAST -> GHAST
         MobFamily.BLAZE -> BLAZE
+        MobFamily.STRIDER -> STRIDER
+        MobFamily.HOGLIN -> HOGLIN
+        MobFamily.BEE -> BEE
+        MobFamily.TURTLE -> TURTLE
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -359,6 +371,77 @@ object MobModels {
             )
         }
     }
+
+    /**
+     * Странник (AdultStriderModel): тело, две ноги и семь щетинок.
+     *
+     * Щетинки — плоские коробки, повёрнутые вокруг Z: в игре они торчат веером.
+     * Низ модели — копыта ног, поэтому тело оказывается на 1.44 блока.
+     */
+    private val STRIDER = listOf(
+        MobBox("left_leg", -0.125f, -1f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 55, offsetX = 0.25f, offsetY = 1f),
+        MobBox("right_leg", -0.125f, -1f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 32, offsetX = -0.25f, offsetY = 1f),
+        MobBox("body", -0.5f, -0.5f, -0.5f, 0.5f, 0.375f, 0.5f, u = 0, v = 0, offsetY = 1.4375f),
+        MobBox("right_top_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 33, offsetX = -0.5f, offsetY = 1.8125f, offsetZ = -0.5f, rotZ = 0.873f),
+        MobBox("right_bottom_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 65, offsetX = -0.5f, offsetY = 1.25f, offsetZ = -0.5f, rotZ = 1.222f),
+        MobBox("left_top_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 33, offsetX = 0.5f, offsetY = 1.875f, offsetZ = -0.5f, rotZ = -0.873f),
+        MobBox("left_bottom_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 65, offsetX = 0.5f, offsetY = 1.3125f, offsetZ = -0.5f, rotZ = -1.222f),
+        MobBox("right_middle_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 49, offsetX = -0.5f, offsetY = 1.5625f, offsetZ = -0.5f, rotZ = 1.134f),
+        MobBox("left_middle_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 49, offsetX = 0.5f, offsetY = 1.625f, offsetZ = -0.5f, rotZ = -1.134f),
+    )
+
+    /**
+     * Хоглин (HoglinModel): тело, голова с рогами и ушами, четыре ноги и грива.
+     *
+     * Уши повёрнуты вокруг Z, голова наклонена вокруг X; низ модели — копыта.
+     */
+    private val HOGLIN = listOf(
+        MobBox("head", -0.4375f, -0.1875f, -1.1875f, 0.4375f, 0.1875f, 0f, u = 61, v = 1, offsetY = 1.375f, offsetZ = -0.75f, rotX = -0.873f),
+        MobBox("right_horn", -0.0625f, 0f, -0.0625f, 0.0625f, 0.6875f, 0.0625f, u = 10, v = 13, offsetX = -0.4375f, offsetY = 1.375f, offsetZ = -0.75f),
+        MobBox("left_horn", -0.0625f, 0f, -0.0625f, 0.0625f, 0.6875f, 0.0625f, u = 1, v = 13, offsetX = 0.4375f, offsetY = 1.375f, offsetZ = -0.75f),
+        MobBox("right_ear", -0.375f, 0f, -0.125f, 0f, 0.0625f, 0.125f, u = 1, v = 1, offsetX = -0.375f, offsetY = 1.625f, offsetZ = -0.1875f, rotZ = 0.698f),
+        MobBox("left_ear", 0f, 0f, -0.125f, 0.375f, 0.0625f, 0.125f, u = 1, v = 6, offsetX = 0.375f, offsetY = 1.625f, offsetZ = -0.1875f, rotZ = -0.698f),
+        MobBox("right_front_leg", -0.1875f, -0.875f, -0.1875f, 0.1875f, 0f, 0.1875f, u = 66, v = 42, offsetX = -0.25f, offsetY = 0.875f, offsetZ = -0.5312f),
+        MobBox("right_hind_leg", -0.1562f, -0.6875f, -0.1562f, 0.1563f, 0f, 0.1563f, u = 21, v = 45, offsetX = -0.3125f, offsetY = 0.6875f, offsetZ = 0.625f),
+        MobBox("left_hind_leg", -0.1562f, -0.6875f, -0.1562f, 0.1563f, 0f, 0.1563f, u = 0, v = 45, offsetX = 0.3125f, offsetY = 0.6875f, offsetZ = 0.625f),
+        MobBox("body", -0.5f, -0.4375f, -0.8125f, 0.5f, 0.4375f, 0.8125f, u = 1, v = 1, offsetY = 1.0625f),
+        MobBox("mane", 0f, -0.625f, -0.5625f, 0f, 0f, 0.625f, u = 90, v = 33, offsetY = 2.375f, offsetZ = -0.4375f),
+        MobBox("left_front_leg", -0.1875f, -0.875f, -0.1875f, 0.1875f, 0f, 0.1875f, u = 41, v = 42, offsetX = 0.25f, offsetY = 0.875f, offsetZ = -0.5312f),
+    )
+
+    /**
+     * Пчела (AdultBeeModel): маленькое тело, крылья и лапки.
+     *
+     * Крылья повёрнуты вокруг Y; низ модели — лапки, поэтому тело на 0.31 блока.
+     */
+    private val BEE = listOf(
+        MobBox("front_legs", -0.3125f, -0.125f, 0f, 0.125f, 0f, 0f, u = 26, v = 1, offsetX = 0.0938f, offsetY = 0.125f, offsetZ = -0.125f),
+        MobBox("right_wing", -0.5625f, 0f, 0f, 0f, 0f, 0.375f, u = 0, v = 18, offsetX = -0.0937f, offsetY = 0.5625f, offsetZ = -0.1875f, rotY = -0.262f),
+        MobBox("left_wing", 0f, 0f, 0f, 0.5625f, 0f, 0.375f, u = 0, v = 18, offsetX = 0.0938f, offsetY = 0.5625f, offsetZ = -0.1875f, rotY = 0.262f),
+        MobBox("middle_legs", -0.3125f, -0.125f, 0f, 0.125f, 0f, 0f, u = 26, v = 3, offsetX = 0.0938f, offsetY = 0.125f),
+        MobBox("body", -0.2187f, -0.1875f, -0.3125f, 0.2188f, 0.25f, 0.3125f, u = 0, v = 0, offsetY = 0.3125f),
+        MobBox("right_antenna", -0.1562f, 0f, -0.1875f, -0.0937f, 0.125f, 0f, u = 2, v = 3, offsetY = 0.4375f, offsetZ = -0.3125f),
+        MobBox("stinger", 0f, 0f, 0.3125f, 0f, 0.0625f, 0.4375f, u = 26, v = 7, offsetY = 0.3125f),
+        MobBox("left_antenna", 0.0938f, 0f, -0.1875f, 0.1563f, 0.125f, 0f, u = 2, v = 0, offsetY = 0.4375f, offsetZ = -0.3125f),
+        MobBox("back_legs", -0.3125f, -0.125f, 0f, 0.125f, 0f, 0f, u = 26, v = 5, offsetX = 0.0938f, offsetY = 0.125f, offsetZ = 0.125f),
+    )
+
+    /**
+     * Черепаха (AdultTurtleModel): панцирь, голова и четыре лапы.
+     *
+     * Панцирь — плоская коробка, повёрнутая вокруг X на 90°, поэтому низ модели
+     * считается по лапам (23 px), а не по коробке панциря.
+     */
+    private val TURTLE = listOf(
+        MobBox("head", -0.1875f, -0.25f, -0.1875f, 0.1875f, 0.0625f, 0.1875f, u = 3, v = 0, offsetY = 0.25f, offsetZ = -0.625f),
+        MobBox("right_front_leg", -0.8125f, -0.0625f, -0.125f, 0f, 0f, 0.1875f, u = 27, v = 30, offsetX = -0.3125f, offsetY = 0.125f, offsetZ = -0.25f),
+        MobBox("right_hind_leg", -0.125f, -0.0625f, 0f, 0.125f, 0f, 0.625f, u = 1, v = 23, offsetX = -0.2187f, offsetY = 0.0625f, offsetZ = 0.6875f),
+        MobBox("egg_belly", -0.2812f, -1.3125f, -0.875f, 0.2813f, -0.1875f, -0.8125f, u = 70, v = 33, offsetY = 0.75f, offsetZ = -0.625f, rotX = -1.571f),
+        MobBox("left_hind_leg", -0.125f, -0.0625f, 0f, 0.125f, 0f, 0.625f, u = 1, v = 12, offsetX = 0.2188f, offsetY = 0.0625f, offsetZ = 0.6875f),
+        MobBox("body", -0.5937f, -1.4375f, -0.625f, 0.5938f, -0.1875f, -0.25f, u = 7, v = 37, offsetY = 0.75f, offsetZ = -0.625f, rotX = -1.571f),
+        MobBox("body", -0.3437f, -1.3125f, -0.8125f, 0.3438f, -0.1875f, -0.625f, u = 31, v = 1, offsetY = 0.75f, offsetZ = -0.625f, rotX = -1.571f),
+        MobBox("left_front_leg", 0f, -0.0625f, -0.125f, 0.8125f, 0f, 0.1875f, u = 27, v = 24, offsetX = 0.3125f, offsetY = 0.125f, offsetZ = -0.25f),
+    )
 
     /**
      * Всполох (`BlazeModel`): голова и двенадцать стержней вокруг неё.

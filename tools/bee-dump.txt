@@ -1,0 +1,21 @@
+﻿SIZE	64	64
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/bone	0.000	19.000	0.000	0.000	0.000	0.000
+PART	root/bone/front_legs	1.500	3.000	-2.000	0.000	0.000	0.000
+CUBE	root/bone/front_legs	-5.000	0.000	0.000	2.000	2.000	0.000	26.0	1.0
+PART	root/bone/right_wing	-1.500	-4.000	-3.000	0.000	-0.262	0.000
+CUBE	root/bone/right_wing	-9.000	0.000	0.000	0.000	0.000	6.000	0.0	18.0
+PART	root/bone/left_wing	1.500	-4.000	-3.000	0.000	0.262	0.000
+CUBE	root/bone/left_wing	0.000	0.000	0.000	9.000	0.000	6.000	0.0	18.0
+PART	root/bone/middle_legs	1.500	3.000	0.000	0.000	0.000	0.000
+CUBE	root/bone/middle_legs	-5.000	0.000	0.000	2.000	2.000	0.000	26.0	3.0
+PART	root/bone/body	0.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/bone/body	-3.500	-4.000	-5.000	3.500	3.000	5.000	0.0	0.0
+PART	root/bone/body/right_antenna	0.000	-2.000	-5.000	0.000	0.000	0.000
+CUBE	root/bone/body/right_antenna	-2.500	-2.000	-3.000	-1.500	0.000	0.000	2.0	3.0
+PART	root/bone/body/stinger	0.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/bone/body/stinger	0.000	-1.000	5.000	0.000	0.000	7.000	26.0	7.0
+PART	root/bone/body/left_antenna	0.000	-2.000	-5.000	0.000	0.000	0.000
+CUBE	root/bone/body/left_antenna	1.500	-2.000	-3.000	2.500	0.000	0.000	2.0	0.0
+PART	root/bone/back_legs	1.500	3.000	2.000	0.000	0.000	0.000
+CUBE	root/bone/back_legs	-5.000	0.000	0.000	2.000	2.000	0.000	26.0	5.0
