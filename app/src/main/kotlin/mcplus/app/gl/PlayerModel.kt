@@ -92,17 +92,28 @@ object PlayerModel {
     private val CLASSIC_PARTS: List<Part> by lazy { CLASSIC_BOXES.map { part(it) } }
     private val SLIM_PARTS: List<Part> by lazy { SLIM_BOXES.map { part(it) } }
 
-    private fun part(box: Box): Part = Part(
+    private fun part(box: Box, growPx: Float = 0f): Part = Part(
         name = box.name,
         pivotX = (box.x + box.width / 2f) / 16f,
         pivotY = box.pivotY / 16f,
         pivotZ = 0f,
-        data = build(box),
+        data = build(box, growPx),
     )
 
     val parts: List<Part> get() = MODERN_PARTS
 
     val vertexCount: Int by lazy { MODERN_PARTS.sumOf { it.vertexCount } }
+
+    /**
+     * Части для брони: та же классическая раскладка, раздутая на [growPx] пикселей.
+     *
+     * Наборы кэшируются: у брони всего два раздувания — пиксель для шлема, нагрудника и
+     * ботинок и полпикселя для штанов.
+     */
+    fun armorParts(growPx: Float): List<Part> =
+        ARMOR_PARTS.getOrPut(growPx) { CLASSIC_BOXES.map { part(it, growPx) } }
+
+    private val ARMOR_PARTS = HashMap<Float, List<Part>>()
 
     /**
      * Номер первой вершины части по байтовому смещению в общем буфере.
@@ -133,14 +144,16 @@ object PlayerModel {
         }
     }
 
-    private fun build(box: Box): FloatArray {
+    private fun build(box: Box, growPx: Float = 0f): FloatArray {
         val out = FloatArrayBuilder(6 * 6 * FLOATS_PER_VERTEX)
-        val x0 = box.x / 16f
-        val x1 = (box.x + box.width) / 16f
-        val y0 = box.y / 16f
-        val y1 = (box.y + box.height) / 16f
-        val z0 = box.z / 16f
-        val z1 = (box.z + box.depth) / 16f
+        // Броня раздувает коробку на пиксель: развёртка остаётся прежней, поэтому текстура
+        // чуть растягивается — так же поступает и игра (CubeDeformation).
+        val x0 = (box.x - growPx) / 16f
+        val x1 = (box.x + box.width + growPx) / 16f
+        val y0 = (box.y - growPx) / 16f
+        val y1 = (box.y + box.height + growPx) / 16f
+        val z0 = (box.z - growPx) / 16f
+        val z1 = (box.z + box.depth + growPx) / 16f
 
         // The skin unwraps a box around its texture origin: the top and bottom strips sit above
         // the side strips, then the four sides follow as depth-wide, width-wide, depth-wide and

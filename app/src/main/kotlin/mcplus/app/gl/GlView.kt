@@ -32,6 +32,22 @@ object GlView {
         "experience_bottle", "potion", "fireball", "small_fireball",
     )
 
+    /** Слоты `Set Equipment` с бронёй: 2 — ботинки, 3 — штаны, 4 — нагрудник, 5 — шлем. */
+    private val ARMOR_EQUIPMENT_SLOTS = listOf(
+        2 to ArmorLook.Piece.BOOTS,
+        3 to ArmorLook.Piece.LEGGINGS,
+        4 to ArmorLook.Piece.CHESTPLATE,
+        5 to ArmorLook.Piece.HELMET,
+    )
+
+    /** Порядок брони в своём инвентаре: 0 — шлем, 1 — нагрудник, 2 — штаны, 3 — ботинки. */
+    private val LOCAL_ARMOR_ORDER = listOf(
+        ArmorLook.Piece.HELMET,
+        ArmorLook.Piece.CHESTPLATE,
+        ArmorLook.Piece.LEGGINGS,
+        ArmorLook.Piece.BOOTS,
+    )
+
     /** Команды для дополнения по Tab после «/». */
     private val COMMANDS = listOf(
         "help", "list", "me", "msg", "tell", "time", "weather", "tp", "gamemode",
@@ -495,6 +511,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val slimHumanoidRenderer = PlayerRenderer(
                         width, height, null, classic = true, slim = true, directory = directory,
                     )
+                    // Броня на людях и гуманоидах: та же модель, раздутая на пиксель.
+                    val armorRenderer = ArmorRenderer(width, height, directory)
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
                     sound.musicEnabled = Settings.music
@@ -2527,6 +2545,45 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         humanoidRenderer.draw(camera, humanoids)
                         slimHumanoidRenderer.draw(camera, slimHumanoids)
 
+                        // Броня: у людей и гуманоидов надетое приходит в `Set Equipment`
+                        // (слоты 2…5 — ботинки, штаны, нагрудник, шлем), у себя — из инвентаря.
+                        val armorWearers = ArrayList<ArmorRenderer.Wearer>()
+                        for (entity in entities) {
+                            val name = entityTypes.nameOf(entity.type)
+                            val isPlayer = playerList.nameOf(entity.uuid) != null
+                            if (!isPlayer && HumanoidLook.lookOf(name) == null) continue
+                            val pieces = HashMap<ArmorLook.Piece, Int>()
+                            for ((slot, piece) in ARMOR_EQUIPMENT_SLOTS) {
+                                val itemId = entity.equipmentItem(slot)
+                                if (itemId == 0) continue
+                                val path = ArmorLook.textureOf(itemTable.nameOf(itemId)) ?: continue
+                                val texture = armorRenderer.textureFor(path)
+                                if (texture != 0) pieces[piece] = texture
+                            }
+                            if (pieces.isNotEmpty()) {
+                                armorWearers += ArmorRenderer.Wearer(
+                                    entity.x, entity.y, entity.z, entity.yaw, pieces,
+                                )
+                            }
+                        }
+                        // Свой игрок в третьем лице: броня лежит в слотах 5…8 инвентаря.
+                        if (cameraMode > 0) {
+                            val pieces = HashMap<ArmorLook.Piece, Int>()
+                            for ((index, piece) in LOCAL_ARMOR_ORDER.withIndex()) {
+                                val stack = session?.inventory?.armourStack(index) ?: continue
+                                val path = ArmorLook.textureOf(itemTable.nameOf(stack.itemId)) ?: continue
+                                val texture = armorRenderer.textureFor(path)
+                                if (texture != 0) pieces[piece] = texture
+                            }
+                            if (pieces.isNotEmpty()) {
+                                armorWearers += ArmorRenderer.Wearer(
+                                    player.x, player.y, player.z,
+                                    CameraAngles.degrees(player.yaw), pieces,
+                                )
+                            }
+                        }
+                        armorRenderer.draw(camera, armorWearers)
+
                         mobRenderer.draw(camera, mobs)
                         if (mobDemo) {
                             // По одному мобу каждого семейства в ряд перед камерой: так модель
@@ -3407,6 +3464,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     particleRenderer.close()
                     humanoidRenderer.close()
                     slimHumanoidRenderer.close()
+                    armorRenderer.close()
                     playerRenderer.close()
                     skyRenderer.close()
                     hud.close()
