@@ -21,14 +21,16 @@ if (!path) {
 const lines = fs.readFileSync(path, 'utf8').split(/\r?\n/);
 let textures = { width: 64, height: 32 };
 const parts = [];
+const poses = new Map();
 let current = null;
 
 for (const line of lines) {
-  const cells = line.split('\t');
+  const cells = line.replace(/^\uFEFF/, '').split('\t');
   if (cells[0] === 'SIZE') {
     textures = { width: Number(cells[1]), height: Number(cells[2]) };
   } else if (cells[0] === 'PART') {
     current = {
+      path: cells[1],
       name: cells[1].split('/').pop(),
       x: Number(cells[2]),
       y: Number(cells[3]),
@@ -38,6 +40,7 @@ for (const line of lines) {
       rz: Number(cells[7]),
       cubes: [],
     };
+    poses.set(current.path, current);
     parts.push(current);
   } else if (cells[0] === 'CUBE' && current) {
     current.cubes.push({
@@ -51,6 +54,29 @@ for (const line of lines) {
       v: Number(cells[9]),
     });
   }
+}
+
+// Части бывают вложенными (голова → уши → морда). В дампе у каждой только своя поза,
+// поэтому смещения складываются по всей цепочке родителей — иначе уши окажутся в центре
+// модели, а не на голове.
+for (const part of parts) {
+  const chain = part.path.split('/');
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  let rotatedParent = false;
+  for (let depth = 2; depth <= chain.length; depth++) {
+    const parent = poses.get(chain.slice(0, depth).join('/'));
+    if (!parent) continue;
+    if (parent.rx !== 0 || parent.ry !== 0 || parent.rz !== 0) rotatedParent = true;
+    x += parent.x;
+    y += parent.y;
+    z += parent.z;
+  }
+  part.x = x;
+  part.y = y;
+  part.z = z;
+  part.rotatedParent = rotatedParent;
 }
 
 // Самый низ модели: без учёта поворотов, но этого достаточно, чтобы поставить её на ноль.

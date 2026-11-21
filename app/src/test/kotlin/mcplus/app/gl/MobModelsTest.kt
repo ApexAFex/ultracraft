@@ -377,6 +377,34 @@ class MobModelsTest {
     }
 
     @Test
+    fun `wolf, cat and fox are separate families`() {
+        val cases = listOf(
+            Triple("wolf", MobFamily.WOLF, 64 to 32),
+            Triple("cat", MobFamily.CAT, 64 to 64),
+            Triple("ocelot", MobFamily.CAT, 64 to 64),
+            Triple("fox", MobFamily.FOX, 48 to 32),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+        // Лошади пока остаются коробками: у их модели повёрнуты родительские части.
+        assertEquals(MobFamily.NONE, MobModels.familyOf("horse"))
+
+        assertEquals(11, MobModels.boxes(MobFamily.WOLF).size, "голова, уши, морда, тело, хвост и лапы")
+        // У всех трёх есть хвост и четыре лапы, а голова — наверху, а не в центре модели.
+        for (family in listOf(MobFamily.WOLF, MobFamily.CAT, MobFamily.FOX)) {
+            val boxes = MobModels.boxes(family)
+            assertTrue(boxes.any { it.name.contains("tail") }, "$family без хвоста")
+            assertEquals(4, boxes.count { it.name.contains("leg") }, "$family: не четыре лапы")
+            val head = boxes.filter { it.name.contains("head") }
+            assertTrue(head.isNotEmpty(), "$family без головы")
+            assertTrue(head.all { it.offsetY > 0.3f }, "$family: голова должна быть выше ног")
+        }
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }

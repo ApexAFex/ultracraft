@@ -5,7 +5,7 @@ import mcplus.net.MetaEntry
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
-    GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, BOAT, MINECART, NONE,
+    GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, BOAT, MINECART, NONE,
 }
 
 /**
@@ -48,8 +48,8 @@ data class MobBox(
 object MobModels {
 
     fun familyOf(entityName: String): MobFamily = when (entityName) {
-        "cow", "mooshroom", "pig", "sheep", "goat", "wolf", "fox", "rabbit",
-        "horse", "donkey", "mule", "llama", "trader_llama", "ocelot", "cat" -> MobFamily.QUADRUPED
+        "cow", "mooshroom", "pig", "sheep", "goat", "rabbit",
+        "llama", "trader_llama" -> MobFamily.QUADRUPED
 
         "chicken", "parrot" -> MobFamily.CHICKEN
         "creeper" -> MobFamily.CREEPER
@@ -72,6 +72,11 @@ object MobModels {
         "hoglin", "zoglin" -> MobFamily.HOGLIN
         "bee" -> MobFamily.BEE
         "turtle" -> MobFamily.TURTLE
+        "wolf" -> MobFamily.WOLF
+        "cat", "ocelot" -> MobFamily.CAT
+        "fox" -> MobFamily.FOX
+        // Лошадь, осёл и мул пока коробками: у их модели повёрнуты родительские части,
+        // а плоский список коробок такие вложения не выражает.
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -129,6 +134,9 @@ object MobModels {
         MobFamily.HOGLIN -> 128 to 64
         MobFamily.BEE -> 64 to 64
         MobFamily.TURTLE -> 128 to 64
+        MobFamily.WOLF -> 64 to 32
+        MobFamily.CAT -> 64 to 64
+        MobFamily.FOX -> 48 to 32
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -151,6 +159,9 @@ object MobModels {
         MobFamily.HOGLIN -> HOGLIN
         MobFamily.BEE -> BEE
         MobFamily.TURTLE -> TURTLE
+        MobFamily.WOLF -> WOLF
+        MobFamily.CAT -> CAT
+        MobFamily.FOX -> FOX
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -372,6 +383,66 @@ object MobModels {
         }
     }
 
+    /**
+     * Волк (AdultWolfModel): голова с ушами и мордой, тело, хвост и четыре лапы.
+     *
+     * Части вложены (голова → уши → морда), но дамп разворачивает дерево в плоский
+     * список с отступами, поэтому модель собирается как обычно.
+     */
+    private val WOLF = listOf(
+        MobBox("real_head", -0.125f, -0.1875f, -0.125f, 0.25f, 0.1875f, 0.125f, u = 0, v = 0, offsetX = -0.0625f, offsetY = 0.6563f, offsetZ = -0.4375f),
+        MobBox("real_head", -0.125f, 0.1875f, 0f, 0f, 0.3125f, 0.0625f, u = 16, v = 14, offsetX = -0.0625f, offsetY = 0.6563f, offsetZ = -0.4375f),
+        MobBox("real_head", 0.125f, 0.1875f, 0f, 0.25f, 0.3125f, 0.0625f, u = 16, v = 14, offsetX = -0.0625f, offsetY = 0.6563f, offsetZ = -0.4375f),
+        MobBox("real_head", -0.0312f, -0.1874f, -0.3125f, 0.1563f, 0.0001f, -0.0625f, u = 0, v = 10, offsetX = -0.0625f, offsetY = 0.6563f, offsetZ = -0.4375f),
+        MobBox("right_front_leg", 0f, -0.5f, -0.0625f, 0.125f, 0f, 0.0625f, u = 0, v = 18, offsetX = -0.1562f, offsetY = 0.5f, offsetZ = -0.25f),
+        MobBox("right_hind_leg", 0f, -0.5f, -0.0625f, 0.125f, 0f, 0.0625f, u = 0, v = 18, offsetX = -0.1562f, offsetY = 0.5f, offsetZ = 0.4375f),
+        MobBox("upper_body", -0.1875f, -0.1875f, -0.1875f, 0.3125f, 0.1875f, 0.25f, u = 21, v = 0, offsetX = -0.0625f, offsetY = 0.625f, offsetZ = -0.1875f, rotX = -1.571f),
+        MobBox("real_tail", 0f, -0.5f, -0.0625f, 0.125f, 0f, 0.0625f, u = 9, v = 18, offsetX = -0.0625f, offsetY = 0.75f, offsetZ = 0.5f),
+        MobBox("left_hind_leg", 0f, -0.5f, -0.0625f, 0.125f, 0f, 0.0625f, u = 0, v = 18, offsetX = 0.0313f, offsetY = 0.5f, offsetZ = 0.4375f),
+        MobBox("body", -0.1875f, -0.4375f, -0.1875f, 0.1875f, 0.125f, 0.1875f, u = 18, v = 14, offsetY = 0.625f, offsetZ = 0.125f, rotX = -1.571f),
+        MobBox("left_front_leg", 0f, -0.5f, -0.0625f, 0.125f, 0f, 0.0625f, u = 0, v = 18, offsetX = 0.0313f, offsetY = 0.5f, offsetZ = -0.25f),
+    )
+    /**
+     * Кошка (AdultFelineModel): голова с ушами, тело, хвост и четыре лапы.
+     *
+     * Модель общая с оцелотом — отличается только текстура.
+     */
+    private val CAT = listOf(
+        MobBox("head", -0.1562f, -0.125f, -0.1875f, 0.1563f, 0.125f, 0.125f, u = 0, v = 0, offsetY = 1f, offsetZ = -0.5625f),
+        MobBox("head", -0.0937f, -0.1249f, -0.25f, 0.0938f, 0.0001f, -0.125f, u = 0, v = 24, offsetY = 1f, offsetZ = -0.5625f),
+        MobBox("head", -0.125f, 0.125f, 0f, -0.0625f, 0.1875f, 0.125f, u = 0, v = 10, offsetY = 1f, offsetZ = -0.5625f),
+        MobBox("head", 0.0625f, 0.125f, 0f, 0.125f, 0.1875f, 0.125f, u = 6, v = 10, offsetY = 1f, offsetZ = -0.5625f),
+        MobBox("tail1", -0.0312f, -0.5f, 0f, 0.0313f, 0f, 0.0625f, u = 0, v = 15, offsetY = 1f, offsetZ = 0.5f, rotX = -0.9f),
+        MobBox("right_front_leg", -0.0625f, -0.625f, 0f, 0.0625f, 0f, 0.125f, u = 40, v = 0, offsetX = -0.075f, offsetY = 1.0563f, offsetZ = -0.3125f),
+        MobBox("tail2", -0.0312f, -0.5f, 0f, 0.0313f, 0f, 0.0625f, u = 4, v = 15, offsetY = 0.6875f, offsetZ = 0.875f),
+        MobBox("right_hind_leg", -0.0625f, -0.375f, 0.0625f, 0.0625f, 0f, 0.1875f, u = 8, v = 13, offsetX = -0.0687f, offsetY = 0.8125f, offsetZ = 0.3125f),
+        MobBox("left_hind_leg", -0.0625f, -0.375f, 0.0625f, 0.0625f, 0f, 0.1875f, u = 8, v = 13, offsetX = 0.0688f, offsetY = 0.8125f, offsetZ = 0.3125f),
+        MobBox("body", -0.125f, -1.1875f, -0.5f, 0.125f, -0.1875f, -0.125f, u = 20, v = 0, offsetY = 1.1875f, offsetZ = -0.625f, rotX = -1.571f),
+        MobBox("left_front_leg", -0.0625f, -0.625f, 0f, 0.0625f, 0f, 0.125f, u = 40, v = 0, offsetX = 0.075f, offsetY = 1.0563f, offsetZ = -0.3125f),
+    )
+    /**
+     * Лиса (AdultFoxModel): острая морда, тело, хвост и лапы.
+     *
+     * Текстура лисы 48×32 — вдвое уже обычной, и UV сняты с неё.
+     */
+    private val FOX = listOf(
+        MobBox("head", -0.1875f, -0.25f, -0.3125f, 0.3125f, 0.125f, 0.0625f, u = 1, v = 5, offsetX = -0.0625f, offsetY = 1.4688f, offsetZ = -0.1875f),
+        MobBox("nose", -0.0625f, -0.2506f, -0.5f, 0.1875f, -0.1256f, -0.3125f, u = 6, v = 18, offsetX = -0.0625f, offsetY = 1.4688f, offsetZ = -0.1875f),
+        MobBox("right_ear", -0.1875f, 0.125f, -0.25f, -0.0625f, 0.25f, -0.1875f, u = 8, v = 1, offsetX = -0.0625f, offsetY = 1.4688f, offsetZ = -0.1875f),
+        MobBox("left_ear", 0.1875f, 0.125f, -0.25f, 0.3125f, 0.25f, -0.1875f, u = 15, v = 1, offsetX = -0.0625f, offsetY = 1.4688f, offsetZ = -0.1875f),
+        MobBox("right_front_leg", 0.125f, -0.4062f, -0.0625f, 0.25f, -0.0312f, 0.0625f, u = 13, v = 24, offsetX = -0.3125f, offsetY = 1.4063f),
+        MobBox("right_hind_leg", 0.125f, -0.4062f, -0.0625f, 0.25f, -0.0312f, 0.0625f, u = 13, v = 24, offsetX = -0.3125f, offsetY = 1.4063f, offsetZ = 0.4375f),
+        MobBox("left_hind_leg", 0.125f, -0.4062f, -0.0625f, 0.25f, -0.0312f, 0.0625f, u = 4, v = 24, offsetX = -0.0625f, offsetY = 1.4063f, offsetZ = 0.4375f),
+        MobBox("body", -0.1875f, -0.9374f, -0.2187f, 0.1875f, -0.2499f, 0.1563f, u = 24, v = 15, offsetY = 1.5f, offsetZ = -0.375f, rotX = -1.571f),
+        MobBox("tail", 0.125f, -0.5625f, -0.0625f, 0.375f, 0f, 0.25f, u = 30, v = 0, offsetX = -0.25f, offsetY = 0.5625f, offsetZ = -0.4375f, rotX = 0.052f),
+        MobBox("left_front_leg", 0.125f, -0.4062f, -0.0625f, 0.25f, -0.0312f, 0.0625f, u = 4, v = 24, offsetX = -0.0625f, offsetY = 1.4063f),
+    )
+    /**
+     * Лошадь (AbstractEquineModel): голова с ушами и гривой, тело, хвост, четыре ноги.
+     *
+     * Эта же модель у осла, мула, скелетной и зомби-лошади — отличается только текстура.
+     * Лист 128×128.
+     */
     /**
      * Странник (AdultStriderModel): тело, две ноги и семь щетинок.
      *

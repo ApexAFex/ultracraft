@@ -6,8 +6,10 @@
 // уже с учётом позы части и в блоках (1/16 пикселя), UV — в пикселях текстуры.
 //
 //   tools\mob-dump.ps1 net.minecraft.client.model.animal.squid.SquidModel
-//   tools\mob-dump.ps1 net.minecraft.client.model.animal.golem.IronGolemModel
+//   tools\mob-dump.ps1 net.minecraft.client.model.animal.wolf.AdultWolfModel createBodyLayer 64 32
 //
+// Третий и четвёртый аргументы — размер листа текстуры: у современных моделей фабрика
+// возвращает `MeshDefinition` без материала, и размер иначе не откуда взять.
 // Нужен JDK 25: классы 26.3 собраны под class file version 69.
 
 import java.lang.reflect.Field;
@@ -16,6 +18,7 @@ import java.util.List;
 
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MaterialDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
@@ -29,13 +32,14 @@ final class mob_dump {
         }
         Class<?> type = Class.forName(args[0]);
         String methodName = args.length > 1 ? args[1] : "createBodyLayer";
-        Method method = type.getDeclaredMethod(methodName);
-        method.setAccessible(true);
-        Object result = method.invoke(null);
+        int hintWidth = args.length > 2 ? Integer.parseInt(args[2]) : 0;
+        int hintHeight = args.length > 3 ? Integer.parseInt(args[3]) : 0;
+
+        Object result = callFactory(type, methodName);
 
         MeshDefinition mesh;
-        int textureWidth = 64;
-        int textureHeight = 64;
+        int textureWidth = hintWidth > 0 ? hintWidth : 64;
+        int textureHeight = hintHeight > 0 ? hintHeight : 64;
         if (result instanceof MeshDefinition) {
             mesh = (MeshDefinition) result;
         } else {
@@ -48,6 +52,22 @@ final class mob_dump {
 
         LayerDefinition definition = LayerDefinition.create(mesh, textureWidth, textureHeight);
         dump(definition.bakeRoot(), "root", textureWidth, textureHeight);
+    }
+
+    /** Фабрика слоя: без аргументов или с одной деформацией куба. */
+    private static Object callFactory(Class<?> type, String name) throws Exception {
+        for (Method method : type.getDeclaredMethods()) {
+            if (!method.getName().equals(name)) continue;
+            method.setAccessible(true);
+            if (method.getParameterCount() == 0) {
+                return method.invoke(null);
+            }
+            if (method.getParameterCount() == 1
+                && method.getParameterTypes()[0] == CubeDeformation.class) {
+                return method.invoke(null, new CubeDeformation(0.0F));
+            }
+        }
+        throw new NoSuchMethodException(type.getName() + "." + name);
     }
 
     private static void dump(ModelPart part, String name, int texWidth, int texHeight)
