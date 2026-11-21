@@ -365,6 +365,36 @@ class Session internal constructor(
         send(ContainerClicks.click(FORCE_FULL_STATE, menuSlot, button, input, containerId))
     }
 
+    /**
+     * Кнопка в меню: три зачарования у стола, кнопки маяка и торговли.
+     *
+     * `Container Button Click`: номер окна и номер кнопки. Сервер сам решает, что делать —
+     * списать опыт, выдать зачарование или выбрать сделку.
+     */
+    fun buttonClick(button: Int, containerId: Int = container?.id ?: 0) {
+        send(
+            Packet(
+                Protocol777.Play.CONTAINER_BUTTON_CLICK,
+                ByteWriter().writeVarInt(containerId).writeVarInt(button).toByteArray(),
+            ),
+        )
+    }
+
+    /**
+     * Переименование в наковальне (`Rename Item`): номер окна и новое имя.
+     *
+     * Пустая строка возвращает предмету обычное имя — так же ведёт себя и ванильный клиент.
+     */
+    fun renameItem(name: String, containerId: Int = container?.id ?: 0) {
+        val trimmed = name.take(AnvilName.MAX_LENGTH)
+        send(
+            Packet(
+                Protocol777.Play.RENAME_ITEM,
+                ByteWriter().writeVarInt(containerId).writeString(trimmed).toByteArray(),
+            ),
+        )
+    }
+
     /** Перетаскивание: начало (палец нажат на слоте), добавление слотов и конец. */
     fun dragStart(menuSlot: Int, button: Int = 0) {
         val start = when (button) { 1 -> 4; 2 -> 8; else -> 0 }

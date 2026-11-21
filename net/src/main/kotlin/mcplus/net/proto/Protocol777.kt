@@ -143,7 +143,9 @@ object Protocol777 {
         const val CHAT_COMMAND: Int = 0x07
         const val CHAT: Int = 0x09
         const val CONTAINER_CLICK: Int = 0x12
+        const val CONTAINER_BUTTON_CLICK: Int = 0x11
         const val CONTAINER_CLOSE_SERVERBOUND: Int = 0x13
+        const val RENAME_ITEM: Int = 0x31
         /** Взмах рукой в 26.3 — это действие `STAB` пакета `player_action`. */
         const val SWING_ACTION: Int = 8
         /** Атака сущности: отдельный пакет с одним номером сущности. */

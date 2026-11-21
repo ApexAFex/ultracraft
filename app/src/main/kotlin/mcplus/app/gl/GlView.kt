@@ -208,6 +208,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         startAdvancements: Boolean = false,
         /** Открыть экран статистики сразу (проверка без клавиатуры). */
         startStatistics: Boolean = false,
+        /** Проверка без рук: переименовать предмет в открытой наковальне. */
+        renameAfterOpen: String? = null,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
         particleDemo: Boolean = false,
         /** Нарисовать перед камерой по одному мобу каждого семейства (проверка моделей). */
@@ -864,6 +866,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     var statisticsOpen = startStatistics
     // Экран открыт по флагу --statistics тоже должен попросить статистику у сервера.
     var statisticsRequested = false
+    // Набранное имя в наковальне и признак «печатаем».
+    var anvilText = ""
+    var anvilEditing = false
+    var renameSent = false
     var statisticsType = 8
     var statisticsScroll = 0
     var statisticsLeftWasDown = false
@@ -1298,6 +1304,45 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
 
                         // Number keys pick a hotbar slot; the server echoes the choice. Пока
                         // печатаешь в чат, цифры — это цифры, а не слоты.
+                        // Кнопки меню: три зачарования и поле имени наковальни. Клик по кнопке
+                        // уходит на сервер, клик по полю включает печать.
+                        if (openContainer != null && input.clickRequested) {
+                            val buttonIndex = hud.containerButtons.indexOfFirst {
+                                it.contains(input.mouseX, input.mouseY)
+                            }
+                            if (buttonIndex >= 0) {
+                                session?.buttonClick(buttonIndex)
+                                println("Кнопка меню: ${buttonIndex + 1}")
+                            } else if (
+                                openContainer.type == "anvil" &&
+                                hud.anvilField?.contains(input.mouseX, input.mouseY) == true
+                            ) {
+                                anvilEditing = true
+                                println("Наковальня: печатай имя и нажми Enter")
+                            }
+                        }
+                        // Проверка без рук: отправить имя в наковальню сразу после открытия.
+                        if (!renameSent && renameAfterOpen != null && openContainer?.type == "anvil") {
+                            renameSent = true
+                            session?.renameItem(renameAfterOpen)
+                            println("Наковальня: отправлено имя «${renameAfterOpen}»")
+                        }
+                        // Печать имени в наковальне: буквы идут в поле, Enter отправляет имя.
+                        if (anvilEditing && openContainer?.type == "anvil") {
+                            anvilText = mcplus.net.AnvilName.append(anvilText, input.takeTyped())
+                            if (input.backspaceRequested) {
+                                anvilText = mcplus.net.AnvilName.backspace(anvilText)
+                            }
+                            if (input.enterRequested) {
+                                val name = mcplus.net.AnvilName.toPacket(anvilText)
+                                session?.renameItem(name)
+                                println("Наковальня: переименовать в «$name»")
+                                anvilEditing = false
+                            }
+                        } else if (anvilText.isNotEmpty() && openContainer?.type != "anvil") {
+                            anvilText = ""
+                            anvilEditing = false
+                        }
                         // В экранах инвентаря и контейнера цифры меняют местами с хотбаром, а Q
                         // выбрасывает предмет из слота под курсором.
                         if (inventoryOpen || openContainer != null) {
@@ -3063,7 +3108,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         lastItemTotal = totalItems
                         if (openContainer != null && inventory != null) {
-                            hud.drawContainerScreen(openContainer, inventory, input.mouseX, input.mouseY)
+                            hud.drawContainerScreen(
+                                openContainer, inventory, input.mouseX, input.mouseY,
+                                anvilText = if (anvilEditing) anvilText else "",
+                            )
                         } else if (inventory != null && inventoryOpen) {
                             hud.drawInventoryScreen(inventory, input.mouseX, input.mouseY)
                         }

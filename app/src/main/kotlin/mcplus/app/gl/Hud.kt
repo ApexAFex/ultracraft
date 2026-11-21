@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
@@ -687,8 +687,28 @@ class Hud(
         drawInventoryOverlay(inventory, mouseX, mouseY)
     }
 
+    /**
+     * Прямоугольники кнопок последнего нарисованного меню.
+     *
+     * Клик приходит уже после отрисовки, поэтому экран запоминает, куда попал бы клик:
+     * три кнопки зачарования и поле имени в наковальне.
+     */
+    var containerButtons: List<HudRect> = emptyList()
+        private set
+
+    /** Поле имени наковальни (куда кликать, чтобы печатать). */
+    var anvilField: HudRect? = null
+        private set
+
     /** Экран контейнера: фон своего меню, слоты и подписи в экранном слое. */
-    fun drawContainerScreen(container: OpenContainer, inventory: Inventory, mouseX: Double, mouseY: Double) {
+    fun drawContainerScreen(
+        container: OpenContainer,
+        inventory: Inventory,
+        mouseX: Double,
+        mouseY: Double,
+        /** Что набрано в поле имени наковальни (пусто — показываем имя предмета). */
+        anvilText: String = "",
+    ) {
         val layout = ContainerScreen.layout(container)
         val s = ContainerScreen.scale(height)
         val ox = ContainerScreen.originX(width, s)
@@ -699,8 +719,22 @@ class Hud(
             renderer.rect(panel, 0x101018, 0.85f)
         }
         // У наковальни в текстуре красное поле имени: рисуем поверх тёмное, как EditBox.
+        anvilField = null
         if (container.type == "anvil") {
             renderer.rect(ox + 58f * s, oy + 20f * s, 112f * s, 16f * s, 0x202020, 0.95f)
+            anvilField = HudRect(ox + 58f * s, oy + 20f * s, 112f * s, 16f * s)
+        }
+        // Зачарование: три кнопки, по одной на строку цены. Клик по ним уходит на сервер.
+        containerButtons = if (container.type == "enchantment") {
+            (0 until 3).map { index ->
+                val rect = HudRect(ox + 10f * s, oy + (7f + index * 18f) * s, 98f * s, 16f * s)
+                val cost = container.dataValue(index) ?: 0
+                val tint = if (cost > 0) 0x3A2E5A else 0x202020
+                renderer.rect(rect.x, rect.y, rect.width, rect.height, tint, 0.55f)
+                rect
+            }
+        } else {
+            emptyList()
         }
         // Печь: пламя и стрелка плавки по данным меню (0/1 — горение, 2/3 — плавка).
         if (container.type in MenuLayout.FURNACES) {
@@ -754,6 +788,12 @@ class Hud(
         if (container.title.isNotBlank()) {
             text?.drawScreen(
                 listOf(TextRenderer.ScreenLabel(ox + 8f * s, oy + 6f * s, container.title, s * 0.8f)),
+            )
+        }
+        // Поле имени наковальни: набранный текст или имя предмета.
+        if (container.type == "anvil" && anvilText.isNotBlank()) {
+            text?.drawScreen(
+                listOf(TextRenderer.ScreenLabel(ox + 62f * s, oy + 25f * s, anvilText, s * 0.8f)),
             )
         }
         // Цена зачарования: три числа рядом с кнопками (данные 0…2). Ноль — кнопка пустая.

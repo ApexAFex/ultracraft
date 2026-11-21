@@ -948,6 +948,8 @@ private fun windowCommand(args: List<String>) {
     var mobDemo = false
     var skinFile: String? = null
     var startStatistics = false
+    /** Проверка без рук: переименовать предмет в открытой наковальне. */
+    var renameAfterOpen: String? = null
     var pauseAtStart = false
     var cameraModeAtStart = 0
     var pitchAtStart: Float? = null
@@ -968,6 +970,7 @@ private fun windowCommand(args: List<String>) {
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
             "--statistics" -> startStatistics = true
+            "--rename" -> renameAfterOpen = args.getOrNull(++index) ?: fail("--rename ждёт имя")
             "--use-item" -> useItemAtFrame =
                 args.getOrNull(++index)?.toIntOrNull() ?: fail("--use-item ждёт номер кадра")
             "--after-use" -> captureAfterUseSeconds =
@@ -1100,6 +1103,7 @@ private fun windowCommand(args: List<String>) {
             showTab = showTab,
             startAdvancements = startAdvancements,
             startStatistics = startStatistics,
+            renameAfterOpen = renameAfterOpen,
             useItemAtFrame = useItemAtFrame,
             captureAfterUseSeconds = captureAfterUseSeconds,
             heldSlotAtStart = heldSlotAtStart,
