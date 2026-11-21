@@ -143,6 +143,38 @@ class PlayerModelTest {
     }
 
     @Test
+    fun `skeleton limbs are two pixels wide and sit at the body edge`() {
+        val slim = PlayerModel.parts(classic = true, slim = true)
+        assertEquals(
+            listOf("head", "body", "rightArm", "leftArm", "rightLeg", "leftLeg"),
+            slim.map { it.name },
+        )
+
+        fun bounds(part: PlayerModel.Part): ClosedFloatingPointRange<Float> {
+            var minX = Float.MAX_VALUE
+            var maxX = -Float.MAX_VALUE
+            var index = 0
+            while (index < part.data.size) {
+                minX = minOf(minX, part.data[index])
+                maxX = maxOf(maxX, part.data[index])
+                index += PlayerModel.FLOATS_PER_VERTEX
+            }
+            return minX..maxX
+        }
+
+        // Ванильная SkeletonModel: рука от −6 до −4, нога от −3 до −1 (пиксели).
+        assertEquals(-0.375f..-0.25f, bounds(slim.first { it.name == "rightArm" }))
+        assertEquals(0.25f..0.375f, bounds(slim.first { it.name == "leftArm" }))
+        assertEquals(-0.1875f..-0.0625f, bounds(slim.first { it.name == "rightLeg" }))
+        assertEquals(0.0625f..0.1875f, bounds(slim.first { it.name == "leftLeg" }))
+
+        // Голова и тело те же, что у обычной модели.
+        val classic = PlayerModel.parts(classic = true)
+        assertEquals(bounds(classic.first { it.name == "head" }), bounds(slim.first { it.name == "head" }))
+        assertEquals(bounds(classic.first { it.name == "body" }), bounds(slim.first { it.name == "body" }))
+    }
+
+    @Test
     fun `classic left limbs mirror the right limb texture`() {
         val classic = PlayerModel.parts(classic = true)
 

@@ -41,6 +41,8 @@ class Hud(
         durability: Pair<Int, Int>? = null,
         /** Готовность удара: 0 сразу после удара, 1 когда перезарядка прошла. */
         attackCooldown: Float = 1f,
+        /** Доля запаса воздуха под водой; null — рисовать пузырьки не нужно. */
+        air: Float? = null,
     ) {
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
@@ -61,6 +63,7 @@ class Hud(
             drawHearts(vitals)
             drawFood(vitals)
             drawExperience(vitals)
+            if (air != null && air < 1f) drawAir(air)
         }
         drawCrosshair(s)
         renderer.draw()
@@ -1123,6 +1126,26 @@ class Hud(
                 value >= 1 -> if (!renderer.sprite("food_half", rect)) {
                     renderer.rect(rect, 0xC07820, 0.95f)
                 }
+            }
+        }
+    }
+
+    /**
+     * Пузырьки воздуха над полосой еды.
+     *
+     * Полных пузырьков — по доле запаса, на границе рисуется лопающийся, остальные пустые:
+     * так видно, сколько ещё можно провести под водой.
+     */
+    private fun drawAir(fraction: Float) {
+        val filled = (fraction * HudLayout.HEARTS).toInt().coerceIn(0, HudLayout.HEARTS)
+        for (index in 0 until HudLayout.HEARTS) {
+            val rect = HudLayout.air(index, width, height)
+            if (index < filled) {
+                if (!renderer.sprite("air", rect)) renderer.rect(rect, 0x9FD8FF, 0.9f)
+            } else if (index == filled && fraction > 0f) {
+                if (!renderer.sprite("air_bursting", rect)) renderer.rect(rect, 0x7FB8E8, 0.9f)
+            } else {
+                if (!renderer.sprite("air_empty", rect)) renderer.rect(rect, 0x18283A, 0.85f)
             }
         }
     }

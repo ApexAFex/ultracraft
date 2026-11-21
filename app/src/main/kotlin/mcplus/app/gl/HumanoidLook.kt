@@ -34,6 +34,17 @@ object HumanoidLook {
         else -> null
     }
 
+    /**
+     * Тонкие ли конечности.
+     *
+     * Ванильная `SkeletonModel` строит руки и ноги 2×12×2, а не 4×12×4: с толстыми
+     * конечностями скелет превращается в белую плиту. У остальных гуманоидов — обычные.
+     */
+    fun slim(typeName: String): Boolean = when (typeName) {
+        "skeleton", "stray", "bogged", "parched", "wither_skeleton" -> true
+        else -> false
+    }
+
     /** Гуманоид ли это: нужен для руки с предметом и брони. */
     fun isHumanoid(typeName: String): Boolean = lookOf(typeName) != null
 

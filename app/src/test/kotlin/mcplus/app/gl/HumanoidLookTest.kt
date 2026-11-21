@@ -54,6 +54,16 @@ class HumanoidLookTest {
     }
 
     @Test
+    fun `skeletons have thin limbs`() {
+        for (type in listOf("skeleton", "stray", "bogged", "parched", "wither_skeleton")) {
+            assertTrue(HumanoidLook.slim(type), "$type — скелет, конечности тонкие")
+        }
+        for (type in listOf("zombie", "pillager", "enderman", "cow")) {
+            assertTrue(!HumanoidLook.slim(type), "$type — обычные конечности")
+        }
+    }
+
+    @Test
     fun `zombies keep their arms forward`() {
         for (type in listOf("zombie", "husk", "drowned", "zombified_piglin")) {
             assertTrue(HumanoidLook.armsForward(type), "$type держит руки вперёд")

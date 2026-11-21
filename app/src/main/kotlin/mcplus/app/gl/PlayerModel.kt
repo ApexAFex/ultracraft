@@ -62,11 +62,35 @@ object PlayerModel {
         Box("leftLeg", 0, 0, -2, 4, 12, 4, 0, 16, 12, mirror = true),
     )
 
-    /** @param classic true для скинов 64×32 (скелет): левые конечности берут текстуру правых. */
-    fun parts(classic: Boolean = false): List<Part> = if (classic) CLASSIC_PARTS else MODERN_PARTS
+    /**
+     * Скелет и его родня: те же 64×32 развёртки, но руки и ноги в два пикселя.
+     *
+     * Ванильная `SkeletonModel.createDefaultSkeletonMesh` строит конечности 2×12×2 у самого
+     * края тела: рука от −6 до −4, нога от −3 до −1. С четырёхпиксельными конечностями
+     * скелет выглядит белой плитой и не узнаётся.
+     */
+    private val SLIM_BOXES = listOf(
+        Box("head", -4, 24, -4, 8, 8, 8, 0, 0, 24),
+        Box("body", -4, 12, -2, 8, 12, 4, 16, 16, 12),
+        Box("rightArm", -6, 12, -2, 2, 12, 2, 40, 16, 24),
+        Box("leftArm", 4, 12, -2, 2, 12, 2, 40, 16, 24, mirror = true),
+        Box("rightLeg", -3, 0, -2, 2, 12, 2, 0, 16, 12),
+        Box("leftLeg", 1, 0, -2, 2, 12, 2, 0, 16, 12, mirror = true),
+    )
+
+    /**
+     * @param classic true для скинов 64×32 (скелет): левые конечности берут текстуру правых.
+     * @param slim true для скелетов: руки и ноги в два пикселя вместо четырёх.
+     */
+    fun parts(classic: Boolean = false, slim: Boolean = false): List<Part> = when {
+        slim -> SLIM_PARTS
+        classic -> CLASSIC_PARTS
+        else -> MODERN_PARTS
+    }
 
     private val MODERN_PARTS: List<Part> by lazy { BOXES.map { part(it) } }
     private val CLASSIC_PARTS: List<Part> by lazy { CLASSIC_BOXES.map { part(it) } }
+    private val SLIM_PARTS: List<Part> by lazy { SLIM_BOXES.map { part(it) } }
 
     private fun part(box: Box): Part = Part(
         name = box.name,

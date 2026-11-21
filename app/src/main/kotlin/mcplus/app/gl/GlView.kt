@@ -490,6 +490,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val humanoidRenderer = PlayerRenderer(
                         width, height, null, classic = true, directory = directory,
                     )
+                    // Скелеты — та же раскладка, но с тонкими конечностями: с толстыми руками
+                    // и ногами скелет выглядит белой плитой.
+                    val slimHumanoidRenderer = PlayerRenderer(
+                        width, height, null, classic = true, slim = true, directory = directory,
+                    )
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
                     sound.musicEnabled = Settings.music
@@ -857,6 +862,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var nextCaveSoundNanos = 0L
                     var nextElementSoundNanos = 0L
                     var wasInWater = false
+                    val air = AirSupply()
                     var lastAttackNanos = 0L
                     var invLastClickNanos = 0L
                     var invLastClickSlot = -1
@@ -1689,6 +1695,14 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             steps++
                             tickAccumulator -= TICK_SECONDS
 
+                            // Запас воздуха: под водой убывает, на воздухе возвращается.
+                            val eyeState = world.blockAt(
+                                kotlin.math.floor(player.x).toInt(),
+                                kotlin.math.floor(player.eyeY).toInt(),
+                                kotlin.math.floor(player.z).toInt(),
+                            )
+                            air.tick("water" in blocks.nameOf(eyeState))
+
                             // Пламя и дым от факелов, огня и костров: сервер такие частицы
                             // не присылает, их рисует клиент. Сканируем окрестность раз
                             // в десять тиков, чтобы не проверять блоки каждый кадр.
@@ -2302,6 +2316,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             )
                         }
                         val humanoids = ArrayList<PlayerRenderer.Player>()
+                        val slimHumanoids = ArrayList<PlayerRenderer.Player>()
 
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
@@ -2336,6 +2351,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val family = MobModels.familyOf(name)
                                 val look = HumanoidLook.lookOf(name)
                                 when {
+                                    look != null && HumanoidLook.slim(name) ->
+                                        slimHumanoids += humanoid.copy(
+                                            texture = slimHumanoidRenderer.textureFor(look),
+                                        )
+
                                     look != null ->
                                         humanoids += humanoid.copy(
                                             texture = humanoidRenderer.textureFor(look),
@@ -2494,6 +2514,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         playerRenderer.draw(camera, players)
                         humanoidRenderer.draw(camera, humanoids)
+                        slimHumanoidRenderer.draw(camera, slimHumanoids)
 
                         mobRenderer.draw(camera, mobs)
                         if (mobDemo) {
@@ -2567,19 +2588,28 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             val humanoidSamples = listOf(
                                 "zombie", "drowned", "husk", "pillager", "skeleton", "enderman",
                             )
-                            val demoHumanoids = humanoidSamples.mapIndexedNotNull { index, typeName ->
-                                val look = HumanoidLook.lookOf(typeName) ?: return@mapIndexedNotNull null
+                            val demoHumanoids = ArrayList<PlayerRenderer.Player>()
+                            val demoSlim = ArrayList<PlayerRenderer.Player>()
+                            humanoidSamples.forEachIndexed { index, typeName ->
+                                val look = HumanoidLook.lookOf(typeName) ?: return@forEachIndexed
                                 val side = (index - (humanoidSamples.size - 1) / 2f) * 1.6f
-                                PlayerRenderer.Player(
+                                val slim = HumanoidLook.slim(typeName)
+                                val player = PlayerRenderer.Player(
                                     x = camera.x + forward[0] * 11.0 + right[0] * side,
                                     y = camera.y + 3.4,
                                     z = camera.z + forward[2] * 11.0 + right[2] * side,
                                     yaw = faceCamera,
-                                    texture = humanoidRenderer.textureFor(look),
+                                    texture = if (slim) {
+                                        slimHumanoidRenderer.textureFor(look)
+                                    } else {
+                                        humanoidRenderer.textureFor(look)
+                                    },
                                     armsForward = HumanoidLook.armsForward(typeName),
                                 )
+                                if (slim) demoSlim += player else demoHumanoids += player
                             }
                             humanoidRenderer.draw(camera, demoHumanoids)
+                            slimHumanoidRenderer.draw(camera, demoSlim)
                         }
                         entityRenderer.draw(camera, boxes)
                         if (debris.isNotEmpty()) {
@@ -2864,6 +2894,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     } else {
                                         attackCooldown(System.nanoTime() - lastAttackNanos)
                                     },
+                                    air = if (air.fraction < 1f) air.fraction else null,
                                 )
                                 // Индикатор перезарядки удара.
                                 if (lastAttackNanos != 0L) {
@@ -3345,6 +3376,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     mobRenderer.close()
                     particleRenderer.close()
                     humanoidRenderer.close()
+                    slimHumanoidRenderer.close()
                     playerRenderer.close()
                     skyRenderer.close()
                     hud.close()

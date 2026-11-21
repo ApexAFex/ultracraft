@@ -20,6 +20,8 @@ class PlayerRenderer(
     private val skin: BufferedImage?,
     /** Скин 64×32 (скелет): левые конечности зеркалят правые. */
     private val classic: Boolean = false,
+    /** Скелет: руки и ноги в два пикселя (ванильная `SkeletonModel`). */
+    private val slim: Boolean = false,
     /** Установка игры: из неё читаются скины мобов (`textureFor`). */
     private val directory: java.io.File? = null,
 ) : Closeable {
@@ -75,7 +77,7 @@ class PlayerRenderer(
         GL30.glBindVertexArray(vao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, vbo)
 
-        val parts = PlayerModel.parts(classic)
+        val parts = PlayerModel.parts(classic, slim)
         val total = parts.sumOf { it.data.size }
         var offset = 0
         offsets = IntArray(parts.size)
@@ -111,7 +113,7 @@ class PlayerRenderer(
         GL30.glActiveTexture(GL30.GL_TEXTURE0)
         GL30.glBindVertexArray(vao)
 
-        val parts = PlayerModel.parts(classic)
+        val parts = PlayerModel.parts(classic, slim)
         for (player in players) {
             // У мобов свой скин, у игроков — общий из конструктора.
             val current = if (player.texture != 0) player.texture else texture

@@ -75,6 +75,23 @@ object HudLayout {
         return HudRect(cell.x - s, cell.y - s, 24f * s, 24f * s)
     }
 
+    /**
+     * Пузырьки воздуха: как еда, только на 10 пикселей выше.
+     *
+     * В игре ряд воздуха висит над рядом еды и прижимается к правому краю хотбара.
+     */
+    fun air(index: Int, width: Int, height: Int): HudRect {
+        val s = scale(height).toFloat()
+        val bar = hotbar(width, height)
+        val row = hearts(width, height)
+        return HudRect(
+            x = bar.right - s - HEART_SIZE * s - index * HEART_STEP * s,
+            y = row.y - 10f * s,
+            width = HEART_SIZE * s,
+            height = HEART_SIZE * s,
+        )
+    }
+
     /** Полоса опыта лежит прямо над хотбаром. */
     fun xpBar(width: Int, height: Int): HudRect {
         val s = scale(height).toFloat()

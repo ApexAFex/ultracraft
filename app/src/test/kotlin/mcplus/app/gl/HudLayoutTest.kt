@@ -69,6 +69,20 @@ class HudLayoutTest {
     }
 
     @Test
+    fun `air bubbles sit above the food row and do not overlap it`() {
+        val s = HudLayout.scale(720).toFloat()
+        val food = HudLayout.food(0, 1280, 720)
+        val bubble = HudLayout.air(0, 1280, 720)
+        val second = HudLayout.air(1, 1280, 720)
+
+        // Воздух прижат к тому же правому краю, что и еда, но на 10 пикселей выше.
+        assertEquals(food.right, bubble.right, 0.01f)
+        assertEquals(food.y - 10f * s, bubble.y, 0.01f)
+        assertEquals(-8f * s, second.x - bubble.x, 0.01f)
+        assertTrue(bubble.y + bubble.height <= food.y, "пузырьки налезли на еду")
+    }
+
+    @Test
     fun `respawn button is centred and hit-testable`() {
         val button = HudLayout.respawnButton(1280, 720)
         assertEquals(1280f, button.x * 2f + button.width, 0.01f)
