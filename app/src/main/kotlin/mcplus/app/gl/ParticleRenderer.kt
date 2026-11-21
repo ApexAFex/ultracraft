@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
@@ -184,34 +184,6 @@ class ParticleRenderer(
         private const val FLOATS = 6
         private const val TILE = 16
 
-        /** Имя типа частицы → файлы без `.png`; список кадров идёт по порядку. */
-        private fun textureFiles(name: String): List<String> = when (name) {
-            "flame" -> listOf("flame")
-            "soul_fire_flame" -> listOf("soul_fire_flame")
-            "smoke", "large_smoke" -> (0..7).map { "big_smoke_$it" }
-            "crit" -> listOf("critical_hit")
-            "enchanted_hit" -> listOf("enchanted_hit")
-            "splash" -> (0..3).map { "splash_$it" }
-            "explosion", "explosion_emitter" -> (0..7).map { "explosion_$it" }
-            "bubble" -> listOf("bubble")
-            "bubble_pop" -> (0..4).map { "bubble_pop_$it" }
-            "lava" -> listOf("lava")
-            "note" -> listOf("note")
-            "heart" -> listOf("heart")
-            "angry_villager" -> listOf("angry")
-            "portal" -> listOf("portal")
-            "enchant" -> listOf("enchanted_hit")
-            "glow" -> listOf("glow")
-            "ash" -> listOf("ash")
-            "white_ash" -> listOf("white_ash")
-            "snowflake" -> listOf("snowflake")
-            "cherry_leaves" -> listOf("cherry_0")
-            "dust" -> listOf("generic_0")
-            "rain" -> listOf("rain")
-            "snow" -> listOf("snow")
-            else -> (0..7).map { "generic_$it" }
-        }
-
         /** Собирает атлас и карту «имя → номера кадров». */
         private fun buildAtlas(directory: java.io.File?): Pair<BufferedImage, Map<String, List<Int>>> {
             val root = directory ?: GameFiles.minecraftDirectory()
@@ -221,8 +193,8 @@ class ParticleRenderer(
             var slot = 0
             val loaded = HashMap<String, BufferedImage?>()
 
-            for (name in PARTICLE_NAMES) {
-                val files = textureFiles(name)
+            for (name in ParticleTextures.names) {
+                val files = ParticleTextures.filesFor(name)
                 val slots = ArrayList<Int>()
                 for (file in files) {
                     val image = loaded.getOrPut(file) {
@@ -255,14 +227,6 @@ class ParticleRenderer(
             return atlas to frames
         }
 
-        /** Типы частиц, для которых ищем картинки; остальные получают generic. */
-        private val PARTICLE_NAMES = listOf(
-            "flame", "soul_fire_flame", "smoke", "large_smoke", "crit", "enchanted_hit",
-            "splash", "explosion", "explosion_emitter", "bubble", "bubble_pop", "lava",
-            "note", "heart", "angry_villager", "portal", "enchant", "glow", "ash",
-            "white_ash", "snowflake", "cherry_leaves", "dust", "generic",
-            "rain", "snow",
-        )
 
         private const val VERTEX_SHADER = """
             #version 330 core
