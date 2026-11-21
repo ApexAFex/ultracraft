@@ -36,4 +36,15 @@ object HumanoidLook {
 
     /** Гуманоид ли это: нужен для руки с предметом и брони. */
     fun isHumanoid(typeName: String): Boolean = lookOf(typeName) != null
+
+    /**
+     * Держит ли моб руки вытянутыми вперёд.
+     *
+     * В игре это `ZombieModel.setupAnim`: у зомби, кадавра, утопленника и зомби-пиглина
+     * обе руки повёрнуты на 90° вперёд, поэтому они и узнаются издалека.
+     */
+    fun armsForward(typeName: String): Boolean = when (typeName) {
+        "zombie", "husk", "drowned", "zombified_piglin" -> true
+        else -> false
+    }
 }

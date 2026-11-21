@@ -20,6 +20,40 @@ enum class SlabHalf { BOTTOM, TOP, DOUBLE }
 /** Форма ступени: прямая или угловая. Углы пока рисуются прямой ступенью. */
 enum class StairShape { STRAIGHT, INNER_LEFT, INNER_RIGHT, OUTER_LEFT, OUTER_RIGHT }
 
+/** Форма рельса: прямая, подъём на один блок или поворот. */
+enum class RailShape {
+    NORTH_SOUTH, EAST_WEST,
+    ASCENDING_NORTH, ASCENDING_SOUTH, ASCENDING_EAST, ASCENDING_WEST,
+    NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST;
+
+    val ascending: Boolean get() = this == ASCENDING_NORTH || this == ASCENDING_SOUTH ||
+        this == ASCENDING_EAST || this == ASCENDING_WEST
+
+    /**
+     * Поворот: у него своя текстура `rail_corner` — дуга, а не прямая полоса.
+     *
+     * Имя формы говорит, между какими краями клетки проходит путь: `south_east` — из южного
+     * края в восточный.
+     */
+    val curved: Boolean get() = this == NORTH_EAST || this == NORTH_WEST ||
+        this == SOUTH_EAST || this == SOUTH_WEST
+
+    companion object {
+        fun byName(value: String?): RailShape = when (value) {
+            "east_west" -> EAST_WEST
+            "ascending_north" -> ASCENDING_NORTH
+            "ascending_south" -> ASCENDING_SOUTH
+            "ascending_east" -> ASCENDING_EAST
+            "ascending_west" -> ASCENDING_WEST
+            "north_east" -> NORTH_EAST
+            "north_west" -> NORTH_WEST
+            "south_east" -> SOUTH_EAST
+            "south_west" -> SOUTH_WEST
+            else -> NORTH_SOUTH
+        }
+    }
+}
+
 /**
  * Не-кубическая форма блока — то, что нельзя понять по одному номеру состояния.
  *
@@ -35,8 +69,8 @@ sealed interface BlockShape {
     /** Кровать: матрас и ножки со стороны изголовья или изножья. */
     data class Bed(val part: String? = null) : BlockShape
 
-    /** Рельсы: плоская полоса в 1/16 блока над землёй. */
-    data object Rail : BlockShape
+    /** Рельсы: плоская полоса в 1/16 блока над землёй, с уклоном или поворотом. */
+    data class Rail(val shape: RailShape = RailShape.NORTH_SOUTH) : BlockShape
 
     /** Ступень: базовая плита и ступенька со стороны [facing]. */
     data class Stairs(
@@ -139,7 +173,7 @@ sealed interface BlockShape {
 
                 name.endsWith("_bed") -> Bed(part = values["part"])
 
-                name == "rail" || name.endsWith("_rail") -> Rail
+                name == "rail" || name.endsWith("_rail") -> Rail(RailShape.byName(values["shape"]))
 
                 name.endsWith("_door") -> {
                     val facing = ShapeDirection.byName(values["facing"]) ?: return null

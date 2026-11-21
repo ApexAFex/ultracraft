@@ -54,6 +54,16 @@ class HumanoidLookTest {
     }
 
     @Test
+    fun `zombies keep their arms forward`() {
+        for (type in listOf("zombie", "husk", "drowned", "zombified_piglin")) {
+            assertTrue(HumanoidLook.armsForward(type), "$type держит руки вперёд")
+        }
+        for (type in listOf("skeleton", "pillager", "enderman", "cow")) {
+            assertTrue(!HumanoidLook.armsForward(type), "$type — руки вдоль тела")
+        }
+    }
+
+    @Test
     fun `animals and unknown types are not humanoids`() {
         assertNull(HumanoidLook.lookOf("cow"))
         assertNull(HumanoidLook.lookOf("villager"))

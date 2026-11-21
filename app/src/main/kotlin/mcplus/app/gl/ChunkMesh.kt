@@ -2,6 +2,7 @@ package mcplus.app.gl
 
 import mcplus.net.BlockShape
 import mcplus.net.BlockTable
+import mcplus.net.RailShape
 import mcplus.net.ShapeDirection
 import mcplus.net.SlabHalf
 import mcplus.net.StairShape
@@ -32,6 +33,9 @@ class ChunkMesh(
 object MeshBuilder {
 
     private const val FLOATS_PER_VERTEX = 11
+
+    /** Растяжение полосы рельса по диагонали: 1/cos(45°). */
+    private const val SQRT_2 = 1.4142135f
 
     fun build(
         world: World,
@@ -89,7 +93,10 @@ object MeshBuilder {
                 val target = if (name in TRANSLUCENT) translucentData else vertexData
                 when {
                     shape is BlockShape.Cross ->
-                        emitCross(target, world, blocks, atlas, x, y, z, shape, tint)
+                        emitCross(
+                            target, world, blocks, atlas, x, y, z, shape, tint,
+                            PlantOffset.of(name, x, y, z),
+                        )
 
                     // Факел рисуется с точными UV из ванильной модели: общая развёртка
                     // натягивает на его коробку всю текстуру и превращает в столб пламени.
@@ -105,13 +112,17 @@ object MeshBuilder {
                         // берёт доски своей породы, полотнище — шерсть своего цвета.
                         val texture = textureForShape(name, shape)
                         val chestOpen = shape is BlockShape.Chest && world.isChestOpen(x, y, z)
+                        val rail = (shape as? BlockShape.Rail)?.let { railTransform(it) }
                         for ((boxIndex, box) in boxesOf(shape).withIndex()) {
                             // У открытого сундука крышка поворачивается вокруг задней кромки:
                             // корпус остаётся, вторая коробка встаёт вертикально.
                             val lid = chestOpen && boxIndex == 1
                             emitBox(
                                 target, world, blocks, atlas, x, y, z, box, texture, shape, tint,
-                                if (lid) chestLidTransform(shape as BlockShape.Chest) else null,
+                                when {
+                                    lid -> chestLidTransform(shape as BlockShape.Chest)
+                                    else -> rail
+                                },
                             )
                         }
                     }
@@ -210,8 +221,15 @@ object MeshBuilder {
             boxes
         }
 
-        // Рельсы: плоская полоса в 1/16 блока, а не куб.
-        BlockShape.Rail -> listOf(Box(0f, 0f, 0f, 1f, 1f / 16f, 1f))
+        // Рельсы: плоская полоса в 1/16 блока, а не куб. У подъёма полоса ещё и наклонена
+        // на 45°, поэтому её коробка centred по Y: матрица ставит её на место.
+        is BlockShape.Rail -> listOf(
+            if (shape.shape.ascending) {
+                Box(0f, -1f / 32f, 0f, 1f, 1f / 32f, 1f)
+            } else {
+                Box(0f, 0f, 0f, 1f, 1f / 16f, 1f)
+            },
+        )
 
         is BlockShape.Sign -> {
             val wall = shape.wall
@@ -297,6 +315,7 @@ object MeshBuilder {
         z: Int,
         shape: BlockShape.Cross,
         tint: FloatArray?,
+        offset: FloatArray? = null,
     ) {
         val layer = atlas.layerOf(shape.texture).toFloat()
         val light = world.lightAt(x, y, z).toFloat()
@@ -305,11 +324,15 @@ object MeshBuilder {
         val blue = tint?.get(2) ?: 1f
         val lo = 0.146f
         val hi = 1f - lo
+        // Цветы и трава стоят не по центру клетки: сдвиг считается из координат блока.
+        val dx = offset?.get(0) ?: 0f
+        val dy = offset?.get(1) ?: 0f
+        val dz = offset?.get(2) ?: 0f
 
         fun vertex(px: Float, py: Float, pz: Float, u: Float, v: Float) {
-            data.add(x + px)
-            data.add(y + py * shape.height)
-            data.add(z + pz)
+            data.add(x + px + dx)
+            data.add(y + py * shape.height + dy)
+            data.add(z + pz + dz)
             data.add(1f)
             data.add(light)
             data.add(layer)
@@ -375,6 +398,9 @@ object MeshBuilder {
         // Кровати рисуются текстурой шерсти своего цвета: файла `block/*_bed` нет,
         // а `entity/bed/*` в атлас блоков не попадает.
         is BlockShape.Bed -> name.removeSuffix("_bed") + "_wool"
+
+        // У поворота рельса своя текстура-дуга: с прямой полосой угол выглядит разорванным.
+        is BlockShape.Rail -> if (shape.shape.curved) "rail_corner" else name
 
         else -> name
     }
@@ -531,6 +557,56 @@ object MeshBuilder {
             Mat4.translate(pivotX, pivotY, pivotZ),
             Mat4.multiply(rotation, Mat4.translate(-pivotX, -pivotY, -pivotZ)),
         )
+    }
+
+    /**
+     * Рельс: поворот вокруг центра клетки и наклон на 45° у подъёма.
+     *
+     * Ванильная модель подъёма (`template_rail_raised_ne/sw`) — плоскость на высоте 9/16,
+     * повёрнутая на ±45° вокруг оси X с `rescale`: полоса занимает клетку целиком, от 1/16
+     * над нижним краем до 1/16 над верхним. Здесь то же самое: масштаб по Z на √2 растягивает
+     * полосу по диагонали, наклон поднимает один край, поворот ставит подъём на нужную сторону.
+     *
+     * У поворота (`rail_corner`) наклон не нужен: дуга лежит в плоскости пола, её края просто
+     * должны смотреть на те две стороны, откуда приходят соседние рельсы.
+     */
+    private fun railTransform(rail: BlockShape.Rail): FloatArray {
+        val shape = rail.shape
+        val yaw = when (shape) {
+            RailShape.NORTH_SOUTH, RailShape.ASCENDING_NORTH -> 0f
+            RailShape.EAST_WEST, RailShape.ASCENDING_WEST -> 90f
+            RailShape.ASCENDING_EAST -> -90f
+            RailShape.ASCENDING_SOUTH -> 0f
+            RailShape.NORTH_EAST -> 0f
+            RailShape.NORTH_WEST -> 90f
+            RailShape.SOUTH_WEST -> 180f
+            RailShape.SOUTH_EAST -> 270f
+        }
+        val spin = Mat4.multiply(
+            Mat4.multiply(
+                Mat4.translate(0.5f, 0f, 0.5f),
+                Mat4.rotateY(Math.toRadians(yaw.toDouble()).toFloat()),
+            ),
+            Mat4.translate(-0.5f, 0f, -0.5f),
+        )
+        if (!shape.ascending) return spin
+
+        val tilt = if (shape == RailShape.ASCENDING_NORTH || shape == RailShape.ASCENDING_EAST) {
+            45f
+        } else {
+            -45f
+        }
+        val slope = Mat4.multiply(
+            Mat4.translate(0.5f, 9f / 16f, 0.5f),
+            Mat4.multiply(
+                Mat4.rotateX(Math.toRadians(tilt.toDouble()).toFloat()),
+                Mat4.multiply(
+                    Mat4.scale(1f, 1f, SQRT_2),
+                    Mat4.translate(0f, 0f, -0.5f),
+                ),
+            ),
+        )
+        return Mat4.multiply(spin, slope)
     }
 
     private fun emitBox(

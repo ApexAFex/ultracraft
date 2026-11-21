@@ -224,7 +224,12 @@ class MeshBuilderTest {
                     "23\tcarrots\tage=3\n" +
                     "24\tchest\tfacing=north,type=single,waterlogged=false\n" +
                     "25\twall_torch\tfacing=north\n" +
-                    "26\twall_torch\tfacing=east\n",
+                    "26\twall_torch\tfacing=east\n" +
+                    "27\trail\tshape=north_south\n" +
+                    "28\trail\tshape=east_west\n" +
+                    "29\trail\tshape=ascending_north\n" +
+                    "30\trail\tshape=ascending_east\n" +
+                    "31\trail\tshape=south_east\n",
             )
         },
     )
@@ -234,6 +239,7 @@ class MeshBuilderTest {
             "air", "stone", "oak_slab", "oak_stairs", "oak_fence", "oak_door",
             "torch", "oak_trapdoor", "white_carpet", "snow", "cobblestone_wall", "short_grass",
             "oak_planks", "white_wool", "wheat_stage0", "wheat_stage7", "carrots_stage3",
+            "rail", "rail_corner",
         ),
     )
 
@@ -550,6 +556,81 @@ class MeshBuilderTest {
         assertEquals(1f / 16f, xs.min(), 0.001f)
         assertEquals(15f / 16f, xs.max(), 0.001f)
         assertEquals(48f + 14f / 16f, ys.max(), 0.001f, "крышка ниже полного блока")
+    }
+
+    // ---------------------------------------------------------------- рельсы
+
+    /** Самая высокая вершина меша: высота и её координаты по X и Z. */
+    private fun highest(mesh: ChunkMesh): Triple<Float, Float, Float> {
+        var result = Triple(0f, 0f, 0f)
+        var index = 0
+        while (index < mesh.data.size) {
+            if (mesh.data[index + 1] > result.first) {
+                result = Triple(mesh.data[index + 1], mesh.data[index], mesh.data[index + 2])
+            }
+            index += MESH_STRIDE
+        }
+        return result
+    }
+
+    @Test
+    fun `a flat rail lies one sixteenth above the ground`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 27))
+
+        val ys = axisValues(shapeMesh(world), 1)
+        assertEquals(48f, ys.min(), 0.001f)
+        assertEquals(48f + 1f / 16f, ys.max(), 0.001f)
+    }
+
+    @Test
+    fun `an ascending rail rises towards its own side`() {
+        val north = world().also { it.add(chunkWith(intArrayOf(0, 48, 0) to 29)) }
+        val (northTop, _, northZ) = highest(shapeMesh(north))
+        assertTrue(northTop > 49f, "северный подъём должен подниматься до верха клетки: $northTop")
+        assertTrue(northZ < 0.1f, "высокий край — у северной стороны, а не у южной: $northZ")
+
+        val east = world().also { it.add(chunkWith(intArrayOf(0, 48, 0) to 30)) }
+        val (eastTop, eastX, _) = highest(shapeMesh(east))
+        assertTrue(eastTop > 49f, "восточный подъём тоже поднимается: $eastTop")
+        assertTrue(eastX > 0.9f, "высокий край — у восточной стороны: $eastX")
+    }
+
+    @Test
+    fun `a corner rail uses the corner texture`() {
+        val straight = world().also { it.add(chunkWith(intArrayOf(0, 48, 0) to 27)) }
+        val corner = world().also { it.add(chunkWith(intArrayOf(0, 48, 0) to 31)) }
+
+        assertEquals(shapeAtlas.layerOf("rail"), layerOf(shapeMesh(straight)))
+        assertEquals(shapeAtlas.layerOf("rail_corner"), layerOf(shapeMesh(corner)))
+    }
+
+    /** Слой текстуры первой вершины меша. */
+    private fun layerOf(mesh: ChunkMesh): Int = mesh.data[5].toInt()
+
+    @Test
+    fun `grass next to grass is not on the same grid`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 12, intArrayOf(0, 48, 2) to 12))
+
+        val mesh = shapeMesh(world)
+        var nearMin = Float.MAX_VALUE
+        var farMin = Float.MAX_VALUE
+        var index = 0
+        while (index < mesh.data.size) {
+            val z = mesh.data[index + 2]
+            if (z < 1.5f) nearMin = minOf(nearMin, z) else farMin = minOf(farMin, z)
+            index += MESH_STRIDE
+        }
+        val nearShift = nearMin - 0.146f
+        val farShift = farMin - 2.146f
+
+        assertTrue(kotlin.math.abs(nearShift) <= 0.25f, "ближняя трава уехала: $nearShift")
+        assertTrue(kotlin.math.abs(farShift) <= 0.25f, "дальняя трава уехала: $farShift")
+        assertTrue(
+            kotlin.math.abs(nearShift - farShift) > 0.01f,
+            "соседние кустики не должны стоять на одной линии: $nearShift и $farShift",
+        )
     }
 }
 

@@ -109,6 +109,12 @@ object Mat4 {
         }
     }
 
+    fun scale(x: Float, y: Float, z: Float): FloatArray = identity().also {
+        it[0] = x
+        it[5] = y
+        it[10] = z
+    }
+
     fun perspective(fovY: Float, aspect: Float, near: Float, far: Float): FloatArray {
         val f = (1.0 / tan(fovY / 2.0)).toFloat()
         val result = FloatArray(16)

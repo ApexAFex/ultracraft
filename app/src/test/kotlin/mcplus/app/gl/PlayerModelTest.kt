@@ -143,6 +143,37 @@ class PlayerModelTest {
     }
 
     @Test
+    fun `classic left limbs mirror the right limb texture`() {
+        val classic = PlayerModel.parts(classic = true)
+
+        /** UV передней грани: она эмитится последней, по шесть вершин. */
+        fun front(part: PlayerModel.Part): List<Pair<Float, Float>> {
+            val start = part.data.size - 6 * PlayerModel.FLOATS_PER_VERTEX
+            val result = ArrayList<Pair<Float, Float>>()
+            var index = start
+            while (index < part.data.size) {
+                result += part.data[index + 3] to part.data[index + 4]
+                index += PlayerModel.FLOATS_PER_VERTEX
+            }
+            return result
+        }
+
+        for ((rightName, leftName) in listOf("rightArm" to "leftArm", "rightLeg" to "leftLeg")) {
+            val right = front(classic.first { it.name == rightName })
+            val left = front(classic.first { it.name == leftName })
+
+            assertEquals(right.map { it.second }, left.map { it.second }, "V у зеркальной грани те же")
+            assertEquals(right.first().first, left[1].first, "U идут в обратном порядке")
+            assertEquals(right[1].first, left.first().first, "U идут в обратном порядке")
+            assertEquals(
+                right.map { it.first }.toSet(),
+                left.map { it.first }.toSet(),
+                "множество U то же: текстура та же, только отражена",
+            )
+        }
+    }
+
+    @Test
     fun `parts start at consecutive vertex numbers, not float offsets`() {
         // Байтовое смещение делится на размер целой вершины: раньше делили только на
         // размер float, и все части кроме головы уезжали за конец буфера.

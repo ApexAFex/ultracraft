@@ -38,6 +38,8 @@ class PlayerRenderer(
         val hurt: Float = 0f,
         /** Игрок крадётся: модель ниже, как в ванили. */
         val sneak: Boolean = false,
+        /** Зомби и его родня держат руки вперёд, а не опущенными вдоль тела. */
+        val armsForward: Boolean = false,
         /**
          * Свой скин для этого моба (0 — скин по умолчанию из конструктора).
          *
@@ -127,7 +129,12 @@ class PlayerRenderer(
                 } else {
                     0f
                 }
-                val angle = PlayerModel.limbAngle(part.name, player.walkPhase, player.walkAmount) + swingAngle
+                val angle = if (player.armsForward && part.name.endsWith("Arm")) {
+                    // Руки зомби вытянуты вперёд: поворот на 90° вокруг плеча.
+                    -Math.PI.toFloat() / 2f
+                } else {
+                    PlayerModel.limbAngle(part.name, player.walkPhase, player.walkAmount) + swingAngle
+                }
                 if (angle == 0f) {
                     GL30.glUniformMatrix4fv(modelLocation, false, model)
                 } else {

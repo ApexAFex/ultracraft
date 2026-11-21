@@ -35,6 +35,8 @@ object PlayerModel {
         val u: Int,
         val v: Int,
         val pivotY: Int,
+        /** Зеркальная развёртка: у левых конечностей текстура правых, отражённая по U. */
+        val mirror: Boolean = false,
     )
 
     private val BOXES = listOf(
@@ -55,9 +57,9 @@ object PlayerModel {
         Box("head", -4, 24, -4, 8, 8, 8, 0, 0, 24),
         Box("body", -4, 12, -2, 8, 12, 4, 16, 16, 12),
         Box("rightArm", -8, 12, -2, 4, 12, 4, 40, 16, 24),
-        Box("leftArm", 4, 12, -2, 4, 12, 4, 40, 16, 24),
+        Box("leftArm", 4, 12, -2, 4, 12, 4, 40, 16, 24, mirror = true),
         Box("rightLeg", -4, 0, -2, 4, 12, 4, 0, 16, 12),
-        Box("leftLeg", 0, 0, -2, 4, 12, 4, 0, 16, 12),
+        Box("leftLeg", 0, 0, -2, 4, 12, 4, 0, 16, 12, mirror = true),
     )
 
     /** @param classic true для скинов 64×32 (скелет): левые конечности берут текстуру правых. */
@@ -126,7 +128,10 @@ object PlayerModel {
         val d = box.depth.toFloat()
 
         fun uv(u0: Float, v0: Float, u1: Float, v1: Float) = floatArrayOf(
-            u0 / SKIN_SIZE, v0 / SKIN_SIZE, u1 / SKIN_SIZE, v1 / SKIN_SIZE,
+            // У зеркальной развёртки U идут в обратном порядке: так ванильная модель
+            // разворачивает левую руку и ногу текстурой правой.
+            (if (box.mirror) u1 else u0) / SKIN_SIZE, v0 / SKIN_SIZE,
+            (if (box.mirror) u0 else u1) / SKIN_SIZE, v1 / SKIN_SIZE,
         )
 
         // +Y (top)

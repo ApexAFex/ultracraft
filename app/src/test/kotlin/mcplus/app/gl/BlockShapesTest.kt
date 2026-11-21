@@ -1,6 +1,7 @@
 package mcplus.app.gl
 
 import mcplus.net.BlockShape
+import mcplus.net.RailShape
 import mcplus.net.ShapeDirection
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,9 +21,31 @@ class BlockShapesTest {
     fun `bed and rails are not cubes`() {
         assertEquals(BlockShape.Bed(part = "head"), BlockShape.parse("oak_bed", "facing=north,part=head"))
         assertEquals(BlockShape.Bed(part = "foot"), BlockShape.parse("red_bed", "facing=east,part=foot"))
-        assertEquals(BlockShape.Rail, BlockShape.parse("rail", "shape=north_south"))
-        assertEquals(BlockShape.Rail, BlockShape.parse("powered_rail", "powered=true"))
-        assertEquals(BlockShape.Rail, BlockShape.parse("detector_rail", ""))
+        assertEquals(
+            BlockShape.Rail(RailShape.NORTH_SOUTH),
+            BlockShape.parse("rail", "shape=north_south"),
+        )
+        assertEquals(
+            BlockShape.Rail(RailShape.NORTH_SOUTH),
+            BlockShape.parse("powered_rail", "powered=true"),
+        )
+        assertEquals(BlockShape.Rail(RailShape.NORTH_SOUTH), BlockShape.parse("detector_rail", ""))
+    }
+
+    @Test
+    fun `rail keeps its shape`() {
+        assertEquals(
+            BlockShape.Rail(RailShape.SOUTH_EAST),
+            BlockShape.parse("rail", "shape=south_east"),
+        )
+        assertEquals(
+            BlockShape.Rail(RailShape.ASCENDING_WEST),
+            BlockShape.parse("activator_rail", "shape=ascending_west,powered=false"),
+        )
+        assertTrue(RailShape.ASCENDING_NORTH.ascending)
+        assertTrue(!RailShape.EAST_WEST.ascending)
+        assertTrue(RailShape.NORTH_WEST.curved)
+        assertTrue(!RailShape.EAST_WEST.curved)
     }
 
     @Test

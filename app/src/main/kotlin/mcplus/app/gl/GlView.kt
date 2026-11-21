@@ -2339,6 +2339,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     look != null ->
                                         humanoids += humanoid.copy(
                                             texture = humanoidRenderer.textureFor(look),
+                                            armsForward = HumanoidLook.armsForward(name),
                                         )
 
                                     name == "item" -> {                                        // Выпавший предмет: мини-куб блока, если это блок.
@@ -2556,6 +2557,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     z = camera.z + forward[2] * 11.0 + right[2] * side,
                                     yaw = faceCamera,
                                     texture = humanoidRenderer.textureFor(look),
+                                    armsForward = HumanoidLook.armsForward(typeName),
                                 )
                             }
                             humanoidRenderer.draw(camera, demoHumanoids)
