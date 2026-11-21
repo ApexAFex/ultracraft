@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
@@ -672,6 +672,24 @@ class Hud(
                 renderer.rect(ox + 79f * s, oy + 35f * s, width * s, 16f * s, 0xFFFFFF, 0.5f)
             }
         }
+        // Варка: пузырьки снизу вверх и полоска топлива (данные 0 и 1 меню зельеварения).
+        if (container.type == "brewing_stand") {
+            val brew = container.dataValue(0) ?: 0
+            if (brew > 0) {
+                val filled = ContainerProgress.brewFraction(brew)
+                renderer.rect(
+                    ox + 79f * s, oy + (44f - 14f * filled) * s, 10f * s, 14f * filled * s,
+                    0x8ED4FF, 0.85f,
+                )
+            }
+            val fuel = ContainerProgress.fuelFraction(container.dataValue(1) ?: 0)
+            if (fuel > 0f) {
+                renderer.rect(
+                    ox + 17f * s, oy + (44f - 14f * fuel) * s, 14f * s, 14f * fuel * s,
+                    0xFFB020, 0.85f,
+                )
+            }
+        }
         for (cell in ContainerScreen.cells(container)) {
             val stack = container.slot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
@@ -692,6 +710,22 @@ class Hud(
             text?.drawScreen(
                 listOf(TextRenderer.ScreenLabel(ox + 8f * s, oy + 6f * s, container.title, s * 0.8f)),
             )
+        }
+        // Цена зачарования: три числа рядом с кнопками (данные 0…2). Ноль — кнопка пустая.
+        if (container.type == "enchantment") {
+            val costs = ContainerProgress.enchantCosts(
+                container.dataValue(0), container.dataValue(1), container.dataValue(2),
+            )
+            val labels = costs.mapIndexedNotNull { index, cost ->
+                if (cost <= 0) {
+                    null
+                } else {
+                    TextRenderer.ScreenLabel(
+                        ox + 20f * s, oy + (11f + index * 18f) * s, cost.toString(), s * 0.8f,
+                    )
+                }
+            }
+            if (labels.isNotEmpty()) text?.drawScreen(labels)
         }
         drawContainerOverlay(container, inventory, mouseX, mouseY)
     }
