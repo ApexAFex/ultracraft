@@ -385,7 +385,6 @@ class MobRenderer(
             "polar_bear" to "entity/bear/polarbear.png",
             "dolphin" to "entity/dolphin/dolphin.png",
             "frog" to "entity/frog/frog_temperate.png",
-            "goat" to "entity/goat/goat.png",
             "horse" to "entity/horse/horse_brown.png",
             "donkey" to "entity/horse/donkey.png",
             "mule" to "entity/horse/mule.png",
@@ -409,6 +408,9 @@ class MobRenderer(
             "zoglin" to "entity/hoglin/zoglin.png",
             "bee" to "entity/bee/bee.png",
             "turtle" to "entity/turtle/turtle.png",
+            "goat" to "entity/goat/goat.png",
+            "axolotl" to "entity/axolotl/axolotl_blue.png",
+            "sniffer" to "entity/sniffer/sniffer.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

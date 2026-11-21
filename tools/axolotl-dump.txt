@@ -1,0 +1,23 @@
+﻿SIZE	64	64
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/body	0.000	19.500	5.000	0.000	0.000	0.000
+CUBE	root/body	-4.000	-2.000	-9.000	4.000	2.000	1.000	0.0	11.0
+CUBE	root/body	0.000	-3.000	-8.000	0.000	2.000	1.000	2.0	17.0
+PART	root/body/head	0.000	0.000	-9.000	0.000	0.000	0.000
+CUBE	root/body/head	-4.000	-3.000	-5.000	4.000	2.000	0.000	0.0	1.0
+PART	root/body/head/top_gills	0.000	-3.000	-1.000	0.000	0.000	0.000
+CUBE	root/body/head/top_gills	-4.000	-3.000	0.000	4.000	0.000	0.000	3.0	37.0
+PART	root/body/head/left_gills	-4.000	0.000	-1.000	0.000	0.000	0.000
+CUBE	root/body/head/left_gills	-3.000	-5.000	0.000	0.000	2.000	0.000	0.0	40.0
+PART	root/body/head/right_gills	4.000	0.000	-1.000	0.000	0.000	0.000
+CUBE	root/body/head/right_gills	0.000	-5.000	0.000	3.000	2.000	0.000	11.0	40.0
+PART	root/body/right_front_leg	-3.500	1.000	-8.000	0.000	0.000	0.000
+CUBE	root/body/right_front_leg	-2.000	0.000	0.000	1.000	5.000	0.000	2.0	13.0
+PART	root/body/right_hind_leg	-3.500	1.000	-1.000	0.000	0.000	0.000
+CUBE	root/body/right_hind_leg	-2.000	0.000	0.000	1.000	5.000	0.000	2.0	13.0
+PART	root/body/tail	0.000	0.000	1.000	0.000	0.000	0.000
+CUBE	root/body/tail	0.000	-3.000	0.000	0.000	2.000	12.000	2.0	19.0
+PART	root/body/left_hind_leg	3.500	1.000	-1.000	0.000	0.000	0.000
+CUBE	root/body/left_hind_leg	-1.000	0.000	0.000	2.000	5.000	0.000	2.0	13.0
+PART	root/body/left_front_leg	3.500	1.000	-8.000	0.000	0.000	0.000
+CUBE	root/body/left_front_leg	-1.000	0.000	0.000	2.000	5.000	0.000	2.0	13.0

@@ -142,7 +142,7 @@ $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.13.9-hotspot"
 ```
 
 ```
-.\gradlew.bat build                          # компиляция + 507 тестов
+.\gradlew.bat build                          # компиляция + 508 тестов
 .\gradlew.bat :app:run --args="mc.hypixel.net"   # список игроков
 .\gradlew.bat :app:run --args="join"             # войти на сервер
 .\gradlew.bat :app:run --args="world --chunks 5" # карта мира текстом

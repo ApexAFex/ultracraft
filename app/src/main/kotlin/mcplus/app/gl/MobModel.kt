@@ -5,7 +5,8 @@ import mcplus.net.MetaEntry
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
-    GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR, DOLPHIN, FROG, BOAT, MINECART, NONE,
+    GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
+    DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, BOAT, MINECART, NONE,
 }
 
 /**
@@ -56,7 +57,7 @@ data class MobBox(
 object MobModels {
 
     fun familyOf(entityName: String): MobFamily = when (entityName) {
-        "cow", "mooshroom", "pig", "sheep", "goat", "rabbit" -> MobFamily.QUADRUPED
+        "cow", "mooshroom", "pig", "sheep", "rabbit" -> MobFamily.QUADRUPED
 
         "chicken", "parrot" -> MobFamily.CHICKEN
         "creeper" -> MobFamily.CREEPER
@@ -91,6 +92,9 @@ object MobModels {
         "polar_bear" -> MobFamily.POLAR_BEAR
         "dolphin" -> MobFamily.DOLPHIN
         "frog" -> MobFamily.FROG
+        "goat" -> MobFamily.GOAT
+        "axolotl" -> MobFamily.AXOLOTL
+        "sniffer" -> MobFamily.SNIFFER
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -157,6 +161,9 @@ object MobModels {
         MobFamily.POLAR_BEAR -> 128 to 64
         MobFamily.DOLPHIN -> 64 to 64
         MobFamily.FROG -> 48 to 48
+        MobFamily.GOAT -> 64 to 64
+        MobFamily.AXOLOTL -> 64 to 64
+        MobFamily.SNIFFER -> 192 to 192
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -188,6 +195,9 @@ object MobModels {
         MobFamily.POLAR_BEAR -> POLAR_BEAR
         MobFamily.DOLPHIN -> DOLPHIN
         MobFamily.FROG -> FROG
+        MobFamily.GOAT -> GOAT
+        MobFamily.AXOLOTL -> AXOLOTL
+        MobFamily.SNIFFER -> SNIFFER
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -564,6 +574,63 @@ object MobModels {
         MobBox("left_arm", -0.0625f, -0.1875f, -0.0625f, 0.0625f, 0f, 0.125f, u = 0, v = 32, offsetX = 0.25f, offsetY = 8.3125f, offsetZ = -0.1562f),
         MobBox("left_hand", -0.25f, -0.0006f, -0.25f, 0.25f, -0.0006f, 0.25f, u = 18, v = 40, offsetX = 0.25f, offsetY = 5.25f, offsetZ = 0.0313f),
         MobBox("croaking_body", -0.2187f, -0.1187f, -0.1812f, 0.2188f, 0.0063f, 0.0063f, u = 26, v = 5, offsetY = 8.3125f, offsetZ = -0.0625f),
+    )
+    /**
+     * Коза (GoatModel): тело, голова с рогами и бородой, четыре ноги. Лист 64×64.
+     *
+     * Рога и борода — короткие коробки с поворотом вокруг X.
+     */
+    private val GOAT = listOf(
+        MobBox("head", -0.375f, 0.5625f, -0.625f, -0.1875f, 0.6875f, -0.5625f, u = 2, v = 61, offsetX = 0.0625f, offsetY = 0.625f),
+        MobBox("head", 0.125f, 0.5625f, -0.625f, 0.3125f, 0.6875f, -0.5625f, u = 2, v = 61, offsetX = 0.0625f, offsetY = 0.625f),
+        MobBox("head", -0.0312f, -0.25f, -0.875f, -0.0312f, 0.1875f, -0.5625f, u = 23, v = 52, offsetX = 0.0625f, offsetY = 0.625f),
+        MobBox("nose", -0.1875f, -0.1875f, -0.5f, 0.125f, 0.25f, 0.125f, u = 34, v = 46, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.5735f, -0.8192f, 0f, 0f, 0.8192f, 0.5735f, 0f, 0.0625f, 1.125f, -0.5f, 1f)),
+        MobBox("right_horn", -0.1869f, 0.5625f, -0.625f, -0.0619f, 1f, -0.5f, u = 12, v = 55, offsetX = 0.0625f, offsetY = 0.625f),
+        MobBox("left_horn", -0.0006f, 0.5625f, -0.625f, 0.1244f, 1f, -0.5f, u = 12, v = 55, offsetX = 0.0625f, offsetY = 0.625f),
+        MobBox("right_front_leg", 0f, -0.625f, 0f, 0.1875f, 0f, 0.1875f, u = 35, v = 2, offsetX = -0.1875f, offsetY = 0.625f, offsetZ = -0.375f),
+        MobBox("right_hind_leg", 0f, -0.625f, 0f, 0.1875f, -0.25f, 0.1875f, u = 49, v = 29, offsetX = -0.1875f, offsetY = 0.625f, offsetZ = 0.25f),
+        MobBox("left_hind_leg", 0f, -0.625f, 0f, 0.1875f, -0.25f, 0.1875f, u = 36, v = 29, offsetX = 0.0625f, offsetY = 0.625f, offsetZ = 0.25f),
+        MobBox("body", -0.25f, 0.375f, -0.4375f, 0.3125f, 1.0625f, 0.5625f, u = 1, v = 1),
+        MobBox("body", -0.3125f, 0.25f, -0.5f, 0.375f, 1.125f, 0.1875f, u = 0, v = 28),
+        MobBox("left_front_leg", 0f, -0.625f, 0f, 0.1875f, 0f, 0.1875f, u = 49, v = 2, offsetX = 0.0625f, offsetY = 0.625f, offsetZ = -0.375f),
+    )
+    /**
+     * Аксолотль (AdultAxolotlModel): тело, голова с жабрами, хвост и четыре лапы.
+     * Лист 64×64.
+     */
+    private val AXOLOTL = listOf(
+        MobBox("body", -0.25f, -0.125f, -0.5625f, 0.25f, 0.125f, 0.0625f, u = 0, v = 11, offsetY = 1.3438f, offsetZ = 0.3125f),
+        MobBox("body", 0f, -0.125f, -0.5f, 0f, 0.1875f, 0.0625f, u = 2, v = 17, offsetY = 1.3438f, offsetZ = 0.3125f),
+        MobBox("head", -0.25f, -0.125f, -0.3125f, 0.25f, 0.1875f, 0f, u = 0, v = 1, offsetY = 1.3438f, offsetZ = -0.25f),
+        MobBox("top_gills", -0.25f, 0f, 0f, 0.25f, 0.1875f, 0f, u = 3, v = 37, offsetY = 0.3125f),
+        MobBox("left_gills", -0.1875f, -0.125f, 0f, 0f, 0.3125f, 0f, u = 0, v = 40, offsetX = -0.25f, offsetY = 0.125f),
+        MobBox("right_gills", 0f, -0.125f, 0f, 0.1875f, 0.3125f, 0f, u = 11, v = 40, offsetX = 0.25f, offsetY = 0.125f),
+        MobBox("right_front_leg", -0.125f, -0.3125f, 0f, 0.0625f, 0f, 0f, u = 2, v = 13, offsetX = -0.2187f, offsetY = 1.2813f, offsetZ = -0.1875f),
+        MobBox("right_hind_leg", -0.125f, -0.3125f, 0f, 0.0625f, 0f, 0f, u = 2, v = 13, offsetX = -0.2187f, offsetY = 1.2813f, offsetZ = 0.25f),
+        MobBox("tail", 0f, -0.125f, 0f, 0f, 0.1875f, 0.75f, u = 2, v = 19, offsetY = 1.3438f, offsetZ = 0.375f),
+        MobBox("left_hind_leg", -0.0625f, -0.3125f, 0f, 0.125f, 0f, 0f, u = 2, v = 13, offsetX = 0.2188f, offsetY = 1.2813f, offsetZ = 0.25f),
+        MobBox("left_front_leg", -0.0625f, -0.3125f, 0f, 0.125f, 0f, 0f, u = 2, v = 13, offsetX = 0.2188f, offsetY = 1.2813f, offsetZ = -0.1875f),
+    )
+    /**
+     * Нюхач (SnifferModel): тяжёлое тело, голова с хоботком, четыре ноги и уши.
+     * Лист 192×192 — самый большой лист среди моделей мобов.
+     */
+    private val SNIFFER = listOf(
+        MobBox("right_front_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 87, offsetX = -0.4687f, offsetY = 1.4375f, offsetZ = -0.9375f),
+        MobBox("right_hind_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 123, offsetX = -0.4687f, offsetY = 1.4375f, offsetZ = 0.9375f),
+        MobBox("right_mid_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 105, offsetX = -0.4687f, offsetY = 1.4375f),
+        MobBox("left_hind_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 123, offsetX = 0.4688f, offsetY = 1.4375f, offsetZ = 0.9375f),
+        MobBox("body", -0.7812f, -0.9375f, -1.25f, 0.7813f, 0.875f, 1.25f, u = 62, v = 68, offsetY = 2.0625f),
+        MobBox("body", -0.7812f, -0.625f, -1.25f, 0.7813f, 0.875f, 1.25f, u = 62, v = 0, offsetY = 2.0625f),
+        MobBox("body", -0.7812f, -0.75f, -1.25f, 0.7813f, -0.75f, 1.25f, u = 87, v = 68, offsetY = 2.0625f),
+        MobBox("head", -0.4062f, -0.6562f, -0.7187f, 0.4063f, 0.4688f, -0.0312f, u = 8, v = 15, offsetY = 1.3438f, offsetZ = -1.2175f),
+        MobBox("head", -0.4062f, -0.4687f, -0.7187f, 0.4063f, -0.4687f, -0.0312f, u = 8, v = 4, offsetY = 1.3438f, offsetZ = -1.2175f),
+        MobBox("nose", -0.4062f, 0f, -0.5625f, 0.4063f, 0.125f, 0f, u = 10, v = 45, offsetY = 1f, offsetZ = -1.9362f),
+        MobBox("lower_beak", -0.4062f, -0.3125f, -0.5f, 0.4063f, 0.4375f, 0.0625f, u = 10, v = 57, offsetY = 0.5625f, offsetZ = -1.9987f),
+        MobBox("right_ear", -0.0625f, -1.1875f, -0.1875f, 0f, 0f, 0.25f, u = 48, v = 0, offsetX = -0.4069f, offsetY = 1.1875f, offsetZ = -1.4994f),
+        MobBox("left_ear", 0f, -1.1875f, -0.1875f, 0.0625f, 0f, 0.25f, u = 2, v = 0, offsetX = 0.4069f, offsetY = 1.1875f, offsetZ = -1.4994f),
+        MobBox("left_mid_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 105, offsetX = 0.4688f, offsetY = 1.4375f),
+        MobBox("left_front_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 87, offsetX = 0.4688f, offsetY = 1.4375f, offsetZ = -0.9375f),
     )
     /**
      * Лама (LlamaModel): тело, длинная шея с головой и ушами, четыре ноги.

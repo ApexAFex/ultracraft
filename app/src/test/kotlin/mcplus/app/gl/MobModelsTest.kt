@@ -461,6 +461,30 @@ class MobModelsTest {
     }
 
     @Test
+    fun `goat, axolotl and sniffer have their own models`() {
+        val cases = listOf(
+            Triple("goat", MobFamily.GOAT, 64 to 64),
+            Triple("axolotl", MobFamily.AXOLOTL, 64 to 64),
+            Triple("sniffer", MobFamily.SNIFFER, 192 to 192),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+            assertTrue(MobModels.boxes(family).isNotEmpty(), "$name без коробок")
+        }
+        assertEquals(12, MobModels.boxes(MobFamily.GOAT).size, "тело, голова, рога, борода и ноги")
+        assertEquals(4, MobModels.boxes(MobFamily.GOAT).count { it.name.contains("leg") })
+        assertEquals(11, MobModels.boxes(MobFamily.AXOLOTL).size)
+        assertEquals(15, MobModels.boxes(MobFamily.SNIFFER).size, "нюхач подробнее остальных")
+        // У нюхача есть хоботок и уши, у аксолотля — жабры.
+        assertTrue(MobModels.boxes(MobFamily.SNIFFER).any { it.name.contains("trunk") ||
+            it.name.contains("ear") }, "у нюхача нет головы с ушами")
+        assertTrue(MobModels.boxes(MobFamily.AXOLOTL).any { it.name.contains("gill") ||
+            it.name.contains("head") }, "у аксолотля нет головы")
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }
