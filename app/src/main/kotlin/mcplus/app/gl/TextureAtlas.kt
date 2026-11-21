@@ -25,6 +25,8 @@ class TextureAtlas(
     val namesByLayer: List<String> = emptyList(),
     /** Текстуры из моделей игры: у ступеней, плит и заборов своих файлов текстур нет. */
     val appearances: Map<String, FaceTextures> = emptyMap(),
+    /** Анимированные текстуры по номеру слоя: вода, лава, огонь и прочие ленты кадров. */
+    val animations: Map<Int, TextureAnimation.Frames> = emptyMap(),
 ) {
 
     val size: Int get() = images.size
@@ -108,8 +110,17 @@ class TextureAtlas(
         private const val TILE = 16
         private const val BLOCK_TEXTURES = "assets/minecraft/textures/block/"
         private const val ITEM_TEXTURES = "assets/minecraft/textures/item/"
+        private const val ENTITY_TEXTURES = "assets/minecraft/textures/entity/"
         private const val BLOCK_STATES = "assets/minecraft/blockstates/"
         private const val BLOCK_MODELS = "assets/minecraft/models/"
+
+        /**
+         * Текстуры сущностей, которые рисуются плоскими спрайтами в мире.
+         *
+         * В атлас они попадают как обычные слои с префиксом `entity:` — так сфера опыта
+         * получает настоящую картинку (и её анимацию) вместо жёлтого куба.
+         */
+        private val EXTRA_ENTITY_TEXTURES = listOf("experience/experience_orb")
 
         fun findMinecraftDirectory(): File? {
             val appData = System.getenv("APPDATA") ?: return null
@@ -140,9 +151,44 @@ class TextureAtlas(
                 val layers = HashMap<String, Int>(1024)
                 val blockStates = HashMap<String, String>(1024)
                 val models = HashMap<String, String>(2048)
+                val animations = HashMap<Int, TextureAnimation.Frames>(64)
 
                 try {
                     ZipFile(jar).use { zip ->
+                        // Сначала собираем описания анимаций: они лежат рядом с картинками
+                        // (`water_still.png.mcmeta`) и нужны в момент чтения самой картинки.
+                        val mcmeta = HashMap<String, String>(256)
+                        for (entry in zip.entries()) {
+                            val name = entry.name
+                            when {
+                                name.startsWith(BLOCK_TEXTURES) && name.endsWith(".png.mcmeta") ->
+                                    mcmeta[name.removePrefix(BLOCK_TEXTURES).removeSuffix(".png.mcmeta")] =
+                                        zip.getInputStream(entry).readBytes().decodeToString()
+
+                                name.startsWith(ITEM_TEXTURES) && name.endsWith(".png.mcmeta") ->
+                                    mcmeta["item:" + name.removePrefix(ITEM_TEXTURES).removeSuffix(".png.mcmeta")] =
+                                        zip.getInputStream(entry).readBytes().decodeToString()
+
+                                name.startsWith(ENTITY_TEXTURES) && name.endsWith(".png.mcmeta") ->
+                                    mcmeta["entity:" + name.removePrefix(ENTITY_TEXTURES).removeSuffix(".png.mcmeta")] =
+                                        zip.getInputStream(entry).readBytes().decodeToString()
+                            }
+                        }
+
+                        // Спрайты сущностей (сфера опыта): отдельные файлы, но живут в том
+                        // же атласе, чтобы рисоваться тем же шейдером, что иконки предметов.
+                        for (texture in EXTRA_ENTITY_TEXTURES) {
+                            val entry = zip.getEntry("$ENTITY_TEXTURES$texture.png") ?: continue
+                            val image = runCatching {
+                                ImageIO.read(ByteArrayInputStream(zip.getInputStream(entry).readBytes()))
+                            }.getOrNull() ?: continue
+                            val key = "entity:$texture"
+                            val animation = animationOf(image, mcmeta[key])
+                            layers[key] = images.size
+                            images += animation?.frames?.first() ?: firstFrame(image)
+                            if (animation != null) animations[images.lastIndex] = animation
+                        }
+
                         for (entry in zip.entries()) {
                             val name = entry.name
                             when {
@@ -151,8 +197,10 @@ class TextureAtlas(
                                     val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
                                         ?: continue
                                     val texture = name.removePrefix(BLOCK_TEXTURES).removeSuffix(".png")
+                                    val animation = animationOf(image, mcmeta[texture])
                                     layers[texture] = images.size
-                                    images += firstFrame(image)
+                                    images += animation?.frames?.first() ?: firstFrame(image)
+                                    if (animation != null) animations[images.lastIndex] = animation
                                 }
 
                                 // Иконки предметов: у 529 предметов без блока своей текстуры
@@ -166,8 +214,10 @@ class TextureAtlas(
                                     val bytes = zip.getInputStream(entry).readBytes()
                                     val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
                                         ?: continue
+                                    val animation = animationOf(image, mcmeta["item:$texture"])
                                     layers["item:$texture"] = images.size
-                                    images += firstFrame(image)
+                                    images += animation?.frames?.first() ?: firstFrame(image)
+                                    if (animation != null) animations[images.lastIndex] = animation
                                 }
 
                                 // Модели и их описания нужны, чтобы узнать текстуры блоков,
@@ -191,7 +241,8 @@ class TextureAtlas(
                     images += missingTile()
                     val appearances = resolveAppearances(blockStates, models, layers)
                     return TextureAtlas(
-                        layers, images, "jar ${jar.name}", namesByLayer(images.size, layers), appearances,
+                        layers, images, "jar ${jar.name}", namesByLayer(images.size, layers),
+                        appearances, animations,
                     )
                 }
             }
@@ -287,9 +338,33 @@ class TextureAtlas(
             return names
         }
 
-        /** Animated textures are vertical strips; only the first frame is used. */
-        private fun firstFrame(image: BufferedImage): BufferedImage {
-            val side = minOf(image.width, image.height)
+        /**
+         * Разбирает ленту кадров (`water_still.png` — это 16×16, составленные в столбик).
+         *
+         * Возвращает null, если текстура не анимирована: нет `.png.mcmeta`, высота равна
+         * ширине (один кадр) или файл не квадратный. Кадры копируются: `getSubimage` держит
+         * ссылку на всю ленту, а нам нужны отдельные картинки на всё время работы.
+         */
+        private fun animationOf(image: BufferedImage, mcmeta: String?): TextureAnimation.Frames? {
+            if (mcmeta == null) return null
+            val side = image.width
+            if (side < TILE || image.height <= side || image.height % side != 0) return null
+            val count = image.height / side
+            if (count <= 1) return null
+
+            val (order, ticks) = TextureAnimation.parse(mcmeta, count)
+            val strip = (0 until count).map { index ->
+                val copy = BufferedImage(side, side, BufferedImage.TYPE_INT_ARGB)
+                val graphics = copy.createGraphics()
+                graphics.drawImage(image.getSubimage(0, index * side, side, side), 0, 0, null)
+                graphics.dispose()
+                copy
+            }
+            return TextureAnimation.Frames(order.map { strip[it] }, ticks)
+        }
+
+        /** Один кадр текстуры, растянутый до 16×16. */
+        private fun firstFrame(image: BufferedImage): BufferedImage {            val side = minOf(image.width, image.height)
             val cropped = image.getSubimage(0, 0, side, side)
             if (side == TILE) return cropped
 

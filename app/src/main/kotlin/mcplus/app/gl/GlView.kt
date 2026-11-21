@@ -801,6 +801,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var allUploaded = false
                     val startedAt = System.currentTimeMillis()
                     var lastEntityCount = -1
+                    var animatedTick = -1L
+                    /** Какой кадр анимации уже загружен в слой атласа. */
+                    val animatedFrame = HashMap<Int, Int>()
+                    var animatedUploads = 0
                     var frame = 0
                     val windowStartedAt = System.nanoTime()
                     var inventoryOpen = false
@@ -953,6 +957,24 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
 
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
+
+                        // Покадровая анимация текстур: вода, лава и огонь меняют слой атласа,
+                        // когда приходит время следующего кадра. Меши при этом не трогаются.
+                        if (atlas.animations.isNotEmpty()) {
+                            val tickNow = (System.nanoTime() - windowStartedAt) / 50_000_000L
+                            if (tickNow != animatedTick) {
+                                animatedTick = tickNow
+                                for ((layer, animation) in atlas.animations) {
+                                    val frame = animation.frameAt(tickNow)
+                                    if (animatedFrame[layer] != frame) {
+                                        animatedFrame[layer] = frame
+                                        textures.updateLayer(layer, animation.frames[frame])
+                                        animatedUploads++
+                                    }
+                                }
+                            }
+                        }
+
                         if (demo && frame == DEMO_FLY_ATTEMPT) input.requestFlyToggle()
                         if (demo && frame == DEMO_INVENTORY_AT) {
                             inventoryOpen = true
@@ -2361,16 +2383,17 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     }
 
                                     name == "experience_orb" -> {
-                                        // Сфера опыта: маленький жёлтый куб, качается над землёй.
-                                        cubes += Renderer.BlockCube(
+                                        // Сфера опыта: настоящий спрайт из игры (он ещё и
+                                        // анимирован), лицом к камере, чуть покачивается.
+                                        val bob = kotlin.math.sin(
+                                            nowNanos / 1_000_000_000.0 * 3 + entity.id,
+                                        ) * 0.04
+                                        worldIcons += Renderer.WorldIcon(
                                             entity.x,
-                                            entity.y + 0.12,
+                                            entity.y + 0.22 + bob,
                                             entity.z,
-                                            0.18f,
-                                            atlas.layerOf("gold_block"),
-                                            atlas.layerOf("gold_block"),
-                                            atlas.layerOf("gold_block"),
-                                            yaw = (nowNanos / 1_000_000_000.0 * 2.0).toFloat(),
+                                            0.34f,
+                                            atlas.layerOf("entity:experience/experience_orb"),
                                         )
                                     }
 
@@ -3298,6 +3321,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
                     println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}, чужих трещин ${remoteCrackPackets.get()}, подобрано предметов ${pickupsCount.get()}")
                     println("Игроков в списке: ${playerList.size}, частиц от блоков: $ambientParticles")
+                    println("Анимаций текстур: ${atlas.animations.size}, кадров обновлено: $animatedUploads")
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                 }
             }
