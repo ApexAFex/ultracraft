@@ -947,6 +947,7 @@ private fun windowCommand(args: List<String>) {
     var particleDemo = false
     var mobDemo = false
     var skinFile: String? = null
+    var startStatistics = false
     var pauseAtStart = false
     var cameraModeAtStart = 0
     var pitchAtStart: Float? = null
@@ -966,6 +967,7 @@ private fun windowCommand(args: List<String>) {
             "--debug" -> debug = true
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
+            "--statistics" -> startStatistics = true
             "--use-item" -> useItemAtFrame =
                 args.getOrNull(++index)?.toIntOrNull() ?: fail("--use-item ждёт номер кадра")
             "--after-use" -> captureAfterUseSeconds =
@@ -1097,6 +1099,7 @@ private fun windowCommand(args: List<String>) {
             debug = debug,
             showTab = showTab,
             startAdvancements = startAdvancements,
+            startStatistics = startStatistics,
             useItemAtFrame = useItemAtFrame,
             captureAfterUseSeconds = captureAfterUseSeconds,
             heldSlotAtStart = heldSlotAtStart,
@@ -1116,6 +1119,7 @@ private fun windowCommand(args: List<String>) {
             soundEvents = findSoundEventTable(),
             consumables = findConsumables(),
             villagerTable = findVillagerTable(),
+            statsTable = findStatsTable(),
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
@@ -1350,6 +1354,13 @@ private fun findVillagerTable(): mcplus.net.VillagerTable {
     val file = tableCandidates("villager-777.tsv").firstOrNull { it.isFile }
         ?: return mcplus.net.VillagerTable.EMPTY
     return mcplus.net.VillagerTable.load(file)
+}
+
+/** Имена видов статистики, сгенерированы `tools/build-stats-table.js`. */
+private fun findStatsTable(): mcplus.net.StatsTable {
+    val file = tableCandidates("stats-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.StatsTable.EMPTY
+    return mcplus.net.StatsTable.load(file)
 }
 
 /** Sound event names for `Sound`/`Entity Sound`, generated with `tools/sound-ids.java`. */

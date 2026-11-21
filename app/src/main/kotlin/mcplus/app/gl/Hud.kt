@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
@@ -292,6 +292,51 @@ class Hud(
         1 -> mcplus.net.Language.translate("advancements.toast.challenge") ?: "Challenge Complete!"
         2 -> mcplus.net.Language.translate("advancements.toast.goal") ?: "Goal Reached!"
         else -> mcplus.net.Language.translate("advancements.toast.task") ?: "Advancement Made!"
+    }
+
+    /**
+     * Экран статистики: заголовок, вид счётчика и строки «название — число».
+     *
+     * Рисуется в экранном слое поверх затемнённого мира, как экран достижений. Строки идут
+     * по убыванию значения; [scroll] сдвигает список, если он не помещается.
+     */
+    fun drawStatisticsScreen(
+        category: String,
+        rows: List<StatisticsScreen.Row>,
+        scroll: Int,
+    ) {
+        val text = this.text ?: return
+        val s = HudLayout.scale(height).toFloat()
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x06090F, 0.9f)
+        renderer.draw()
+
+        val left = width * 0.12f
+        val top = height * 0.10f
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        labels += TextRenderer.ScreenLabel(left, top, "Статистика", s * 1.6f)
+        labels += TextRenderer.ScreenLabel(left, top + 26f * s, category, s * 1.1f)
+
+        if (rows.isEmpty()) {
+            labels += TextRenderer.ScreenLabel(left, top + 56f * s, "Пока ничего не накоплено", s)
+        } else {
+            val visible = StatisticsScreen.visibleRows(height)
+            val from = scroll.coerceIn(0, maxOf(0, rows.size - visible))
+            var y = top + 56f * s
+            for (row in rows.drop(from).take(visible)) {
+                labels += TextRenderer.ScreenLabel(left, y, row.name, s)
+                labels += TextRenderer.ScreenLabel(width * 0.72f, y, row.value.toString(), s)
+                y += 14f * s
+            }
+            if (rows.size > visible) {
+                labels += TextRenderer.ScreenLabel(
+                    left, top + (56f + visible * 14f) * s,
+                    "${from + 1}…${(from + visible).coerceAtMost(rows.size)} из ${rows.size}",
+                    s * 0.8f,
+                )
+            }
+        }
+        text.drawScreen(labels)
     }
 
     /**

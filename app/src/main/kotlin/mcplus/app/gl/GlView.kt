@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -206,6 +206,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         showTab: Boolean = false,
         /** Открыть экран достижений сразу (проверка без клавиатуры). */
         startAdvancements: Boolean = false,
+        /** Открыть экран статистики сразу (проверка без клавиатуры). */
+        startStatistics: Boolean = false,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
         particleDemo: Boolean = false,
         /** Нарисовать перед камерой по одному мобу каждого семейства (проверка моделей). */
@@ -232,6 +234,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         consumables: mcplus.net.Consumables = mcplus.net.Consumables.EMPTY,
         /** Климаты и профессии жителей: номер из `Villager Data` → имя файла текстуры. */
         villagerTable: mcplus.net.VillagerTable = mcplus.net.VillagerTable.EMPTY,
+        /** Таблицы статистики: имена видов счётчиков и своих счётчиков. */
+        statsTable: mcplus.net.StatsTable = mcplus.net.StatsTable.EMPTY,
         /** На каком кадре нажать «использовать предмет» — проверка еды без мыши. */
         useItemAtFrame: Int = -1,
         /** Снять снимок через столько секунд после начала еды (проверка позы). */
@@ -857,6 +861,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
 
                     /** Экран достижений (L): вкладки, дерево и подсказка. */
                     var advancementsOpen = startAdvancements
+    var statisticsOpen = startStatistics
+    // Экран открыт по флагу --statistics тоже должен попросить статистику у сервера.
+    var statisticsRequested = false
+    var statisticsType = 8
+    var statisticsScroll = 0
+    var statisticsLeftWasDown = false
+    var statisticsRightWasDown = false
                     var advancementTab = 0
                     var advancementTabRects: List<HudRect> = emptyList()
                     if (startAdvancements) input.warpCursor(width * 0.5, height * 0.56)
@@ -1099,7 +1110,45 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         // L — экран достижений; он не открывается поверх инвентаря и контейнера.
                         if (input.advancementsToggleRequested && !dead && !chat.open) {
-                            if (openContainer == null && !inventoryOpen) advancementsOpen = !advancementsOpen
+                            if (openContainer == null && !inventoryOpen) {
+                                advancementsOpen = !advancementsOpen
+                                if (advancementsOpen) statisticsOpen = false
+                            }
+                        }
+                        // K — экран статистики. Стрелки влево/вправо меняют вид счётчика,
+                        // PageUp/PageDown листают список.
+                        if (input.statisticsToggleRequested && !dead && !chat.open) {
+                            if (openContainer == null && !inventoryOpen) {
+                                statisticsOpen = !statisticsOpen
+                                statisticsScroll = 0
+                                if (statisticsOpen) {
+                                    advancementsOpen = false
+                                    // Сервер присылает статистику только по запросу.
+                                    session?.requestStats()
+                                }
+                            }
+                        }
+                        // Экран, открытый флагом `--statistics`, тоже просит статистику.
+                        if (statisticsOpen && !statisticsRequested) {
+                            statisticsRequested = true
+                            session?.requestStats()
+                        }
+                        if (statisticsOpen) {
+                            if (input.chatScrollUpRequested) statisticsScroll += 5
+                            if (input.chatScrollDownRequested) statisticsScroll = maxOf(0, statisticsScroll - 5)
+                            val left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS
+                            val right = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS
+                            if (left && !statisticsLeftWasDown) {
+                                statisticsType = ((statisticsType + StatisticsScreen.TYPES.size - 1) %
+                                    StatisticsScreen.TYPES.size)
+                                statisticsScroll = 0
+                            }
+                            if (right && !statisticsRightWasDown) {
+                                statisticsType = (statisticsType + 1) % StatisticsScreen.TYPES.size
+                                statisticsScroll = 0
+                            }
+                            statisticsLeftWasDown = left
+                            statisticsRightWasDown = right
                         }
                         if (advancementsOpen && input.clickRequested) {
                             val index = advancementTabRects.indexOfFirst {
@@ -1169,6 +1218,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 openContainer != null -> session?.closeContainer()
                                 inventoryOpen -> inventoryOpen = false
                                 advancementsOpen -> advancementsOpen = false
+                                statisticsOpen -> statisticsOpen = false
                                 dead -> Unit
                                 paused -> paused = false
                                 else -> paused = true
@@ -1677,10 +1727,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val wasOnGround = player.onGround
                                 player.move(
                                     TICK_SECONDS, world, blocks,
-                                    if (chat.open || advancementsOpen) 0.0 else forwardInput * inputScale,
-                                    if (chat.open || advancementsOpen) 0.0 else input.strafe * inputScale,
-                                    if (chat.open || advancementsOpen) false else input.jump,
-                                    if (chat.open || advancementsOpen) false else input.descend,
+                                    if (chat.open || advancementsOpen || statisticsOpen) 0.0 else forwardInput * inputScale,
+                                    if (chat.open || advancementsOpen || statisticsOpen) 0.0 else input.strafe * inputScale,
+                                    if (chat.open || advancementsOpen || statisticsOpen) false else input.jump,
+                                    if (chat.open || advancementsOpen || statisticsOpen) false else input.descend,
                                     sneak = sneakHeld,
                                 )
                                 // Приземление после падения: пыль под ногами и звук шага.
@@ -3021,6 +3071,26 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             hud.drawDeathScreen(
                                 where = "Координаты: %.1f, %.1f, %.1f".format(player.x, player.y, player.z),
                                 worldName = session?.joinResult?.joinGame?.dimensionName,
+                            )
+                        } else if (statisticsOpen) {
+                            // Экран статистики: строки по выбранному виду счётчика.
+                            val stats = session?.stats
+                            val rows = if (stats == null) {
+                                emptyList()
+                            } else {
+                                StatisticsScreen.rows(
+                                    stats, statsTable,
+                                    itemName = { id -> itemTable.nameOf(id) },
+                                    entityName = { id -> entityTypes.nameOf(id) },
+                                    type = StatisticsScreen.TYPES[statisticsType],
+                                )
+                            }
+                            hud.drawStatisticsScreen(
+                                StatisticsScreen.titleOf(
+                                    StatisticsScreen.TYPES[statisticsType], statsTable,
+                                ),
+                                rows,
+                                statisticsScroll,
                             )
                         } else if (advancementsOpen) {
                             // Экран достижений: вкладки и дерево; клик по вкладке — выше.

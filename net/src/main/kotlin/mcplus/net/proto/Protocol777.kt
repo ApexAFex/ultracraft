@@ -135,6 +135,8 @@ object Protocol777 {
         const val SET_ENTITY_DATA: Int = 0x65
         const val SET_EQUIPMENT: Int = 0x68
         const val UPDATE_ADVANCEMENTS: Int = 0x85
+        /** Статистика игрока: карта «вид счётчика → (номер → значение)». */
+        const val AWARD_STATS: Int = 0x03
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00

@@ -41,6 +41,9 @@ class Session internal constructor(
     /** Достижения и очередь тостов. */
     val advancements = Advancements()
 
+    /** Статистика игрока: приходит пакетом `Award Stats` и обновляется при изменениях. */
+    val stats = Stats()
+
     /** Строка над хотбаром и большой заголовок: приходят компонентами. */    @Volatile
     var actionBar: String? = null
         private set
@@ -248,6 +251,12 @@ class Session internal constructor(
 
                 Protocol777.Play.UPDATE_ADVANCEMENTS -> advancements.onPacket(packet.id, packet.body)
 
+                Protocol777.Play.AWARD_STATS -> {
+                    if (stats.onPacket(packet.id, packet.body) && stats.packets == 1) {
+                        println("Статистика: ${stats.size} счётчиков в ${stats.activeTypes().size} видах")
+                    }
+                }
+
                 Protocol777.Play.SET_OBJECTIVE,
                 Protocol777.Play.SET_SCORE,
                 Protocol777.Play.SET_DISPLAY_OBJECTIVE,
@@ -311,6 +320,19 @@ class Session internal constructor(
      */
     fun requestRespawn() {
         send(Packet(Protocol777.Play.CLIENT_STATUS, ByteWriter().writeVarInt(RESPAWN).toByteArray()))
+    }
+
+    /**
+     * Просит сервер прислать статистику (`Client Command: request stats`).
+     *
+     * Сервер не присылает её сам ни при входе, ни при возрождении: в 26.3 он отправляет
+     * только «грязные» счётчики и только по запросу — так же поступает ванильный клиент,
+     * когда открывают экран статистики.
+     */
+    fun requestStats() {
+        send(
+            Packet(Protocol777.Play.CLIENT_STATUS, ByteWriter().writeVarInt(REQUEST_STATS).toByteArray()),
+        )
     }
 
     /**
@@ -564,6 +586,9 @@ class Session internal constructor(
 
         /** `Client Status` action: "I died, put me back in the world". */
         const val RESPAWN = 0
+
+        /** Client Command action: «пришли мою статистику». */
+        const val REQUEST_STATS = 1
 
         /** How long one poll waits during [drain]; small enough to react quickly. */
         const val POLL_TIMEOUT_MS = 100

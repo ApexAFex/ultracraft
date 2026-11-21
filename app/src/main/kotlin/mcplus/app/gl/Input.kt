@@ -39,6 +39,7 @@ class Input(private val window: Long, private val camera: Camera) {
     private var hotbarPressed = -1
     private var inventoryPressed = false
     private var advancementsPressed = false
+    private var statisticsPressed = false
     private var escapePressed = false
     private var respawnPressed = false
     private var chatPressed = false
@@ -77,6 +78,7 @@ class Input(private val window: Long, private val camera: Camera) {
 
     /** Set once when L is pressed: открыть или закрыть экран достижений. */
     var advancementsToggleRequested: Boolean = false
+    var statisticsToggleRequested: Boolean = false
         private set
 
     /** Set once when Escape is pressed; the caller decides what to close. */
@@ -245,6 +247,10 @@ class Input(private val window: Long, private val camera: Camera) {
         val advancements = pressed(GLFW.GLFW_KEY_L)
         advancementsToggleRequested = advancements && !advancementsPressed
         advancementsPressed = advancements
+
+        val statistics = pressed(GLFW.GLFW_KEY_K)
+        statisticsToggleRequested = statistics && !statisticsPressed
+        statisticsPressed = statistics
 
         val escape = pressed(GLFW.GLFW_KEY_ESCAPE)
         escapeRequested = escape && !escapePressed
