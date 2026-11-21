@@ -21,9 +21,15 @@ class PlayerList {
     private val names = ConcurrentHashMap<UUID, String>()
     private val latency = ConcurrentHashMap<UUID, Int>()
 
+    /** Ссылки на скины из свойства профиля `textures`: uuid → адрес картинки. */
+    private val skins = ConcurrentHashMap<UUID, String>()
+
     val size: Int get() = names.size
 
     fun nameOf(uuid: UUID): String? = names[uuid]
+
+    /** Адрес скина игрока или null, если сервер его не присылал (оффлайн-режим). */
+    fun skinUrl(uuid: UUID): String? = skins[uuid]
 
     fun uuids(): Set<UUID> = names.keys.toSet()
 
@@ -45,7 +51,11 @@ class PlayerList {
     private fun remove(reader: ByteReader): Boolean {
         val count = reader.readVarInt()
         if (count < 0 || count > 1024) return false
-        repeat(count) { names.remove(reader.readUuid()) }
+        repeat(count) {
+            val uuid = reader.readUuid()
+            names.remove(uuid)
+            skins.remove(uuid)
+        }
         return true
     }
 
@@ -65,9 +75,13 @@ class PlayerList {
                 val properties = reader.readVarInt()
                 if (properties !in 0..64) return false
                 repeat(properties) {
-                    reader.readString()                                  // property name
-                    reader.readString(32767 * 4)                          // value
-                    if (reader.readBoolean()) reader.readString(1024)     // signature
+                    val propertyName = reader.readString()                     // property name
+                    val propertyValue = reader.readString(32767 * 4)          // value
+                    if (reader.readBoolean()) reader.readString(1024)         // signature
+                    // Подпись не проверяется, но ссылка на скин берётся только с домена игры.
+                    if (propertyName == "textures") {
+                        SkinTextures.skinUrl(propertyValue)?.let { skins[uuid] = it }
+                    }
                 }
             }
             if (actions and INITIALIZE_CHAT != 0 && reader.readBoolean()) {

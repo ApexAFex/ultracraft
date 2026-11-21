@@ -946,6 +946,7 @@ private fun windowCommand(args: List<String>) {
     var respawnAtStart = false
     var particleDemo = false
     var mobDemo = false
+    var skinFile: String? = null
     var pauseAtStart = false
     var cameraModeAtStart = 0
     var pitchAtStart: Float? = null
@@ -978,6 +979,7 @@ private fun windowCommand(args: List<String>) {
             "--mobs" -> mobDemo = true
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
+            "--skin" -> skinFile = args.getOrNull(++index) ?: fail("--skin ждёт путь к PNG")
             "--no-menu" -> noMenu = true
             "--menu-auto" -> menuAuto = true
             "--menu-settings" -> menuSettings = true
@@ -1102,6 +1104,7 @@ private fun windowCommand(args: List<String>) {
             respawnAtStart = respawnAtStart,
             particleDemo = particleDemo,
             mobDemo = mobDemo,
+            skinFile = skinFile,
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
             pitchAtStart = pitchAtStart,

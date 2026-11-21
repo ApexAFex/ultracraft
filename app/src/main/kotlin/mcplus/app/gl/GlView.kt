@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -210,6 +210,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         particleDemo: Boolean = false,
         /** Нарисовать перед камерой по одному мобу каждого семейства (проверка моделей). */
         mobDemo: Boolean = false,
+        /** Скин из файла для своего игрока: проверка рисования без сети (`--skin`). */
+        skinFile: String? = null,
         /** Открыть меню паузы сразу (для снимка). */
         pauseAtStart: Boolean = false,
         /** Начать с вида от третьего лица (для снимка): 0 — от первого, 1 — сзади, 2 — спереди. */
@@ -481,6 +483,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val entityRenderer = EntityRenderer(width, height)
                     val skin = GameFiles.readPng(directory, "assets/minecraft/textures/entity/player/wide/steve.png")
                     val playerRenderer = PlayerRenderer(width, height, skin)
+                    // Скины игроков: ссылка из профиля, скачивание и текстура для модели.
+                    val skinLibrary = SkinLibrary()
+                    // `--skin` рисует свой скин из файла: так проверяется рисование без сети.
+                    skinFile?.let { path ->
+                        runCatching { javax.imageio.ImageIO.read(java.io.File(path)) }
+                            .getOrNull()
+                            ?.let { image ->
+                                session?.joinResult?.profile?.uuid?.let { uuid ->
+                                    skinLibrary.useLocal(uuid, image)
+                                }
+                                println("Скин из файла: $path")
+                            }
+                    }
                     if (skin == null) println("Скин игрока не найден: игроки рисуются коробками")
                     // Мобы: коробки с настоящими текстурами.
                     val mobRenderer = MobRenderer(width, height, directory)
@@ -2340,6 +2355,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // Players get a humanoid with a skin; common mobs get simple box models;
                         // everything else stays a coloured box.
                         val players = ArrayList<PlayerRenderer.Player>()
+                        // Скин своего игрока: ссылка из профиля (при `--skin` — из файла).
+                        val selfUuid = session?.joinResult?.profile?.uuid
+                        selfUuid?.let { uuid -> skinLibrary.request(uuid, playerList.skinUrl(uuid)) }
                         if (cameraMode > 0) {
                             val ownSwingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
                             players += PlayerRenderer.Player(
@@ -2356,6 +2374,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     0f
                                 },
                                 sneak = sneakHeld,
+                                texture = selfUuid?.let { skinLibrary.textureFor(it) } ?: 0,
                             )
                         }
                         val humanoids = ArrayList<PlayerRenderer.Player>()
@@ -2369,6 +2388,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         val nowNanos = System.nanoTime()
                         for (entity in entities) {
                             if (playerList.nameOf(entity.uuid) != null) {
+                                // Чужой игрок: свой скин из профиля, иначе скин по умолчанию.
+                                skinLibrary.request(entity.uuid, playerList.skinUrl(entity.uuid))
                                 players += PlayerRenderer.Player(
                                     x = entity.x,
                                     y = entity.y,
@@ -2379,6 +2400,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     swing = entity.swingProgress(System.nanoTime()),
                                     hurt = entity.hurtProgress(System.nanoTime()),
                                     sneak = entity.sneaking,
+                                    texture = skinLibrary.textureFor(entity.uuid),
                                 )
                             } else {
                                 val name = entityTypes.nameOf(entity.type)
@@ -3517,6 +3539,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     armorRenderer.close()
                     paintingRenderer.close()
                     playerRenderer.close()
+                    skinLibrary.close()
                     skyRenderer.close()
                     hud.close()
                     textRenderer?.close()
