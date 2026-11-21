@@ -107,7 +107,7 @@ sealed interface BlockShape {
     data class Banner(val wall: ShapeDirection? = null) : BlockShape
 
     /** Сундук: корпус и крышка; двойной сундук пока выглядит как два одинарных. */
-    data object Chest : BlockShape
+    data class Chest(val facing: ShapeDirection = ShapeDirection.NORTH) : BlockShape
 
     companion object {
         /**
@@ -202,7 +202,8 @@ sealed interface BlockShape {
 
                 name.endsWith("_banner") -> Banner()
 
-                name == "chest" || name == "trapped_chest" || name == "ender_chest" -> Chest
+                name == "chest" || name == "trapped_chest" || name == "ender_chest" ->
+                    Chest(ShapeDirection.byName(values["facing"]) ?: ShapeDirection.NORTH)
 
                 else -> null
             }

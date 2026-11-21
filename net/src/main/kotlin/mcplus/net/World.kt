@@ -205,14 +205,38 @@ class World(val minY: Int) {
         return key(position.x shr 4, position.z shr 4)
     }
 
-    /** Parses a `Chunk Data` packet straight into the world — used by the streaming reader. */
+    /** Парсит `Chunk Data` пакет прямо в мир — используется потоковым читателем. */
     fun addChunk(body: ByteArray, sectionCount: Int): ChunkColumn {
         val column = readChunkColumn(body, sectionCount)
         add(column)
         return column
     }
 
-    /** Applies a block change coming from the player or from a Block Update packet. */
+    /**
+     * Открытые сундуки: упакованная позиция → число смотрящих.
+     *
+     * Состояние приходит пакетом `Block Event` и живёт только на клиенте: сам блок не
+     * меняется, а крышка должна подниматься. Набор потокобезопасный — меши чанков
+     * собираются на рабочих потоках и спрашивают его при каждой коробке.
+     */
+    private val openChests = ConcurrentHashMap<Long, Int>()
+
+    /** Открыт ли сундук в этой клетке. */
+    fun isChestOpen(x: Int, y: Int, z: Int): Boolean = openChests.containsKey(chestKey(x, y, z))
+
+    /** @return true, если состояние изменилось и чанк нужно пересобрать. */
+    fun setChestOpen(x: Int, y: Int, z: Int, open: Boolean, viewers: Int = 1): Boolean {
+        val key = chestKey(x, y, z)
+        return if (open) openChests.put(key, viewers) == null else openChests.remove(key) != null
+    }
+
+    /** Ключ клетки: 26 бит X, 26 бит Z и 12 бит Y — как в ключе блока у клиента. */
+    private fun chestKey(x: Int, y: Int, z: Int): Long =
+        (x.toLong() and 0x3FF_FFFF) or
+            ((z.toLong() and 0x3FF_FFFF) shl 26) or
+            ((y.toLong() and 0xFFF) shl 52)
+
+    /** Применяет изменение блока от игрока или из пакета Block Update. */
     @Synchronized
 
     fun setBlock(x: Int, y: Int, z: Int, state: Int): Boolean {

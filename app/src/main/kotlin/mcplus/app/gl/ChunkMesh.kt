@@ -104,8 +104,15 @@ object MeshBuilder {
                         // У таблички и знамени нет своей текстуры в атласе блоков: доска
                         // берёт доски своей породы, полотнище — шерсть своего цвета.
                         val texture = textureForShape(name, shape)
-                        for (box in boxesOf(shape)) {
-                            emitBox(target, world, blocks, atlas, x, y, z, box, texture, shape, tint)
+                        val chestOpen = shape is BlockShape.Chest && world.isChestOpen(x, y, z)
+                        for ((boxIndex, box) in boxesOf(shape).withIndex()) {
+                            // У открытого сундука крышка поворачивается вокруг задней кромки:
+                            // корпус остаётся, вторая коробка встаёт вертикально.
+                            val lid = chestOpen && boxIndex == 1
+                            emitBox(
+                                target, world, blocks, atlas, x, y, z, box, texture, shape, tint,
+                                if (lid) chestLidTransform(shape as BlockShape.Chest) else null,
+                            )
                         }
                     }
                 }
@@ -499,6 +506,31 @@ object MeshBuilder {
             Mat4.multiply(spin, Mat4.translate(-0.5f, 0f, -0.5f)),
         )
         return Mat4.multiply(spin, lean)
+    }
+
+    /**
+     * Открытая крышка сундука: поворот на 90° вокруг задней верхней кромки.
+     *
+     * Ванильный сундук поднимает крышку вверх и назад, вокруг кромки со стороны, обратной
+     * `facing`. Крышка лежит в коробке 1…15 по X и Z и 10…14 по Y, её задняя кромка идёт по
+     * линии `y = 10/16` и одной из стенок.
+     */
+    private fun chestLidTransform(chest: BlockShape.Chest): FloatArray {
+        val pivotY = 10f / 16f
+        val near = 1f / 16f
+        val far = 15f / 16f
+        val half = 0.5f
+        val quarter = Math.toRadians(90.0).toFloat()
+        val (pivotX, pivotZ, rotation) = when (chest.facing) {
+            ShapeDirection.NORTH -> Triple(half, far, Mat4.rotateX(quarter))
+            ShapeDirection.SOUTH -> Triple(half, near, Mat4.rotateX(-quarter))
+            ShapeDirection.EAST -> Triple(near, half, Mat4.rotateZ(quarter))
+            ShapeDirection.WEST -> Triple(far, half, Mat4.rotateZ(-quarter))
+        }
+        return Mat4.multiply(
+            Mat4.translate(pivotX, pivotY, pivotZ),
+            Mat4.multiply(rotation, Mat4.translate(-pivotX, -pivotY, -pivotZ)),
+        )
     }
 
     private fun emitBox(

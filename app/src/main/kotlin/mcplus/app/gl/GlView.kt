@@ -179,6 +179,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         replay: List<mcplus.protocol.Packet> = emptyList(),
         /** Блок, по которому кликнуть правой кнопкой на 30-м кадре (проверка контейнеров). */
         openAt: Triple<Int, Int, Int>? = null,
+        /** Сундук, который считается открытым на 30-м кадре (снимок крышки без экрана). */
+        chestOpenAt: Triple<Int, Int, Int>? = null,
         /** Показать отладочные строки (F3) и список игроков (Tab). */
         debug: Boolean = false,
         showTab: Boolean = false,
@@ -328,6 +330,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             breakEvents += PendingBreak(position.x, position.y, position.z, before)
                         }
                         remeshAround(position.x, position.y, position.z)
+                    }
+                    return
+                }
+                if (packet.id == Protocol777.Play.BLOCK_EVENT) {
+                    // Сундук открыли или закрыли: блок не меняется, меняется только крышка.
+                    runCatching { mcplus.net.readBlockEvent(packet.body) }.getOrNull()?.let { event ->
+                        val name = blocks.nameOf(world.blockAt(event.x, event.y, event.z))
+                        if (name == "chest" || name == "trapped_chest") {
+                            if (world.setChestOpen(event.x, event.y, event.z, event.chestOpen, event.b1)) {
+                                remeshAround(event.x, event.y, event.z)
+                                println("Сундук ${if (event.chestOpen) "открыт" else "закрыт"}: ${event.x}, ${event.y}, ${event.z}")
+                            }
+                        }
                     }
                     return
                 }
@@ -1394,8 +1409,15 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
 
                         // Проверка контейнера без рук: правый клик по заданному блоку.
-                        if (openAt != null && session != null && frame == 30) {
-                            session.send(
+                        if (chestOpenAt != null && frame == 30) {
+                            // Крышка сундука без экрана контейнера: состояние ставится руками,
+                            // иначе снимок закрывает ванильная панель.
+                            world.setChestOpen(
+                                chestOpenAt.first, chestOpenAt.second, chestOpenAt.third, true,
+                            )
+                            remeshAround(chestOpenAt.first, chestOpenAt.second, chestOpenAt.third)
+                        }
+                        if (openAt != null && session != null && frame == 30) {                            session.send(
                                 mcplus.net.BlockInteraction.useItemOn(
                                     openAt.first, openAt.second, openAt.third, face = 1,
                                     cursorX = 0.5f, cursorY = 0.5f, cursorZ = 0.5f, sequence = 1,

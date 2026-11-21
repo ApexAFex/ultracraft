@@ -934,6 +934,7 @@ private fun windowCommand(args: List<String>) {
     loadLanguage()
     // `--open x,y,z` — проверка контейнеров; `--debug` и `--tab` — снимки отладки и табло.
     var openAt: Triple<Int, Int, Int>? = null
+    var chestOpenAt: Triple<Int, Int, Int>? = null
     var debug = false
     var showTab = false
     var startAdvancements = false
@@ -958,6 +959,8 @@ private fun windowCommand(args: List<String>) {
     while (index < args.size) {
         when (args[index]) {
             "--open" -> openAt = parsePosition(args.getOrNull(++index) ?: fail("--open требует x,y,z"))
+            "--chest-open" -> chestOpenAt =
+                parsePosition(args.getOrNull(++index) ?: fail("--chest-open требует x,y,z"))
             "--debug" -> debug = true
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
@@ -1087,6 +1090,7 @@ private fun windowCommand(args: List<String>) {
             meshThreads = options.threads,
             replay = replay,
             openAt = openAt,
+            chestOpenAt = chestOpenAt,
             debug = debug,
             showTab = showTab,
             startAdvancements = startAdvancements,

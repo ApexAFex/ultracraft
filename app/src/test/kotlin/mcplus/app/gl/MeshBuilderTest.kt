@@ -411,6 +411,25 @@ class MeshBuilderTest {
     }
 
     @Test
+    fun `an open chest stands its lid up`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 24)) // chest facing north
+
+        val closed = axisValues(shapeMesh(world), 1)
+        assertEquals(48f + 14f / 16f, closed.max(), 0.001f, "закрытая крышка лежит сверху")
+
+        assertTrue(world.setChestOpen(0, 48, 0, true))
+        val open = axisValues(shapeMesh(world), 1)
+        assertTrue(
+            open.max() > 48f + 1.4f,
+            "открытая крышка должна встать: ${open.max()}",
+        )
+        // Закрытие возвращает крышку на место.
+        assertTrue(world.setChestOpen(0, 48, 0, false))
+        assertEquals(48f + 14f / 16f, axisValues(shapeMesh(world), 1).max(), 0.001f)
+    }
+
+    @Test
     fun `wall has a post and shoulders only where connected`() {
         val world = world()
         world.add(chunkWith(intArrayOf(0, 48, 0) to 11))
