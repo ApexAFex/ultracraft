@@ -51,7 +51,8 @@ object MobModels {
         "spider", "cave_spider" -> MobFamily.SPIDER
 
         // Жители: геометрия снята с ванильной VillagerModel, см. tools/villager_dump.java.
-        "villager" -> MobFamily.VILLAGER
+        // Зомби-житель — та же модель и та же раскладка слоёв, только файлы другие.
+        "villager", "zombie_villager" -> MobFamily.VILLAGER
         else -> MobFamily.NONE
     }
 
@@ -67,7 +68,7 @@ object MobModels {
         "llama", "trader_llama" -> 1.2f
 
         // Ванильный VillagerRenderer рисует модель в 0.9375 масштаба.
-        "villager" -> 0.9375f
+        "villager", "zombie_villager" -> 0.9375f
         else -> 1f
     }
 

@@ -206,6 +206,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         soundEvents: mcplus.net.SoundEventTable = mcplus.net.SoundEventTable.EMPTY,
         /** Предметы с анимацией использования: что едят, что пьют и сколько это длится. */
         consumables: mcplus.net.Consumables = mcplus.net.Consumables.EMPTY,
+        /** Климаты и профессии жителей: номер из `Villager Data` → имя файла текстуры. */
+        villagerTable: mcplus.net.VillagerTable = mcplus.net.VillagerTable.EMPTY,
         /** На каком кадре нажать «использовать предмет» — проверка еды без мыши. */
         useItemAtFrame: Int = -1,
         /** Снять снимок через столько секунд после начала еды (проверка позы). */
@@ -442,6 +444,33 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     if (skin == null) println("Скин игрока не найден: игроки рисуются коробками")
                     // Мобы: коробки с настоящими текстурами.
                     val mobRenderer = MobRenderer(width, height, directory)
+
+                    /**
+                     * Слои текстуры жителя поверх базовой шкуры.
+                     *
+                     * Климат, профессия и уровень приходят в `Villager Data` номерами реестров;
+                     * у остальных мобов слоёв нет.
+                     */
+                    /**
+                     * Слои текстуры жителя поверх базовой шкуры.
+                     *
+                     * Климат, профессия и уровень приходят в `Villager Data` номерами реестров;
+                     * у остальных мобов слоёв нет.
+                     */
+                    fun villagerLayers(entity: mcplus.net.TrackedEntity, name: String): List<Int> {
+                        if (name != "villager" && name != "zombie_villager") return emptyList()
+                        val data = entity.villagerData ?: return emptyList()
+                        val type = villagerTable.typeName(data.villagerType)
+                        val profession = villagerTable.professionName(data.villagerProfession)
+                        val directory = if (name == "zombie_villager") {
+                            VillagerLook.ZOMBIE_DIRECTORY
+                        } else {
+                            "entity/villager"
+                        }
+                        return VillagerLook.layers(type, profession, data.villagerLevel, directory)
+                            .drop(1)
+                            .map { mobRenderer.textureForPath(it) }
+                    }
                     // Частицы: спрайты из textures/particle, собранные в один атлас.
                     val particleRenderer = ParticleRenderer(width, height, directory)
                     // Гуманоидные мобы — та же модель человека, но со своей текстурой.
@@ -2368,7 +2397,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         family = family,
                                         scale = MobModels.scaleOf(name),
                                         texture = mobRenderer.textureFor(name),
-                                        overlay = mobRenderer.overlayFor(name),
+                                        overlays = villagerLayers(entity, name),
                                         hurt = entity.hurtProgress(System.nanoTime()),
                                     )
                                 }
@@ -2450,27 +2479,46 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         mobRenderer.draw(camera, mobs)
                         if (mobDemo) {
                             // По одному мобу каждого семейства в ряд перед камерой: так модель
-                            // видно целиком и без возни с призывами на сервере.
+                            // видно целиком и без возни с призывами на сервере. Жителей двое —
+                            // фермер в тёплом климате и библиотекарь в снежном: видно все слои.
                             val forward = camera.forward()
                             val right = camera.right()
                             val samples = listOf(
-                                "cow", "pig", "sheep", "chicken", "creeper", "spider", "villager",
+                                DemoMob("cow"),
+                                DemoMob("pig"),
+                                DemoMob("sheep"),
+                                DemoMob("chicken"),
+                                DemoMob("creeper"),
+                                DemoMob("spider"),
+                                DemoMob("villager", "plains", "farmer", 3),
+                                DemoMob("villager", "snow", "librarian", 1),
+                                DemoMob("zombie_villager", "plains", "butcher", 2),
                             )
                             val faceCamera = 180f - CameraAngles.degrees(camera.yaw)
-                            val demoMobs = samples.mapIndexed { index, name ->
-                                val side = (index - (samples.size - 1) / 2f) * 1.15f
+                            val demoMobs = samples.mapIndexed { index, sample ->
+                                val side = (index - (samples.size - 1) / 2f) * 1.05f
+                                val layers = when (sample.name) {
+                                    "villager" -> VillagerLook.layers(
+                                        sample.type, sample.profession, sample.level,
+                                    )
+                                    "zombie_villager" -> VillagerLook.layers(
+                                        sample.type, sample.profession, sample.level,
+                                        VillagerLook.ZOMBIE_DIRECTORY,
+                                    )
+                                    else -> emptyList()
+                                }
                                 MobRenderer.Mob(
-                                    x = camera.x + forward[0] * 6.0 + right[0] * side,
+                                    x = camera.x + forward[0] * 6.5 + right[0] * side,
                                     // В воздухе: трава и склоны иначе закрывают половину модели.
                                     y = camera.y + 0.4,
-                                    z = camera.z + forward[2] * 6.0 + right[2] * side,
+                                    z = camera.z + forward[2] * 6.5 + right[2] * side,
                                     yaw = faceCamera,
                                     walkPhase = 0f,
                                     walkAmount = 0f,
-                                    family = MobModels.familyOf(name),
-                                    scale = MobModels.scaleOf(name),
-                                    texture = mobRenderer.textureFor(name),
-                                    overlay = mobRenderer.overlayFor(name),
+                                    family = MobModels.familyOf(sample.name),
+                                    scale = MobModels.scaleOf(sample.name),
+                                    texture = mobRenderer.textureFor(sample.name),
+                                    overlays = layers.drop(1).map { mobRenderer.textureForPath(it) },
                                 )
                             }
                             mobRenderer.draw(camera, demoMobs)
@@ -3291,6 +3339,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         println("Снимок сохранён: ${file.absolutePath}")
     }
 }
+
+/**
+ * Образец моба для флага `--mobs`.
+ *
+ * [type], [profession] и [level] нужны только жителям: у них от этих полей зависят слои
+ * текстуры, а у остальных мобов они пустые.
+ */
+private data class DemoMob(
+    val name: String,
+    val type: String = "",
+    val profession: String = "",
+    val level: Int = 0,
+)
 
 
 

@@ -117,8 +117,11 @@ class MobModelsTest {
 
     @Test
     fun `villager has a clothing overlay texture`() {
-        val overlay = MobRenderer.OVERLAYS["villager"]
-        assertTrue(overlay != null && overlay.endsWith(".png"), "у жителя нет слоя одежды")
+        // Слои жителя собирает VillagerLook: база, климат, профессия и значок уровня.
+        val layers = VillagerLook.layers("plains", "farmer", 3)
+        assertEquals(VillagerLook.BASE, layers.first())
+        assertTrue(layers.any { it == "entity/villager/type/plains.png" }, "нет слоя климата")
+        assertTrue(layers.any { it == "entity/villager/profession/farmer.png" }, "нет слоя профессии")
         assertTrue(MobRenderer.TEXTURES["villager"]?.endsWith(".png") == true)
     }
 }

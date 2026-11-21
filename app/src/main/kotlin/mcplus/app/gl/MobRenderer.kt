@@ -31,8 +31,8 @@ class MobRenderer(
         val family: MobFamily,
         val scale: Float,
         val texture: Int,
-        /** Второй слой текстуры (одежда жителя): рисуется поверх той же модели. */
-        val overlay: Int = 0,
+        /** Слои поверх базовой шкуры (одежда, климат, значок уровня жителя). */
+        val overlays: List<Int> = emptyList(),
         /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
         val hurt: Float = 0f,
     )
@@ -62,14 +62,14 @@ class MobRenderer(
     }
 
     /**
-     * Второй слой текстуры: у жителей одежда лежит отдельным файлом и рисуется
-     * поверх базовой шкуры той же моделью.
+     * Текстура по пути внутри `assets/minecraft/textures` (кэшируется).
+     *
+     * Нужна слоям жителя: их набор зависит от климата, профессии и уровня из метаданных,
+     * поэтому заранее фиксированной таблицей имён тут не обойтись.
      */
-    fun overlayFor(entityName: String): Int = OVERLAYS[entityName]?.let { path ->
-        textures.getOrPut("$entityName:$path") {
-            GameFiles.readPng(directory, "assets/minecraft/textures/$path")?.let { upload(it) } ?: 0
-        }
-    } ?: 0
+    fun textureForPath(path: String): Int = textures.getOrPut(path) {
+        GameFiles.readPng(directory, "assets/minecraft/textures/$path")?.let { upload(it) } ?: 0
+    }
 
     fun draw(camera: Camera, mobs: List<Mob>) {
         if (mobs.isEmpty()) return
@@ -85,14 +85,16 @@ class MobRenderer(
         for (mob in mobs) {
             val mesh = meshFor(mob.family) ?: continue
             drawMob(mesh, mob, mob.texture)
-            if (mob.overlay != 0) {
-                // Слой одежды повторяет ту же геометрию, поэтому без сдвига он спорит
+            if (mob.overlays.isNotEmpty()) {
+                // Слои повторяют ту же геометрию, поэтому без сдвига они спорят
                 // с базой за глубину: полигоны ровно на одном расстоянии.
                 GL30.glEnable(GL30.GL_BLEND)
                 GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
                 GL30.glEnable(GL30.GL_POLYGON_OFFSET_FILL)
                 GL30.glPolygonOffset(-1f, -1f)
-                drawMob(mesh, mob, mob.overlay)
+                for (overlay in mob.overlays) {
+                    if (overlay != 0) drawMob(mesh, mob, overlay)
+                }
                 GL30.glDisable(GL30.GL_POLYGON_OFFSET_FILL)
                 GL30.glDisable(GL30.GL_BLEND)
             }
@@ -381,18 +383,10 @@ class MobRenderer(
             "ocelot" to "entity/cat/ocelot.png",
             "rabbit" to "entity/rabbit/rabbit_brown.png",
 
-            // Шкура жителя — только база (лицо, руки, штаны). Цвет одежды лежит отдельным
-            // слоем, см. OVERLAYS.
-            "villager" to "entity/villager/villager.png",
-        )
-
-        /**
-         * Второй слой текстуры: в 26.3 одежда жителя — отдельный файл `type/<климат>.png`,
-         * который игра рисует поверх базовой шкуры той же моделью. Климат из пакетов
-         * (`Villager Data`) пока не разбирается, поэтому берём равнинный вариант.
-         */
-        val OVERLAYS = mapOf(
-            "villager" to "entity/villager/type/plains.png",
+            // Шкура жителя — только база (лицо, руки, штаны). Климат, профессия и уровень
+            // лежат отдельными файлами, см. VillagerLook. У зомби-жителя те же слои.
+            "villager" to VillagerLook.BASE,
+            "zombie_villager" to VillagerLook.ZOMBIE_BASE,
         )
 
         /** Сколько чисел на вершину: x, y, z, u, v, shade. */

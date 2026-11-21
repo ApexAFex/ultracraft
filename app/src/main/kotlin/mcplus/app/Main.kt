@@ -1107,6 +1107,7 @@ private fun windowCommand(args: List<String>) {
             particleTable = findParticleTable(),
             soundEvents = findSoundEventTable(),
             consumables = findConsumables(),
+            villagerTable = findVillagerTable(),
         )
 
         // The window is gone by now; if the server kicked us, say so instead of ending
@@ -1334,6 +1335,13 @@ private fun findParticleTable(): mcplus.net.ParticleTable {
     val file = tableCandidates("particles-777.tsv").firstOrNull { it.isFile }
         ?: return mcplus.net.ParticleTable.EMPTY
     return mcplus.net.ParticleTable.load(file)
+}
+
+/** Климаты и профессии жителей, сгенерированы `tools/build-villager-table.js`. */
+private fun findVillagerTable(): mcplus.net.VillagerTable {
+    val file = tableCandidates("villager-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.VillagerTable.EMPTY
+    return mcplus.net.VillagerTable.load(file)
 }
 
 /** Sound event names for `Sound`/`Entity Sound`, generated with `tools/sound-ids.java`. */

@@ -121,4 +121,79 @@ class EntityMetadataTest {
         assertEquals(3, id)
         assertTrue(meta.isEmpty())
     }
+
+    @Test
+    fun `villager data is three registry ids`() {
+        val payload = ByteWriter()
+            .writeVarInt(4)   // климат: snow
+            .writeVarInt(9)   // профессия: librarian
+            .writeVarInt(2)   // уровень
+            .toByteArray()
+        val packet = body(12, field(17, 18, payload))
+        val (_, meta) = readEntityMetadata(packet)
+        val data = meta.getValue(17)
+
+        assertEquals(4, data.villagerType)
+        assertEquals(9, data.villagerProfession)
+        assertEquals(2, data.villagerLevel)
+    }
+
+    @Test
+    fun `villager data is found by type and not by field number`() {
+        // Номер поля у каждого класса свой, поэтому ищем по типу значения.
+        val payload = ByteWriter().writeVarInt(2).writeVarInt(5).writeVarInt(1).toByteArray()
+        val packet = body(3, field(19, 18, payload))
+        val entity = TrackedEntity(3, java.util.UUID.randomUUID(), 143)
+        entity.applyMetadata(readEntityMetadata(packet).second)
+
+        val data = entity.villagerData
+        assertTrue(data != null)
+        assertEquals(2, data.villagerType)
+        assertEquals(5, data.villagerProfession)
+    }
+
+    @Test
+    fun `a particle list field stops the parse without losing earlier fields`() {
+        // 17 — список частиц: длину его данных мы не знаем, поэтому разбор аккуратно
+        // останавливается, а не съедает пакет исключением.
+        val packet = body(
+            5,
+            field(9, 3, ByteWriter().writeFloat(18f).toByteArray()),
+            field(17, 17, ByteWriter().writeVarInt(1).toByteArray()),
+        )
+        val (_, meta) = readEntityMetadata(packet)
+
+        assertEquals(18f, meta.getValue(9).number.toFloat())
+        assertTrue(meta.size == 1)
+    }
+
+    @Test
+    fun `a villager without villager data is not a crash`() {
+        val packet = body(3, field(9, 3, ByteWriter().writeFloat(20f).toByteArray()))
+        val entity = TrackedEntity(3, java.util.UUID.randomUUID(), 143)
+        entity.applyMetadata(readEntityMetadata(packet).second)
+        assertNull(entity.villagerData)
+    }
+
+    @Test
+    fun `the villager table maps registry ids to names`() {
+        val file = java.io.File.createTempFile("villager", ".tsv")
+        try {
+            file.writeText(
+                """
+                type	0	desert
+                type	2	plains
+                profession	0	none
+                profession	9	librarian
+                """.trimIndent() + "\n",
+            )
+            val table = VillagerTable.load(file)
+            assertEquals("plains", table.typeName(2))
+            assertEquals("librarian", table.professionName(9))
+            assertEquals("", table.typeName(5), "неизвестный номер — пустая строка")
+            assertEquals("", table.professionName(-1))
+        } finally {
+            file.delete()
+        }
+    }
 }

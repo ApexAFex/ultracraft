@@ -103,6 +103,14 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     /** Предмет выпавшей сущности (поле 8, тип «стек») или null. */
     val droppedItem: MetaEntry? get() = meta[DROPPED_ITEM_FIELD]?.takeIf { it.type == 7 }
 
+    /**
+     * Данные жителя (тип 18: климат, профессия, уровень) или null.
+     *
+     * Номер поля у каждого класса свой и назначается при регистрации, поэтому ищем по типу
+     * значения, а не по номеру поля. В 26.3 тип данных жителя — 18 (17 занят списком частиц).
+     */
+    val villagerData: MetaEntry? get() = meta.values.firstOrNull { it.type == VILLAGER_DATA_TYPE }
+
     /** Сколько живёт сфера опыта — поле 8 у `experience_orb`. */
     val orbValue: Int? get() = meta[ORB_VALUE_FIELD]?.takeIf { it.type == 1 }?.number?.toInt()
 
@@ -413,6 +421,9 @@ private const val DROPPED_ITEM_FIELD = 8
 private const val ORB_VALUE_FIELD = 8
 private const val POSE_FIELD = 6
 private const val POSE_SNEAKING = 5
+
+/** Тип значения «данные жителя» в `Set Entity Data` (26.3): климат, профессия, уровень. */
+private const val VILLAGER_DATA_TYPE = 18
 
 /** Длительность взмаха рукой в секундах. */
 private const val SWING_SECONDS = 0.3
