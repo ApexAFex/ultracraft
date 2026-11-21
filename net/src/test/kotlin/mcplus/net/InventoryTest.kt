@@ -117,7 +117,7 @@ class InventoryTest {
     @Test
     fun `a damaged tool keeps its name and damage`() {
         val previous = ComponentTable.active
-        ComponentTable.active = ComponentTable(listOf("custom_data", "", "damage"))
+        ComponentTable.active = componentTable()
         try {
             val inventory = Inventory(items)
             val stack = ByteWriter()
@@ -125,7 +125,7 @@ class InventoryTest {
                 .writeVarInt(1)
                 .writeVarInt(1)   // один добавленный компонент
                 .writeVarInt(0)   // удалённых нет
-                .writeVarInt(2)   // damage
+                .writeVarInt(3)   // damage (как в таблице игры)
                 .writeVarInt(37)  // износ 37
             val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
             inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
@@ -136,6 +136,111 @@ class InventoryTest {
             ComponentTable.active = previous
         }
     }
+
+    @Test
+    fun `enchantments and a custom name are read from the component patch`() {
+        val previous = ComponentTable.active
+        // Индексы как в data/components-777.tsv: damage, custom_name, enchantments.
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val name = "Клинок".toByteArray(Charsets.UTF_8)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(3)   // три добавленных компонента
+                .writeVarInt(0)   // удалённых нет
+                .writeVarInt(3)   // damage
+                .writeVarInt(12)
+                .writeVarInt(6)   // custom_name
+                .writeByte(0x08)  // NBT: строка
+                .writeShort(name.size)
+                .writeBytes(name)
+                .writeVarInt(9)   // item_name — незнакомый компонент
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            // Незнакомый компонент в патче: стек неизвестен, но количество сохраняется.
+            assertNull(inventory.heldName())
+            assertEquals(1, inventory.stackIn(0)?.count)
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
+    fun `a renamed enchanted sword is a known stack`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val name = "Клинок".toByteArray(Charsets.UTF_8)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(3)
+                .writeVarInt(0)
+                .writeVarInt(13)  // enchantments: 1 зачарование, id 5, уровень 3
+                .writeVarInt(1)
+                .writeVarInt(5)
+                .writeVarInt(3)
+                .writeVarInt(6)   // custom_name
+                .writeByte(0x08)
+                .writeShort(name.size)
+                .writeBytes(name)
+                .writeVarInt(3)   // damage
+                .writeVarInt(9)
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertNotNull(inventory.heldName())
+            assertEquals("Клинок", parsed.customName)
+            assertEquals(listOf(5 to 3), parsed.enchantments)
+            assertEquals(9, parsed.damage)
+            assertEquals("Клинок", inventory.displayNameOf(parsed))
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
+    fun `an unbreakable item is skipped without payload`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(2)
+                .writeVarInt(0)
+                .writeVarInt(4)   // unbreakable: без данных
+                .writeVarInt(3)   // damage: число
+                .writeVarInt(77)
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            assertEquals(77, inventory.stackIn(0)?.damage)
+            assertNotNull(inventory.heldName())
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    /**
+     * Таблица компонентов как в `data/components-777.tsv`.
+     *
+     * Номер компонента — его место в таблице, а не имя: ошибка здесь даёт «неизвестный
+     * предмет» на зачарованном мече.
+     */
+    private fun componentTable(): ComponentTable = ComponentTable(
+        listOf(
+            "custom_data", "max_stack_size", "max_damage", "damage", "unbreakable",
+            "use_effects", "custom_name", "minimum_attack_charge", "damage_type",
+            "item_name", "item_model", "lore", "rarity", "enchantments",
+        ),
+    )
 
     @Test
     fun `the cursor arrives at the end of the whole menu packet`() {

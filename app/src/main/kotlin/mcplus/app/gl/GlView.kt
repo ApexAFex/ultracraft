@@ -1264,7 +1264,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // Название предмета в руке. Смотрим на фактическое состояние, а не на
                         // нажатую клавишу: сервер может поправить слот, и показывать надо его.
                         val selectedNow = session?.inventory?.selected ?: 0
-                        val heldName = session?.inventory?.heldName()
+                        // Показываем имя для игрока: у переименованного предмета — своё.
+                        val heldName = session?.inventory?.displayNameOf(session?.inventory?.held())
                         if (selectedNow != lastSelected || heldName != lastHeldName) {
                             lastSelected = selectedNow
                             lastHeldName = heldName

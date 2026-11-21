@@ -472,7 +472,8 @@ private fun printInventory(inventory: mcplus.net.Inventory) {
         when {
             stack == null -> "—"
             !stack.isKnown -> "? × ${stack.count}"
-            else -> "${inventory.nameOf(stack)} × ${stack.count}"
+            else -> "${inventory.displayNameOf(stack)} × ${stack.count}" +
+                if (stack.enchantments.isEmpty()) "" else " +${stack.enchantments.size} зач."
         }
 
     println("Выбран слот ${inventory.selected + 1}: ${inventory.heldName() ?: "пусто"}")

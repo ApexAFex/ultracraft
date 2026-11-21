@@ -25,7 +25,15 @@ class Inventory(
     private val stats: ItemStats = ItemStats.EMPTY,
 ) {
 
-    data class Stack(val itemId: Int, val count: Int, val damage: Int = 0) {
+    data class Stack(
+        val itemId: Int,
+        val count: Int,
+        val damage: Int = 0,
+        /** Имя из компонента `custom_name`: переименованный предмет. */
+        val customName: String? = null,
+        /** Зачарования: пары «номер зачарования, уровень» (реестр зачарований встроен). */
+        val enchantments: List<Pair<Int, Int>> = emptyList(),
+    ) {
         val isEmpty: Boolean get() = count <= 0
 
         /** False when the stack is there but its item id could not be read (opaque components). */
@@ -66,6 +74,16 @@ class Inventory(
 
     /** Name of the held item, or null when the hand is empty (or the stack has components). */
     fun heldName(): String? = nameOf(held())
+
+    /**
+     * Имя для показа игроку: переименованный предмет называется своим именем.
+     *
+     * В 26.3 компоненты приходят патчем к стеку; из них читаются износ, `custom_name` и
+     * зачарования. Остальные компоненты незнакомы по длине — такой стек помечается
+     * неизвестным, как и раньше.
+     */
+    fun displayNameOf(stack: Stack?): String? =
+        stack?.customName?.takeIf { it.isNotBlank() } ?: nameOf(stack)
 
     fun nameOf(stack: Stack?): String? =
         stack?.takeIf { it.isKnown }?.let { items.nameOf(it.itemId) }
@@ -235,20 +253,33 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
 
     val added = reader.readVarInt()
     val removed = reader.readVarInt()
-    // Единственный компонент, который читается точно, — износ инструмента (VarInt).
-    // Любой другой компонент незнаком по длине, поэтому стек помечается неизвестным.
+    // Патч компонентов: износ, имя и зачарования читаются, остальное неизвестно по длине.
     var damage = 0
+    var customName: String? = null
+    val enchantments = ArrayList<Pair<Int, Int>>()
     repeat(added) {
         val id = reader.readVarInt()
-        if (ComponentTable.active.nameOf(id) == "damage") {
-            damage = reader.readVarInt()
-        } else {
-            throw UnreadableStack(count)
+        when (ComponentTable.active.nameOf(id)) {
+            "damage" -> damage = reader.readVarInt()
+            // Размер прочности и цена ремонта — по одному числу.
+            "max_damage", "repair_cost" -> reader.readVarInt()
+            // `unbreakable` — компонент без полезной нагрузки.
+            "unbreakable" -> Unit
+            "custom_name" -> customName = mcplus.net.componentText(
+                mcplus.protocol.nbt.NbtReader.read(reader),
+            )
+            "enchantments", "stored_enchantments" -> {
+                val size = reader.readVarInt()
+                if (size !in 0..MAX_ENCHANTMENTS) throw UnreadableStack(count)
+                repeat(size) { enchantments += reader.readVarInt() to reader.readVarInt() }
+            }
+
+            else -> throw UnreadableStack(count)
         }
     }
     repeat(removed) { reader.readVarInt() }
 
-    return Inventory.Stack(itemId, count, damage)
+    return Inventory.Stack(itemId, count, damage, customName, enchantments)
 }
 
 /** То же, но нечитаемый стек превращается в «неизвестный предмет» с количеством. */
@@ -260,3 +291,6 @@ internal fun readMenuStackOrUnknown(reader: ByteReader): Inventory.Stack? =
     }
 
 internal class UnreadableStack(val count: Int) : RuntimeException()
+
+/** Больше зачарований на одном предмете в игре не бывает. */
+private const val MAX_ENCHANTMENTS = 64

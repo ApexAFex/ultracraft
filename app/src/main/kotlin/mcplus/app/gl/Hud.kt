@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.ActiveEffect
 import mcplus.net.BossBar
@@ -745,7 +745,7 @@ class Hud(
             if (mouseX >= px - slotPixels / 2 && mouseX <= px + slotPixels / 2 &&
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
-                val name = inventory.nameOf(stack) ?: continue
+                val name = inventory.displayNameOf(stack) ?: continue
                 hoveredName = if (max > 0 && stack.damage > 0) {
                     "$name  ${max - stack.damage}/$max" + if (stack.count > 1) " ×${stack.count}" else ""
                 } else {
@@ -824,7 +824,7 @@ class Hud(
             if (mouseX >= px - slotPixels / 2 && mouseX <= px + slotPixels / 2 &&
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
-                val name = inventory.nameOf(stack) ?: continue
+                val name = inventory.displayNameOf(stack) ?: continue
                 hovered = if (max > 0 && stack.damage > 0) {
                     "$name  ${max - stack.damage}/$max" + if (stack.count > 1) " ×${stack.count}" else ""
                 } else {
