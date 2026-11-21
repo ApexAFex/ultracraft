@@ -411,6 +411,10 @@ class MobRenderer(
             "goat" to "entity/goat/goat.png",
             "axolotl" to "entity/axolotl/axolotl_blue.png",
             "sniffer" to "entity/sniffer/sniffer.png",
+            "phantom" to "entity/phantom/phantom.png",
+            "shulker" to "entity/shulker/shulker.png",
+            "silverfish" to "entity/silverfish/silverfish.png",
+            "endermite" to "entity/endermite/endermite.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

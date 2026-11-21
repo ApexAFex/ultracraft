@@ -1,0 +1,4 @@
+﻿        MobBox("segment2", -0.0937f, -0.1875f, -0.0312f, 0.0938f, 0f, 0.0313f, u = 0, v = 14, offsetY = 0.1875f, offsetZ = 0.1875f),
+        MobBox("segment1", -0.1875f, -0.25f, -0.1562f, 0.1875f, 0f, 0.1563f, u = 0, v = 5, offsetY = 0.25f),
+        MobBox("segment0", -0.125f, -0.1875f, -0.0625f, 0.125f, 0f, 0.0625f, u = 0, v = 0, offsetY = 0.1875f, offsetZ = -0.2187f),
+        MobBox("segment3", -0.0312f, -0.125f, -0.0312f, 0.0313f, 0f, 0.0313f, u = 0, v = 18, offsetY = 0.125f, offsetZ = 0.25f),

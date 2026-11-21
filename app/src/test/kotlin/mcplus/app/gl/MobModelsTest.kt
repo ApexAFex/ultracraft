@@ -485,6 +485,36 @@ class MobModelsTest {
     }
 
     @Test
+    fun `phantom, shulker, silverfish and endermite are separate families`() {
+        val cases = listOf(
+            Triple("phantom", MobFamily.PHANTOM, 64 to 64),
+            Triple("shulker", MobFamily.SHULKER, 64 to 64),
+            Triple("silverfish", MobFamily.SILVERFISH, 64 to 32),
+            Triple("endermite", MobFamily.ENDERMITE, 64 to 32),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+        assertEquals(8, MobModels.boxes(MobFamily.PHANTOM).size, "тело, голова и два крыла")
+        assertEquals(3, MobModels.boxes(MobFamily.SHULKER).size, "раковина, голова и подошва")
+        assertEquals(10, MobModels.boxes(MobFamily.SILVERFISH).size)
+        assertEquals(4, MobModels.boxes(MobFamily.ENDERMITE).size, "четыре сегмента")
+        // Крылья фантома тонкие: хотя бы один размер не больше двух пикселей.
+        val wings = MobModels.boxes(MobFamily.PHANTOM).filter { it.name.contains("wing") }
+        assertEquals(4, wings.size, "два крыла по две коробки")
+        assertTrue(
+            wings.all {
+                listOf(it.maxX - it.minX, it.maxY - it.minY, it.maxZ - it.minZ).any { size ->
+                    size <= 2f / 16f + 1e-4f
+                }
+            },
+            "крылья должны быть тонкими",
+        )
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }

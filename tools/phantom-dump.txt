@@ -1,0 +1,18 @@
+﻿SIZE	64	64
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/body	0.000	0.000	0.000	-0.100	0.000	0.000
+CUBE	root/body	-3.000	-2.000	-8.000	2.000	1.000	1.000	0.0	8.0
+PART	root/body/head	0.000	1.000	-7.000	0.200	0.000	0.000
+CUBE	root/body/head	-4.000	-2.000	-5.000	3.000	1.000	0.000	0.0	0.0
+PART	root/body/right_wing_base	-3.000	-2.000	-8.000	0.000	0.000	-0.100
+CUBE	root/body/right_wing_base	-6.000	0.000	0.000	0.000	2.000	9.000	23.0	12.0
+PART	root/body/right_wing_base/right_wing_tip	-6.000	0.000	0.000	0.000	0.000	-0.100
+CUBE	root/body/right_wing_base/right_wing_tip	-13.000	0.000	0.000	0.000	1.000	9.000	16.0	24.0
+PART	root/body/tail_base	0.000	-2.000	1.000	0.000	0.000	0.000
+CUBE	root/body/tail_base	-2.000	0.000	0.000	1.000	2.000	6.000	3.0	20.0
+PART	root/body/tail_base/tail_tip	0.000	0.500	6.000	0.000	0.000	0.000
+CUBE	root/body/tail_base/tail_tip	-1.000	0.000	0.000	0.000	1.000	6.000	4.0	29.0
+PART	root/body/left_wing_base	2.000	-2.000	-8.000	0.000	0.000	0.100
+CUBE	root/body/left_wing_base	0.000	0.000	0.000	6.000	2.000	9.000	23.0	12.0
+PART	root/body/left_wing_base/left_wing_tip	6.000	0.000	0.000	0.000	0.000	0.100
+CUBE	root/body/left_wing_base/left_wing_tip	0.000	0.000	0.000	13.000	1.000	9.000	16.0	24.0
