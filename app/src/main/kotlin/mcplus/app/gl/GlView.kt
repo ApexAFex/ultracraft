@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -2441,7 +2441,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                         walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                         family = family,
-                                        scale = MobModels.scaleOf(name),
+                                        scale = MobModels.scaleFor(name, entity.metadata),
                                         texture = mobRenderer.textureFor(name),
                                         overlays = villagerLayers(entity, name),
                                         hurt = entity.hurtProgress(System.nanoTime()),
@@ -2565,7 +2565,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
 
                             // Ближе и на полу — крупный голем, мелкая мышь и спрут: в общем ряду
                             // их модели было бы не разглядеть, а так видно и размер, и развёртку.
-                            val groundSamples = listOf("iron_golem", "bat", "squid")
+                            val groundSamples = listOf("iron_golem", "bat", "squid", "slime", "magma_cube")
                             val demoGround = groundSamples.mapIndexed { index, typeName ->
                                 val side = (index - (groundSamples.size - 1) / 2f) * 2.2f
                                 MobRenderer.Mob(
@@ -2576,7 +2576,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     walkPhase = 0f,
                                     walkAmount = 0f,
                                     family = MobModels.familyOf(typeName),
-                                    scale = MobModels.scaleOf(typeName),
+                                    scale = MobModels.scaleFor(typeName, emptyMap()),
                                     texture = mobRenderer.textureFor(typeName),
                                 )
                             }

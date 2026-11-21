@@ -1,7 +1,11 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
+
+import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
-enum class MobFamily { QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, NONE }
+enum class MobFamily {
+    QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE, NONE,
+}
 
 /**
  * Одна коробка модели моба в блоках: от [minX] до [maxX] и так далее.
@@ -59,6 +63,8 @@ object MobModels {
         "iron_golem" -> MobFamily.IRON_GOLEM
         "squid", "glow_squid" -> MobFamily.SQUID
         "bat" -> MobFamily.BAT
+        "slime" -> MobFamily.SLIME
+        "magma_cube" -> MobFamily.MAGMA_CUBE
         else -> MobFamily.NONE
     }
 
@@ -89,6 +95,8 @@ object MobModels {
         MobFamily.IRON_GOLEM -> 128 to 128
         MobFamily.SQUID -> 64 to 32
         MobFamily.BAT -> 32 to 32
+        MobFamily.SLIME -> 64 to 32
+        MobFamily.MAGMA_CUBE -> 64 to 64
         else -> 64 to 32
     }
 
@@ -101,8 +109,30 @@ object MobModels {
         MobFamily.IRON_GOLEM -> IRON_GOLEM
         MobFamily.SQUID -> SQUID
         MobFamily.BAT -> BAT
+        MobFamily.SLIME -> SLIME
+        MobFamily.MAGMA_CUBE -> MAGMA_CUBE
         MobFamily.NONE -> emptyList()
     }
+
+    /**
+     * Размер слизня и магмового куба: в метаданных это целое поле 18, от 1 до 127.
+     *
+     * Модель у них — куб в полблока, а масштаб равен размеру: слизень размера 4 занимает
+     * два блока, как в игре. Без поля (старый пакет) считаем размер 2.
+     */
+    fun cubeSize(metadata: Map<Int, MetaEntry>): Int =
+        (metadata[CUBE_SIZE_FIELD]?.number?.toInt() ?: 2).coerceIn(1, 127)
+
+    /** Масштаб моба: у слизней он зависит от размера из метаданных, у остальных — от типа. */
+    fun scaleFor(entityName: String, metadata: Map<Int, MetaEntry>): Float = when (familyOf(entityName)) {
+        // Внутренний слой слизня — 6 пикселей вместо 8 у оболочки, поэтому 4/3.
+        MobFamily.SLIME -> cubeSize(metadata) * 4f / 3f
+        MobFamily.MAGMA_CUBE -> cubeSize(metadata).toFloat()
+        else -> scaleOf(entityName)
+    }
+
+    /** Номер поля размера в `Set Entity Data` для слизня и магмового куба. */
+    const val CUBE_SIZE_FIELD = 18
 
     /** Угол качания коробки: ноги идут крест-накрест, крылья машут вверх-вниз. */
     fun limbAngle(name: String, phase: Float, amount: Float): Float {
@@ -237,4 +267,40 @@ object MobModels {
         MobBox("wingL", 0.09375f, 0.125f, 0f, 0.21875f, 0.5625f, 0f, u = 12, v = 7),
         MobBox("wingL", 0.21875f, 0.0625f, 0f, 0.59375f, 0.5625f, 0f, u = 16, v = 8),
     )
+
+    /**
+     * Слизень: ванильная модель — прозрачная оболочка и внутренний куб с лицом.
+     *
+     * Прозрачной оболочки у нас нет (шейдер мобов не смешивает альфу), поэтому рисуется
+     * внутренний слой: куб 6×6×6 пикселя с глазами и ртом, а масштаб умножается на 4/3,
+     * чтобы слизень остался того же размера, что и оболочка в игре. Глаза и рот в ванильной
+     * модели стоят при отрицательном Z, поэтому их Z отражён: иначе лицо смотрит внутрь куба.
+     */
+    private val SLIME = listOf(
+        MobBox("body", -0.1875f, 0.0625f, -0.1875f, 0.1875f, 0.4375f, 0.1875f, u = 0, v = 16),
+        MobBox("eye", -0.203125f, 0.25f, 0.09375f, -0.078125f, 0.375f, 0.21875f, u = 32, v = 0),
+        MobBox("eye", 0.078125f, 0.25f, 0.09375f, 0.203125f, 0.375f, 0.21875f, u = 32, v = 4),
+        MobBox("mouth", 0f, 0.125f, 0.15625f, 0.0625f, 0.1875f, 0.21875f, u = 32, v = 8),
+    )
+
+    /**
+     * Магмовый куб (`MagmaCubeModel`): восемь слоёв по 1/16 блока и внутренний куб.
+     *
+     * Слои по четыре берут развёртку с левой и с правой половины листа 64×64 — так на кубе
+     * получается «текучая» полосатая корка. Внутренний куб спрятан внутри и нужен только
+     * для полноты модели.
+     */
+    private val MAGMA_CUBE = buildList {
+        for (layer in 0 until 8) {
+            add(
+                MobBox(
+                    "layer$layer",
+                    -0.25f, layer / 16f, -0.25f, 0.25f, (layer + 1) / 16f, 0.25f,
+                    u = if (layer < 4) 0 else 32,
+                    v = 9 * (layer % 4),
+                ),
+            )
+        }
+        add(MobBox("inside", -0.125f, 0.125f, -0.125f, 0.125f, 0.375f, 0.125f, u = 24, v = 40))
+    }
 }

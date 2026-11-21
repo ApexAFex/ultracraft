@@ -1,4 +1,6 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
+
+import mcplus.net.MetaEntry
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -192,6 +194,47 @@ class MobModelsTest {
         // Щупальца стоят по кругу: есть и слева, и справа, и спереди, и сзади.
         assertTrue(tentacles.any { it.minX > 0f } && tentacles.any { it.maxX < 0f })
         assertTrue(tentacles.any { it.minZ > 0f } && tentacles.any { it.maxZ < 0f })
+    }
+
+    @Test
+    fun `slimes and magma cubes are cubes scaled by their size`() {
+        assertEquals(MobFamily.SLIME, MobModels.familyOf("slime"))
+        assertEquals(MobFamily.MAGMA_CUBE, MobModels.familyOf("magma_cube"))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.SLIME))
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.MAGMA_CUBE))
+        assertTrue(MobRenderer.TEXTURES["slime"]?.endsWith("slime.png") == true)
+        assertTrue(MobRenderer.TEXTURES["magma_cube"]?.endsWith("magmacube.png") == true)
+
+        // Слизень — внутренний куб и лицо; магмовый — восемь слоёв и внутренний куб.
+        val slime = MobModels.boxes(MobFamily.SLIME)
+        assertEquals(4, slime.size)
+        assertEquals(1, slime.count { it.name == "body" })
+        assertEquals(2, slime.count { it.name == "eye" })
+        assertEquals(1, slime.count { it.name == "mouth" })
+        assertEquals(9, MobModels.boxes(MobFamily.MAGMA_CUBE).size)
+
+        // Лицо слизня должно смотреть вперёд (+Z), а не внутрь куба.
+        assertTrue(slime.filter { it.name == "eye" }.all { it.minZ > 0.05f })
+    }
+
+    @Test
+    fun `slime size comes from metadata and sets the scale`() {
+        // Поле 18 — размер; у слизня размера 4 он даёт масштаб 4*4/3.
+        val big = mapOf(MobModels.CUBE_SIZE_FIELD to MetaEntry(type = 1, number = 4.0))
+        val small = mapOf(MobModels.CUBE_SIZE_FIELD to MetaEntry(type = 1, number = 1.0))
+
+        assertEquals(4, MobModels.cubeSize(big))
+        assertEquals(1, MobModels.cubeSize(small))
+        assertEquals(2, MobModels.cubeSize(emptyMap()), "без поля размера считаем двойку")
+        assertEquals(4f * 4f / 3f, MobModels.scaleFor("slime", big), 0.001f)
+        assertEquals(1f * 4f / 3f, MobModels.scaleFor("slime", small), 0.001f)
+        assertEquals(4f, MobModels.scaleFor("magma_cube", big), 0.001f)
+        // Остальные мобы не зависят от поля размера.
+        assertEquals(MobModels.scaleOf("cow"), MobModels.scaleFor("cow", big), 0.001f)
+
+        // Размер за пределами 1..127 не должен ломать рендер.
+        assertEquals(127, MobModels.cubeSize(mapOf(MobModels.CUBE_SIZE_FIELD to MetaEntry(1, number = 999.0))))
+        assertEquals(1, MobModels.cubeSize(mapOf(MobModels.CUBE_SIZE_FIELD to MetaEntry(1, number = -5.0))))
     }
 
     @Test
