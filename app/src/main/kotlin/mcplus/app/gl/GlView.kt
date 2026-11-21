@@ -1743,7 +1743,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             camera.y += direction[1] * offset + 0.3f
                             camera.z += direction[2] * offset
                             if (cameraMode == 2) {
-                                camera.yaw += 180f
+                                // yaw камеры в радианах: пол-оборота — это π, а не 180.
+                                camera.yaw += Math.PI.toFloat()
                                 camera.pitch = -camera.pitch
                             }
                         }
@@ -2816,6 +2817,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     ),
                                     "Радиус сервера: ${session?.serverChunkRadius ?: -1} чанков",
                                     "Сторона: " + CameraAngles.side(camera.yaw),
+                                    "Вид: " + when (cameraMode) {
+                                        0 -> "от первого лица"
+                                        1 -> "от третьего, сзади"
+                                        else -> "от третьего, спереди"
+                                    },
                                     "Цель: " + (target?.let {
                                         "${blocks.nameOf(world.blockAt(it.x, it.y, it.z))} (${it.x}, ${it.y}, ${it.z})"
                                     } ?: "—"),
