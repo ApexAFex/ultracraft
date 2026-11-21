@@ -1,4 +1,4 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.MetaEntry
 
@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, BOAT, MINECART, NONE,
 }
 
 /**
@@ -100,6 +100,9 @@ object MobModels {
         "shulker" -> MobFamily.SHULKER
         "silverfish" -> MobFamily.SILVERFISH
         "endermite" -> MobFamily.ENDERMITE
+        "guardian", "elder_guardian" -> MobFamily.GUARDIAN
+        "allay" -> MobFamily.ALLAY
+        "warden" -> MobFamily.WARDEN
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -173,6 +176,9 @@ object MobModels {
         MobFamily.SHULKER -> 64 to 64
         MobFamily.SILVERFISH -> 64 to 32
         MobFamily.ENDERMITE -> 64 to 32
+        MobFamily.GUARDIAN -> 64 to 64
+        MobFamily.ALLAY -> 32 to 32
+        MobFamily.WARDEN -> 128 to 128
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -211,6 +217,9 @@ object MobModels {
         MobFamily.SHULKER -> SHULKER
         MobFamily.SILVERFISH -> SILVERFISH
         MobFamily.ENDERMITE -> ENDERMITE
+        MobFamily.GUARDIAN -> GUARDIAN
+        MobFamily.ALLAY -> ALLAY
+        MobFamily.WARDEN -> WARDEN
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -638,6 +647,67 @@ object MobModels {
         MobBox("segment1", -0.1875f, -0.25f, -0.1562f, 0.1875f, 0f, 0.1563f, u = 0, v = 5, offsetY = 0.25f),
         MobBox("segment0", -0.125f, -0.1875f, -0.0625f, 0.125f, 0f, 0.0625f, u = 0, v = 0, offsetY = 0.1875f, offsetZ = -0.2187f),
         MobBox("segment3", -0.0312f, -0.125f, -0.0312f, 0.0313f, 0f, 0.0313f, u = 0, v = 18, offsetY = 0.125f, offsetZ = 0.25f),
+    )
+    /**
+     * Страж (GuardianModel): тело с шипами, голова и хвост. Лист 64×64.
+     *
+     * У стража 22 коробки: шипы вокруг тела — отдельные плоскости с поворотами.
+     */
+    private val GUARDIAN = listOf(
+        MobBox("head", -0.375f, -1.375f, -0.5f, 0.375f, -0.625f, 0.5f, u = 0, v = 0, offsetY = 1.7813f),
+        MobBox("head", -0.5f, -1.375f, -0.375f, -0.375f, -0.625f, 0.375f, u = 0, v = 28, offsetY = 1.7813f),
+        MobBox("head", 0.375f, -1.375f, -0.375f, 0.5f, -0.625f, 0.375f, u = 0, v = 28, offsetY = 1.7813f),
+        MobBox("head", -0.375f, -0.625f, -0.375f, 0.375f, -0.5f, 0.375f, u = 16, v = 40, offsetY = 1.7813f),
+        MobBox("head", -0.375f, -1.5f, -0.375f, 0.375f, -1.375f, 0.375f, u = 16, v = 40, offsetY = 1.7813f),
+        MobBox("spike10", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(-0.707f, -0.7072f, 0f, 0f, 0.7072f, -0.707f, 0f, 0f, 0f, 0f, 1f, 0f, 0.4958f, 0.2854f, 0f, 1f)),
+        MobBox("spike11", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(-0.7071f, 0.7071f, 0f, 0f, -0.7071f, -0.7071f, 0f, 0f, 0f, 0f, 1f, 0f, -0.5f, 0.2813f, 0f, 1f)),
+        MobBox("spike6", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(-0.7071f, 0f, 0.7071f, 0f, 0.7071f, -0.0002f, 0.7071f, 0f, 0.0001f, 1f, 0.0001f, 0f, 0.5048f, 0.7813f, 0.5048f, 1f)),
+        MobBox("spike7", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(-0.707f, 0f, -0.7072f, 0f, -0.7072f, -0.0002f, 0.707f, 0f, -0.0001f, 1f, 0.0001f, 0f, -0.5037f, 0.7813f, 0.5038f, 1f)),
+        MobBox("spike8", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.7071f, 0.7071f, 0f, 0f, -0.7071f, -0.7071f, 0f, 0f, 0.282f, 0.4993f, 1f)),
+        MobBox("spike9", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.707f, -0.7072f, 0f, 0f, 0.7072f, -0.707f, 0f, 0f, 0.2858f, -0.4954f, 1f)),
+        MobBox("eye", -0.0625f, -1.0625f, 0f, 0.0625f, -0.9375f, 0.0625f, u = 8, v = 0, offsetY = 1.7813f, offsetZ = -0.5156f),
+        MobBox("tail0", -0.125f, -1.125f, 0.4375f, 0.125f, -0.875f, 0.9375f, u = 40, v = 0, offsetY = 1.7813f),
+        MobBox("tail1", 0f, -1.0625f, 0f, 0.1875f, -0.875f, 0.4375f, u = 0, v = 54, offsetX = -0.0937f, offsetY = 1.75f, offsetZ = 0.875f),
+        MobBox("tail2", 0f, -1f, 0f, 0.125f, -0.875f, 0.375f, u = 41, v = 32, offsetX = -0.0625f, offsetY = 1.7188f, offsetZ = 1.25f),
+        MobBox("tail2", 0.0625f, -1.2187f, 0.1875f, 0.125f, -0.6562f, 0.75f, u = 25, v = 19, offsetX = -0.0625f, offsetY = 1.7188f, offsetZ = 1.25f),
+        MobBox("spike0", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7073f, 0.707f, 0f, 0f, -0.707f, 0.7073f, 0f, 0f, 1.2862f, 0.505f, 1f)),
+        MobBox("spike1", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 1.2839f, -0.5027f, 1f)),
+        MobBox("spike2", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, 0.4979f, 1.2792f, 0f, 1f)),
+        MobBox("spike3", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(0.7073f, 0.707f, 0f, 0f, -0.707f, 0.7073f, 0f, 0f, 0f, 0f, 1f, 0f, -0.4951f, 1.2763f, 0f, 1f)),
+        MobBox("spike4", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, -0.7068f, -0.0002f, -0.7074f, 0f, -0.0001f, 1f, -0.0001f, 0f, -0.4967f, 0.7813f, -0.4967f, 1f)),
+        MobBox("spike5", -0.0625f, -0.2812f, -0.0625f, 0.0625f, 0.2813f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(0.7073f, 0f, 0.707f, 0f, 0.707f, -0.0002f, -0.7073f, 0f, 0.0001f, 1f, -0.0001f, 0f, 0.5014f, 0.7813f, -0.5014f, 1f)),
+    )
+    /**
+     * Аллей (AllayModel): маленькое тело, голова и два крыла. Лист 32×32.
+     *
+     * Лист 32×32 — самый маленький среди мобов.
+     */
+    private val ALLAY = listOf(
+        MobBox("head", -0.1562f, 0f, -0.1562f, 0.1563f, 0.3125f, 0.1563f, u = 0, v = 0, offsetY = 1.8431f),
+        MobBox("body", -0.0937f, -0.25f, -0.0625f, 0.0938f, 0f, 0.0625f, u = 0, v = 10, offsetY = 1.8438f),
+        MobBox("body", -0.0937f, -0.3125f, -0.0625f, 0.0938f, 0f, 0.0625f, u = 0, v = 16, offsetY = 1.8438f),
+        MobBox("right_arm", -0.0469f, -0.2187f, -0.0625f, 0.0156f, 0.0313f, 0.0625f, u = 23, v = 0, offsetX = -0.1094f, offsetY = 0.3438f),
+        MobBox("left_arm", -0.0156f, -0.2187f, -0.0625f, 0.0469f, 0.0313f, 0.0625f, u = 23, v = 6, offsetX = 0.1094f, offsetY = 0.3438f),
+        MobBox("right_wing", 0f, -0.375f, 0f, 0f, -0.0625f, 0.5f, u = 16, v = 14, offsetX = -0.0312f, offsetY = 0.375f, offsetZ = 0.0375f),
+        MobBox("left_wing", 0f, -0.375f, 0f, 0f, -0.0625f, 0.5f, u = 16, v = 14, offsetX = 0.0313f, offsetY = 0.375f, offsetZ = 0.0375f),
+    )
+    /**
+     * Хранитель (WardenModel): тяжёлое тело, голова с рогами и щупальцами, две руки.
+     * Лист 128×128.
+     *
+     * Голова вложена с поворотом, поэтому её коробки несут матрицу.
+     */
+    private val WARDEN = listOf(
+        MobBox("left_leg", -0.1812f, -0.8125f, -0.1875f, 0.1938f, 0f, 0.1875f, u = 76, v = 76, offsetX = 0.3688f, offsetY = 1.9375f),
+        MobBox("right_leg", -0.1937f, -0.8125f, -0.1875f, 0.1813f, 0f, 0.1875f, u = 76, v = 48, offsetX = -0.3687f, offsetY = 1.9375f),
+        MobBox("body", -0.5625f, -0.5f, -0.25f, 0.5625f, 0.8125f, 0.4375f, u = 0, v = 0, offsetY = 2.4375f),
+        MobBox("head", -0.5f, 0f, -0.3125f, 0.5f, 1f, 0.3125f, u = 0, v = 32, offsetY = 1.75f),
+        MobBox("right_tendril", -1f, -0.1875f, 0f, 0f, 0.8125f, 0f, u = 52, v = 32, offsetX = -0.5f, offsetY = 0.8125f),
+        MobBox("left_tendril", 0f, -0.1875f, 0f, 1f, 0.8125f, 0f, u = 58, v = 0, offsetX = 0.5f, offsetY = 0.8125f),
+        MobBox("right_arm", -0.25f, -1.75f, -0.25f, 0.25f, 0f, 0.25f, u = 44, v = 50, offsetX = -0.8125f, offsetY = 1.75f, offsetZ = 0.0625f),
+        MobBox("left_arm", -0.25f, -1.75f, -0.25f, 0.25f, 0f, 0.25f, u = 0, v = 58, offsetX = 0.8125f, offsetY = 1.75f, offsetZ = 0.0625f),
+        MobBox("left_ribcage", -0.4375f, -0.625f, -0.0062f, 0.125f, 0.6875f, -0.0062f, u = 90, v = 11, offsetX = 0.4375f, offsetY = 1.0625f, offsetZ = -0.25f),
+        MobBox("right_ribcage", -0.125f, -0.625f, -0.0062f, 0.4375f, 0.6875f, -0.0062f, u = 90, v = 11, offsetX = -0.4375f, offsetY = 1.0625f, offsetZ = -0.25f),
     )
     /**
      * Коза (GoatModel): тело, голова с рогами и бородой, четыре ноги. Лист 64×64.

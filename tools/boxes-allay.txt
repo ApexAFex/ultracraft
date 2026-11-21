@@ -1,0 +1,7 @@
+﻿        MobBox("head", -0.1562f, 0f, -0.1562f, 0.1563f, 0.3125f, 0.1563f, u = 0, v = 0, offsetY = 1.8431f),
+        MobBox("body", -0.0937f, -0.25f, -0.0625f, 0.0938f, 0f, 0.0625f, u = 0, v = 10, offsetY = 1.8438f),
+        MobBox("body", -0.0937f, -0.3125f, -0.0625f, 0.0938f, 0f, 0.0625f, u = 0, v = 16, offsetY = 1.8438f),
+        MobBox("right_arm", -0.0469f, -0.2187f, -0.0625f, 0.0156f, 0.0313f, 0.0625f, u = 23, v = 0, offsetX = -0.1094f, offsetY = 0.3438f),
+        MobBox("left_arm", -0.0156f, -0.2187f, -0.0625f, 0.0469f, 0.0313f, 0.0625f, u = 23, v = 6, offsetX = 0.1094f, offsetY = 0.3438f),
+        MobBox("right_wing", 0f, -0.375f, 0f, 0f, -0.0625f, 0.5f, u = 16, v = 14, offsetX = -0.0312f, offsetY = 0.375f, offsetZ = 0.0375f),
+        MobBox("left_wing", 0f, -0.375f, 0f, 0f, -0.0625f, 0.5f, u = 16, v = 14, offsetX = 0.0313f, offsetY = 0.375f, offsetZ = 0.0375f),

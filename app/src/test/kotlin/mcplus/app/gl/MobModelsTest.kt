@@ -515,6 +515,30 @@ class MobModelsTest {
     }
 
     @Test
+    fun `guardian, allay and warden have their own models`() {
+        val cases = listOf(
+            Triple("guardian", MobFamily.GUARDIAN, 64 to 64),
+            Triple("elder_guardian", MobFamily.GUARDIAN, 64 to 64),
+            Triple("allay", MobFamily.ALLAY, 32 to 32),
+            Triple("warden", MobFamily.WARDEN, 128 to 128),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+        assertEquals(22, MobModels.boxes(MobFamily.GUARDIAN).size, "тело и шипы вокруг него")
+        assertEquals(7, MobModels.boxes(MobFamily.ALLAY).size)
+        assertEquals(10, MobModels.boxes(MobFamily.WARDEN).size)
+        // У стража есть шипы, у аллея — крылья, у хранителя — голова и щупальца.
+        assertTrue(MobModels.boxes(MobFamily.GUARDIAN).count { it.name.contains("spike") } > 4)
+        assertEquals(2, MobModels.boxes(MobFamily.ALLAY).count { it.name.contains("wing") })
+        val warden = MobModels.boxes(MobFamily.WARDEN)
+        assertTrue(warden.any { it.name == "head" }, "у хранителя нет головы")
+        assertEquals(2, warden.count { it.name.contains("tendril") }, "у хранителя два щупальца")
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }
