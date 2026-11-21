@@ -124,4 +124,83 @@ class MobModelsTest {
         assertTrue(layers.any { it == "entity/villager/profession/farmer.png" }, "нет слоя профессии")
         assertTrue(MobRenderer.TEXTURES["villager"]?.endsWith(".png") == true)
     }
+
+    // ---------------------------------------------------------------- новые семейства
+
+    @Test
+    fun `golem squid and bat have their own families and textures`() {
+        assertEquals(MobFamily.IRON_GOLEM, MobModels.familyOf("iron_golem"))
+        assertEquals(MobFamily.SQUID, MobModels.familyOf("squid"))
+        assertEquals(MobFamily.SQUID, MobModels.familyOf("glow_squid"))
+        assertEquals(MobFamily.BAT, MobModels.familyOf("bat"))
+
+        assertEquals(128 to 128, MobModels.textureSize(MobFamily.IRON_GOLEM))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.SQUID))
+        assertEquals(32 to 32, MobModels.textureSize(MobFamily.BAT))
+
+        for (name in listOf("iron_golem", "squid", "glow_squid", "bat")) {
+            val path = MobRenderer.TEXTURES[name]
+            assertTrue(path != null && path.endsWith(".png"), "$name без текстуры")
+        }
+    }
+
+    @Test
+    fun `every box of the new models fits into its texture`() {
+        for (family in listOf(MobFamily.IRON_GOLEM, MobFamily.SQUID, MobFamily.BAT)) {
+            val (width, height) = MobModels.textureSize(family)
+            for (box in MobModels.boxes(family)) {
+                val w = ((box.maxX - box.minX) * 16f).toInt()
+                val h = ((box.maxY - box.minY) * 16f).toInt()
+                val d = ((box.maxZ - box.minZ) * 16f).toInt()
+                // Развёртка коробки: сверху и снизу полосы глубины, сбоку — ширина и высота.
+                assertTrue(
+                    box.u + 2 * (d + w) <= width,
+                    "${family.name}/${box.name}: развёртка шире листа (${box.u}+$w+$d > $width)",
+                )
+                assertTrue(
+                    box.v + d + h <= height,
+                    "${family.name}/${box.name}: развёртка выше листа (${box.v}+$h+$d > $height)",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `iron golem is two and a half blocks tall and stands on its legs`() {
+        val boxes = MobModels.boxes(MobFamily.IRON_GOLEM)
+        assertEquals(8, boxes.size)
+        assertEquals(0f, boxes.minOf { it.minY }, 1e-4f)
+        assertTrue(boxes.maxOf { it.maxY } > 2.5f, "голем выше двух с половиной блоков")
+
+        val legs = boxes.filter { it.name.startsWith("leg") }
+        assertEquals(2, legs.size)
+        assertTrue(legs.all { it.pivotY == 1f }, "ноги качаются от бедра на высоте 1,0")
+
+        // Голова и руки — по своим сторонам, а не в центре.
+        assertTrue(boxes.first { it.name == "rightArm" }.maxX < 0f)
+        assertTrue(boxes.first { it.name == "leftArm" }.minX > 0f)
+    }
+
+    @Test
+    fun `squid has a body and eight tentacles hanging to the ground`() {
+        val boxes = MobModels.boxes(MobFamily.SQUID)
+        assertEquals(9, boxes.size)
+        val tentacles = boxes.filter { it.name == "tentacle" }
+        assertEquals(8, tentacles.size)
+        assertTrue(tentacles.all { it.minY == 0f }, "щупальца должны доставать до земли")
+        assertTrue(boxes.first { it.name == "body" }.minY > 1f, "тело висит над щупальцами")
+        // Щупальца стоят по кругу: есть и слева, и справа, и спереди, и сзади.
+        assertTrue(tentacles.any { it.minX > 0f } && tentacles.any { it.maxX < 0f })
+        assertTrue(tentacles.any { it.minZ > 0f } && tentacles.any { it.maxZ < 0f })
+    }
+
+    @Test
+    fun `bat has flat wings on both sides`() {
+        val boxes = MobModels.boxes(MobFamily.BAT)
+        val wings = boxes.filter { it.name.startsWith("wing") }
+        assertEquals(4, wings.size, "два крыла по две коробки")
+        assertTrue(wings.all { it.minZ == it.maxZ }, "крылья — плоскости без толщины")
+        assertTrue(wings.any { it.maxX < 0f } && wings.any { it.minX > 0f }, "крылья по обе стороны")
+        assertTrue(boxes.minOf { it.minY } == 0f, "мышь стоит на земле")
+    }
 }

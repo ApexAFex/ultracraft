@@ -1,7 +1,7 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
-enum class MobFamily { QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, NONE }
+enum class MobFamily { QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, NONE }
 
 /**
  * Одна коробка модели моба в блоках: от [minX] до [maxX] и так далее.
@@ -54,6 +54,11 @@ object MobModels {
         // Зомби-житель — та же модель и та же раскладка слоёв, только файлы другие.
         // Странствующий торговец тоже собран на модели жителя, но без слоёв профессии.
         "villager", "zombie_villager", "wandering_trader" -> MobFamily.VILLAGER
+
+        // Геометрия снята с ванильных моделей через tools/mob-dump.ps1 (см. tools/mob-dump.java).
+        "iron_golem" -> MobFamily.IRON_GOLEM
+        "squid", "glow_squid" -> MobFamily.SQUID
+        "bat" -> MobFamily.BAT
         else -> MobFamily.NONE
     }
 
@@ -70,6 +75,9 @@ object MobModels {
 
         // Ванильный VillagerRenderer рисует модель в 0.9375 масштаба.
         "villager", "zombie_villager", "wandering_trader" -> 0.9375f
+
+        // Модель спрута — 33 пикселя в высоту (тело и щупальца), в игре её рисуют в 0.7.
+        "squid", "glow_squid" -> 0.7f
         else -> 1f
     }
 
@@ -77,6 +85,10 @@ object MobModels {
     fun textureSize(family: MobFamily): Pair<Int, Int> = when (family) {
         // Шкура жителя — 64×64: и базовая, и слой одежды.
         MobFamily.VILLAGER -> 64 to 64
+        // У голема развёртка большая: тело 18 пикселей в ширину и 128 пикселей текстуры.
+        MobFamily.IRON_GOLEM -> 128 to 128
+        MobFamily.SQUID -> 64 to 32
+        MobFamily.BAT -> 32 to 32
         else -> 64 to 32
     }
 
@@ -86,6 +98,9 @@ object MobModels {
         MobFamily.CREEPER -> CREEPER
         MobFamily.SPIDER -> SPIDER
         MobFamily.VILLAGER -> VILLAGER
+        MobFamily.IRON_GOLEM -> IRON_GOLEM
+        MobFamily.SQUID -> SQUID
+        MobFamily.BAT -> BAT
         MobFamily.NONE -> emptyList()
     }
 
@@ -153,15 +168,73 @@ object MobModels {
     private val VILLAGER = listOf(
         // 11 коробок: голова, нос, шляпа, поля шляпы, руки, тело, мантия, ноги.
         MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.625f, 0.25f, u = 0, v = 0, offsetY = 1.5f),
-        MobBox("nose", -0.0625f, -0.1875f, -0.375f, 0.0625f, 0.0625f, -0.25f, u = 24, v = 0, offsetY = 1.625f),
+        MobBox("nose", -0.0625f, -0.1875f, 0.25f, 0.0625f, 0.0625f, 0.375f, u = 24, v = 0, offsetY = 1.625f),
         MobBox("hat", -0.25f, 0f, -0.25f, 0.25f, 0.625f, 0.25f, u = 32, v = 0, grow = 0.0319f, offsetY = 1.5f),
-        MobBox("hatRim", -0.5f, -0.5f, -0.375f, 0.5f, 0.5f, -0.3125f, u = 30, v = 47, offsetY = 1.5f, rotX = 1.571f),
+        MobBox("hatRim", -0.5f, -0.5f, 0.3125f, 0.5f, 0.5f, 0.375f, u = 30, v = 47, offsetY = 1.5f, rotX = 1.571f),
         MobBox("legFL", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, pivotY = 0.75f, u = 0, v = 22, offsetX = 0.125f, offsetY = 0.75f),
         MobBox("legFR", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, pivotY = 0.75f, u = 0, v = 22, offsetX = -0.125f, offsetY = 0.75f),
-        MobBox("arms", -0.5f, -0.375f, -0.125f, -0.25f, 0.125f, 0.125f, u = 44, v = 22, offsetY = 1.3125f, offsetZ = -0.0625f, rotX = 0.75f),
-        MobBox("arms", 0.25f, -0.375f, -0.125f, 0.5f, 0.125f, 0.125f, u = 44, v = 22, offsetY = 1.3125f, offsetZ = -0.0625f, rotX = 0.75f),
-        MobBox("arms", -0.25f, -0.375f, -0.125f, 0.25f, -0.125f, 0.125f, u = 40, v = 38, offsetY = 1.3125f, offsetZ = -0.0625f, rotX = 0.75f),
+        MobBox("arms", -0.5f, -0.375f, -0.125f, -0.25f, 0.125f, 0.125f, u = 44, v = 22, offsetY = 1.3125f, offsetZ = 0.0625f, rotX = 0.75f),
+        MobBox("arms", 0.25f, -0.375f, -0.125f, 0.5f, 0.125f, 0.125f, u = 44, v = 22, offsetY = 1.3125f, offsetZ = 0.0625f, rotX = 0.75f),
+        MobBox("arms", -0.25f, -0.375f, -0.125f, 0.25f, -0.125f, 0.125f, u = 40, v = 38, offsetY = 1.3125f, offsetZ = 0.0625f, rotX = 0.75f),
         MobBox("body", -0.25f, -0.75f, -0.1875f, 0.25f, 0f, 0.1875f, u = 16, v = 20, offsetY = 1.5f),
         MobBox("jacket", -0.25f, -1.25f, -0.1875f, 0.25f, 0f, 0.1875f, u = 0, v = 38, grow = 0.0313f, offsetY = 1.5f),
+    )
+
+    /**
+     * Железный голем, снятый с ванильной `IronGolemModel` (tools/mob-dump.ps1).
+     *
+     * Коробки уже стоят в координатах модели (ноги на y = 0), поэтому смещений нет.
+     * Ноги качаются вокруг бедра на высоте 1,0 блока — это их верхняя грань.
+     */
+    private val IRON_GOLEM = listOf(
+        MobBox("head", -0.25f, 2.0625f, -0.03125f, 0.25f, 2.6875f, 0.46875f, u = 0, v = 0),
+        MobBox("nose", -0.0625f, 2f, 0.46875f, 0.0625f, 2.25f, 0.59375f, u = 24, v = 0),
+        MobBox("body", -0.5625f, 1.3125f, -0.3125f, 0.5625f, 2.0625f, 0.375f, u = 0, v = 40),
+        MobBox("body", -0.28125f, 1f, -0.1875f, 0.28125f, 1.3125f, 0.1875f, u = 0, v = 70),
+        MobBox("rightArm", -0.8125f, 0.21875f, -0.1875f, -0.5625f, 2.09375f, 0.1875f, u = 60, v = 21),
+        MobBox("leftArm", 0.5625f, 0.21875f, -0.1875f, 0.8125f, 2.09375f, 0.1875f, u = 60, v = 58),
+        MobBox("legFR", -0.46875f, 0f, -0.125f, -0.09375f, 1f, 0.1875f, pivotY = 1f, u = 37, v = 0),
+        MobBox("legFL", 0.09375f, 0f, -0.125f, 0.46875f, 1f, 0.1875f, pivotY = 1f, u = 60, v = 0),
+    )
+
+    /**
+     * Спрут (`SquidModel`): тело 12×16×12 и восемь щупалец по кругу.
+     *
+     * Щупальца стоят на окружности радиуса 5 пикселей (по диагонали — 3,536) и свисают
+     * на 18 пикселей; тело висит над ними, как в игре. Все щупальца берут развёртку
+     * с одного места текстуры (48, 0).
+     */
+    private val SQUID = run {
+        fun tentacle(x: Float, z: Float) = MobBox(
+            "tentacle",
+            x - 1f / 16f, 0f, z - 1f / 16f,
+            x + 1f / 16f, 1.125f, z + 1f / 16f,
+            u = 48, v = 0,
+        )
+        val r = 5f / 16f
+        val d = 3.536f / 16f
+        listOf(
+            MobBox("body", -0.375f, 1.0625f, -0.375f, 0.375f, 2.0625f, 0.375f, u = 0, v = 0),
+            tentacle(r, 0f), tentacle(d, d), tentacle(0f, r), tentacle(-d, d),
+            tentacle(-r, 0f), tentacle(-d, -d), tentacle(0f, -r), tentacle(d, -d),
+        )
+    }
+
+    /**
+     * Летучая мышь (`BatModel`): тельце, морда с ушами и два плоских крыла с кончиками.
+     *
+     * Крылья в модели — плоскости без толщины, поэтому их коробки имеют нулевую глубину:
+     * мешер строит две совпадающие грани, и крыло видно с обеих сторон.
+     */
+    private val BAT = listOf(
+        MobBox("head", -0.125f, 0.4375f, -0.0625f, 0.125f, 0.625f, 0.0625f, u = 0, v = 7),
+        MobBox("ear", -0.25f, 0.5f, 0f, -0.0625f, 0.8125f, 0f, u = 1, v = 15),
+        MobBox("ear", 0.0625f, 0.5f, 0f, 0.25f, 0.8125f, 0f, u = 8, v = 15),
+        MobBox("body", -0.09375f, 0.125f, -0.0625f, 0.09375f, 0.4375f, 0.0625f, u = 0, v = 0),
+        MobBox("feet", -0.09375f, 0f, 0f, 0.09375f, 0.125f, 0f, u = 16, v = 16),
+        MobBox("wingR", -0.21875f, 0.125f, 0f, -0.09375f, 0.5625f, 0f, u = 12, v = 0),
+        MobBox("wingR", -0.59375f, 0.0625f, 0f, -0.21875f, 0.5625f, 0f, u = 16, v = 0),
+        MobBox("wingL", 0.09375f, 0.125f, 0f, 0.21875f, 0.5625f, 0f, u = 12, v = 7),
+        MobBox("wingL", 0.21875f, 0.0625f, 0f, 0.59375f, 0.5625f, 0f, u = 16, v = 8),
     )
 }

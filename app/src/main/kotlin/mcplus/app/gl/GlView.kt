@@ -2542,6 +2542,25 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                             mobRenderer.draw(camera, demoMobs)
 
+                            // Ближе и на полу — крупный голем, мелкая мышь и спрут: в общем ряду
+                            // их модели было бы не разглядеть, а так видно и размер, и развёртку.
+                            val groundSamples = listOf("iron_golem", "bat", "squid")
+                            val demoGround = groundSamples.mapIndexed { index, typeName ->
+                                val side = (index - (groundSamples.size - 1) / 2f) * 2.2f
+                                MobRenderer.Mob(
+                                    x = camera.x + forward[0] * 5f + right[0] * side,
+                                    y = camera.y - 1.55,
+                                    z = camera.z + forward[2] * 5f + right[2] * side,
+                                    yaw = faceCamera,
+                                    walkPhase = 0f,
+                                    walkAmount = 0f,
+                                    family = MobModels.familyOf(typeName),
+                                    scale = MobModels.scaleOf(typeName),
+                                    texture = mobRenderer.textureFor(typeName),
+                                )
+                            }
+                            mobRenderer.draw(camera, demoGround)
+
                             // Вторым рядом, выше и дальше — гуманоиды: видно, что у каждого
                             // свой скин и что левые конечности зеркалят правые. Ряд выше
                             // первого, иначе мобы закрывают его собой: они на том же месте.

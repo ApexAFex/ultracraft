@@ -129,12 +129,16 @@ class MobRenderer(
             } else {
                 val pivotX = (box.minX + box.maxX) / 2f
                 val pivotZ = (box.minZ + box.maxZ) / 2f
+                // Крылья висят в плоскости XY: машут они вокруг Z, а не вокруг X, иначе
+                // вместо взмаха получается шаг вперёд-назад.
+                val rotation = if (box.name.startsWith("wing")) {
+                    Mat4.rotateZ(angle)
+                } else {
+                    Mat4.rotateX(angle)
+                }
                 val rotate = Mat4.multiply(
                     Mat4.translate(pivotX, box.pivotY, pivotZ),
-                    Mat4.multiply(
-                        Mat4.rotateX(angle),
-                        Mat4.translate(-pivotX, -box.pivotY, -pivotZ),
-                    ),
+                    Mat4.multiply(rotation, Mat4.translate(-pivotX, -box.pivotY, -pivotZ)),
                 )
                 Mat4.multiply(base, rotate)
             }
@@ -382,6 +386,10 @@ class MobRenderer(
             "cat" to "entity/cat/cat_tabby.png",
             "ocelot" to "entity/cat/ocelot.png",
             "rabbit" to "entity/rabbit/rabbit_brown.png",
+            "iron_golem" to "entity/iron_golem/iron_golem.png",
+            "squid" to "entity/squid/squid.png",
+            "glow_squid" to "entity/squid/glow_squid.png",
+            "bat" to "entity/bat/bat.png",
 
             // Шкура жителя — только база (лицо, руки, штаны). Климат, профессия и уровень
             // лежат отдельными файлами, см. VillagerLook. У зомби-жителя те же слои.
