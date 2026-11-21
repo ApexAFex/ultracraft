@@ -103,4 +103,70 @@ class PlayerListTest {
         assertFalse(list.onPacket(Protocol777.Play.BLOCK_UPDATE, joinPacket()))
         assertEquals(0, list.size)
     }
+
+    /** `Player Info Update` с одним свойством `textures` (скин и модель рук). */
+    private fun skinPacket(json: String): ByteArray {
+        val value = java.util.Base64.getEncoder()
+            .encodeToString(json.toByteArray(Charsets.UTF_8))
+        return ByteWriter()
+            .writeByte(0x01)       // только ADD_PLAYER
+            .writeVarInt(1)
+            .writeUuid(sid)
+            .writeString("probe2")
+            .writeVarInt(1)        // одно свойство
+            .writeString("textures")
+            .writeString(value)
+            .writeBoolean(false)   // подписи нет
+            .toByteArray()
+    }
+
+    @Test
+    fun `the skin url and the slim model come from the profile`() {
+        val list = PlayerList()
+        list.onPacket(
+            Protocol777.Play.PLAYER_INFO,
+            skinPacket(
+                """{"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/alex",""" +
+                    """"metadata":{"model":"slim"}}}}""",
+            ),
+        )
+
+        assertEquals("http://textures.minecraft.net/texture/alex", list.skinUrl(sid))
+        assertTrue(list.isSlim(sid), "у Алекса тонкая модель рук")
+    }
+
+    @Test
+    fun `a skin without slim metadata is a classic model`() {
+        val list = PlayerList()
+        list.onPacket(
+            Protocol777.Play.PLAYER_INFO,
+            skinPacket(
+                """{"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/steve"}}}""",
+            ),
+        )
+
+        assertEquals("http://textures.minecraft.net/texture/steve", list.skinUrl(sid))
+        assertFalse(list.isSlim(sid))
+    }
+
+    @Test
+    fun `removing a player forgets the skin model too`() {
+        val list = PlayerList()
+        list.onPacket(
+            Protocol777.Play.PLAYER_INFO,
+            skinPacket(
+                """{"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/alex",""" +
+                    """"metadata":{"model":"slim"}}}}""",
+            ),
+        )
+        assertTrue(list.isSlim(sid))
+
+        list.onPacket(
+            Protocol777.Play.PLAYER_REMOVE,
+            ByteWriter().writeVarInt(1).writeUuid(sid).toByteArray(),
+        )
+
+        assertNull(list.skinUrl(sid))
+        assertFalse(list.isSlim(sid), "иначе следующий игрок с тем же uuid получит чужую модель")
+    }
 }

@@ -82,6 +82,88 @@ class PlayerModelTest {
     }
 
     @Test
+    fun `slim skins use three pixel arms and normal legs`() {
+        val slim = PlayerModel.parts(slimArms = true)
+        assertEquals(
+            listOf("head", "body", "rightArm", "leftArm", "rightLeg", "leftLeg"),
+            slim.map { it.name },
+        )
+
+        fun bounds(part: PlayerModel.Part): ClosedFloatingPointRange<Float> {
+            var minX = Float.MAX_VALUE
+            var maxX = -Float.MAX_VALUE
+            var index = 0
+            while (index < part.data.size) {
+                minX = minOf(minX, part.data[index])
+                maxX = maxOf(maxX, part.data[index])
+                index += PlayerModel.FLOATS_PER_VERTEX
+            }
+            return minX..maxX
+        }
+
+        // Ванильная PlayerModel: рука три пикселя от края тела (−7..−4 и 4..7),
+        // ноги по четыре пикселя, как у широкой модели.
+        assertEquals(-0.4375f..-0.25f, bounds(slim.first { it.name == "rightArm" }))
+        assertEquals(0.25f..0.4375f, bounds(slim.first { it.name == "leftArm" }))
+        assertEquals(-0.25f..0f, bounds(slim.first { it.name == "rightLeg" }))
+        assertEquals(0f..0.25f, bounds(slim.first { it.name == "leftLeg" }))
+
+        // Против широкой модели: руки на пиксель уже, всё остальное совпадает.
+        val wide = PlayerModel.parts
+        assertEquals(bounds(wide.first { it.name == "rightArm" }), -0.5f..-0.25f)
+        for (name in listOf("head", "body", "rightLeg", "leftLeg")) {
+            assertEquals(
+                bounds(wide.first { it.name == name }),
+                bounds(slim.first { it.name == name }),
+                name,
+            )
+        }
+        // Модель по-прежнему два блока в высоту и не шире блока.
+        assertEquals(2f, slim.maxOf { part ->
+            var maxY = -Float.MAX_VALUE
+            var index = 1
+            while (index < part.data.size) {
+                maxY = maxOf(maxY, part.data[index])
+                index += PlayerModel.FLOATS_PER_VERTEX
+            }
+            maxY
+        })
+    }
+
+    @Test
+    fun `slim arms take their own texture panels, not a mirrored one`() {
+        val slim = PlayerModel.parts(slimArms = true)
+        // У скина 64×64 у левой руки своя развёртка (32,48), поэтому её передняя грань
+        // начинается правее, чем у правой (40,16): зеркалить нечего.
+        fun frontU(part: PlayerModel.Part): Set<Float> {
+            val result = HashSet<Float>()
+            var index = part.data.size - 6 * PlayerModel.FLOATS_PER_VERTEX
+            while (index < part.data.size) {
+                result += part.data[index + 3]
+                index += PlayerModel.FLOATS_PER_VERTEX
+            }
+            return result
+        }
+
+        val right = frontU(slim.first { it.name == "rightArm" })
+        val left = frontU(slim.first { it.name == "leftArm" })
+        assertEquals(setOf(44f / 64f, 47f / 64f), right)
+        assertEquals(setOf(36f / 64f, 39f / 64f), left)
+    }
+
+    @Test
+    fun `slim arms still swing like everyone else`() {
+        val slim = PlayerModel.parts(slimArms = true)
+        assertEquals(
+            PlayerModel.limbAngle("rightArm", 1f, 1f),
+            PlayerModel.limbAngle(slim.first { it.name == "rightArm" }.name, 1f, 1f),
+        )
+        for (arm in slim.filter { it.name.endsWith("Arm") }) {
+            assertEquals(1.5f, arm.pivotY, "${arm.name}: плечо на высоте 24 пикселя")
+        }
+    }
+
+    @Test
     fun `limbs swing against each other while walking`() {
         val phase = (kotlin.math.PI / 2).toFloat() // the moment the swing is at its largest
 

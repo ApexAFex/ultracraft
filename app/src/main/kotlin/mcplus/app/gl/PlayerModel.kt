@@ -79,10 +79,32 @@ object PlayerModel {
     )
 
     /**
-     * @param classic true для скинов 64×32 (скелет): левые конечности берут текстуру правых.
-     * @param slim true для скелетов: руки и ноги в два пикселя вместо четырёх.
+     * Тонкая модель игрока (`slim`, Алекс): руки на пиксель уже, ноги прежние.
+     *
+     * Ванильная `PlayerModel` при `slim = true` строит правую руку 3×12×4 от x = −7 и левую от
+     * x = 4 — вплотную к телу. Развёртка у них своя: правая берётся с (40,16), левая с (32,48),
+     * поэтому зеркалить нечего. Ноги остаются четырёхпиксельными: тонкими у Алекса только руки.
      */
-    fun parts(classic: Boolean = false, slim: Boolean = false): List<Part> = when {
+    private val SLIM_PLAYER_BOXES = listOf(
+        Box("head", -4, 24, -4, 8, 8, 8, 0, 0, 24),
+        Box("body", -4, 12, -2, 8, 12, 4, 16, 16, 12),
+        Box("rightArm", -7, 12, -2, 3, 12, 4, 40, 16, 24),
+        Box("leftArm", 4, 12, -2, 3, 12, 4, 32, 48, 24),
+        Box("rightLeg", -4, 0, -2, 4, 12, 4, 0, 16, 12),
+        Box("leftLeg", 0, 0, -2, 4, 12, 4, 16, 48, 12),
+    )
+
+    /**
+     * @param classic true для скинов 64×32 (скелет): левые конечности берут текстуру правых.
+     * @param slim true для скелетов: руки и ноги в два пикселя.
+     * @param slimArms true для скинов `slim` (Алекс): руки в три пикселя, ноги обычные.
+     */
+    fun parts(
+        classic: Boolean = false,
+        slim: Boolean = false,
+        slimArms: Boolean = false,
+    ): List<Part> = when {
+        slimArms -> SLIM_PLAYER_PARTS
         slim -> SLIM_PARTS
         classic -> CLASSIC_PARTS
         else -> MODERN_PARTS
@@ -91,6 +113,7 @@ object PlayerModel {
     private val MODERN_PARTS: List<Part> by lazy { BOXES.map { part(it) } }
     private val CLASSIC_PARTS: List<Part> by lazy { CLASSIC_BOXES.map { part(it) } }
     private val SLIM_PARTS: List<Part> by lazy { SLIM_BOXES.map { part(it) } }
+    private val SLIM_PLAYER_PARTS: List<Part> by lazy { SLIM_PLAYER_BOXES.map { part(it) } }
 
     private fun part(box: Box, growPx: Float = 0f): Part = Part(
         name = box.name,

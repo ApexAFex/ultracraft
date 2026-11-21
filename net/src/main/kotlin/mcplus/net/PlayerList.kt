@@ -24,12 +24,18 @@ class PlayerList {
     /** Ссылки на скины из свойства профиля `textures`: uuid → адрес картинки. */
     private val skins = ConcurrentHashMap<UUID, String>()
 
+    /** У кого тонкая модель рук (`slim`, Алекс). */
+    private val slim = ConcurrentHashMap.newKeySet<UUID>()
+
     val size: Int get() = names.size
 
     fun nameOf(uuid: UUID): String? = names[uuid]
 
     /** Адрес скина игрока или null, если сервер его не присылал (оффлайн-режим). */
     fun skinUrl(uuid: UUID): String? = skins[uuid]
+
+    /** Тонкая модель рук (`slim`) или обычная — как её указал сам игрок в профиле. */
+    fun isSlim(uuid: UUID): Boolean = uuid in slim
 
     fun uuids(): Set<UUID> = names.keys.toSet()
 
@@ -55,6 +61,7 @@ class PlayerList {
             val uuid = reader.readUuid()
             names.remove(uuid)
             skins.remove(uuid)
+            slim.remove(uuid)
         }
         return true
     }
@@ -80,7 +87,10 @@ class PlayerList {
                     if (reader.readBoolean()) reader.readString(1024)         // signature
                     // Подпись не проверяется, но ссылка на скин берётся только с домена игры.
                     if (propertyName == "textures") {
-                        SkinTextures.skinUrl(propertyValue)?.let { skins[uuid] = it }
+                        SkinTextures.skin(propertyValue)?.let {
+                            skins[uuid] = it.url
+                            if (it.slim) slim += uuid else slim -= uuid
+                        }
                     }
                 }
             }

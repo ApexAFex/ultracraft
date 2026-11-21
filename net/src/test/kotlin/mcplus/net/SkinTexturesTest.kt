@@ -53,4 +53,32 @@ class SkinTexturesTest {
         assertNull(SkinTextures.skinUrl(property("это не json")))
         assertNull(SkinTextures.skinUrl(property("""{"url":123}""")))
     }
+
+    @Test
+    fun `a classic skin is not slim`() {
+        val value = property(
+            """{"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/steve",""" +
+                """"metadata":{"model":"classic"}}}}""",
+        )
+        val skin = SkinTextures.skin(value)
+        assertEquals("http://textures.minecraft.net/texture/steve", skin?.url)
+        assertEquals(false, skin?.slim)
+    }
+
+    @Test
+    fun `slim metadata gives the thin arm model`() {
+        val value = property(
+            """{"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/alex",""" +
+                """"metadata":{"model":"slim"}}}}""",
+        )
+        assertEquals(true, SkinTextures.skin(value)?.slim, "у Алекса руки на пиксель уже")
+    }
+
+    @Test
+    fun `a texture without metadata is the default model`() {
+        val value = property(
+            """{"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/plain"}}}""",
+        )
+        assertEquals(false, SkinTextures.skin(value)?.slim)
+    }
 }

@@ -947,6 +947,7 @@ private fun windowCommand(args: List<String>) {
     var particleDemo = false
     var mobDemo = false
     var skinFile: String? = null
+    var skinSlim = false
     var startStatistics = false
     /** Проверка без рук: переименовать предмет в открытой наковальне. */
     var renameAfterOpen: String? = null
@@ -985,6 +986,7 @@ private fun windowCommand(args: List<String>) {
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
             "--skin" -> skinFile = args.getOrNull(++index) ?: fail("--skin ждёт путь к PNG")
+            "--slim" -> skinSlim = true
             "--no-menu" -> noMenu = true
             "--menu-auto" -> menuAuto = true
             "--menu-settings" -> menuSettings = true
@@ -1112,6 +1114,7 @@ private fun windowCommand(args: List<String>) {
             particleDemo = particleDemo,
             mobDemo = mobDemo,
             skinFile = skinFile,
+            skinSlim = skinSlim,
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
             pitchAtStart = pitchAtStart,
@@ -1556,6 +1559,8 @@ private fun printUsage() {
           --advancements открыть экран достижений (клавиша L в игре)
           --particles    нарисовать образцы частиц перед камерой (проверка без сервера)
           --mobs         нарисовать по одному мобу каждого семейства перед камерой
+    --skin PATH    свой скин из файла PNG (проверка рисования кожи без сети)
+    --slim         скин из файла — тонкая модель рук (Алекс), без сети метаданных нет
     --use-item N   нажать «использовать предмет» на кадре N (проверка еды)
     --after-use N  снять снимок через N секунд после начала еды
     --held N       выбрать слот хотбара 1..9 после входа

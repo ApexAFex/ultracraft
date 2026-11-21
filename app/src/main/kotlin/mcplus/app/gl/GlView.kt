@@ -216,6 +216,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         mobDemo: Boolean = false,
         /** Скин из файла для своего игрока: проверка рисования без сети (`--skin`). */
         skinFile: String? = null,
+        /** Тонкая модель рук для скина из файла (`--slim`): без сети неоткуда взять метаданные. */
+        skinSlim: Boolean = false,
         /** Открыть меню паузы сразу (для снимка). */
         pauseAtStart: Boolean = false,
         /** Начать с вида от третьего лица (для снимка): 0 — от первого, 1 — сзади, 2 — спереди. */
@@ -344,6 +346,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             val soundPackets = java.util.concurrent.atomic.AtomicInteger()
             val serverSounds = java.util.concurrent.atomic.AtomicInteger()
             val particlePackets = java.util.concurrent.atomic.AtomicInteger()
+            /** Сколько раз игрока нарисовали тонкой моделью рук (`slim`). */
+            val slimModelCount = java.util.concurrent.atomic.AtomicInteger()
             val seenIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
 
             fun handle(packet: mcplus.protocol.Packet) {
@@ -512,12 +516,6 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                      * Климат, профессия и уровень приходят в `Villager Data` номерами реестров;
                      * у остальных мобов слоёв нет.
                      */
-                    /**
-                     * Слои текстуры жителя поверх базовой шкуры.
-                     *
-                     * Климат, профессия и уровень приходят в `Villager Data` номерами реестров;
-                     * у остальных мобов слоёв нет.
-                     */
                     fun villagerLayers(entity: mcplus.net.TrackedEntity, name: String): List<Int> {
                         if (name != "villager" && name != "zombie_villager") return emptyList()
                         val data = entity.villagerData ?: return emptyList()
@@ -544,6 +542,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     // и ногами скелет выглядит белой плитой.
                     val slimHumanoidRenderer = PlayerRenderer(
                         width, height, null, classic = true, slim = true, directory = directory,
+                    )
+                    // Скины `slim` (Алекс): руки в три пикселя, ноги и раскладка обычные.
+                    val slimPlayerRenderer = PlayerRenderer(
+                        width, height, null, slimArms = true, directory = directory,
                     )
                     // Броня на людях и гуманоидах: та же модель, раздутая на пиксель.
                     val armorRenderer = ArmorRenderer(width, height, directory)
@@ -2450,17 +2452,24 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // Players get a humanoid with a skin; common mobs get simple box models;
                         // everything else stays a coloured box.
                         val players = ArrayList<PlayerRenderer.Player>()
+                        val humanoids = ArrayList<PlayerRenderer.Player>()
+                        val slimHumanoids = ArrayList<PlayerRenderer.Player>()
+                        // Игроки с тонкой моделью рук — отдельная геометрия.
+                        val slimPlayers = ArrayList<PlayerRenderer.Player>()
                         // Скин своего игрока: ссылка из профиля (при `--skin` — из файла).
                         val selfUuid = session?.joinResult?.profile?.uuid
                         selfUuid?.let { uuid -> skinLibrary.request(uuid, playerList.skinUrl(uuid)) }
+                        // Своя модель тонкая, если так указано в профиле (или задано флагом).
+                        val selfSlim = skinSlim || (selfUuid != null && playerList.isSlim(selfUuid))
                         if (cameraMode > 0) {
                             val ownSwingAge = (System.nanoTime() - swingNanos) / 250_000_000.0
-                            players += PlayerRenderer.Player(
+                            val selfPlayer = PlayerRenderer.Player(
                                 x = player.x,
                                 y = player.y,
                                 z = player.z,
-                                // Модель получает ванильные градусы, как и чужие игроки.
-                                yaw = CameraAngles.degrees(player.yaw),
+                                // Модель получает ванильные градусы, как и чужие игроки:
+                                // у протокола +90° — это −X, у камеры +90° — это +X.
+                                yaw = CameraAngles.protocolYaw(player.yaw),
                                 walkPhase = (selfWalkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                 walkAmount = (selfSpeed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                 swing = if (ownSwingAge in 0.0..1.0) {
@@ -2471,9 +2480,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 sneak = sneakHeld,
                                 texture = selfUuid?.let { skinLibrary.textureFor(it) } ?: 0,
                             )
+                            if (selfSlim) slimPlayers += selfPlayer else players += selfPlayer
+                            if (selfSlim) slimModelCount.incrementAndGet()
                         }
-                        val humanoids = ArrayList<PlayerRenderer.Player>()
-                        val slimHumanoids = ArrayList<PlayerRenderer.Player>()
 
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
@@ -2485,7 +2494,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             if (playerList.nameOf(entity.uuid) != null) {
                                 // Чужой игрок: свой скин из профиля, иначе скин по умолчанию.
                                 skinLibrary.request(entity.uuid, playerList.skinUrl(entity.uuid))
-                                players += PlayerRenderer.Player(
+                                val player = PlayerRenderer.Player(
                                     x = entity.x,
                                     y = entity.y,
                                     z = entity.z,
@@ -2497,6 +2506,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     sneak = entity.sneaking,
                                     texture = skinLibrary.textureFor(entity.uuid),
                                 )
+                                // Тонкая модель рук — как её указал сам игрок в профиле.
+                                if (playerList.isSlim(entity.uuid)) {
+                                    slimPlayers += player
+                                    slimModelCount.incrementAndGet()
+                                } else {
+                                    players += player
+                                }
                             } else {
                                 val name = entityTypes.nameOf(entity.type)
                                 val humanoid = PlayerRenderer.Player(
@@ -2707,6 +2723,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         playerRenderer.draw(camera, players)
                         humanoidRenderer.draw(camera, humanoids)
                         slimHumanoidRenderer.draw(camera, slimHumanoids)
+                        slimPlayerRenderer.draw(camera, slimPlayers)
 
                         // Броня: у людей и гуманоидов надетое приходит в `Set Equipment`
                         // (слоты 2…5 — ботинки, штаны, нагрудник, шлем), у себя — из инвентаря.
@@ -2741,7 +2758,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             if (pieces.isNotEmpty()) {
                                 armorWearers += ArmorRenderer.Wearer(
                                     player.x, player.y, player.z,
-                                    CameraAngles.degrees(player.yaw), pieces,
+                                    CameraAngles.protocolYaw(player.yaw), pieces,
                                 )
                             }
                         }
@@ -3654,6 +3671,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     particleRenderer.close()
                     humanoidRenderer.close()
                     slimHumanoidRenderer.close()
+                    slimPlayerRenderer.close()
                     armorRenderer.close()
                     paintingRenderer.close()
                     playerRenderer.close()
@@ -3665,6 +3683,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     println("Итого чанков в сцене: ${renderer.chunkCount}, докачано в игре: $streamed, пакетов движения: ${tracker.movementPackets}")
                     println("Отправлено серверу: тиков $tickCount, пакетов позиции ${moveSender?.movementPackets ?: 0}, правок мира от сервера ${blockUpdates.get()}, обновлений света ${lightUpdates.get()}, чанков не разобрано ${chunkFailures.get()}, чужих трещин ${remoteCrackPackets.get()}, подобрано предметов ${pickupsCount.get()}")
                     println("Игроков в списке: ${playerList.size}, частиц от блоков: $ambientParticles")
+                    println(
+                        "Тонкая модель рук: " + if (slimModelCount.get() > 0) {
+                            "рисовалась, кадров ${slimModelCount.get()}"
+                        } else {
+                            "не рисовалась"
+                        },
+                    )
                     println("Анимаций текстур: ${atlas.animations.size}, кадров обновлено: $animatedUploads")
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                 }
