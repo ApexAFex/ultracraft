@@ -55,11 +55,34 @@ class Camera(
     /** Угол обзора в градусах: бег немного расширяет его, как в ванили. */
     var fovDegrees: Float = 70f
 
+    /**
+     * Крен камеры в радианах: тошнота и урон наклоняют горизонт.
+     *
+     * Наклон считается вокруг направления взгляда, поэтому его достаточно передать в
+     * `lookAt` как повёрнутый вектор «вверх».
+     */
+    var roll: Float = 0f
+
     fun viewProjection(aspect: Float): FloatArray {
         val f = forward()
         val eye = doubleArrayOf(x, y, z)
         val center = doubleArrayOf(x + f[0], y + f[1], z + f[2])
-        val view = Mat4.lookAt(eye, center)
+        val up = if (roll == 0f) {
+            doubleArrayOf(0.0, 1.0, 0.0)
+        } else {
+            // Поворот мирового «вверх» вокруг взгляда: правый вектор умножается на sin,
+            // «вверх» — на cos.
+            val r = right()
+            val u = up()
+            val c = cos(roll)
+            val s = sin(roll)
+            doubleArrayOf(
+                (u[0] * c + r[0] * s).toDouble(),
+                (u[1] * c + r[1] * s).toDouble(),
+                (u[2] * c + r[2] * s).toDouble(),
+            )
+        }
+        val view = Mat4.lookAt(eye, center, up)
         val projection = Mat4.perspective(Math.toRadians(fovDegrees.toDouble()).toFloat(), aspect, 0.1f, 2000f)
         return Mat4.multiply(projection, view)
     }
@@ -126,19 +149,26 @@ object Mat4 {
         return result
     }
 
-    fun lookAt(eye: DoubleArray, center: DoubleArray): FloatArray {
+    /**
+     * Вид из [eye] на [center]. [up] — мировое «вверх»: крен камеры передаётся именно им.
+     */
+    fun lookAt(
+        eye: DoubleArray,
+        center: DoubleArray,
+        up: DoubleArray = doubleArrayOf(0.0, 1.0, 0.0),
+    ): FloatArray {
         var fx = center[0] - eye[0]
         var fy = center[1] - eye[1]
         var fz = center[2] - eye[2]
         val fLength = sqrt(fx * fx + fy * fy + fz * fz)
         fx /= fLength; fy /= fLength; fz /= fLength
 
-        // right = normalize(cross(forward, worldUp)) with up = (0, 1, 0)
-        var sx = -fz
-        var sy = 0.0
-        var sz = fx
-        val sLength = sqrt(sx * sx + sz * sz).takeIf { it > 1e-6 } ?: 1.0
-        sx /= sLength; sz /= sLength
+        // right = normalize(cross(forward, up))
+        var sx = fy * up[2] - fz * up[1]
+        var sy = fz * up[0] - fx * up[2]
+        var sz = fx * up[1] - fy * up[0]
+        val sLength = sqrt(sx * sx + sy * sy + sz * sz).takeIf { it > 1e-9 } ?: 1.0
+        sx /= sLength; sy /= sLength; sz /= sLength
 
         // up = cross(right, forward)
         val ux = sy * fz - sz * fy

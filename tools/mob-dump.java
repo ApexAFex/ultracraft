@@ -54,7 +54,8 @@ final class mob_dump {
         throws Exception {
         PartPose pose = part.getInitialPose();
         System.out.printf(
-            "PART\t%s\t%.3f\t%.3f\t%.3f%n", name, pose.x(), pose.y(), pose.z());
+            "PART\t%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f%n",
+            name, pose.x(), pose.y(), pose.z(), pose.xRot(), pose.yRot(), pose.zRot());
 
         for (ModelPart.Cube cube : cubes(part)) {
             float minU = Float.MAX_VALUE;

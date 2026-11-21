@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.BlockInteraction
 import mcplus.net.BlockTable
@@ -1030,6 +1030,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         val bossBars = session?.bossBars?.snapshot() ?: emptyList()
                         val effects = session?.effects?.snapshot() ?: emptyList()
+                        // Эффекты, влияющие на картинку: тошнота качает камеру, слепота и тьма
+                        // гасят экран. Раньше это было видно только значком в углу.
+                        val screenEffects = ScreenEffects.of(effects)
                         val openContainer = session?.container
                         if (openContainer != null && !containerLogged) {
                             containerLogged = true
@@ -1811,6 +1814,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             camera.pitch += CameraFeel.hurtTilt(tiltAge)
                             camera.yaw += CameraFeel.hurtShake(tiltAge)
                             if (tiltAge > 0.4) hurtTiltNanos = 0L
+                        }
+                        // Тошнота качает горизонт: медленная волна вокруг взгляда.
+                        camera.roll = if (screenEffects.warp) {
+                            ScreenEffects.nauseaRoll(tickCount / 20.0, screenEffects.nausea)
+                        } else {
+                            0f
                         }
 
                         // F5: камера отъезжает назад (или вперёд и разворачивается). Стену
@@ -3198,6 +3207,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             sound.masterVolume = volume
                         }
                         if (underwater) hud.drawWaterOverlay(0.3f)
+                        // Слепота и тьма гасят экран: без этого эффект был виден только значком.
+                        val screenDarkness = ScreenEffects.darkness(screenEffects, tickCount / 20.0)
+                        if (screenDarkness > 0.01f) hud.drawDarknessOverlay(screenDarkness)
 
                         // Гроза: редкие белые вспышки и гром.
                         val thunderNow = session?.sky?.thunder ?: 0f

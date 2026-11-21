@@ -196,6 +196,14 @@ class Hud(
         renderer.draw()
     }
 
+    /** Затемнение от слепоты и тьмы: чёрный слой поверх кадра. */
+    fun drawDarknessOverlay(alpha: Float) {
+        if (alpha <= 0.01f) return
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x000000, alpha.coerceIn(0f, 1f))
+        renderer.draw()
+    }
+
     /** Строка действия над хотбаром (например, «Нажмите, чтобы продолжить»). */
     fun drawActionBar(value: String, alpha: Float = 1f) {
         if (alpha <= 0.01f) return
