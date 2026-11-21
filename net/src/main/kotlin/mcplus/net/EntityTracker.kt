@@ -221,6 +221,13 @@ class EntityTracker {
                     val z = reader.readDouble()
                     val entity = TrackedEntity(id, uuid, type)
                     entity.place(x, y, z)
+                    // Поворот приходит в пакете спавна байтами (1/256 оборота). Без него
+                    // картины и рамки не знали, к какой стене прикреплены.
+                    if (reader.remaining >= 2) {
+                        val yaw = (reader.readByte().toInt() and 0xFF) * 360f / 256f
+                        val pitch = (reader.readByte().toInt() and 0xFF) * 360f / 256f
+                        entity.look(yaw, pitch)
+                    }
                     entity.interpolate(1.0)
                     entities[id] = entity
                 }

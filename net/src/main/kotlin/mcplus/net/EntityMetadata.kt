@@ -120,6 +120,10 @@ private fun readMetaValue(reader: ByteReader, type: Int): MetaEntry? = when (typ
     30 -> MetaEntry(type, reader.readVarInt().toDouble())
     31 -> MetaEntry(type, reader.readVarInt().toDouble())
     32 -> MetaEntry(type, reader.readVarInt().toDouble())
+    // 33…38 — состояния и варианты (в том числе 34 — вариант картины): тоже номера реестров.
+    in 33..38 -> MetaEntry(type, reader.readVarInt().toDouble())
+    // 42 — цвет красителя.
+    42 -> MetaEntry(type, reader.readVarInt().toDouble())
     // 7 — стек предмета: count, id, патч компонентов. Патч с добавленными компонентами
     // прочитать нельзя (у каждого свой кодек), поэтому такой предмет помечается неизвестным.
     7 -> {

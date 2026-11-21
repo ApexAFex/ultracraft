@@ -40,6 +40,19 @@ class EntityMetadataTest {
     }
 
     @Test
+    fun `painting variant is a registry id at field eight`() {
+        // Тип 34 — вариант картины: номер в реестре, а не текст. Раньше на нём разбор
+        // пакета обрывался и у картины было «полей 0».
+        val packet = body(
+            7,
+            field(8, 34, ByteWriter().writeVarInt(12).toByteArray()),
+        )
+        val (_, meta) = readEntityMetadata(packet)
+
+        assertEquals(12.0, meta.getValue(8).number, 0.001)
+    }
+
+    @Test
     fun `custom name is a component field`() {
         val name = "Boss".toByteArray()
         val nbt = ByteWriter()

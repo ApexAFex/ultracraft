@@ -5,6 +5,7 @@ import mcplus.protocol.ByteWriter
 import mcplus.protocol.nbt.TYPE_COMPOUND
 import mcplus.protocol.nbt.TYPE_END
 import mcplus.protocol.nbt.TYPE_INT
+import mcplus.protocol.nbt.TYPE_STRING
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -137,6 +138,54 @@ class JoinGameParsingTest {
         .writeByte(TYPE_COMPOUND)
         .writeByte(TYPE_INT).nbtName("min_y").writeInt(minY)
         .writeByte(TYPE_INT).nbtName("height").writeInt(height)
+        .writeByte(TYPE_END)
+        .toByteArray()
+
+    /**
+     * Картины — data-driven реестр: имя, размер в блоках и файл текстуры приходят по сети.
+     * Без этого клиент не знает ни размера, ни картинки для номера из `Set Entity Data`.
+     */
+    @Test
+    fun `reads painting variants from registry data`() {
+        val body = ByteWriter()
+            .writeString("minecraft:painting_variant")
+            .writeVarInt(2)
+            .writeString("minecraft:kebab")
+            .writeBoolean(true)
+            .writeBytes(paintingNbt(width = 1, height = 1, asset = "minecraft:kebab"))
+            .writeString("minecraft:aztec")
+            .writeBoolean(true)
+            .writeBytes(paintingNbt(width = 2, height = 2, asset = "minecraft:aztec"))
+            .toByteArray()
+
+        val registries = Registries()
+        readRegistryData(body, registries)
+
+        assertEquals(2, registries.paintingCount)
+        val kebab = registries.painting(0)!!
+        assertEquals("kebab", kebab.name)
+        assertEquals(1, kebab.width)
+        assertEquals(1, kebab.height)
+        assertEquals("kebab", kebab.asset)
+
+        val aztec = registries.painting(1)!!
+        assertEquals("aztec", aztec.asset)
+        assertEquals(2, aztec.width)
+        assertEquals(2, aztec.height)
+
+        assertEquals(null, registries.painting(7), "неизвестный номер — не падение")
+    }
+
+    private fun paintingNbt(width: Int, height: Int, asset: String): ByteArray = ByteWriter()
+        .writeByte(TYPE_COMPOUND)
+        .writeByte(TYPE_INT).nbtName("width").writeInt(width)
+        .writeByte(TYPE_INT).nbtName("height").writeInt(height)
+        .writeByte(TYPE_STRING).nbtName("asset_id")
+        .let { writer ->
+            val bytes = asset.toByteArray(Charsets.UTF_8)
+            writer.writeShort(bytes.size)
+            writer.writeBytes(bytes)
+        }
         .writeByte(TYPE_END)
         .toByteArray()
 

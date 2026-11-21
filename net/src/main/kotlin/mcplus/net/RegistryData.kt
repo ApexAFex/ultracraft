@@ -5,11 +5,26 @@ import mcplus.protocol.ProtocolException
 import mcplus.protocol.nbt.NbtCompound
 import mcplus.protocol.nbt.NbtReader
 import mcplus.protocol.nbt.int
+import mcplus.protocol.nbt.string
 
 /** Dimension description needed to interpret a chunk column. */
 class DimensionType(val name: String, val minY: Int, val height: Int) {
     val sectionCount: Int get() = height / 16
 }
+
+/**
+ * Вариант картины из реестра `minecraft:painting_variant`.
+ *
+ * Размер в блоках и имя файла текстуры приходят от сервера: в 26.3 картины — это
+ * data-driven реестр, а не зашитый список. Номер варианта лежит в `Set Entity Data`.
+ */
+data class PaintingVariant(
+    val name: String,
+    val width: Int,
+    val height: Int,
+    /** Имя файла в `textures/painting` без `minecraft:`. */
+    val asset: String,
+)
 
 /**
  * Synchronized registries announced during configuration.
@@ -35,6 +50,9 @@ class Registries {
      */
     private val biomes = mutableListOf<String>()
 
+    /** Картины (`minecraft:painting_variant`): размеры и имя текстуры по номеру варианта. */
+    private val paintings = mutableListOf<PaintingVariant>()
+
     val registryIds = mutableListOf<String>()
 
     fun dimensionType(id: Int): DimensionType? = dimensionTypes.getOrNull(id)
@@ -43,6 +61,11 @@ class Registries {
 
     /** Имя биома по id из секции чанка или null, если реестр не пришёл. */
     fun biome(id: Int): String? = biomes.getOrNull(id)
+
+    /** Вариант картины по номеру из `Set Entity Data` или null, если реестр не пришёл. */
+    fun painting(id: Int): PaintingVariant? = paintings.getOrNull(id)
+
+    val paintingCount: Int get() = paintings.size
 
     val biomeNames: List<String> get() = biomes
 
@@ -59,6 +82,10 @@ class Registries {
     internal fun addBiome(name: String) {
         biomes += name
     }
+
+    internal fun addPainting(variant: PaintingVariant) {
+        paintings += variant
+    }
 }
 
 internal fun readRegistryData(body: ByteArray, registries: Registries) {
@@ -72,9 +99,33 @@ internal fun readRegistryData(body: ByteArray, registries: Registries) {
         readWorldClocks(reader, registries)
     } else if (registryId == "minecraft:worldgen/biome") {
         readBiomes(reader, registries)
+    } else if (registryId == "minecraft:painting_variant") {
+        readPaintingVariants(reader, registries)
     }
     // damage types, chat types… are not needed yet
 }
+
+/**
+ * Картины: имя, ширина и высота в блоках, файл текстуры.
+ *
+ * Полезная нагрузка — NBT варианта: `width`, `height`, `asset_id` (например
+ * `minecraft:kebab`). Если NBT нет, считается картина 1×1 с текстурой по имени.
+ */
+private fun readPaintingVariants(reader: ByteReader, registries: Registries) {
+    val entryCount = reader.readVarInt()
+    if (entryCount !in 0..MAX_PAINTINGS) throw ProtocolException("Картин в реестре: $entryCount")
+
+    repeat(entryCount) {
+        val name = reader.readString().removePrefix("minecraft:")
+        val data = if (reader.readBoolean()) NbtReader.read(reader) as? NbtCompound else null
+        val width = (data?.int("width") ?: 1).coerceIn(1, 16)
+        val height = (data?.int("height") ?: 1).coerceIn(1, 16)
+        val asset = data?.string("asset_id")?.removePrefix("minecraft:") ?: name
+        registries.addPainting(PaintingVariant(name, width, height, asset))
+    }
+}
+
+private const val MAX_PAINTINGS = 512
 
 private fun readBiomes(reader: ByteReader, registries: Registries) {
     val entryCount = reader.readVarInt()

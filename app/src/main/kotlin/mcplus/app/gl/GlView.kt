@@ -32,6 +32,14 @@ object GlView {
         "experience_bottle", "potion", "fireball", "small_fireball",
     )
 
+    /**
+     * Номер поля с вариантом картины в `Set Entity Data`.
+     *
+     * У `Painting` это первое собственное поле; у сущности в 26.3 их девять (0…8), значит
+     * 9 — проверено на живом сервере: поле приходит девятым.
+     */
+    private const val PAINTING_VARIANT_FIELD = 9
+
     /** Слоты `Set Equipment` с бронёй: 2 — ботинки, 3 — штаны, 4 — нагрудник, 5 — шлем. */
     private val ARMOR_EQUIPMENT_SLOTS = listOf(
         2 to ArmorLook.Piece.BOOTS,
@@ -266,6 +274,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             val biomeNames = session?.joinResult?.registries?.biomeNames ?: emptyList()
             val tints = BiomeTints.load(directory, biomeNames)
             if (biomeNames.isNotEmpty()) println("Биомы: ${biomeNames.size} названий из реестра")
+            // Картины: размеры и текстуры приходят реестром. Если сервер его не прислал,
+            // картины рисовать нечем — это видно по нулю.
+            session?.joinResult?.registries?.let { registries ->
+                println("Картины: ${registries.paintingCount} вариантов из реестра")
+            }
 
             val pipeline = if (meshThreads > 0) {
                 MeshPipeline(world, blocks, atlas, tints, meshThreads)
@@ -513,6 +526,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     )
                     // Броня на людях и гуманоидах: та же модель, раздутая на пиксель.
                     val armorRenderer = ArmorRenderer(width, height, directory)
+                    // Картины: у каждой своя текстура, в атлас блоков они не влезают.
+                    val paintingRenderer = PaintingRenderer(width, height, directory)
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
                     sound.musicEnabled = Settings.music
@@ -2349,6 +2364,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
                         val worldIcons = ArrayList<Renderer.WorldIcon>()
+                        val paintings = ArrayList<PaintingRenderer.Painting>()
                         val nowNanos = System.nanoTime()
                         for (entity in entities) {
                             if (playerList.nameOf(entity.uuid) != null) {
@@ -2466,6 +2482,26 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             worldIcons += Renderer.WorldIcon(
                                                 entity.x, entity.y + 0.5, entity.z, 0.34f,
                                                 atlas.layerForItem(itemName),
+                                            )
+                                        }
+                                    }
+
+                                    // Картина: номер варианта из метаданных, размер и файл
+                                    // текстуры — из реестра, который сервер прислал при входе.
+                                    name == "painting" -> {
+                                        val variantId = entity.metadata[PAINTING_VARIANT_FIELD]
+                                            ?.number?.toInt() ?: -1
+                                        val variant = session?.joinResult?.registries
+                                            ?.painting(variantId)
+                                        if (variant != null) {
+                                            val direction = kotlin.math.round(entity.yaw / 90f).toInt() and 3
+                                            // Сервер присылает угол блока, а не центр: картина
+                                            // висит на стене соседнего блока, поэтому сдвиг
+                                            // на полблока (так же считает и `atCenterOf`).
+                                            paintings += PaintingRenderer.Painting(
+                                                entity.x + 0.5, entity.y + 0.5, entity.z + 0.5,
+                                                direction,
+                                                variant.width, variant.height, variant.asset,
                                             )
                                         }
                                     }
@@ -2708,6 +2744,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             slimHumanoidRenderer.draw(camera, demoSlim)
                         }
                         entityRenderer.draw(camera, boxes)
+                        paintingRenderer.draw(camera, paintings)
                         if (debris.isNotEmpty()) {
                             val debrisCubes = debris.map {
                                 Renderer.BlockCube(
@@ -3477,6 +3514,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     humanoidRenderer.close()
                     slimHumanoidRenderer.close()
                     armorRenderer.close()
+                    paintingRenderer.close()
                     playerRenderer.close()
                     skyRenderer.close()
                     hud.close()
