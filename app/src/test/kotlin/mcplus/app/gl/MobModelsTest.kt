@@ -430,6 +430,37 @@ class MobModelsTest {
     }
 
     @Test
+    fun `panda, polar bear, dolphin and frog have their own models`() {
+        val cases = listOf(
+            Triple("panda", MobFamily.PANDA, 64 to 64),
+            Triple("polar_bear", MobFamily.POLAR_BEAR, 128 to 64),
+            Triple("dolphin", MobFamily.DOLPHIN, 64 to 64),
+            Triple("frog", MobFamily.FROG, 48 to 48),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+            assertTrue(MobModels.boxes(family).isNotEmpty(), "$name без коробок")
+        }
+        assertEquals(9, MobModels.boxes(MobFamily.PANDA).size)
+        assertEquals(10, MobModels.boxes(MobFamily.POLAR_BEAR).size)
+        assertEquals(8, MobModels.boxes(MobFamily.DOLPHIN).size)
+        assertEquals(16, MobModels.boxes(MobFamily.FROG).size, "у лягушки мелкие глаза и лапы")
+        // У панды и медведя по четыре лапы, у дельфина — плавники, у лягушки четыре лапы.
+        assertEquals(4, MobModels.boxes(MobFamily.PANDA).count { it.name.contains("leg") })
+        assertEquals(4, MobModels.boxes(MobFamily.POLAR_BEAR).count { it.name.contains("leg") })
+        assertEquals(2, MobModels.boxes(MobFamily.FROG).count { it.name.endsWith("_leg") })
+        assertEquals(2, MobModels.boxes(MobFamily.FROG).count { it.name.endsWith("_foot") })
+        assertEquals(2, MobModels.boxes(MobFamily.FROG).count { it.name.endsWith("_eye") })
+        assertTrue(MobModels.boxes(MobFamily.DOLPHIN).any { it.name.contains("fin") })
+        // У дельфина два грудных плавника и хвостовой.
+        assertEquals(2, MobModels.boxes(MobFamily.DOLPHIN).count {
+            it.name == "left_fin" || it.name == "right_fin"
+        })
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }

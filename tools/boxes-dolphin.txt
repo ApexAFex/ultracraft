@@ -1,0 +1,8 @@
+﻿        MobBox("body", -0.25f, 0f, 0f, 0.25f, 0.4375f, 0.8125f, u = 22, v = 0, offsetY = 1.375f, offsetZ = -0.3125f),
+        MobBox("head", -0.25f, -0.25f, -0.1875f, 0.25f, 0.1875f, 0.1875f, u = 0, v = 0, offsetY = 1.625f, offsetZ = -0.5f),
+        MobBox("nose", -0.0625f, -0.25f, -0.4375f, 0.0625f, -0.125f, -0.1875f, u = 0, v = 13, offsetY = 0.25f, offsetZ = -0.8125f),
+        MobBox("left_fin", -0.0312f, 0f, 0f, 0.0313f, 0.25f, 0.4375f, u = 48, v = 20, matrix = floatArrayOf(-0.4997f, -0.8662f, 0f, 0f, 0.4333f, -0.2499f, -0.8659f, 0f, 0.7501f, -0.4327f, 0.5002f, 0f, 0.125f, 1.5f, -0.0625f, 1f)),
+        MobBox("right_fin", -0.0312f, 0f, 0f, 0.0313f, 0.25f, 0.4375f, u = 48, v = 20, matrix = floatArrayOf(-0.4997f, 0.8662f, 0f, 0f, -0.4333f, -0.2499f, -0.8659f, 0f, -0.7501f, -0.4327f, 0.5002f, 0f, -0.125f, 1.5f, -0.0625f, 1f)),
+        MobBox("tail", -0.125f, -0.1562f, 0f, 0.125f, 0.1563f, 0.6875f, u = 0, v = 19, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9945f, 0.1048f, 0f, 0f, -0.1048f, 0.9945f, 0f, 0f, 1.5313f, 0.375f, 1f)),
+        MobBox("tail_fin", -0.3125f, -0.0312f, 0f, 0.3125f, 0.0313f, 0.375f, u = 19, v = 20, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9945f, 0.1048f, 0f, 0f, -0.1048f, 0.9945f, 0f, 0f, 1.4723f, 0.9344f, 1f)),
+        MobBox("back_fin", -0.0312f, -0.25f, 0.5f, 0.0313f, 0f, 0.8125f, u = 51, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.5002f, -0.8659f, 0f, 0f, 0.8659f, 0.5002f, 0f, 0f, 1.375f, -0.3125f, 1f)),
