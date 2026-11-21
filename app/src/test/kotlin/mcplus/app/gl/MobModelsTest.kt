@@ -238,6 +238,30 @@ class MobModelsTest {
     }
 
     @Test
+    fun `ghast is a big cube with nine tentacles hanging to the ground`() {
+        assertEquals(MobFamily.GHAST, MobModels.familyOf("ghast"))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.GHAST))
+        assertEquals(3f, MobModels.scaleOf("ghast"))
+        assertTrue(MobRenderer.TEXTURES["ghast"]?.endsWith("ghast.png") == true)
+
+        val boxes = MobModels.boxes(MobFamily.GHAST)
+        assertEquals(10, boxes.size, "куб и девять щупалец")
+        val body = boxes.first { it.name == "body" }
+        assertEquals(1f, body.maxX - body.minX, 1e-4f)
+        assertEquals(1f, body.maxY - body.minY, 1e-4f)
+        assertTrue(body.minY > 0.5f, "куб висит над землёй")
+
+        val tentacles = boxes.filter { it.name == "tentacle" }
+        assertEquals(9, tentacles.size)
+        assertEquals(0f, tentacles.minOf { it.minY }, 1e-4f, "хотя бы одно щупальце достаёт до земли")
+        // Щупальца разной длины: так в ванильной модели.
+        assertTrue(tentacles.map { it.maxY - it.minY }.toSet().size > 1, "все щупальца одинаковые")
+        // Они стоят по кругу: есть и спереди, и сзади, и по бокам.
+        assertTrue(tentacles.any { it.minZ < 0f } && tentacles.any { it.maxZ > 0f })
+        assertTrue(tentacles.any { it.minX < 0f } && tentacles.any { it.maxX > 0f })
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }

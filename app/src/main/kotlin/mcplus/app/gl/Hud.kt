@@ -72,6 +72,7 @@ class Hud(
         if (inventory != null) appendCounts(labels, inventory, s)
         if (vitals != null && vitals.level > 0) appendLevel(labels, vitals, s)
         appendBossBarNames(labels, bossBars, s)
+        appendEffectTimes(labels, effects, s)
         if (labels.isNotEmpty()) text?.drawScreen(labels)
 
         if (itemName != null && itemNameAlpha > 0.01f) {
@@ -1277,8 +1278,37 @@ class Hud(
         }
     }
 
-    private fun appendCounts(labels: MutableList<TextRenderer.ScreenLabel>, inventory: Inventory, s: Float) {
+    /**
+     * Остаток времени эффектов: мелкие цифры в правом нижнем углу иконки.
+     *
+     * Раньше иконка показывала только сам эффект, и было не понять, сколько ему ещё жить.
+     * Бесконечные эффекты (маяк, кондуит) времени не получают.
+     */
+    private fun appendEffectTimes(
+        labels: MutableList<TextRenderer.ScreenLabel>,
+        effects: List<ActiveEffect>,
+        s: Float,
+    ) {
         val text = this.text ?: return
+        var beneficial = 0
+        var other = 0
+        for (effect in effects.sortedBy { it.id }) {
+            if (!effect.showIcon) continue
+            val index = if (effect.beneficial) beneficial++ else other++
+            val time = EffectHud.effectTime(effect.durationTicks) ?: continue
+            val rect = HudLayout.effectIcon(effect.beneficial, index, width, height)
+            val scale = s * 0.55f
+            val scaleWidth = text.textWidth(time, scale)
+            labels += TextRenderer.ScreenLabel(
+                x = rect.x + rect.width - scaleWidth - s,
+                y = rect.y + rect.height - 6f * s,
+                text = time,
+                scale = scale,
+            )
+        }
+    }
+
+    private fun appendCounts(labels: MutableList<TextRenderer.ScreenLabel>, inventory: Inventory, s: Float) {        val text = this.text ?: return
         for (slot in 0 until 9) {
             val stack = inventory.menuSlot(inventory.hotbarMenuSlot(slot)) ?: continue
             if (stack.count <= 1) continue

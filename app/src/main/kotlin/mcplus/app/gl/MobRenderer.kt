@@ -392,6 +392,7 @@ class MobRenderer(
             "bat" to "entity/bat/bat.png",
             "slime" to "entity/slime/slime.png",
             "magma_cube" to "entity/slime/magmacube.png",
+            "ghast" to "entity/ghast/ghast.png",
 
             // Шкура жителя — только база (лицо, руки, штаны). Климат, профессия и уровень
             // лежат отдельными файлами, см. VillagerLook. У зомби-жителя те же слои.

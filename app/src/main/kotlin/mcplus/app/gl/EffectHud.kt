@@ -14,4 +14,22 @@ object EffectHud {
     /** Фон иконки: у «фоновых» эффектов (маяк, кондуит) он светлее. */
     fun background(ambient: Boolean): String =
         if (ambient) "effect_background_ambient" else "effect_background"
+
+    /**
+     * Остаток времени эффекта строкой, как в игре: `1:23`, `0:07`, `1:02:03`.
+     *
+     * Возвращает null для бесконечных эффектов (`durationTicks = -1`): у них таймера нет.
+     */
+    fun effectTime(durationTicks: Int): String? {
+        if (durationTicks <= 0) return null
+        val total = durationTicks / 20
+        val hours = total / 3600
+        val minutes = (total % 3600) / 60
+        val seconds = total % 60
+        return if (hours > 0) {
+            "$hours:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
+        } else {
+            "$minutes:${seconds.toString().padStart(2, '0')}"
+        }
+    }
 }

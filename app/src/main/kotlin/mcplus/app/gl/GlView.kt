@@ -2421,12 +2421,23 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     }
 
                                     name == "item_frame" || name == "glow_item_frame" -> {
+                                        // Сначала сама рамка (у светящейся своя текстура), потом
+                                        // предмет внутри: иначе от рамки оставалась только иконка.
+                                        val frameName = if (name == "glow_item_frame") {
+                                            "glow_item_frame"
+                                        } else {
+                                            "item_frame"
+                                        }
+                                        worldIcons += Renderer.WorldIcon(
+                                            entity.x, entity.y + 0.5, entity.z, 0.62f,
+                                            atlas.layerFor(frameName, TextureAtlas.Kind.SIDE),
+                                        )
                                         val stack = entity.droppedItem
                                         val itemName = stack?.takeIf { it.itemId >= 0 }
                                             ?.let { itemTable.nameOf(it.itemId) }
                                         if (itemName != null) {
                                             worldIcons += Renderer.WorldIcon(
-                                                entity.x, entity.y + 0.5, entity.z, 0.5f,
+                                                entity.x, entity.y + 0.5, entity.z, 0.34f,
                                                 atlas.layerForItem(itemName),
                                             )
                                         }
@@ -2581,6 +2592,25 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 )
                             }
                             mobRenderer.draw(camera, demoGround)
+
+                            // Гаст парит справа: он втрое крупнее остальных и в общий ряд
+                            // не влезает — три блока в ширину.
+                            mobRenderer.draw(
+                                camera,
+                                listOf(
+                                    MobRenderer.Mob(
+                                        x = camera.x + forward[0] * 11f + right[0] * 4.5f,
+                                        y = camera.y - 3.2,
+                                        z = camera.z + forward[2] * 11f + right[2] * 4.5f,
+                                        yaw = faceCamera,
+                                        walkPhase = 0f,
+                                        walkAmount = 0f,
+                                        family = MobFamily.GHAST,
+                                        scale = MobModels.scaleOf("ghast"),
+                                        texture = mobRenderer.textureFor("ghast"),
+                                    ),
+                                ),
+                            )
 
                             // Вторым рядом, выше и дальше — гуманоиды: видно, что у каждого
                             // свой скин и что левые конечности зеркалят правые. Ряд выше

@@ -1,10 +1,11 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
-    QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE, NONE,
+    QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
+    GHAST, NONE,
 }
 
 /**
@@ -65,6 +66,7 @@ object MobModels {
         "bat" -> MobFamily.BAT
         "slime" -> MobFamily.SLIME
         "magma_cube" -> MobFamily.MAGMA_CUBE
+        "ghast" -> MobFamily.GHAST
         else -> MobFamily.NONE
     }
 
@@ -84,6 +86,8 @@ object MobModels {
 
         // Модель спрута — 33 пикселя в высоту (тело и щупальца), в игре её рисуют в 0.7.
         "squid", "glow_squid" -> 0.7f
+        // Гаст — куб в блок и щупальца; в игре модель растянута вчетверо (4×4 блока).
+        "ghast" -> 3f
         else -> 1f
     }
 
@@ -97,6 +101,7 @@ object MobModels {
         MobFamily.BAT -> 32 to 32
         MobFamily.SLIME -> 64 to 32
         MobFamily.MAGMA_CUBE -> 64 to 64
+        MobFamily.GHAST -> 64 to 32
         else -> 64 to 32
     }
 
@@ -111,6 +116,7 @@ object MobModels {
         MobFamily.BAT -> BAT
         MobFamily.SLIME -> SLIME
         MobFamily.MAGMA_CUBE -> MAGMA_CUBE
+        MobFamily.GHAST -> GHAST
         MobFamily.NONE -> emptyList()
     }
 
@@ -302,5 +308,31 @@ object MobModels {
             )
         }
         add(MobBox("inside", -0.125f, 0.125f, -0.125f, 0.125f, 0.375f, 0.125f, u = 24, v = 40))
+    }
+
+    /**
+     * Гаст (`GhastModel`): куб в блок и девять щупалец разной длины.
+     *
+     * Модель в игре растянута вчетверо, поэтому куб занимает 4×4 блока, а щупальца свисают
+     * до земли. Нижняя точка модели здесь — кончик самого длинного щупальца (13 пикселей).
+     */
+    private val GHAST = buildList {
+        add(MobBox("body", -0.5f, 0.75f, -0.5f, 0.5f, 1.75f, 0.5f, u = 0, v = 0))
+        // Координаты и длины щупалец сняты с ванили: (x, z) центра и длина в пикселях.
+        val tentacles = listOf(
+            Triple(-3.75f, -5f, 8), Triple(1.25f, -5f, 13), Triple(6.25f, -5f, 9),
+            Triple(-6.25f, 0f, 11), Triple(-1.25f, 0f, 11), Triple(3.75f, 0f, 10),
+            Triple(-3.75f, 5f, 12), Triple(1.25f, 5f, 9), Triple(6.25f, 5f, 12),
+        )
+        for ((x, z, length) in tentacles) {
+            add(
+                MobBox(
+                    "tentacle",
+                    (x - 1f) / 16f, (13 - length) / 16f, (z - 1f) / 16f,
+                    (x + 1f) / 16f, 13f / 16f, (z + 1f) / 16f,
+                    u = 0, v = 0,
+                ),
+            )
+        }
     }
 }
