@@ -943,6 +943,7 @@ private fun windowCommand(args: List<String>) {
     var captureAfterSoundSeconds: Double? = null
     var respawnAtStart = false
     var particleDemo = false
+    var mobDemo = false
     var pauseAtStart = false
     var cameraModeAtStart = 0
     var pitchAtStart: Float? = null
@@ -970,6 +971,7 @@ private fun windowCommand(args: List<String>) {
                 args.getOrNull(++index)?.toDoubleOrNull() ?: fail("--after-sound ждёт секунды")
             "--respawn" -> respawnAtStart = true
             "--particles" -> particleDemo = true
+            "--mobs" -> mobDemo = true
             "--pause" -> pauseAtStart = true
             "--third" -> cameraModeAtStart = 1
             "--no-menu" -> noMenu = true
@@ -1094,6 +1096,7 @@ private fun windowCommand(args: List<String>) {
             captureAfterSoundSeconds = captureAfterSoundSeconds,
             respawnAtStart = respawnAtStart,
             particleDemo = particleDemo,
+            mobDemo = mobDemo,
             pauseAtStart = pauseAtStart,
             cameraModeAtStart = cameraModeAtStart,
             pitchAtStart = pitchAtStart,
@@ -1520,6 +1523,8 @@ private fun printUsage() {
           --debug        отладочные строки F3 (FPS, координаты, чанки)
           --tab          список игроков по Tab
           --advancements открыть экран достижений (клавиша L в игре)
+          --particles    нарисовать образцы частиц перед камерой (проверка без сервера)
+          --mobs         нарисовать по одному мобу каждого семейства перед камерой
     --use-item N   нажать «использовать предмет» на кадре N (проверка еды)
     --after-use N  снять снимок через N секунд после начала еды
     --held N       выбрать слот хотбара 1..9 после входа

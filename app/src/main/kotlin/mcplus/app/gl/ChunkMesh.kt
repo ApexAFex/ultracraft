@@ -91,6 +91,12 @@ object MeshBuilder {
                     shape is BlockShape.Cross ->
                         emitCross(target, world, blocks, atlas, x, y, z, shape, tint)
 
+                    // Факел рисуется с точными UV из ванильной модели: общая развёртка
+                    // натягивает на его коробку всю текстуру и превращает в столб пламени.
+                    shape is BlockShape.Torch -> emitTorch(
+                        target, world, blocks, atlas, x, y, z, shape, textureForShape(name, shape), tint,
+                    )
+
                     shape == null ->
                         emitBox(target, world, blocks, atlas, x, y, z, FULL_CUBE, name, null, tint)
 
@@ -425,6 +431,38 @@ object MeshBuilder {
      * neighbour to hide it. Частичные блоки соседа не скрывают грань куба: за плитой видно
      * половину стены, и «оптимизация» здесь оставила бы дыру.
      */
+    /**
+     * Факел: коробка 2×10×2 с UV из ванильной модели (`template_torch`).
+     *
+     * Общая развёртка коробки натягивает на тонкий столбик всю текстуру 16×16 вместе с
+     * пламенем — получался светящийся столб. У факела грани смотрят на узкую полоску
+     * текстуры (7…9 по ширине, 6…16 по высоте), и это видно сразу.
+     */
+    private fun emitTorch(
+        data: FloatArrayBuilder,
+        world: World,
+        blocks: BlockTable,
+        atlas: TextureAtlas,
+        x: Int,
+        y: Int,
+        z: Int,
+        shape: BlockShape.Torch,
+        texture: String,
+        tint: FloatArray?,
+    ) {
+        val box = torchBox(shape.wall)
+        emitBox(data, world, blocks, atlas, x, y, z, box, texture, shape, tint) { face, px, py, pz ->
+            // Текстура 16×16: палка занимает x 7…9, пламя — верхние 10 пикселей.
+            val u = (7f + px * 2f) / 16f
+            val v = when (face) {
+                FACE_UP -> (6f + pz * 2f) / 16f
+                FACE_DOWN -> (13f + pz * 2f) / 16f
+                else -> (6f + (1f - py) * 10f) / 16f
+            }
+            floatArrayOf(u, v)
+        }
+    }
+
     private fun emitBox(
         data: FloatArrayBuilder,
         world: World,
@@ -437,6 +475,7 @@ object MeshBuilder {
         name: String,
         self: BlockShape?,
         blockTint: FloatArray?,
+        uvMapper: ((Int, Float, Float, Float) -> FloatArray)? = null,
     ) {
         for (face in FACES) {
             val onBorder = when {
@@ -488,14 +527,20 @@ object MeshBuilder {
                 // UVs follow the block face: top and bottom use x/z, sides use the
                 // horizontal axis and y. v is flipped because textures are uploaded
                 // top-down, so without it grass ends up at the bottom of a side.
-                val u = when {
-                    face.dy != 0 -> px
-                    face.dx != 0 -> if (face.dx > 0) pz else 1f - pz
-                    else -> if (face.dz > 0) px else 1f - px
+                val mapped = uvMapper?.invoke(face.id, px, py, pz)
+                if (mapped != null) {
+                    data.add(mapped[0])
+                    data.add(mapped[1])
+                } else {
+                    val u = when {
+                        face.dy != 0 -> px
+                        face.dx != 0 -> if (face.dx > 0) pz else 1f - pz
+                        else -> if (face.dz > 0) px else 1f - px
+                    }
+                    val v = if (face.dy != 0) 1f - pz else 1f - py
+                    data.add(u)
+                    data.add(v)
                 }
-                val v = if (face.dy != 0) 1f - pz else 1f - py
-                data.add(u)
-                data.add(v)
                 data.add(red)
                 data.add(green)
                 data.add(blue)

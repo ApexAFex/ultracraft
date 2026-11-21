@@ -1,7 +1,7 @@
 package mcplus.app.gl
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
-enum class MobFamily { QUADRUPED, CHICKEN, CREEPER, SPIDER, NONE }
+enum class MobFamily { QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, NONE }
 
 /**
  * Одна коробка модели моба в блоках: от [minX] до [maxX] и так далее.
@@ -9,6 +9,11 @@ enum class MobFamily { QUADRUPED, CHICKEN, CREEPER, SPIDER, NONE }
  * [pivotY] — высота, вокруг которой коробка качается при ходьбе (бедро или плечо); у тела,
  * головы и неподвижных частей она равна 0. [u] и [v] — начало развёртки коробки в текстуре
  * моба (в «пикселях» 64×32): по ним натягивается настоящая шкура.
+ *
+ * Коробки, снятые с ванильной модели (`villager`), живут в системе координат своей части:
+ * [offsetX]/[offsetY]/[offsetZ] ставят её на место, [rotX]/[rotY]/[rotZ] — её наклон
+ * (радианы, +Y вверх), [grow] раздувает коробку, не меняя развёртки. У простых моделей всё
+ * это нулевое, и координаты коробки сразу заданы в блоках от ног.
  */
 data class MobBox(
     val name: String,
@@ -17,6 +22,14 @@ data class MobBox(
     val pivotY: Float = 0f,
     val u: Int = 0,
     val v: Int = 0,
+    /** Раздувание коробки наружу: мантия жителя и поля его шляпы. */
+    val grow: Float = 0f,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val offsetZ: Float = 0f,
+    val rotX: Float = 0f,
+    val rotY: Float = 0f,
+    val rotZ: Float = 0f,
 )
 
 /**
@@ -36,6 +49,9 @@ object MobModels {
         "chicken", "parrot" -> MobFamily.CHICKEN
         "creeper" -> MobFamily.CREEPER
         "spider", "cave_spider" -> MobFamily.SPIDER
+
+        // Жители: геометрия снята с ванильной VillagerModel, см. tools/villager_dump.java.
+        "villager" -> MobFamily.VILLAGER
         else -> MobFamily.NONE
     }
 
@@ -49,7 +65,17 @@ object MobModels {
         "chicken" -> 0.7f
         "parrot" -> 0.6f
         "llama", "trader_llama" -> 1.2f
+
+        // Ванильный VillagerRenderer рисует модель в 0.9375 масштаба.
+        "villager" -> 0.9375f
         else -> 1f
+    }
+
+    /** Размер текстуры семейства в пикселях: по нему считаются UV. */
+    fun textureSize(family: MobFamily): Pair<Int, Int> = when (family) {
+        // Шкура жителя — 64×64: и базовая, и слой одежды.
+        MobFamily.VILLAGER -> 64 to 64
+        else -> 64 to 32
     }
 
     fun boxes(family: MobFamily): List<MobBox> = when (family) {
@@ -57,6 +83,7 @@ object MobModels {
         MobFamily.CHICKEN -> CHICKEN
         MobFamily.CREEPER -> CREEPER
         MobFamily.SPIDER -> SPIDER
+        MobFamily.VILLAGER -> VILLAGER
         MobFamily.NONE -> emptyList()
     }
 
@@ -110,5 +137,29 @@ object MobModels {
         MobBox("legFR", 0.3125f, 0.5f, -0.25f, 0.5625f, 0.625f, -0.125f, u = 18, v = 0),
         MobBox("legBL", -0.5625f, 0.5f, 0.125f, -0.3125f, 0.625f, 0.25f, u = 18, v = 0),
         MobBox("legBR", 0.3125f, 0.5f, 0.125f, 0.5625f, 0.625f, 0.25f, u = 18, v = 0),
+    )
+
+    /**
+     * Житель, снятый с ванильной `VillagerModel` (tools/villager_dump.java →
+     * tools/build-villager-model.js).
+     *
+     * Отличия от простых моделей: у частей есть смещение и наклон (руки сложены перед собой,
+     * поля шляпы лежат горизонтально), а мантия и шляпа раздуты на полпикселя. Квадратные
+     * числа тут не «на глаз»: это ванильные координаты, переведённые из 16 пикселей на блок
+     * и из оси Y вниз в привычную Y вверх.
+     */
+    private val VILLAGER = listOf(
+        // 11 коробок: голова, нос, шляпа, поля шляпы, руки, тело, мантия, ноги.
+        MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.625f, 0.25f, u = 0, v = 0, offsetY = 1.5f),
+        MobBox("nose", -0.0625f, -0.1875f, -0.375f, 0.0625f, 0.0625f, -0.25f, u = 24, v = 0, offsetY = 1.625f),
+        MobBox("hat", -0.25f, 0f, -0.25f, 0.25f, 0.625f, 0.25f, u = 32, v = 0, grow = 0.0319f, offsetY = 1.5f),
+        MobBox("hatRim", -0.5f, -0.5f, -0.375f, 0.5f, 0.5f, -0.3125f, u = 30, v = 47, offsetY = 1.5f, rotX = 1.571f),
+        MobBox("legFL", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, pivotY = 0.75f, u = 0, v = 22, offsetX = 0.125f, offsetY = 0.75f),
+        MobBox("legFR", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, pivotY = 0.75f, u = 0, v = 22, offsetX = -0.125f, offsetY = 0.75f),
+        MobBox("arms", -0.5f, -0.375f, -0.125f, -0.25f, 0.125f, 0.125f, u = 44, v = 22, offsetY = 1.3125f, offsetZ = -0.0625f, rotX = 0.75f),
+        MobBox("arms", 0.25f, -0.375f, -0.125f, 0.5f, 0.125f, 0.125f, u = 44, v = 22, offsetY = 1.3125f, offsetZ = -0.0625f, rotX = 0.75f),
+        MobBox("arms", -0.25f, -0.375f, -0.125f, 0.25f, -0.125f, 0.125f, u = 40, v = 38, offsetY = 1.3125f, offsetZ = -0.0625f, rotX = 0.75f),
+        MobBox("body", -0.25f, -0.75f, -0.1875f, 0.25f, 0f, 0.1875f, u = 16, v = 20, offsetY = 1.5f),
+        MobBox("jacket", -0.25f, -1.25f, -0.1875f, 0.25f, 0f, 0.1875f, u = 0, v = 38, grow = 0.0313f, offsetY = 1.5f),
     )
 }

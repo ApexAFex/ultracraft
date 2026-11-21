@@ -186,6 +186,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         startAdvancements: Boolean = false,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
         particleDemo: Boolean = false,
+        /** Нарисовать перед камерой по одному мобу каждого семейства (проверка моделей). */
+        mobDemo: Boolean = false,
         /** Открыть меню паузы сразу (для снимка). */
         pauseAtStart: Boolean = false,
         /** Начать с вида от третьего лица (для снимка): 0 — от первого, 1 — сзади, 2 — спереди. */
@@ -653,7 +655,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     fun beginUseItem() {
                         val name = session?.inventory?.heldName() ?: return
                         session?.send(
-                            mcplus.net.BlockInteraction.useItem(sequence++, -player.yaw, -player.pitch),
+                            mcplus.net.BlockInteraction.useItem(
+                                sequence++,
+                                CameraAngles.protocolYaw(player.yaw),
+                                CameraAngles.protocolPitch(player.pitch),
+                            ),
                         )
                         val kind = consumables.of(name)
                         if (kind == null) return
@@ -1624,7 +1630,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             // block action of ours came back as "Mismatch in destroy block pos".
                             moveSender?.tick(
                                 player.x, player.y, player.z,
-                                -player.yaw, -player.pitch, player.onGround,
+                                CameraAngles.protocolYaw(player.yaw),
+                                CameraAngles.protocolPitch(player.pitch),
+                                player.onGround,
                             )
                             tickCount++
                             steps++
@@ -2223,7 +2231,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 x = player.x,
                                 y = player.y,
                                 z = player.z,
-                                yaw = player.yaw,
+                                // Модель получает ванильные градусы, как и чужие игроки.
+                                yaw = CameraAngles.degrees(player.yaw),
                                 walkPhase = (selfWalkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
                                 walkAmount = (selfSpeed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
                                 swing = if (ownSwingAge in 0.0..1.0) {
@@ -2358,6 +2367,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         family = family,
                                         scale = MobModels.scaleOf(name),
                                         texture = mobRenderer.textureFor(name),
+                                        overlay = mobRenderer.overlayFor(name),
                                         hurt = entity.hurtProgress(System.nanoTime()),
                                     )
                                 }
@@ -2437,6 +2447,33 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         traderRenderer.draw(camera, traders)
 
                         mobRenderer.draw(camera, mobs)
+                        if (mobDemo) {
+                            // По одному мобу каждого семейства в ряд перед камерой: так модель
+                            // видно целиком и без возни с призывами на сервере.
+                            val forward = camera.forward()
+                            val right = camera.right()
+                            val samples = listOf(
+                                "cow", "pig", "sheep", "chicken", "creeper", "spider", "villager",
+                            )
+                            val faceCamera = 180f - CameraAngles.degrees(camera.yaw)
+                            val demoMobs = samples.mapIndexed { index, name ->
+                                val side = (index - (samples.size - 1) / 2f) * 1.15f
+                                MobRenderer.Mob(
+                                    x = camera.x + forward[0] * 6.0 + right[0] * side,
+                                    // В воздухе: трава и склоны иначе закрывают половину модели.
+                                    y = camera.y + 0.4,
+                                    z = camera.z + forward[2] * 6.0 + right[2] * side,
+                                    yaw = faceCamera,
+                                    walkPhase = 0f,
+                                    walkAmount = 0f,
+                                    family = MobModels.familyOf(name),
+                                    scale = MobModels.scaleOf(name),
+                                    texture = mobRenderer.textureFor(name),
+                                    overlay = mobRenderer.overlayFor(name),
+                                )
+                            }
+                            mobRenderer.draw(camera, demoMobs)
+                        }
                         entityRenderer.draw(camera, boxes)
                         if (debris.isNotEmpty()) {
                             val debrisCubes = debris.map {
@@ -2624,7 +2661,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         up[1] * (0.34 - handSwing * 0.14)
                                     val fz = camera.z + forward[2] * 0.72 + right[2] * 0.34 -
                                         up[2] * (0.34 - handSwing * 0.14)
-                                    val yaw = -Math.toRadians(camera.yaw.toDouble()).toFloat() + 0.55f + handSwing * 0.5f
+                                    val yaw = -camera.yaw + 0.55f + handSwing * 0.5f
                                     renderer.drawBlockCubes(
                                         camera,
                                         listOf(
@@ -2648,7 +2685,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 }
                             } else if (handState != null) {
                                 // Рука сбоку от тела: вперёд и вправо от лица игрока.
-                                val yawRad = Math.toRadians(player.yaw.toDouble())
+                                val yawRad = player.yaw.toDouble()
                                 val aheadX = kotlin.math.sin(yawRad).toFloat()
                                 val aheadZ = kotlin.math.cos(yawRad).toFloat()
                                 val sideX = -aheadZ
@@ -2755,7 +2792,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             ),
                                         ) ?: "?"
                                         ),
-                                    "Наклон: %.0f, поворот: %.0f".format(camera.pitch, camera.yaw),
+                                    "Наклон: %.0f, поворот: %.0f".format(
+                                        CameraAngles.degrees(camera.pitch),
+                                        CameraAngles.degrees(camera.yaw),
+                                    ),
                                     "Дальность: $viewDistance чанков",
                                     run {
                                         val skyNow = session?.sky
@@ -2775,9 +2815,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         kotlin.math.floor(player.z).toInt(),
                                     ),
                                     "Радиус сервера: ${session?.serverChunkRadius ?: -1} чанков",
-                                    "Сторона: " + listOf("юг", "запад", "север", "восток")[
-                                        ((kotlin.math.floor(camera.yaw / 90f + 0.5f).toInt() % 4) + 4) % 4
-                                        ],
+                                    "Сторона: " + CameraAngles.side(camera.yaw),
                                     "Цель: " + (target?.let {
                                         "${blocks.nameOf(world.blockAt(it.x, it.y, it.z))} (${it.x}, ${it.y}, ${it.z})"
                                     } ?: "—"),

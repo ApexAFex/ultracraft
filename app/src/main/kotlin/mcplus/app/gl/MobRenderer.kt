@@ -31,6 +31,8 @@ class MobRenderer(
         val family: MobFamily,
         val scale: Float,
         val texture: Int,
+        /** Второй слой текстуры (одежда жителя): рисуется поверх той же модели. */
+        val overlay: Int = 0,
         /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
         val hurt: Float = 0f,
     )
@@ -59,6 +61,16 @@ class MobRenderer(
         GameFiles.readPng(directory, "assets/minecraft/textures/$path")?.let { upload(it) } ?: fallback
     }
 
+    /**
+     * Второй слой текстуры: у жителей одежда лежит отдельным файлом и рисуется
+     * поверх базовой шкуры той же моделью.
+     */
+    fun overlayFor(entityName: String): Int = OVERLAYS[entityName]?.let { path ->
+        textures.getOrPut("$entityName:$path") {
+            GameFiles.readPng(directory, "assets/minecraft/textures/$path")?.let { upload(it) } ?: 0
+        }
+    } ?: 0
+
     fun draw(camera: Camera, mobs: List<Mob>) {
         if (mobs.isEmpty()) return
 
@@ -72,43 +84,17 @@ class MobRenderer(
 
         for (mob in mobs) {
             val mesh = meshFor(mob.family) ?: continue
-            GL30.glBindTexture(GL30.GL_TEXTURE_2D, mob.texture)
-            GL30.glBindVertexArray(mesh.vao)
-            GL30.glUniform3f(
-                tintLocation, 1f,
-                1f - mob.hurt * 0.65f,
-                1f - mob.hurt * 0.65f,
-            )
-
-            val yaw = -Math.toRadians(mob.yaw.toDouble()).toFloat()
-            val base = Mat4.multiply(
-                Mat4.translate(mob.x.toFloat(), mob.y.toFloat(), mob.z.toFloat()),
-                Mat4.multiply(Mat4.rotateY(yaw), scale(mob.scale)),
-            )
-
-            for ((index, box) in mesh.boxes.withIndex()) {
-                val local = boxMatrix(box)
-                val angle = MobModels.limbAngle(box.name, mob.walkPhase, mob.walkAmount)
-                val matrix = if (angle == 0f) {
-                    Mat4.multiply(base, local)
-                } else {
-                    val pivotX = (box.minX + box.maxX) / 2f
-                    val pivotZ = (box.minZ + box.maxZ) / 2f
-                    val rotate = Mat4.multiply(
-                        Mat4.translate(pivotX, box.pivotY, pivotZ),
-                        Mat4.multiply(
-                            Mat4.rotateX(angle),
-                            Mat4.translate(-pivotX, -box.pivotY, -pivotZ),
-                        ),
-                    )
-                    Mat4.multiply(base, Mat4.multiply(rotate, local))
-                }
-                GL30.glUniformMatrix4fv(modelLocation, false, matrix)
-                GL30.glDrawArrays(
-                    GL30.GL_TRIANGLES,
-                    mesh.offsets[index] / VERTEX_FLOATS,
-                    mesh.counts[index],
-                )
+            drawMob(mesh, mob, mob.texture)
+            if (mob.overlay != 0) {
+                // Слой одежды повторяет ту же геометрию, поэтому без сдвига он спорит
+                // с базой за глубину: полигоны ровно на одном расстоянии.
+                GL30.glEnable(GL30.GL_BLEND)
+                GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+                GL30.glEnable(GL30.GL_POLYGON_OFFSET_FILL)
+                GL30.glPolygonOffset(-1f, -1f)
+                drawMob(mesh, mob, mob.overlay)
+                GL30.glDisable(GL30.GL_POLYGON_OFFSET_FILL)
+                GL30.glDisable(GL30.GL_BLEND)
             }
         }
 
@@ -116,18 +102,63 @@ class MobRenderer(
         GL30.glUseProgram(0)
     }
 
+    /** Один проход по коробкам модели с указанной текстурой. */
+    private fun drawMob(mesh: FamilyMesh, mob: Mob, texture: Int) {
+        GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
+        GL30.glBindVertexArray(mesh.vao)
+        GL30.glUniform3f(
+            tintLocation, 1f,
+            1f - mob.hurt * 0.65f,
+            1f - mob.hurt * 0.65f,
+        )
+
+        val yaw = -Math.toRadians(mob.yaw.toDouble()).toFloat()
+        val base = Mat4.multiply(
+            Mat4.translate(mob.x.toFloat(), mob.y.toFloat(), mob.z.toFloat()),
+            Mat4.multiply(Mat4.rotateY(yaw), scale(mob.scale)),
+        )
+
+        for ((index, box) in mesh.boxes.withIndex()) {
+            // Вершины коробок уже лежат в координатах модели, поэтому качание — это
+            // поворот вокруг оси бедра, без масштабирования коробки.
+            val angle = MobModels.limbAngle(box.name, mob.walkPhase, mob.walkAmount)
+            val matrix = if (angle == 0f) {
+                base
+            } else {
+                val pivotX = (box.minX + box.maxX) / 2f
+                val pivotZ = (box.minZ + box.maxZ) / 2f
+                val rotate = Mat4.multiply(
+                    Mat4.translate(pivotX, box.pivotY, pivotZ),
+                    Mat4.multiply(
+                        Mat4.rotateX(angle),
+                        Mat4.translate(-pivotX, -box.pivotY, -pivotZ),
+                    ),
+                )
+                Mat4.multiply(base, rotate)
+            }
+            GL30.glUniformMatrix4fv(modelLocation, false, matrix)
+            GL30.glDrawArrays(
+                GL30.GL_TRIANGLES,
+                // offsets — байты; glDrawArrays ждёт номер вершины, а в вершине 6 чисел.
+                mesh.offsets[index] / (VERTEX_FLOATS * Float.SIZE_BYTES),
+                mesh.counts[index],
+            )
+        }
+    }
+
     private fun meshFor(family: MobFamily): FamilyMesh? {
         meshes[family]?.let { return it }
         val boxes = MobModels.boxes(family)
         if (boxes.isEmpty()) return null
 
+        val (textureWidth, textureHeight) = MobModels.textureSize(family)
         val data = FloatArrayBuilder(boxes.sumOf { it.vertexCount() } * VERTEX_FLOATS)
         val offsets = IntArray(boxes.size)
         val counts = IntArray(boxes.size)
         var floatOffset = 0
         for ((index, box) in boxes.withIndex()) {
             offsets[index] = floatOffset * Float.SIZE_BYTES
-            counts[index] = appendBox(data, box)
+            counts[index] = appendBox(data, box, textureWidth, textureHeight)
             floatOffset += counts[index] * VERTEX_FLOATS
         }
 
@@ -153,14 +184,26 @@ class MobRenderer(
         return FamilyMesh(vao, vbo, offsets, counts, boxes).also { meshes[family] = it }
     }
 
-    /** Раскладывает коробку на шесть граней по её развёртке; возвращает число вершин. */
-    private fun appendBox(out: FloatArrayBuilder, box: MobBox): Int {
-        val x0 = box.minX
-        val x1 = box.maxX
-        val y0 = box.minY
-        val y1 = box.maxY
-        val z0 = box.minZ
-        val z1 = box.maxZ
+    /**
+     * Раскладывает коробку на шесть граней по её развёртке; возвращает число вершин.
+     *
+     * [textureWidth]/[textureHeight] — размер шкуры в пикселях: у зверей 64×32, у жителя
+     * 64×64. Развёртка считается по «чистым» размерам коробки, а [MobBox.grow] расширяет
+     * только геометрию — так же, как это делает игра.
+     */
+    private fun appendBox(
+        out: FloatArrayBuilder,
+        box: MobBox,
+        textureWidth: Int,
+        textureHeight: Int,
+    ): Int {
+        val grow = box.grow
+        val x0 = box.minX - grow
+        val x1 = box.maxX + grow
+        val y0 = box.minY - grow
+        val y1 = box.maxY + grow
+        val z0 = box.minZ - grow
+        val z1 = box.maxZ + grow
 
         val u = box.u.toFloat()
         val v = box.v.toFloat()
@@ -169,21 +212,42 @@ class MobRenderer(
         val d = (box.maxZ - box.minZ) * 16f
 
         fun uv(u0: Float, v0: Float, u1: Float, v1: Float): FloatArray =
-            floatArrayOf(u0 / 64f, v0 / 32f, u1 / 64f, v1 / 32f)
+            floatArrayOf(u0 / textureWidth, v0 / textureHeight, u1 / textureWidth, v1 / textureHeight)
+
+        val part = partTransform(box)
 
         // +Y
-        quad(out, x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, uv(u + d, v, u + d + w, v + d), 1f)
+        quad(out, x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, uv(u + d, v, u + d + w, v + d), 1f, part)
         // -Y
-        quad(out, x0, y0, z1, x1, y0, z1, x1, y0, z0, x0, y0, z0, uv(u + d + w, v, u + d + w + w, v + d), 0.45f)
+        quad(out, x0, y0, z1, x1, y0, z1, x1, y0, z0, x0, y0, z0, uv(u + d + w, v, u + d + w + w, v + d), 0.45f, part)
         // -X
-        quad(out, x0, y1, z0, x0, y1, z1, x0, y0, z1, x0, y0, z0, uv(u, v + d, u + d, v + d + h), 0.8f)
+        quad(out, x0, y1, z0, x0, y1, z1, x0, y0, z1, x0, y0, z0, uv(u, v + d, u + d, v + d + h), 0.8f, part)
         // +X
-        quad(out, x1, y1, z1, x1, y1, z0, x1, y0, z0, x1, y0, z1, uv(u + d + w, v + d, u + d + w + d, v + d + h), 0.8f)
+        quad(out, x1, y1, z1, x1, y1, z0, x1, y0, z0, x1, y0, z1, uv(u + d + w, v + d, u + d + w + d, v + d + h), 0.8f, part)
         // -Z
-        quad(out, x1, y1, z0, x0, y1, z0, x0, y0, z0, x1, y0, z0, uv(u + d + w + d, v + d, u + d + w + d + w, v + d + h), 0.62f)
+        quad(out, x1, y1, z0, x0, y1, z0, x0, y0, z0, x1, y0, z0, uv(u + d + w + d, v + d, u + d + w + d + w, v + d + h), 0.62f, part)
         // +Z
-        quad(out, x0, y1, z1, x1, y1, z1, x1, y0, z1, x0, y0, z1, uv(u + d, v + d, u + d + w, v + d + h), 0.9f)
+        quad(out, x0, y1, z1, x1, y1, z1, x1, y0, z1, x0, y0, z1, uv(u + d, v + d, u + d + w, v + d + h), 0.9f, part)
         return 36
+    }
+
+    /**
+     * Матрица части: смещение и наклон коробки внутри модели.
+     *
+     * Житель — единственная модель, у которой части повёрнуты (руки сложены, поля шляпы
+     * лежат). Для остальных коробок возвращается null, и вершины идут как есть.
+     */
+    private fun partTransform(box: MobBox): FloatArray? {
+        if (box.rotX == 0f && box.rotY == 0f && box.rotZ == 0f &&
+            box.offsetX == 0f && box.offsetY == 0f && box.offsetZ == 0f
+        ) {
+            return null
+        }
+        var matrix = Mat4.translate(box.offsetX, box.offsetY, box.offsetZ)
+        if (box.rotZ != 0f) matrix = Mat4.multiply(matrix, Mat4.rotateZ(box.rotZ))
+        if (box.rotY != 0f) matrix = Mat4.multiply(matrix, Mat4.rotateY(box.rotY))
+        if (box.rotX != 0f) matrix = Mat4.multiply(matrix, Mat4.rotateX(box.rotX))
+        return matrix
     }
 
     private fun quad(
@@ -194,9 +258,16 @@ class MobRenderer(
         dx: Float, dy: Float, dz: Float,
         uv: FloatArray,
         shade: Float,
+        part: FloatArray?,
     ) {
         fun vertex(x: Float, y: Float, z: Float, u: Float, v: Float) {
-            out.add(x); out.add(y); out.add(z)
+            if (part == null) {
+                out.add(x); out.add(y); out.add(z)
+            } else {
+                out.add(part[0] * x + part[4] * y + part[8] * z + part[12])
+                out.add(part[1] * x + part[5] * y + part[9] * z + part[13])
+                out.add(part[2] * x + part[6] * y + part[10] * z + part[14])
+            }
             out.add(u); out.add(v)
             out.add(shade)
         }
@@ -214,15 +285,6 @@ class MobRenderer(
         it[0] = value
         it[5] = value
         it[10] = value
-    }
-
-    private fun boxMatrix(box: MobBox): FloatArray = Mat4.identity().also {
-        it[0] = box.maxX - box.minX
-        it[5] = box.maxY - box.minY
-        it[10] = box.maxZ - box.minZ
-        it[12] = box.minX
-        it[13] = box.minY
-        it[14] = box.minZ
     }
 
     private fun upload(image: BufferedImage): Int {
@@ -318,6 +380,19 @@ class MobRenderer(
             "cat" to "entity/cat/cat_tabby.png",
             "ocelot" to "entity/cat/ocelot.png",
             "rabbit" to "entity/rabbit/rabbit_brown.png",
+
+            // Шкура жителя — только база (лицо, руки, штаны). Цвет одежды лежит отдельным
+            // слоем, см. OVERLAYS.
+            "villager" to "entity/villager/villager.png",
+        )
+
+        /**
+         * Второй слой текстуры: в 26.3 одежда жителя — отдельный файл `type/<климат>.png`,
+         * который игра рисует поверх базовой шкуры той же моделью. Климат из пакетов
+         * (`Villager Data`) пока не разбирается, поэтому берём равнинный вариант.
+         */
+        val OVERLAYS = mapOf(
+            "villager" to "entity/villager/type/plains.png",
         )
 
         /** Сколько чисел на вершину: x, y, z, u, v, shade. */

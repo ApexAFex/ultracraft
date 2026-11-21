@@ -98,6 +98,17 @@ object Mat4 {
         }
     }
 
+    fun rotateZ(radians: Float): FloatArray {
+        val c = cos(radians)
+        val s = sin(radians)
+        return identity().also {
+            it[0] = c
+            it[1] = s
+            it[4] = -s
+            it[5] = c
+        }
+    }
+
     fun perspective(fovY: Float, aspect: Float, near: Float, far: Float): FloatArray {
         val f = (1.0 / tan(fovY / 2.0)).toFloat()
         val result = FloatArray(16)

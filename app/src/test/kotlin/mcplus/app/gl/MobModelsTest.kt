@@ -77,4 +77,48 @@ class MobModelsTest {
         val body = MobModels.boxes(MobFamily.QUADRUPED).first { it.name == "body" }
         assertTrue(body.u > 0 || body.v > 0, "у тела должна быть своя развёртка, а не угол листа")
     }
+
+    @Test
+    fun `villager is a modelled mob with a 64 by 64 skin`() {
+        assertEquals(MobFamily.VILLAGER, MobModels.familyOf("villager"))
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.VILLAGER))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.QUADRUPED))
+        assertTrue(MobModels.scaleOf("villager") < 1f, "житель мельче блока")
+
+        for (box in MobModels.boxes(MobFamily.VILLAGER)) {
+            assertTrue(box.u in 0 until 64, "${box.name}: u=${box.u} вне листа")
+            assertTrue(box.v in 0 until 64, "${box.name}: v=${box.v} вне листа 64×64")
+        }
+    }
+
+    @Test
+    fun `villager stands on the ground and is two blocks tall`() {
+        val boxes = MobModels.boxes(MobFamily.VILLAGER)
+        assertEquals(11, boxes.size)
+
+        // Ноги стоят на земле: смещение части плюс низ коробки дают ровно ноль.
+        assertEquals(0f, boxes.minOf { it.offsetY + it.minY }, 1e-4f)
+        // Макушка головы — 2.125 «пиксельных» блока модели, с масштабом 0.9375 это 1.99.
+        assertEquals(2.156f, boxes.maxOf { it.offsetY + it.maxY + it.grow }, 0.01f)
+    }
+
+    @Test
+    fun `villager arms are folded and the hat has a brim`() {
+        val boxes = MobModels.boxes(MobFamily.VILLAGER)
+        // Руки повёрнуты вокруг X: в ванильной модели они сложены перед телом.
+        assertTrue(boxes.filter { it.name == "arms" }.all { it.rotX != 0f }, "руки не сложены")
+        // Поля шляпы — отдельная коробка, повёрнутая на ~90 градусов.
+        val rim = boxes.first { it.name == "hatRim" }
+        assertTrue(kotlin.math.abs(rim.rotX) > 1.4f, "поля шляпы не лежат горизонтально")
+        // Мантия и шляпа раздуты наружу, иначе они совпадают с телом.
+        assertTrue(boxes.first { it.name == "hat" }.grow > 0f)
+        assertTrue(boxes.first { it.name == "jacket" }.grow > 0f)
+    }
+
+    @Test
+    fun `villager has a clothing overlay texture`() {
+        val overlay = MobRenderer.OVERLAYS["villager"]
+        assertTrue(overlay != null && overlay.endsWith(".png"), "у жителя нет слоя одежды")
+        assertTrue(MobRenderer.TEXTURES["villager"]?.endsWith(".png") == true)
+    }
 }
