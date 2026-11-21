@@ -30,4 +30,27 @@ object Ambience {
         "fire", "soul_fire", "lava", "magma_block" -> 2
         else -> 6
     }
+
+    /**
+     * Где у настенного факела кончик: смещение от центра клетки и высота.
+     *
+     * Факел наклонён на 22,5° от стены, поэтому пламя стоит не над центром блока, а сбоку —
+     * иначе частицы висят в воздухе рядом с факелом. У стоящего факела смещения нет.
+     */
+    fun torchTip(shape: mcplus.net.BlockShape?): Triple<Float, Float, Float>? {
+        val wall = (shape as? mcplus.net.BlockShape.Torch)?.wall ?: return null
+        val reach = TORCH_TIP_REACH
+        return when (wall) {
+            mcplus.net.ShapeDirection.EAST -> Triple(reach, 0f, TORCH_TIP_HEIGHT)
+            mcplus.net.ShapeDirection.WEST -> Triple(-reach, 0f, TORCH_TIP_HEIGHT)
+            mcplus.net.ShapeDirection.SOUTH -> Triple(0f, reach, TORCH_TIP_HEIGHT)
+            mcplus.net.ShapeDirection.NORTH -> Triple(0f, -reach, TORCH_TIP_HEIGHT)
+        }
+    }
+
+    /** Кончик факела: 10 пикселей высоты под углом 22,5° дают около 0,24 блока вбок. */
+    private const val TORCH_TIP_REACH = 0.24f
+
+    /** Высота кончика: 3,5 пикселя основания плюс 10 пикселей по косинусу наклона. */
+    private const val TORCH_TIP_HEIGHT = 0.80f
 }

@@ -222,7 +222,9 @@ class MeshBuilderTest {
                     "21\twheat\tage=0\n" +
                     "22\twheat\tage=7\n" +
                     "23\tcarrots\tage=3\n" +
-                    "24\tchest\tfacing=north,type=single,waterlogged=false\n",
+                    "24\tchest\tfacing=north,type=single,waterlogged=false\n" +
+                    "25\twall_torch\tfacing=north\n" +
+                    "26\twall_torch\tfacing=east\n",
             )
         },
     )
@@ -359,6 +361,53 @@ class MeshBuilderTest {
         val ys = axisValues(mesh, 1)
         assertTrue(xs.all { it in 0.4375f..0.5625f }, "факел шире 2/16: $xs")
         assertEquals(48f + 10f / 16f, ys.max(), 0.001f)
+    }
+
+    @Test
+    fun `a wall torch leans away from its wall`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 25)) // wall_torch facing=north
+
+        val mesh = shapeMesh(world)
+        // Низ факела у стены (z ≈ 0), верх наклонён в комнату (z больше).
+        var lowZ = Float.MAX_VALUE
+        var topZ = -Float.MAX_VALUE
+        var lowY = Float.MAX_VALUE
+        var topY = -Float.MAX_VALUE
+        var index = 0
+        while (index < mesh.data.size) {
+            val y = mesh.data[index + 1]
+            val z = mesh.data[index + 2]
+            if (y < lowY) {
+                lowY = y
+                lowZ = z
+            }
+            if (y > topY) {
+                topY = y
+                topZ = z
+            }
+            index += MESH_STRIDE
+        }
+
+        // Низ факела у стены, верх наклонён в комнату; сам наклон слегка опускает углы.
+        assertTrue(lowY in 48.15f..48.24f, "низ факела около 3,5 пикселя: $lowY")
+        assertTrue(topY in 48.80f..48.88f, "верх факела около 13,5 пикселя: $topY")
+        assertTrue(topZ > lowZ + 0.02f, "верх должен отходить от стены: низ $lowZ, верх $topZ")
+        assertTrue(lowZ < 0.12f, "низ должен стоять у стены: $lowZ")
+    }
+
+    @Test
+    fun `an east wall torch leans from the west wall`() {
+        val world = world()
+        world.add(chunkWith(intArrayOf(0, 48, 0) to 26)) // wall_torch facing=east
+
+        val mesh = shapeMesh(world)
+        val xs = axisValues(mesh, 0)
+        val zs = axisValues(mesh, 2)
+        // «facing=east» — факел висит на западной стене и наклонён на восток.
+        assertTrue(xs.min() < 0.05f, "низ у западной стены: $xs")
+        assertTrue(xs.max() > 0.2f, "верх наклонён на восток: $xs")
+        assertTrue(zs.min() > 0.2f && zs.max() < 0.8f, "середина по z: $zs")
     }
 
     @Test

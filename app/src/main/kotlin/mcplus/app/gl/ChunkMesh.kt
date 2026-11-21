@@ -387,14 +387,22 @@ object MeshBuilder {
         ShapeDirection.EAST -> ShapeDirection.NORTH
     }
 
+    /**
+     * Коробка факела. Стоящий — по центру клетки, настенный — по ванильной модели
+     * `template_torch_wall`: 2×10×2 у западного края, наклон задаётся отдельной матрицей.
+     */
     private fun torchBox(wall: ShapeDirection?): Box {
         val width = 1f / 16f
         return when (wall) {
             null -> Box(0.5f - width, 0f, 0.5f - width, 0.5f + width, 10f / 16f, 0.5f + width)
-            ShapeDirection.NORTH -> Box(0.5f - width, 3f / 16f, 0f, 0.5f + width, 13f / 16f, 2f / 16f)
-            ShapeDirection.SOUTH -> Box(0.5f - width, 3f / 16f, 14f / 16f, 0.5f + width, 13f / 16f, 1f)
-            ShapeDirection.WEST -> Box(0f, 3f / 16f, 0.5f - width, 2f / 16f, 13f / 16f, 0.5f + width)
-            ShapeDirection.EAST -> Box(14f / 16f, 3f / 16f, 0.5f - width, 1f, 13f / 16f, 0.5f + width)
+            else -> Box(
+                -width,
+                3.5f / 16f,
+                7f / 16f,
+                width,
+                13.5f / 16f,
+                9f / 16f,
+            )
         }
     }
 
@@ -437,6 +445,9 @@ object MeshBuilder {
      * Общая развёртка коробки натягивает на тонкий столбик всю текстуру 16×16 вместе с
      * пламенем — получался светящийся столб. У факела грани смотрят на узкую полоску
      * текстуры (7…9 по ширине, 6…16 по высоте), и это видно сразу.
+     *
+     * Настенный факел в ванили не вертикальный: он наклонён на 22,5° от стены, а сама модель
+     * поворачивается вокруг центра блока под нужную стену (`template_torch_wall`).
      */
     private fun emitTorch(
         data: FloatArrayBuilder,
@@ -451,7 +462,8 @@ object MeshBuilder {
         tint: FloatArray?,
     ) {
         val box = torchBox(shape.wall)
-        emitBox(data, world, blocks, atlas, x, y, z, box, texture, shape, tint) { face, px, py, pz ->
+        val transform = shape.wall?.let { torchTransform(it) }
+        emitBox(data, world, blocks, atlas, x, y, z, box, texture, shape, tint, transform) { face, px, py, pz ->
             // Текстура 16×16: палка занимает x 7…9, пламя — верхние 10 пикселей.
             val u = (7f + px * 2f) / 16f
             val v = when (face) {
@@ -461,6 +473,32 @@ object MeshBuilder {
             }
             floatArrayOf(u, v)
         }
+    }
+
+    /**
+     * Наклон настенного факела: 22,5° от стены вокруг её края, затем поворот модели под
+     * нужную стену (как `y` в `wall_torch.json`: восток 0, юг 90, запад 180, север 270).
+     */
+    private fun torchTransform(wall: ShapeDirection): FloatArray {
+        val pivotX = 0f
+        val pivotY = 3.5f / 16f
+        val pivotZ = 8f / 16f
+        var lean = Mat4.translate(pivotX, pivotY, pivotZ)
+        lean = Mat4.multiply(lean, Mat4.rotateZ(Math.toRadians(-22.5).toFloat()))
+        lean = Mat4.multiply(lean, Mat4.translate(-pivotX, -pivotY, -pivotZ))
+
+        val angle = when (wall) {
+            ShapeDirection.EAST -> 0f
+            ShapeDirection.SOUTH -> 90f
+            ShapeDirection.WEST -> 180f
+            ShapeDirection.NORTH -> 270f
+        }
+        var spin = Mat4.rotateY(Math.toRadians(angle.toDouble()).toFloat())
+        spin = Mat4.multiply(
+            Mat4.translate(0.5f, 0f, 0.5f),
+            Mat4.multiply(spin, Mat4.translate(-0.5f, 0f, -0.5f)),
+        )
+        return Mat4.multiply(spin, lean)
     }
 
     private fun emitBox(
@@ -475,6 +513,7 @@ object MeshBuilder {
         name: String,
         self: BlockShape?,
         blockTint: FloatArray?,
+        transform: FloatArray? = null,
         uvMapper: ((Int, Float, Float, Float) -> FloatArray)? = null,
     ) {
         for (face in FACES) {
@@ -517,9 +556,17 @@ object MeshBuilder {
                     world, blocks, baseX, baseY, baseZ, base,
                     face.dx, face.dy, face.dz, px, py, pz,
                 )
-                data.add(x + px)
-                data.add(y + py)
-                data.add(z + pz)
+                // Настенный факел наклонён: координаты коробки прогоняются через матрицу,
+                // а свет по-прежнему берётся из клетки блока.
+                if (transform == null) {
+                    data.add(x + px)
+                    data.add(y + py)
+                    data.add(z + pz)
+                } else {
+                    data.add(x + transform[0] * px + transform[4] * py + transform[8] * pz + transform[12])
+                    data.add(y + transform[1] * px + transform[5] * py + transform[9] * pz + transform[13])
+                    data.add(z + transform[2] * px + transform[6] * py + transform[10] * pz + transform[14])
+                }
                 data.add(face.shade)
                 data.add(light.toFloat())
                 data.add(layer)

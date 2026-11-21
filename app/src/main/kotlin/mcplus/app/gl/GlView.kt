@@ -1698,16 +1698,22 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val pz = kotlin.math.floor(player.z).toInt()
                                 val random = java.util.Random()
                                 for (dx in -8..8) for (dz in -8..8) for (dy in -4..4) {
-                                    val name = blocks.nameOf(world.blockAt(px + dx, py + dy, pz + dz))
+                                    val state = world.blockAt(px + dx, py + dy, pz + dz)
+                                    val name = blocks.nameOf(state)
                                     val particle = Ambience.particleFor(name) ?: continue
                                     val period = Ambience.periodTicks(name)
                                     if (random.nextInt(10) >= (10 / period).coerceAtLeast(1)) continue
+                                    // Настенный факел горит на наклонённом кончике, а не над
+                                    // центром клетки: иначе пламя висит в воздухе рядом.
+                                    val tip = Ambience.torchTip(blocks.shapeOf(state))
+                                    val tipX = tip?.first ?: 0f
+                                    val tipZ = tip?.second ?: 0f
+                                    val height = tip?.third ?: Ambience.particleHeight(name)
                                     ambientParticles++
                                     particles += ParticlePiece(
-                                        px + dx + 0.3 + random.nextDouble() * 0.4,
-                                        py + dy + Ambience.particleHeight(name) +
-                                            random.nextDouble() * 0.15,
-                                        pz + dz + 0.3 + random.nextDouble() * 0.4,
+                                        px + dx + 0.5 + tipX + (random.nextDouble() - 0.5) * 0.2,
+                                        py + dy + height + random.nextDouble() * 0.15,
+                                        pz + dz + 0.5 + tipZ + (random.nextDouble() - 0.5) * 0.2,
                                         (random.nextDouble() - 0.5) * 0.05,
                                         0.12 + random.nextDouble() * 0.1,
                                         (random.nextDouble() - 0.5) * 0.05,

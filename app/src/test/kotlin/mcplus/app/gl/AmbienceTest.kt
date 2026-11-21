@@ -38,4 +38,21 @@ class AmbienceTest {
         assertTrue(Ambience.periodTicks("fire") < Ambience.periodTicks("torch"))
         assertTrue(Ambience.periodTicks("torch") >= 1)
     }
+
+    @Test
+    fun `a wall torch burns at its leaning tip`() {
+        // Наклонённый факел: пламя сбоку от центра клетки, со стороны, куда он смотрит.
+        val east = Ambience.torchTip(mcplus.net.BlockShape.Torch(mcplus.net.ShapeDirection.EAST))
+        assertTrue(east != null)
+        assertTrue(east.first > 0.2f, "восточный факел: смещение на восток ${east.first}")
+        assertEquals(0f, east.second, 0.001f)
+        assertTrue(east.third > 0.7f, "кончик выше основания: ${east.third}")
+
+        val north = Ambience.torchTip(mcplus.net.BlockShape.Torch(mcplus.net.ShapeDirection.NORTH))
+        assertTrue(north != null && north.second < -0.2f, "северный факел: смещение на север")
+
+        // Стоящий факел и обычные блоки смещения не дают.
+        assertNull(Ambience.torchTip(mcplus.net.BlockShape.Torch()))
+        assertNull(Ambience.torchTip(null))
+    }
 }
