@@ -1,11 +1,11 @@
-package mcplus.app.gl
+﻿package mcplus.app.gl
 
 import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
-    GHAST, BOAT, MINECART, NONE,
+    GHAST, BLAZE, BOAT, MINECART, NONE,
 }
 
 /**
@@ -67,6 +67,7 @@ object MobModels {
         "slime" -> MobFamily.SLIME
         "magma_cube" -> MobFamily.MAGMA_CUBE
         "ghast" -> MobFamily.GHAST
+        "blaze" -> MobFamily.BLAZE
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -119,6 +120,7 @@ object MobModels {
         MobFamily.SLIME -> 64 to 32
         MobFamily.MAGMA_CUBE -> 64 to 64
         MobFamily.GHAST -> 64 to 32
+        MobFamily.BLAZE -> 64 to 32
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -136,6 +138,7 @@ object MobModels {
         MobFamily.SLIME -> SLIME
         MobFamily.MAGMA_CUBE -> MAGMA_CUBE
         MobFamily.GHAST -> GHAST
+        MobFamily.BLAZE -> BLAZE
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -356,6 +359,29 @@ object MobModels {
             )
         }
     }
+
+    /**
+     * Всполох (`BlazeModel`): голова и двенадцать стержней вокруг неё.
+     *
+     * Стержни висят на разной высоте — так в игре получается «клетка» из палок.
+     * Низ модели — конец самого нижнего стержня, поэтому голова оказывается на 1.25 блока.
+     * Строки получены `tools/build-mob-model.js` из дампа `mob-dump`.
+     */
+    private val BLAZE = listOf(
+        MobBox("part0", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.5625f, offsetY = 1.31f),
+        MobBox("part1", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetY = 1.3176f, offsetZ = 0.5625f),
+        MobBox("part2", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.5625f, offsetY = 1.3388f),
+        MobBox("head", -0.25f, -0.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 0, v = 0, offsetY = 1.2475f),
+        MobBox("part3", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetY = 1.3681f, offsetZ = -0.5625f),
+        MobBox("part11", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1419f, offsetY = 0.5841f, offsetZ = -0.2784f),
+        MobBox("part4", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.3094f, offsetY = 1.1485f, offsetZ = 0.3094f),
+        MobBox("part10", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.2784f, offsetY = 0.5383f, offsetZ = -0.1419f),
+        MobBox("part5", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.3094f, offsetY = 1.1726f, offsetZ = 0.3094f),
+        MobBox("part6", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.3094f, offsetY = 1.1844f, offsetZ = -0.3094f),
+        MobBox("part7", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.3094f, offsetY = 1.181f, offsetZ = -0.3094f),
+        MobBox("part8", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.2784f, offsetY = 0.5f, offsetZ = 0.1419f),
+        MobBox("part9", 0f, -0.5f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1419f, offsetY = 0.5042f, offsetZ = 0.2784f),
+    )
 
     /**
      * Лодка (`BoatModel`): днище, четыре борта и два весла.

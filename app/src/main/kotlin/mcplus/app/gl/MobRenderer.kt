@@ -395,6 +395,7 @@ class MobRenderer(
             "slime" to "entity/slime/slime.png",
             "magma_cube" to "entity/slime/magmacube.png",
             "ghast" to "entity/ghast/ghast.png",
+            "blaze" to "entity/blaze/blaze.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

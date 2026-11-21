@@ -332,6 +332,25 @@ class MobModelsTest {
     }
 
     @Test
+    fun `blaze is a head in a cage of twelve rods`() {
+        assertEquals(MobFamily.BLAZE, MobModels.familyOf("blaze"))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.BLAZE))
+        assertEquals("entity/blaze/blaze.png", MobRenderer.TEXTURES["blaze"])
+
+        val boxes = MobModels.boxes(MobFamily.BLAZE)
+        assertEquals(13, boxes.size, "голова и двенадцать стержней")
+        assertEquals(1, boxes.count { it.name == "head" })
+        assertEquals(12, boxes.count { it.name != "head" })
+
+        // Голова сидит наверху: низ модели — концы стержней.
+        val head = boxes.first { it.name == "head" }
+        assertTrue(head.offsetY > 1.2f, "голова всполоха должна быть на 1.25 блока")
+        val rods = boxes.filter { it.name != "head" }
+        assertTrue(rods.any { it.offsetY < 0.6f }, "часть стержней висит ниже")
+        assertTrue(rods.all { it.minY == -0.5f }, "стержень — два на восемь пикселей")
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }
