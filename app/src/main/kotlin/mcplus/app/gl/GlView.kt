@@ -27,10 +27,6 @@ object GlView {
     private const val TICK_SECONDS = 1.0 / 20.0
 
     /** Гуманоидные мобы, которых рисуем моделью человека с их текстурой. */
-    private val ZOMBIE_TYPES = setOf("zombie", "husk", "drowned", "zombie_villager", "zombified_piglin")
-    private val SKELETON_TYPES = setOf("skeleton", "stray", "bogged")
-    private val ENDERMAN_TYPES = setOf("enderman")
-    private val PIGLIN_TYPES = setOf("piglin", "zombified_piglin", "piglin_brute")
     private val PROJECTILE_TYPES = setOf(
         "arrow", "spectral_arrow", "snowball", "egg", "ender_pearl", "trident",
         "experience_bottle", "potion", "fireball", "small_fireball",
@@ -488,29 +484,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     }
                     // Частицы: спрайты из textures/particle, собранные в один атлас.
                     val particleRenderer = ParticleRenderer(width, height, directory)
-                    // Гуманоидные мобы — та же модель человека, но со своей текстурой.
-                    val zombieRenderer = PlayerRenderer(
-                        width, height,
-                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/zombie/zombie.png"),
-                    )
-                    val skeletonRenderer = PlayerRenderer(
-                        width, height,
-                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/skeleton/skeleton.png"),
-                        classic = true,
-                    )
-                    val endermanRenderer = PlayerRenderer(
-                        width, height,
-                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/enderman/enderman.png"),
-                        classic = true,
-                    )
-                    val piglinRenderer = PlayerRenderer(
-                        width, height,
-                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/piglin/piglin.png"),
-                    )
-                    // Странствующий торговец — тот же гуманоид, но в синем халате.
-                    val traderRenderer = PlayerRenderer(
-                        width, height,
-                        GameFiles.readPng(directory, "assets/minecraft/textures/entity/wandering_trader/wandering_trader.png"),
+                    // Гуманоидные мобы: одна модель человека, у каждого свой скин. Раскладка
+                    // у мобов классическая — левые рука и нога зеркалят правые; отдельные
+                    // пиксели для них есть только у скинов игроков.
+                    val humanoidRenderer = PlayerRenderer(
+                        width, height, null, classic = true, directory = directory,
                     )
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
@@ -2323,11 +2301,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 sneak = sneakHeld,
                             )
                         }
-                        val zombies = ArrayList<PlayerRenderer.Player>()
-                        val skeletons = ArrayList<PlayerRenderer.Player>()
-                        val endermen = ArrayList<PlayerRenderer.Player>()
-                        val piglins = ArrayList<PlayerRenderer.Player>()
-                        val traders = ArrayList<PlayerRenderer.Player>()
+                        val humanoids = ArrayList<PlayerRenderer.Player>()
 
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
@@ -2360,12 +2334,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     hurt = entity.hurtProgress(System.nanoTime()),
                                 )
                                 val family = MobModels.familyOf(name)
+                                val look = HumanoidLook.lookOf(name)
                                 when {
-                                    name in ZOMBIE_TYPES -> zombies += humanoid
-                                    name in SKELETON_TYPES -> skeletons += humanoid
-                                    name in ENDERMAN_TYPES -> endermen += humanoid
-                                    name in PIGLIN_TYPES -> piglins += humanoid
-                                    name == "wandering_trader" -> traders += humanoid
+                                    look != null ->
+                                        humanoids += humanoid.copy(
+                                            texture = humanoidRenderer.textureFor(look),
+                                        )
 
                                     name == "item" -> {                                        // Выпавший предмет: мини-куб блока, если это блок.
                                         val stack = entity.droppedItem
@@ -2461,9 +2435,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             if (heldName != null) {
                                 val typeName = entityTypes.nameOf(entity.type)
                                 val isHumanoid = playerList.nameOf(entity.uuid) != null ||
-                                    typeName in ZOMBIE_TYPES || typeName in SKELETON_TYPES ||
-                                    typeName in ENDERMAN_TYPES || typeName in PIGLIN_TYPES ||
-                                    typeName == "wandering_trader"
+                                    HumanoidLook.isHumanoid(typeName)
                                 val height = if (isHumanoid) 1.8f else EntityRay.boxOf(typeName).second
                                 val yawRad = Math.toRadians(entity.yaw.toDouble())
                                 val forwardX = kotlin.math.sin(yawRad).toFloat()
@@ -2493,8 +2465,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             // поверх модели. Своих слоёв брони пока нет, но силуэт виден.
                             val typeName = entityTypes.nameOf(entity.type)
                             val isHumanoid = playerList.nameOf(entity.uuid) != null ||
-                                typeName in ZOMBIE_TYPES || typeName in SKELETON_TYPES ||
-                                typeName in ENDERMAN_TYPES || typeName in PIGLIN_TYPES
+                                HumanoidLook.isHumanoid(typeName)
                             if (isHumanoid) {
                                 val yaw = -Math.toRadians(entity.yaw.toDouble()).toFloat()
                                 val pieces = listOf(
@@ -2521,11 +2492,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                         }
                         playerRenderer.draw(camera, players)
-                        zombieRenderer.draw(camera, zombies)
-                        skeletonRenderer.draw(camera, skeletons)
-                        endermanRenderer.draw(camera, endermen)
-                        piglinRenderer.draw(camera, piglins)
-                        traderRenderer.draw(camera, traders)
+                        humanoidRenderer.draw(camera, humanoids)
 
                         mobRenderer.draw(camera, mobs)
                         if (mobDemo) {
@@ -2573,6 +2540,25 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 )
                             }
                             mobRenderer.draw(camera, demoMobs)
+
+                            // Вторым рядом, выше и дальше — гуманоиды: видно, что у каждого
+                            // свой скин и что левые конечности зеркалят правые. Ряд выше
+                            // первого, иначе мобы закрывают его собой: они на том же месте.
+                            val humanoidSamples = listOf(
+                                "zombie", "drowned", "husk", "pillager", "skeleton", "enderman",
+                            )
+                            val demoHumanoids = humanoidSamples.mapIndexedNotNull { index, typeName ->
+                                val look = HumanoidLook.lookOf(typeName) ?: return@mapIndexedNotNull null
+                                val side = (index - (humanoidSamples.size - 1) / 2f) * 1.6f
+                                PlayerRenderer.Player(
+                                    x = camera.x + forward[0] * 11.0 + right[0] * side,
+                                    y = camera.y + 3.4,
+                                    z = camera.z + forward[2] * 11.0 + right[2] * side,
+                                    yaw = faceCamera,
+                                    texture = humanoidRenderer.textureFor(look),
+                                )
+                            }
+                            humanoidRenderer.draw(camera, demoHumanoids)
                         }
                         entityRenderer.draw(camera, boxes)
                         if (debris.isNotEmpty()) {
@@ -3337,10 +3323,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     entityRenderer.close()
                     mobRenderer.close()
                     particleRenderer.close()
-                    zombieRenderer.close()
-                    skeletonRenderer.close()
-                    endermanRenderer.close()
-                    piglinRenderer.close()
+                    humanoidRenderer.close()
                     playerRenderer.close()
                     skyRenderer.close()
                     hud.close()

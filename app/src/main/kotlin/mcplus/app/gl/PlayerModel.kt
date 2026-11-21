@@ -78,6 +78,15 @@ object PlayerModel {
 
     val vertexCount: Int by lazy { MODERN_PARTS.sumOf { it.vertexCount } }
 
+    /**
+     * Номер первой вершины части по байтовому смещению в общем буфере.
+     *
+     * `glDrawArrays` ждёт номер вершины, а не байт: если разделить только на размер float,
+     * все части кроме головы окажутся за концом буфера и просто не нарисуются.
+     */
+    fun firstVertex(byteOffset: Int): Int =
+        byteOffset / (FLOATS_PER_VERTEX * Float.SIZE_BYTES)
+
     /** Largest limb swing in radians, at full speed. */
     const val MAX_SWING = 0.8f
 

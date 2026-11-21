@@ -387,6 +387,8 @@ class MobRenderer(
             // лежат отдельными файлами, см. VillagerLook. У зомби-жителя те же слои.
             "villager" to VillagerLook.BASE,
             "zombie_villager" to VillagerLook.ZOMBIE_BASE,
+            // Странствующий торговец — та же модель жителя, свой халат и без слоёв.
+            "wandering_trader" to "entity/wandering_trader/wandering_trader.png",
         )
 
         /** Сколько чисел на вершину: x, y, z, u, v, shade. */

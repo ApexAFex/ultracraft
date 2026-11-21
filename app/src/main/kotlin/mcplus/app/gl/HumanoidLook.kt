@@ -1,0 +1,39 @@
+package mcplus.app.gl
+
+/**
+ * Какие мобы рисуются моделью человека и какой у них скин.
+ *
+ * В Minecraft две раскладки скина: у игрока (`entity/player/wide/steve.png`) современная
+ * 64×64, где у левых руки и ноги свои пиксели, а у мобов — классическая: левые конечности
+ * берут текстуру правых, только зеркально. Это видно в самой игре: `HumanoidModel`
+ * строит `left_arm` с `texOffs(40, 16)` и `mirror()`, а `PlayerModel` — с `texOffs(32, 48)`.
+ * Поэтому у зомби файл скина 64×64, но правая половина пустая: игра её и не читает.
+ *
+ * Таблица чистая: ни GL, ни чтения файлов, поэтому её можно проверить тестами.
+ */
+object HumanoidLook {
+
+    /** Скин моба по пути внутри `assets/minecraft/textures`. */
+    fun lookOf(typeName: String): String? = when (typeName) {
+        "zombie" -> "entity/zombie/zombie.png"
+        "drowned" -> "entity/zombie/drowned.png"
+        "husk" -> "entity/zombie/husk.png"
+        "zombified_piglin" -> "entity/piglin/zombified_piglin.png"
+        "piglin" -> "entity/piglin/piglin.png"
+        "piglin_brute" -> "entity/piglin/piglin_brute.png"
+        "pillager" -> "entity/illager/pillager.png"
+        "vindicator" -> "entity/illager/vindicator.png"
+        "evoker" -> "entity/illager/evoker.png"
+        "illusioner" -> "entity/illager/illusioner.png"
+        "skeleton" -> "entity/skeleton/skeleton.png"
+        "stray" -> "entity/skeleton/stray.png"
+        "bogged" -> "entity/skeleton/bogged.png"
+        "parched" -> "entity/skeleton/parched.png"
+        "wither_skeleton" -> "entity/skeleton/wither_skeleton.png"
+        "enderman" -> "entity/enderman/enderman.png"
+        else -> null
+    }
+
+    /** Гуманоид ли это: нужен для руки с предметом и брони. */
+    fun isHumanoid(typeName: String): Boolean = lookOf(typeName) != null
+}

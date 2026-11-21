@@ -20,6 +20,8 @@ class PlayerRenderer(
     private val skin: BufferedImage?,
     /** Скин 64×32 (скелет): левые конечности зеркалят правые. */
     private val classic: Boolean = false,
+    /** Установка игры: из неё читаются скины мобов (`textureFor`). */
+    private val directory: java.io.File? = null,
 ) : Closeable {
 
     /** One player to draw: position, facing in protocol degrees, walk phase and speed. */
@@ -36,6 +38,13 @@ class PlayerRenderer(
         val hurt: Float = 0f,
         /** Игрок крадётся: модель ниже, как в ванили. */
         val sneak: Boolean = false,
+        /**
+         * Свой скин для этого моба (0 — скин по умолчанию из конструктора).
+         *
+         * Так один рендерер рисует и игрока, и зомби, и пиглина: модель общая, отличается
+         * только текстура.
+         */
+        val texture: Int = 0,
     )
 
     private val program = createProgram()
@@ -47,6 +56,14 @@ class PlayerRenderer(
     private val vao = GL30.glGenVertexArrays()
     private val vbo = GL30.glGenBuffers()
     private val texture = skin?.let { upload(it) } ?: 0
+
+    /** Скины мобов по пути в установке игры: грузятся один раз. */
+    private val skins = HashMap<String, Int>()
+
+    /** Скин по пути внутри `assets/minecraft/textures` (0 — файла нет). */
+    fun textureFor(path: String): Int = skins.getOrPut(path) {
+        GameFiles.readPng(directory, "assets/minecraft/textures/$path")?.let { upload(it) } ?: 0
+    }
 
     /** Byte offset of each part inside the shared buffer. */
     private val offsets: IntArray
@@ -81,7 +98,7 @@ class PlayerRenderer(
     }
 
     fun draw(camera: Camera, players: List<Player>) {
-        if (players.isEmpty() || texture == 0) return
+        if (players.isEmpty()) return
 
         GL30.glUseProgram(program)
         GL30.glUniformMatrix4fv(
@@ -90,11 +107,14 @@ class PlayerRenderer(
         )
         GL30.glUniform1i(skinLocation, 0)
         GL30.glActiveTexture(GL30.GL_TEXTURE0)
-        GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
         GL30.glBindVertexArray(vao)
 
         val parts = PlayerModel.parts(classic)
         for (player in players) {
+            // У мобов свой скин, у игроков — общий из конструктора.
+            val current = if (player.texture != 0) player.texture else texture
+            if (current == 0) continue
+            GL30.glBindTexture(GL30.GL_TEXTURE_2D, current)
             GL30.glUniform3f(
                 tintLocation, 1f,
                 1f - player.hurt * 0.65f,
@@ -117,7 +137,12 @@ class PlayerRenderer(
                     val rotated = Mat4.multiply(model, Mat4.multiply(pivot, Mat4.rotateX(angle)))
                     GL30.glUniformMatrix4fv(modelLocation, false, Mat4.multiply(rotated, back))
                 }
-                GL30.glDrawArrays(GL30.GL_TRIANGLES, offsets[index] / Float.SIZE_BYTES, part.vertexCount)
+                // offsets лежат в байтах, а glDrawArrays ждёт номер вершины.
+                GL30.glDrawArrays(
+                    GL30.GL_TRIANGLES,
+                    PlayerModel.firstVertex(offsets[index]),
+                    part.vertexCount,
+                )
             }
         }
 
@@ -142,6 +167,7 @@ class PlayerRenderer(
 
     override fun close() {
         if (texture != 0) GL30.glDeleteTextures(texture)
+        for (skin in skins.values) if (skin != 0) GL30.glDeleteTextures(skin)
         GL30.glDeleteBuffers(vbo)
         GL30.glDeleteVertexArrays(vao)
         GL30.glDeleteProgram(program)

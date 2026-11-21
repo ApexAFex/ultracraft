@@ -108,6 +108,57 @@ class PlayerModelTest {
     }
 
     @Test
+    fun `each limb sits on its own side of the body`() {
+        fun bounds(part: PlayerModel.Part): Triple<ClosedFloatingPointRange<Float>, ClosedFloatingPointRange<Float>, ClosedFloatingPointRange<Float>> {
+            var minX = Float.MAX_VALUE
+            var maxX = -Float.MAX_VALUE
+            var minY = Float.MAX_VALUE
+            var maxY = -Float.MAX_VALUE
+            var minZ = Float.MAX_VALUE
+            var maxZ = -Float.MAX_VALUE
+            var index = 0
+            while (index < part.data.size) {
+                minX = minOf(minX, part.data[index])
+                maxX = maxOf(maxX, part.data[index])
+                minY = minOf(minY, part.data[index + 1])
+                maxY = maxOf(maxY, part.data[index + 1])
+                minZ = minOf(minZ, part.data[index + 2])
+                maxZ = maxOf(maxZ, part.data[index + 2])
+                index += PlayerModel.FLOATS_PER_VERTEX
+            }
+            return Triple(minX..maxX, minY..maxY, minZ..maxZ)
+        }
+
+        val rightArm = bounds(parts.first { it.name == "rightArm" })
+        val leftArm = bounds(parts.first { it.name == "leftArm" })
+        val rightLeg = bounds(parts.first { it.name == "rightLeg" })
+        val leftLeg = bounds(parts.first { it.name == "leftLeg" })
+
+        assertEquals(-0.5f..-0.25f, rightArm.first)
+        assertEquals(0.25f..0.5f, leftArm.first)
+        assertEquals(-0.25f..0f, rightLeg.first)
+        assertEquals(0f..0.25f, leftLeg.first)
+        assertEquals(0.75f..1.5f, rightArm.second)
+        assertEquals(0f..0.75f, leftLeg.second)
+    }
+
+    @Test
+    fun `parts start at consecutive vertex numbers, not float offsets`() {
+        // Байтовое смещение делится на размер целой вершины: раньше делили только на
+        // размер float, и все части кроме головы уезжали за конец буфера.
+        var byteOffset = 0
+        for ((index, part) in parts.withIndex()) {
+            assertEquals(
+                index * 36,
+                PlayerModel.firstVertex(byteOffset),
+                "${part.name} должна начинаться с вершины ${index * 36}",
+            )
+            byteOffset += part.data.size * Float.SIZE_BYTES
+        }
+        assertEquals(parts.sumOf { it.vertexCount }, PlayerModel.firstVertex(byteOffset))
+    }
+
+    @Test
     fun `swing amplitude is clamped to the model`() {
         val phase = (kotlin.math.PI / 2).toFloat()
 
