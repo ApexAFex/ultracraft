@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.MetaEntry
 
@@ -259,6 +259,40 @@ class MobModelsTest {
         // Они стоят по кругу: есть и спереди, и сзади, и по бокам.
         assertTrue(tentacles.any { it.minZ < 0f } && tentacles.any { it.maxZ > 0f })
         assertTrue(tentacles.any { it.minX < 0f } && tentacles.any { it.maxX > 0f })
+    }
+
+    @Test
+    fun `boats are a hull with sides and two paddles`() {
+        assertEquals(MobFamily.BOAT, MobModels.familyOf("oak_boat"))
+        assertEquals(MobFamily.BOAT, MobModels.familyOf("oak_chest_boat"))
+        assertEquals(MobFamily.BOAT, MobModels.familyOf("bamboo_boat"))
+        assertEquals(128 to 64, MobModels.textureSize(MobFamily.BOAT))
+        // Лодка вытянута вдоль X, поэтому модель поворачивается на 90°.
+        assertEquals(-90f, MobModels.yawOffsetOf(MobFamily.BOAT))
+        assertEquals(0f, MobModels.yawOffsetOf(MobFamily.GHAST))
+
+        val boxes = MobModels.boxes(MobFamily.BOAT)
+        assertEquals(9, boxes.size, "днище, четыре борта и четыре части вёсел")
+        assertEquals(1, boxes.count { it.name == "bottom" })
+        assertEquals(4, boxes.count { it.name == "side" })
+        assertEquals(4, boxes.count { it.name == "paddle" })
+        assertTrue(boxes.first { it.name == "bottom" }.rotX != 0f, "днище в модели повёрнуто на 90°")
+
+        for (wood in listOf("oak", "spruce", "bamboo")) {
+            val path = MobRenderer.TEXTURES["${wood}_boat"]
+            assertTrue(path != null && path.endsWith("/$wood.png"), "$wood без текстуры лодки")
+        }
+    }
+
+    @Test
+    fun `every boat box fits into the 128 by 64 sheet`() {
+        for (box in MobModels.boxes(MobFamily.BOAT)) {
+            val w = ((box.maxX - box.minX) * 16f).toInt()
+            val h = ((box.maxY - box.minY) * 16f).toInt()
+            val d = ((box.maxZ - box.minZ) * 16f).toInt()
+            assertTrue(box.u + 2 * (d + w) <= 128, "${box.name}: развёртка шире листа")
+            assertTrue(box.v + d + h <= 64, "${box.name}: развёртка выше листа")
+        }
     }
 
     @Test

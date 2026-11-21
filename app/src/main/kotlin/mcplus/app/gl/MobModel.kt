@@ -1,11 +1,11 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
-    GHAST, NONE,
+    GHAST, BOAT, NONE,
 }
 
 /**
@@ -67,7 +67,19 @@ object MobModels {
         "slime" -> MobFamily.SLIME
         "magma_cube" -> MobFamily.MAGMA_CUBE
         "ghast" -> MobFamily.GHAST
-        else -> MobFamily.NONE
+        // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
+        else -> if (entityName.endsWith("_boat")) MobFamily.BOAT else MobFamily.NONE
+    }
+
+    /**
+     * Поворот модели вокруг Y, если её длина идёт по X, а не по Z.
+     *
+     * Лодка в модели вытянута вдоль X (28 пикселей), поэтому без поворота она стояла бы
+     * поперёк своего направления.
+     */
+    fun yawOffsetOf(family: MobFamily): Float = when (family) {
+        MobFamily.BOAT -> -90f
+        else -> 0f
     }
 
     /** Множитель размера: свинья мельче коровы, цыплёнок мельче курицы. */
@@ -102,6 +114,7 @@ object MobModels {
         MobFamily.SLIME -> 64 to 32
         MobFamily.MAGMA_CUBE -> 64 to 64
         MobFamily.GHAST -> 64 to 32
+        MobFamily.BOAT -> 128 to 64
         else -> 64 to 32
     }
 
@@ -117,6 +130,7 @@ object MobModels {
         MobFamily.SLIME -> SLIME
         MobFamily.MAGMA_CUBE -> MAGMA_CUBE
         MobFamily.GHAST -> GHAST
+        MobFamily.BOAT -> BOAT
         MobFamily.NONE -> emptyList()
     }
 
@@ -335,4 +349,54 @@ object MobModels {
             )
         }
     }
+
+    /**
+     * Лодка (`BoatModel`): днище, четыре борта и два весла.
+     *
+     * Модель описывается в ванильной системе: Y вниз, части повёрнуты вокруг своих осей
+     * (`bottom` — на 90° вокруг X, борта — на 90/180/270° вокруг Y). Здесь всё переведено
+     * в нашу систему: Y вверх (`y → -y`), повороты X и Z меняют знак, Y остаётся.
+     * Низ модели — днище — поставлен на y = 0.
+     */
+    private val BOAT = listOf(
+        MobBox(
+            "bottom", -0.875f, -0.4375f, -0.1875f, 0.875f, 0.5625f, 0f,
+            u = 0, v = 0, offsetY = 0.1875f, offsetZ = 0.0625f, rotX = -1.5708f,
+        ),
+        MobBox(
+            "side", -0.875f, 0.0625f, -0.0625f, 0.875f, 0.4375f, 0.0625f,
+            u = 0, v = 43, offsetY = 0.125f, offsetZ = 0.5625f,
+        ),
+        MobBox(
+            "side", -0.875f, 0.0625f, -0.0625f, 0.875f, 0.4375f, 0.0625f,
+            u = 0, v = 35, offsetY = 0.125f, offsetZ = -0.5625f, rotY = 3.1416f,
+        ),
+        MobBox(
+            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.4375f, 0.0625f,
+            u = 0, v = 27, offsetX = 0.9375f, offsetY = 0.125f, rotY = 1.5708f,
+        ),
+        MobBox(
+            "side", -0.8125f, 0.0625f, -0.0625f, 0.3125f, 0.4375f, 0.0625f,
+            u = 0, v = 19, offsetX = -0.9375f, offsetY = 0.125f, offsetZ = 0.25f, rotY = 4.712f,
+        ),
+        // Вёсла: черенок и лопасть. В ванили они чуть повёрнуты вокруг Z.
+        MobBox(
+            "paddle", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
+            u = 62, v = 0, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = 0.5625f, rotZ = -0.196f,
+        ),
+        MobBox(
+            "paddle", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
+            u = 62, v = 0, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = 0.5625f, rotZ = -0.196f,
+        ),
+        MobBox(
+            "paddle", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
+            u = 62, v = 20, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = -0.5625f,
+            rotY = 3.1416f, rotZ = -0.196f,
+        ),
+        MobBox(
+            "paddle", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
+            u = 62, v = 20, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = -0.5625f,
+            rotY = 3.1416f, rotZ = -0.196f,
+        ),
+    )
 }

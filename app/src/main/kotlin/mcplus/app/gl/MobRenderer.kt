@@ -114,7 +114,9 @@ class MobRenderer(
             1f - mob.hurt * 0.65f,
         )
 
-        val yaw = -Math.toRadians(mob.yaw.toDouble()).toFloat()
+        // Лодка и вагонетка в модели длиной по X, а не по Z: им нужен поворот на 90°.
+        val yaw = -Math.toRadians(mob.yaw.toDouble()).toFloat() +
+            Math.toRadians(MobModels.yawOffsetOf(mob.family).toDouble()).toFloat()
         val base = Mat4.multiply(
             Mat4.translate(mob.x.toFloat(), mob.y.toFloat(), mob.z.toFloat()),
             Mat4.multiply(Mat4.rotateY(yaw), scale(mob.scale)),
@@ -393,6 +395,31 @@ class MobRenderer(
             "slime" to "entity/slime/slime.png",
             "magma_cube" to "entity/slime/magmacube.png",
             "ghast" to "entity/ghast/ghast.png",
+
+            // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
+            // сам сундук на борту не рисуется.
+            "oak_boat" to "entity/boat/oak.png",
+            "oak_chest_boat" to "entity/boat/oak.png",
+            "spruce_boat" to "entity/boat/spruce.png",
+            "spruce_chest_boat" to "entity/boat/spruce.png",
+            "birch_boat" to "entity/boat/birch.png",
+            "birch_chest_boat" to "entity/boat/birch.png",
+            "jungle_boat" to "entity/boat/jungle.png",
+            "jungle_chest_boat" to "entity/boat/jungle.png",
+            "acacia_boat" to "entity/boat/acacia.png",
+            "acacia_chest_boat" to "entity/boat/acacia.png",
+            "dark_oak_boat" to "entity/boat/dark_oak.png",
+            "dark_oak_chest_boat" to "entity/boat/dark_oak.png",
+            "mangrove_boat" to "entity/boat/mangrove.png",
+            "mangrove_chest_boat" to "entity/boat/mangrove.png",
+            "cherry_boat" to "entity/boat/cherry.png",
+            "cherry_chest_boat" to "entity/boat/cherry.png",
+            "pale_oak_boat" to "entity/boat/pale_oak.png",
+            "pale_oak_chest_boat" to "entity/boat/pale_oak.png",
+            "poplar_boat" to "entity/boat/poplar.png",
+            "poplar_chest_boat" to "entity/boat/poplar.png",
+            "bamboo_boat" to "entity/boat/bamboo.png",
+            "bamboo_chest_boat" to "entity/boat/bamboo.png",
 
             // Шкура жителя — только база (лицо, руки, штаны). Климат, профессия и уровень
             // лежат отдельными файлами, см. VillagerLook. У зомби-жителя те же слои.
