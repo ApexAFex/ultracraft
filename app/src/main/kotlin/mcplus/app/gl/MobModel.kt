@@ -5,7 +5,7 @@ import mcplus.net.MetaEntry
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
-    GHAST, BOAT, NONE,
+    GHAST, BOAT, MINECART, NONE,
 }
 
 /**
@@ -68,17 +68,22 @@ object MobModels {
         "magma_cube" -> MobFamily.MAGMA_CUBE
         "ghast" -> MobFamily.GHAST
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
-        else -> if (entityName.endsWith("_boat")) MobFamily.BOAT else MobFamily.NONE
+        else -> when {
+            entityName.endsWith("_boat") -> MobFamily.BOAT
+            // Вагонетки: обычная, с сундуком, печью, воронкой, ТНТ и командным блоком.
+            entityName == "minecart" || entityName.endsWith("_minecart") -> MobFamily.MINECART
+            else -> MobFamily.NONE
+        }
     }
 
     /**
      * Поворот модели вокруг Y, если её длина идёт по X, а не по Z.
      *
-     * Лодка в модели вытянута вдоль X (28 пикселей), поэтому без поворота она стояла бы
-     * поперёк своего направления.
+     * Лодка и вагонетка в модели вытянуты вдоль X, поэтому без поворота встали бы поперёк
+     * своего направления.
      */
     fun yawOffsetOf(family: MobFamily): Float = when (family) {
-        MobFamily.BOAT -> -90f
+        MobFamily.BOAT, MobFamily.MINECART -> -90f
         else -> 0f
     }
 
@@ -115,6 +120,7 @@ object MobModels {
         MobFamily.MAGMA_CUBE -> 64 to 64
         MobFamily.GHAST -> 64 to 32
         MobFamily.BOAT -> 128 to 64
+        MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
     }
 
@@ -131,6 +137,7 @@ object MobModels {
         MobFamily.MAGMA_CUBE -> MAGMA_CUBE
         MobFamily.GHAST -> GHAST
         MobFamily.BOAT -> BOAT
+        MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
     }
 
@@ -397,6 +404,37 @@ object MobModels {
             "paddle", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
             u = 62, v = 20, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = -0.5625f,
             rotY = 3.1416f, rotZ = -0.196f,
+        ),
+    )
+
+    /**
+     * Вагонетка (`MinecartModel`): днище и четыре борта.
+     *
+     * В ванильной модели днище повёрнуто на 90° вокруг X, а борта — на 90/180/270° вокруг Y;
+     * после переворота Y (вверх) знаки X и Z меняются, Y остаётся. Низ — днище — на y = 0.
+     * Коробки те же для всех вагонеток: с сундуком, печью и воронкой сверху ставится блок,
+     * а сам кузов один.
+     */
+    private val MINECART = listOf(
+        MobBox(
+            "bottom", -0.625f, -0.5f, -0.0625f, 0.625f, 0.5f, 0.0625f,
+            u = 0, v = 10, offsetY = 0.0625f, rotX = -1.5708f,
+        ),
+        MobBox(
+            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
+            u = 0, v = 0, offsetY = 0.0625f, offsetZ = -0.4375f, rotY = 3.1416f,
+        ),
+        MobBox(
+            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
+            u = 0, v = 0, offsetY = 0.0625f, offsetZ = 0.4375f,
+        ),
+        MobBox(
+            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
+            u = 0, v = 0, offsetX = -0.5625f, offsetY = 0.0625f, rotY = 4.712f,
+        ),
+        MobBox(
+            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
+            u = 0, v = 0, offsetX = 0.5625f, offsetY = 0.0625f, rotY = 1.5708f,
         ),
     )
 }

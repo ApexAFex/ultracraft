@@ -421,6 +421,15 @@ class MobRenderer(
             "bamboo_boat" to "entity/boat/bamboo.png",
             "bamboo_chest_boat" to "entity/boat/bamboo.png",
 
+            // Вагонетки: кузов один, роль (сундук, печь, воронка) задаёт блок сверху —
+            // его пока не рисуем, поэтому текстура у всех типов общая.
+            "minecart" to "entity/minecart/minecart.png",
+            "chest_minecart" to "entity/minecart/minecart.png",
+            "furnace_minecart" to "entity/minecart/minecart.png",
+            "hopper_minecart" to "entity/minecart/minecart.png",
+            "tnt_minecart" to "entity/minecart/minecart.png",
+            "command_block_minecart" to "entity/minecart/minecart.png",
+
             // Шкура жителя — только база (лицо, руки, штаны). Климат, профессия и уровень
             // лежат отдельными файлами, см. VillagerLook. У зомби-жителя те же слои.
             "villager" to VillagerLook.BASE,

@@ -296,6 +296,42 @@ class MobModelsTest {
     }
 
     @Test
+    fun `minecarts are a hull of five boxes`() {
+        assertEquals(MobFamily.MINECART, MobModels.familyOf("minecart"))
+        assertEquals(MobFamily.MINECART, MobModels.familyOf("chest_minecart"))
+        assertEquals(MobFamily.MINECART, MobModels.familyOf("hopper_minecart"))
+        assertEquals(MobFamily.MINECART, MobModels.familyOf("tnt_minecart"))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.MINECART))
+        assertEquals(-90f, MobModels.yawOffsetOf(MobFamily.MINECART))
+
+        val boxes = MobModels.boxes(MobFamily.MINECART)
+        assertEquals(5, boxes.size, "днище и четыре борта")
+        assertEquals(1, boxes.count { it.name == "bottom" })
+        assertEquals(4, boxes.count { it.name == "side" })
+        assertTrue(boxes.first { it.name == "bottom" }.rotX != 0f, "днище повёрнуто на 90°")
+        // Борта стоят по сторонам: два по Z и два по X.
+        assertTrue(boxes.filter { it.name == "side" }.any { it.offsetZ > 0f })
+        assertTrue(boxes.filter { it.name == "side" }.any { it.offsetZ < 0f })
+        assertTrue(boxes.filter { it.name == "side" }.any { it.offsetX > 0f })
+        assertTrue(boxes.filter { it.name == "side" }.any { it.offsetX < 0f })
+
+        for (name in listOf("minecart", "chest_minecart", "tnt_minecart")) {
+            assertEquals("entity/minecart/minecart.png", MobRenderer.TEXTURES[name])
+        }
+    }
+
+    @Test
+    fun `every minecart box fits into its sheet`() {
+        for (box in MobModels.boxes(MobFamily.MINECART)) {
+            val w = ((box.maxX - box.minX) * 16f).toInt()
+            val h = ((box.maxY - box.minY) * 16f).toInt()
+            val d = ((box.maxZ - box.minZ) * 16f).toInt()
+            assertTrue(box.u + 2 * (d + w) <= 64, "${box.name}: развёртка шире листа")
+            assertTrue(box.v + d + h <= 32, "${box.name}: развёртка выше листа")
+        }
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }
