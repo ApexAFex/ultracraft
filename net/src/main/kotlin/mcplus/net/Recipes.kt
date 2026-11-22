@@ -142,7 +142,13 @@ class RecipeBook {
         3 -> { readSlot(reader); skipPredicate(reader); -1 }
         4 -> reader.readVarInt()                     // предмет
         5 -> readTemplateStack(reader)               // стек с компонентами
-        6 -> { reader.readVarInt(); -1 }              // тег: номер тега как VarInt (лучший замер: 2 записи)
+        6 -> {
+            reader.readVarInt()
+            // Диагностический довесок: перебор в тесте проверяет, не идёт ли после номера
+            // тега ещё несколько байт. В обычной работе он равен нулю.
+            repeat(tagExtra()) { reader.readByte() }
+            -1
+        }
         7 -> { readSlot(reader); reader.readVarInt(); -1 }       // крашеный
         8 -> { readSlot(reader); readSlot(reader); readSlot(reader); -1 } // отделка
         9 -> { val inner = readSlot(reader); readSlot(reader); inner }    // с остатком
@@ -197,6 +203,9 @@ data class Recipe(val id: Int, val result: Int, val ingredients: List<Int>)
 internal class RecipeFormatException(message: String) : RuntimeException(message)
 
 /** Больше рецептов в книге не бывает. */
+/** Диагностический довесок после номера тега (0 в обычной работе). */
+private fun tagExtra(): Int = System.getProperty("mcplus.tagExtra", "0").toIntOrNull() ?: 0
+
 private const val MAX_RECIPES = 4096
 
 /** Сетка крафта в игре максимум 3×3. */

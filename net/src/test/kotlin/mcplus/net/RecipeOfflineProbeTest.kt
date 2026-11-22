@@ -26,6 +26,13 @@ class RecipeOfflineProbeTest {
             println("пакета рецептов нет — замер пропущен")
             return
         }
+        for (extra in 0..2) {
+            System.setProperty("mcplus.tagExtra", extra.toString())
+            val book = RecipeBook()
+            book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, body)
+            println("довесок тега $extra → рецептов ${book.size}")
+        }
+        System.setProperty("mcplus.tagExtra", "0")
         val book = RecipeBook()
         book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, body)
         println("боевой разбор сохранённого пакета: рецептов ${book.size} из ${body.size} байт")
