@@ -319,7 +319,8 @@ class Hud(
         val top = height * 0.10f
         val labels = ArrayList<TextRenderer.ScreenLabel>()
         labels += TextRenderer.ScreenLabel(left, top, "Статистика", s * 1.6f)
-        labels += TextRenderer.ScreenLabel(left, top + 26f * s, category, s * 1.1f)
+        // Сколько счётчиков в выбранном виде: иначе непонятно, список кончился или нет.
+        labels += TextRenderer.ScreenLabel(left, top + 26f * s, "$category — ${rows.size}", s * 1.1f)
 
         // Колонка видов счётчиков слева: по ней переключаются мышью, как в игре.
         val listX = width * 0.02f
@@ -371,6 +372,14 @@ class Hud(
                     left, top + (56f + visible * 14f) * s,
                     "${from + 1}…${(from + visible).coerceAtMost(rows.size)} из ${rows.size}",
                     s * 0.8f,
+                )
+            } else {
+                // Сколько всего счётчиков в виде: иначе непонятно, список кончился или нет.
+                labels += TextRenderer.ScreenLabel(
+                    left, top + (56f + visible * 14f) * s,
+                    "всего ${rows.size}",
+                    s * 0.8f,
+                    0x8A94A0,
                 )
             }
         }

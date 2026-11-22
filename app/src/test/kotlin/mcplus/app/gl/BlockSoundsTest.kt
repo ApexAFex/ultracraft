@@ -46,6 +46,17 @@ class BlockSoundsTest {
     }
 
     @Test
+    fun `closing a container plays the right lid sound`() {
+        assertEquals("block.chest.close", BlockSounds.closeSound("generic_9x3"))
+        assertEquals("block.chest.close", BlockSounds.closeSound("generic_9x6"))
+        assertEquals("block.shulker_box.close", BlockSounds.closeSound("shulker_box"))
+        // У наковальни, печи и верстака своего звука закрытия нет — там молчим.
+        assertNull(BlockSounds.closeSound("anvil"))
+        assertNull(BlockSounds.closeSound("furnace"))
+        assertNull(BlockSounds.closeSound("crafting"))
+    }
+
+    @Test
     fun `plain blocks are silent`() {
         assertNull(BlockSounds.openSound("stone"))
         assertNull(BlockSounds.openSound("grass_block"))

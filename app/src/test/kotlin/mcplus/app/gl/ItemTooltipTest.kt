@@ -50,8 +50,15 @@ class ItemTooltipTest {
     @Test
     fun `count, damage and the enchantment mark are appended`() {
         val lines = ItemTooltip.lines(stack(count = 3, damage = 10), "Меч", maxDamage = 100)
-        assertEquals("Меч  90/100 ×3", lines[0].first)
+        assertEquals("Меч ×3", lines[0].first, "имя без числа прочности — оно отдельной строкой")
         assertEquals(0xFFFFFF, lines[0].second)
+        assertEquals("Прочность: 90 из 100", lines[1].first)
+        assertTrue(lines[1].second == 0x7FD07F, "больше половины — зелёная строка")
+
+        // Почти сломанный инструмент: цвет строки красный.
+        val worn = ItemTooltip.lines(stack(damage = 95), "Кирка", maxDamage = 100)
+        assertEquals("Прочность: 5 из 100", worn[1].first)
+        assertTrue(worn[1].second == 0xD07070, "меньше четверти — красная строка")
 
         val enchanted = ItemTooltip.lines(
             stack(enchantments = listOf(5 to 3)), "Меч",

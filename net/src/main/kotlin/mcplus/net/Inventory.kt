@@ -306,6 +306,18 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
 
             // Компоненты без полезной нагрузки: планировщик крыла и «нематериальный снаряд».
             "glider", "intangible_projectile" -> Unit
+            // `custom_data` — произвольный NBT датапака: он самодостаточен по длине,
+            // поэтому его можно прочитать и выбросить, а не считать стек «неизвестным».
+            "custom_data" -> mcplus.protocol.nbt.NbtReader.read(reader)
+            // Узоры флага: список пар «узор, цвет», оба — номера реестров.
+            "banner_patterns" -> {
+                val layers = reader.readVarInt()
+                if (layers !in 0..MAX_BANNER_LAYERS) throw UnreadableStack(count)
+                repeat(layers) {
+                    reader.readVarInt()
+                    reader.readVarInt()
+                }
+            }
             // Одно число: минимальный заряд удара и множитель длительности зелья — float,
             // доплата торговцу, уровень зачаруемости и номер карты — VarInt.
             "minimum_attack_charge", "potion_duration_scale" -> reader.readFloat()
@@ -347,3 +359,6 @@ private const val MAX_ENCHANTMENTS = 64
 
 /** Предел строк описания: в игре `ItemLore.MAX_LINES`. */
 private const val MAX_LORE_LINES = 256
+
+/** Узоров на флаге в игре не больше двадцати. */
+private const val MAX_BANNER_LAYERS = 32

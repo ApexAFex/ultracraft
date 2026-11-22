@@ -56,4 +56,17 @@ object BlockSounds {
 
     /** Блоки, у которых есть экран или звук открытия при нажатии. */
     fun isInteractive(blockName: String): Boolean = openSound(blockName) != null
+
+    /**
+     * Звук закрытия экрана контейнера по типу меню: сундук, бочка, шалкер.
+     *
+     * @param menuType тип меню из `Open Screen`, например `generic_9x3` или `shulker_box`
+     */
+    fun closeSound(menuType: String): String? = when {
+        // Открытый экран сундука закрывается со звуком крышки, бочки и шалкера — своим.
+        menuType == "generic_9x3" || menuType == "generic_9x6" -> "block.chest.close"
+        menuType == "shulker_box" -> "block.shulker_box.close"
+        menuType == "crafter_3x3" || menuType == "generic_3x3" -> "block.chest.close"
+        else -> null
+    }
 }

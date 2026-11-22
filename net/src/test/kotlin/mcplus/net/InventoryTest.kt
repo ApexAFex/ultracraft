@@ -275,6 +275,63 @@ class InventoryTest {
     }
 
     @Test
+    fun `custom data is skipped by its own nbt length`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            // custom_data = NBT-словарь {"a": 7}, за ним обычный компонент damage.
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(2)
+                .writeVarInt(0)
+                .writeVarInt(0)      // custom_data
+                .writeByte(0x0A)     // NBT: compound (в сетевом NBT имени корня нет)
+                .writeByte(0x01)     // байт (TAG_Byte = 1)
+                .writeShort(1).writeBytes("a".toByteArray(Charsets.UTF_8))
+                .writeByte(7)
+                .writeByte(0x00)     // конец compound
+                .writeVarInt(3)      // damage = 5
+                .writeVarInt(5)
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(5, parsed.damage, "после custom_data пакет читается дальше")
+            assertEquals("stone", inventory.heldName())
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
+    fun `banner patterns are read as pairs of registry ids`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(74)   // banner_patterns
+                .writeVarInt(2)    // два узора
+                .writeVarInt(4).writeVarInt(1)
+                .writeVarInt(7).writeVarInt(14)
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            assertEquals("stone", inventory.heldName(), "флаг с узорами остаётся известным")
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `a renamed enchanted sword is a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()
@@ -335,26 +392,19 @@ class InventoryTest {
     }
 
     /**
-     * Таблица компонентов как в `data/components-777.tsv`.
+     * Таблица компонентов — настоящая, из `data/components-777.tsv`.
      *
-     * Номер компонента — его место в таблице, а не имя: ошибка здесь даёт «неизвестный
-     * предмет» на зачарованном мече.
+     * Раньше здесь был рукописный список, и номера в тестах разъезжались с игрой: например,
+     * у `banner_patterns` номер 74, а не 51. Теперь тест берёт ту же таблицу, что и клиент.
      */
-    private fun componentTable(): ComponentTable = ComponentTable(
-        listOf(
-            "custom_data", "max_stack_size", "max_damage", "damage", "unbreakable",
-            "use_effects", "custom_name", "minimum_attack_charge", "damage_type",
-            "item_name", "item_model", "lore", "rarity", "enchantments",
-            "can_place_on", "can_break", "attribute_modifiers", "custom_model_data",
-            "tooltip_display", "repair_cost", "creative_slot_lock", "enchantment_glint_override",
-            "intangible_projectile", "food", "consumable", "use_remainder", "use_cooldown",
-            "damage_resistant", "tool", "weapon", "attack_range", "enchantable", "equippable",
-            "repairable", "glider", "tooltip_style", "death_protection", "blocks_attacks",
-            "piercing_weapon", "kinetic_weapon", "attack_animation", "interact_animation",
-            "additional_trade_cost", "block_transformer", "villager_food", "stored_enchantments",
-            "dye", "dyed_color",
-        ),
-    )
+    private fun componentTable(): ComponentTable {
+        // У `net`-тестов рабочий каталог — корень модуля, у `app`-тестов — корень проекта.
+        val file = listOf("data/components-777.tsv", "../data/components-777.tsv")
+            .map { java.io.File(it) }
+            .firstOrNull { it.isFile }
+            ?: error("Нет таблицы компонентов: искали data/components-777.tsv")
+        return ComponentTable.load(file)
+    }
 
     @Test
     fun `the cursor arrives at the end of the whole menu packet`() {

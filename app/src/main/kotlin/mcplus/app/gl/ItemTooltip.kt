@@ -32,14 +32,24 @@ object ItemTooltip {
         maxDamage: Int = 0,
         enchantmentName: (Int) -> String? = { null },
     ): List<Pair<String, Int>> {
-        val result = ArrayList<Pair<String, Int>>(4)
+        val result = ArrayList<Pair<String, Int>>(5)
         val title = buildString {
             append(name)
-            if (maxDamage > 0 && stack.damage > 0) append("  ${maxDamage - stack.damage}/$maxDamage")
             if (stack.count > 1) append(" ×${stack.count}")
             if (stack.enchantments.isNotEmpty() || stack.glintOverride == true) append(" ✦")
         }
         result += title to rarityColor(stack.rarity)
+        // Прочность отдельной строкой: в заголовке она ломала имя, а так видно и остаток,
+        // и предел.
+        if (maxDamage > 0 && stack.damage > 0) {
+            val left = (maxDamage - stack.damage).coerceAtLeast(0)
+            val color = when {
+                left.toFloat() / maxDamage > 0.5f -> 0x7FD07F
+                left.toFloat() / maxDamage > 0.25f -> 0xD8C860
+                else -> 0xD07070
+            }
+            result += "Прочность: $left из $maxDamage" to color
+        }
         // Описание идёт серым, как в игре; строки уже разобраны из компонента `lore`.
         for (line in stack.lore) result += line to 0xAAAAAA
         if (stack.enchantments.isNotEmpty()) {
