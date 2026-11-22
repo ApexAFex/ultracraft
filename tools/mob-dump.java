@@ -66,6 +66,12 @@ final class mob_dump {
                 && method.getParameterTypes()[0] == CubeDeformation.class) {
                 return method.invoke(null, new CubeDeformation(0.0F));
             }
+            // Счастливый гаст: фабрика принимает «детёныш ли» и деформацию куба.
+            if (method.getParameterCount() == 2
+                && method.getParameterTypes()[0] == boolean.class
+                && method.getParameterTypes()[1] == CubeDeformation.class) {
+                return method.invoke(null, false, new CubeDeformation(0.0F));
+            }
         }
         throw new NoSuchMethodException(type.getName() + "." + name);
     }

@@ -42,7 +42,6 @@ class EntityRenderer(private val width: Int, private val height: Int) : Closeabl
      * и плевок ламы маленькие и цветные, иначе они выглядели бы как големы.
      */
     data class Appearance(val width: Float = WIDTH, val height: Float = HEIGHT, val color: Int = 0x33BFD9)
-
     fun draw(
         camera: Camera,
         entities: List<TrackedEntity>,

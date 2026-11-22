@@ -548,6 +548,48 @@ class MobModelsTest {
     }
 
     @Test
+    fun `happy ghast floats with nine tentacles`() {
+        assertEquals(MobFamily.HAPPY_GHAST, MobModels.familyOf("happy_ghast"))
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.HAPPY_GHAST))
+        assertTrue(MobRenderer.TEXTURES["happy_ghast"] != null, "гаст без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.HAPPY_GHAST)
+        // Куб-тело и девять щупалец: в дампе они идут под именами tentacle0…tentacle8.
+        assertEquals(9, boxes.count { it.name.startsWith("tentacle") })
+        assertEquals(boxes.count { it.name.startsWith("tentacle") } + 1, boxes.size)
+        // Тело висит высоко: сущность стоит на земле, а куб — на трёх с половиной блоках.
+        val body = boxes.first { it.name == "body" }
+        assertTrue(body.offsetY >= 3f, "тело гаста висит высоко: ${body.offsetY}")
+        val tentacleBottom = boxes.filter { it.name.startsWith("tentacle") }
+            .minOf { it.offsetY + it.minY }
+        assertTrue(tentacleBottom > 2f, "щупальца не достают до земли: $tentacleBottom")
+    }
+
+    @Test
+    fun `a cushion is a flat seat`() {
+        assertEquals(MobFamily.CUSHION, MobModels.familyOf("cushion"))
+        assertTrue(MobRenderer.TEXTURES["cushion"] != null, "подушка без текстуры")
+        val boxes = MobModels.boxes(MobFamily.CUSHION)
+        assertEquals(1, boxes.size, "подушка — одна плита")
+        val seat = boxes.single()
+        assertEquals(0f, seat.minY, "плита лежит на земле")
+        assertTrue(seat.maxY <= 0.3f, "подушка низкая: ${seat.maxY}")
+        // По X плита занимает блок по центру: смещение в модели 23 пикселя.
+        assertTrue((seat.minX + seat.offsetX).let { kotlin.math.abs(it + 0.5f) } < 0.01f)
+    }
+
+    @Test
+    fun `rafts and the spawner minecart use the boat and minecart models`() {
+        assertEquals(MobFamily.BOAT, MobModels.familyOf("bamboo_raft"))
+        assertEquals(MobFamily.BOAT, MobModels.familyOf("bamboo_chest_raft"))
+        assertEquals(MobFamily.MINECART, MobModels.familyOf("spawner_minecart"))
+        assertTrue(MobRenderer.TEXTURES["bamboo_raft"] != null, "плот без текстуры")
+        assertTrue(MobRenderer.TEXTURES["spawner_minecart"] != null, "вагонетка-спавнер без текстуры")
+        // Плот поворачивается так же, как лодка: модель вытянута вдоль X.
+        assertEquals(-90f, MobModels.yawOffsetOf(MobFamily.BOAT))
+    }
+
+    @Test
     fun `end crystal is a cube on a small base`() {
         assertEquals(MobFamily.CRYSTAL, MobModels.familyOf("end_crystal"))
         assertEquals(64 to 32, MobModels.textureSize(MobFamily.CRYSTAL))

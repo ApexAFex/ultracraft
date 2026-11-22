@@ -2737,6 +2737,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         }
                                     }
 
+                                    // Технические сущности (маркер, зона взаимодействия,
+                                    // дисплеи) в игре не рисуются — не рисуем и мы.
+                                    SpecialEntities.isInvisible(name) -> Unit
+
                                     family == MobFamily.NONE -> boxes += entity
                                     else -> mobs += MobRenderer.Mob(
                                         x = entity.x,
@@ -2980,7 +2984,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         entityRenderer.draw(
                             camera, boxes,
                         ) { entity ->
-                            Projectiles.appearanceOf(entityTypes.nameOf(entity.type))
+                            val typeName = entityTypes.nameOf(entity.type)
+                            Projectiles.appearanceOf(typeName)
+                                ?: SpecialEntities.lookOf(typeName)?.let {
+                                    EntityRenderer.Appearance(it.width, it.height, it.color)
+                                }
                                 ?: EntityRenderer.Appearance()
                         }
                         paintingRenderer.draw(camera, paintings)

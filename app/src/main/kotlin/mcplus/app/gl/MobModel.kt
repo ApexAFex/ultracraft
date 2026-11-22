@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, BOAT, MINECART, NONE,
 }
 
 /**
@@ -128,11 +128,13 @@ object MobModels {
         "ender_dragon" -> MobFamily.DRAGON
         // Кристалл Края: подставка и куб с гранью внутри.
         "end_crystal" -> MobFamily.CRYSTAL
+        "happy_ghast" -> MobFamily.HAPPY_GHAST
+        "cushion" -> MobFamily.CUSHION
         // Серный куб: та же геометрия, что у слизня, но своя текстура.
         "sulfur_cube" -> MobFamily.SLIME
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
-            entityName.endsWith("_boat") -> MobFamily.BOAT
+            entityName.endsWith("_boat") || entityName.endsWith("_raft") -> MobFamily.BOAT
             // Вагонетки: обычная, с сундуком, печью, воронкой, ТНТ и командным блоком.
             entityName == "minecart" || entityName.endsWith("_minecart") -> MobFamily.MINECART
             else -> MobFamily.NONE
@@ -230,6 +232,8 @@ object MobModels {
         MobFamily.NAUTILUS -> 128 to 128
         MobFamily.DRAGON -> 256 to 256
         MobFamily.CRYSTAL -> 64 to 32
+        MobFamily.HAPPY_GHAST -> 64 to 64
+        MobFamily.CUSHION -> 64 to 64
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -289,6 +293,8 @@ object MobModels {
         MobFamily.NAUTILUS -> NAUTILUS
         MobFamily.DRAGON -> DRAGON
         MobFamily.CRYSTAL -> CRYSTAL
+        MobFamily.HAPPY_GHAST -> HAPPY_GHAST
+        MobFamily.CUSHION -> CUSHION
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -1382,5 +1388,28 @@ object MobModels {
         MobBox("outer_glass", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 0, v = 0),
         MobBox("inner_glass", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 0, v = 0),
         MobBox("cube", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 32, v = 0),
+    )
+
+    /**
+     * Счастливый гаст (HappyGhastModel): куб-тело и девять щупалец, лист 64×64. Модель висит высоко: у сущности ноги на нуле, а тело — на трёх с половиной блоках, поэтому смещения подняты на 41 пиксель (в дампе корень модели стоит на -72).
+     */
+    private val HAPPY_GHAST = listOf(
+        MobBox("body", -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, u = 0, v = 0, offsetY = 3.5f),
+        MobBox("tentacle0", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 3.0625f, offsetZ = -0.3125f),
+        MobBox("tentacle1", -0.0625f, -0.4375f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 3.0625f, offsetZ = -0.3125f),
+        MobBox("tentacle8", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 3.0625f, offsetZ = 0.3125f),
+        MobBox("tentacle6", -0.0625f, -0.5f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 3.0625f, offsetZ = 0.3125f),
+        MobBox("tentacle7", -0.0625f, -0.5f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 3.0625f, offsetZ = 0.3125f),
+        MobBox("tentacle4", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.0781f, offsetY = 3.0625f),
+        MobBox("tentacle5", -0.0625f, -0.4375f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.2344f, offsetY = 3.0625f),
+        MobBox("tentacle2", -0.0625f, -0.25f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 3.0625f, offsetZ = -0.3125f),
+        MobBox("tentacle3", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.3906f, offsetY = 3.0625f),
+    )
+
+    /**
+     * Подушка (CushionModel): одна плита-сиденье, лист 64×64. Цвет — из метаданных, которых мы пока не читаем, поэтому рисуется белая.
+     */
+    private val CUSHION = listOf(
+        MobBox("cushion", -1.9375f, 0f, -0.0625f, -0.9375f, 0.25f, 0.9375f, u = 0, v = 0, offsetX = 1.4375f, offsetZ = -0.4375f),
     )
 }

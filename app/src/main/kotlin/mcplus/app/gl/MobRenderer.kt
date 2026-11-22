@@ -439,12 +439,16 @@ class MobRenderer(
             "camel_husk" to "entity/camel/camel_husk.png",
             "ender_dragon" to "entity/enderdragon/dragon.png",
             "end_crystal" to "entity/end_crystal/end_crystal.png",
+            "happy_ghast" to "entity/ghast/happy_ghast.png",
+            "cushion" to "entity/cushion/white_cushion.png",
             "sulfur_cube" to "entity/sulfur_cube/sulfur_cube_inner.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.
             "oak_boat" to "entity/boat/oak.png",
             "oak_chest_boat" to "entity/boat/oak.png",
+            "bamboo_raft" to "entity/boat/bamboo.png",
+            "bamboo_chest_raft" to "entity/boat/bamboo.png",
             "spruce_boat" to "entity/boat/spruce.png",
             "spruce_chest_boat" to "entity/boat/spruce.png",
             "birch_boat" to "entity/boat/birch.png",
@@ -474,6 +478,7 @@ class MobRenderer(
             "hopper_minecart" to "entity/minecart/minecart.png",
             "tnt_minecart" to "entity/minecart/minecart.png",
             "command_block_minecart" to "entity/minecart/minecart.png",
+            "spawner_minecart" to "entity/minecart/minecart.png",
 
             // Шкура жителя — только база (лицо, руки, штаны). Климат, профессия и уровень
             // лежат отдельными файлами, см. VillagerLook. У зомби-жителя те же слои.
