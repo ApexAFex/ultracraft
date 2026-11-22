@@ -46,6 +46,14 @@ class RecipeBook {
                 "Рецепты: разбор сломался на байте $at из ${body.size} после $parsedRecipes записей; " +
                     "окно [$from..$to): $window; причина: ${it.message}",
             )
+            // Весь пакет кладём на диск: следующий заход сможет разбирать формат офлайн,
+            // без запуска игры и сервера — байтов там все 10 КБ, а не окно в 32.
+            runCatching {
+                val file = java.io.File("screenshots/recipes-packet.bin")
+                file.parentFile?.mkdirs()
+                if (!file.exists() || file.length() != body.size.toLong()) file.writeBytes(body)
+                println("Рецепты: пакет целиком сохранён в ${file.path}")
+            }
         }
         return true
     }
