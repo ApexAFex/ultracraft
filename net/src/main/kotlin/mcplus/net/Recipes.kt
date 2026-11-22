@@ -31,18 +31,24 @@ class RecipeBook {
 
     fun onPacket(packetId: Int, body: ByteArray): Boolean {
         if (packetId != Protocol777.Play.RECIPE_BOOK_ADD) return false
-        runCatching { read(body) }
+        val reader = ByteReader(body)
+        runCatching { read(body, reader) }
             .onFailure {
-                // Первые байты пакета печатаем: по ним видно, где разъехался формат,
-                // без этого подбирать номера типов вслепую бессмысленно.
-                val head = body.take(48).joinToString(" ") { byte -> "%02x".format(byte) }
-                println("Рецепты: пакет не разобран — ${it.message}; всего ${body.size} байт: $head")
+                // Печатаем место, где разбор сломался, и окно байтов вокруг него: по нему
+                // видно, какое поле пропущено, без повторных прогонов вслепую.
+                val at = (body.size - reader.remaining).coerceIn(0, body.size)
+                val from = (at - 8).coerceAtLeast(0)
+                val to = (at + 24).coerceAtMost(body.size)
+                val window = body.copyOfRange(from, to).joinToString(" ") { byte -> "%02x".format(byte) }
+                println(
+                    "Рецепты: пакет не разобран — ${it.message}; сломалось на байте $at из ${body.size}, " +
+                        "окно [$from..$to): $window",
+                )
             }
         return true
     }
 
-    private fun read(body: ByteArray) {
-        val reader = ByteReader(body)
+    private fun read(body: ByteArray, reader: ByteReader) {
         val count = reader.readVarInt()
         if (count !in 0..MAX_RECIPES) throw RecipeFormatException("рецептов: $count")
         // Собираем во временную карту: при ошибке книга остаётся прежней, а не полупустой.
