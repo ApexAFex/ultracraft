@@ -140,7 +140,7 @@ class InventoryTest {
     @Test
     fun `enchantments and a custom name are read from the component patch`() {
         val previous = ComponentTable.active
-        // Индексы как в data/components-777.tsv: damage, custom_name, enchantments.
+        // Индексы как в data/components-777.tsv: damage, custom_name, attribute_modifiers.
         ComponentTable.active = componentTable()
         try {
             val inventory = Inventory(items)
@@ -156,13 +156,58 @@ class InventoryTest {
                 .writeByte(0x08)  // NBT: строка
                 .writeShort(name.size)
                 .writeBytes(name)
-                .writeVarInt(9)   // item_name — незнакомый компонент
+                .writeVarInt(16)  // attribute_modifiers — незнакомый компонент
             val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
             inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
 
             // Незнакомый компонент в патче: стек неизвестен, но количество сохраняется.
             assertNull(inventory.heldName())
             assertEquals(1, inventory.stackIn(0)?.count)
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
+    fun `rarity, dye, lore and the stack limit are read too`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            fun nbtString(text: String): ByteArray {
+                val bytes = text.toByteArray(Charsets.UTF_8)
+                return ByteWriter()
+                    .writeByte(0x08)
+                    .writeShort(bytes.size)
+                    .writeBytes(bytes)
+                    .toByteArray()
+            }
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(5)    // пять компонентов
+                .writeVarInt(0)
+                .writeVarInt(1)    // max_stack_size = 16
+                .writeVarInt(16)
+                .writeVarInt(12)   // rarity = 2 (редкий)
+                .writeVarInt(2)
+                .writeVarInt(47)   // dyed_color
+                .writeInt(0x3366CC)
+                .writeVarInt(21)   // enchantment_glint_override = false
+                .writeBoolean(false)
+                .writeVarInt(11)   // lore: одна строка
+                .writeVarInt(1)
+                .writeBytes(nbtString("Строка описания"))
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(16, parsed.maxStackSize)
+            assertEquals(2, parsed.rarity)
+            assertEquals(0x3366CC, parsed.dyedColor)
+            assertEquals(false, parsed.glintOverride)
+            assertEquals(listOf("Строка описания"), parsed.lore)
         } finally {
             ComponentTable.active = previous
         }
@@ -239,6 +284,14 @@ class InventoryTest {
             "custom_data", "max_stack_size", "max_damage", "damage", "unbreakable",
             "use_effects", "custom_name", "minimum_attack_charge", "damage_type",
             "item_name", "item_model", "lore", "rarity", "enchantments",
+            "can_place_on", "can_break", "attribute_modifiers", "custom_model_data",
+            "tooltip_display", "repair_cost", "creative_slot_lock", "enchantment_glint_override",
+            "intangible_projectile", "food", "consumable", "use_remainder", "use_cooldown",
+            "damage_resistant", "tool", "weapon", "attack_range", "enchantable", "equippable",
+            "repairable", "glider", "tooltip_style", "death_protection", "blocks_attacks",
+            "piercing_weapon", "kinetic_weapon", "attack_animation", "interact_animation",
+            "additional_trade_cost", "block_transformer", "villager_food", "stored_enchantments",
+            "dye", "dyed_color",
         ),
     )
 

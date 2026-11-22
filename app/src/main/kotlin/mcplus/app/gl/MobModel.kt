@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, BOAT, MINECART, NONE,
 }
 
 /**
@@ -116,6 +116,11 @@ object MobModels {
         "wither" -> MobFamily.WITHER
         "vex" -> MobFamily.VEX
         "ravager" -> MobFamily.RAVAGER
+        // Стойка для брони: тонкие палки вместо рук и ног, шляпа и подставка.
+        "armor_stand" -> MobFamily.ARMOR_STAND
+        // Иглобрюх и тропическая рыба: маленькие модели, лист 32×32.
+        "pufferfish" -> MobFamily.PUFFERFISH
+        "tropical_fish" -> MobFamily.TROPICAL_FISH
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -205,6 +210,9 @@ object MobModels {
         MobFamily.WITHER -> 64 to 64
         MobFamily.VEX -> 32 to 32
         MobFamily.RAVAGER -> 128 to 128
+        MobFamily.ARMOR_STAND -> 64 to 64
+        MobFamily.PUFFERFISH -> 32 to 32
+        MobFamily.TROPICAL_FISH -> 32 to 32
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -255,6 +263,9 @@ object MobModels {
         MobFamily.WITHER -> WITHER
         MobFamily.VEX -> VEX
         MobFamily.RAVAGER -> RAVAGER
+        MobFamily.ARMOR_STAND -> ARMOR_STAND
+        MobFamily.PUFFERFISH -> PUFFERFISH
+        MobFamily.TROPICAL_FISH -> TROPICAL_FISH
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -1149,5 +1160,54 @@ object MobModels {
         MobBox("body", -0.4375f, -0.375f, -0.4375f, 0.4375f, 0.625f, 0.8125f, u = 0, v = 55, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.4375f, 0.125f, 1f)),
         MobBox("body", -0.375f, -1.1875f, -0.4375f, 0.375f, -0.375f, 0.6875f, u = 0, v = 91, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.4375f, 0.125f, 1f)),
         MobBox("left_front_leg", -0.25f, -2.3125f, -0.25f, 0.25f, 0f, 0.25f, u = 64, v = 0, offsetX = 0.5f, offsetY = 2.3125f, offsetZ = -0.3125f),
+    )
+
+    /**
+     * Стойка для брони (`ArmorStandModel`): тонкие палки вместо рук и ног, голова и подставка.
+     *
+     * В игре у неё есть позы (руки подняты, ноги согнуты), но приходят они метаданными,
+     * которых мы пока не читаем: стойка стоит в позе по умолчанию.
+     */
+    private val ARMOR_STAND = listOf(
+        MobBox("head", -0.0625f, 0f, -0.0625f, 0.0625f, 0.4375f, 0.0625f, u = 0, v = 0, offsetY = 1.4375f),
+        MobBox("hat", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 32, v = 0, offsetY = 1.4375f),
+        MobBox("left_body_stick", 0.0625f, -0.625f, -0.0625f, 0.1875f, -0.1875f, 0.0625f, u = 48, v = 16, offsetY = 1.5f),
+        MobBox("right_arm", -0.125f, -0.625f, -0.0625f, 0f, 0.125f, 0.0625f, u = 24, v = 0, offsetX = -0.3125f, offsetY = 1.375f),
+        MobBox("left_leg", -0.0625f, -0.6875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 40, v = 16, offsetX = 0.1188f, offsetY = 0.75f),
+        MobBox("left_arm", 0f, -0.625f, -0.0625f, 0.125f, 0.125f, 0.0625f, u = 32, v = 16, offsetX = 0.3125f, offsetY = 1.375f),
+        MobBox("right_leg", -0.0625f, -0.6875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 8, v = 0, offsetX = -0.1187f, offsetY = 0.75f),
+        MobBox("shoulder_stick", -0.25f, -0.75f, -0.0625f, 0.25f, -0.625f, 0.0625f, u = 0, v = 48, offsetY = 1.5f),
+        MobBox("right_body_stick", -0.1875f, -0.625f, -0.0625f, -0.0625f, -0.1875f, 0.0625f, u = 16, v = 0, offsetY = 1.5f),
+        MobBox("base_plate", -0.375f, -0.75f, -0.375f, 0.375f, -0.6875f, 0.375f, u = 0, v = 32, offsetY = 0.75f),
+        MobBox("body", -0.375f, -0.1875f, -0.0937f, 0.375f, 0f, 0.0938f, u = 0, v = 26, offsetY = 1.5f),
+    )
+
+    /**
+     * Иглобрюх (`PufferfishSmallModel`): тело-шарик, два глаза, плавники и хвост.
+     *
+     * В игре у него три модели по состоянию надувания (маленький, средний, большой);
+     * метаданные состояния мы пока не читаем, поэтому берём обычную — маленькую.
+     */
+    private val PUFFERFISH = listOf(
+        MobBox("right_eye", -0.0937f, -0.0625f, -0.0937f, -0.0312f, 0f, -0.0312f, u = 24, v = 6, offsetY = 0.1875f),
+        MobBox("left_fin", 0f, 0f, 0f, 0.0625f, 0f, 0.125f, u = 25, v = 0, offsetX = 0.0938f, offsetY = 0.0625f, offsetZ = -0.0937f),
+        MobBox("right_fin", -0.0625f, 0f, 0f, 0f, 0f, 0.125f, u = 25, v = 0, offsetX = -0.0937f, offsetY = 0.0625f, offsetZ = -0.0937f),
+        MobBox("left_eye", 0.0313f, -0.0625f, -0.0937f, 0.0938f, 0f, -0.0312f, u = 28, v = 6, offsetY = 0.1875f),
+        MobBox("body", -0.0937f, 0f, -0.0937f, 0.0938f, 0.125f, 0.0938f, u = 0, v = 27),
+        MobBox("back_fin", -0.0937f, 0f, 0f, 0.0938f, 0f, 0.1875f, u = -3, v = 0, offsetY = 0.0625f, offsetZ = 0.0938f),
+    )
+
+    /**
+     * Тропическая рыба (`TropicalFishSmallModel`): тело, хвост и три плавника.
+     *
+     * Расцветок у неё десятки (основа и узор — отдельные слои текстуры). Взят базовый
+     * `tropical_a`: без метаданных варианта другого не выбрать.
+     */
+    private val TROPICAL_FISH = listOf(
+        MobBox("left_fin", 0f, -0.0625f, 0f, 0.125f, 0.0625f, 0f, u = 2, v = 12, matrix = floatArrayOf(0.7074f, 0f, 0.7068f, 0f, 0f, 1f, 0f, 0f, -0.7068f, 0f, 0.7074f, 0f, 0.0625f, 0.0625f, 0f, 1f)),
+        MobBox("top_fin", 0f, 0f, 0f, 0f, 0.1875f, 0.375f, u = 10, v = -5, offsetY = 0.1875f, offsetZ = -0.1875f),
+        MobBox("tail", 0f, -0.0937f, 0f, 0f, 0.0938f, 0.375f, u = 22, v = -6, offsetY = 0.0938f, offsetZ = 0.1875f),
+        MobBox("right_fin", -0.125f, -0.0625f, 0f, 0f, 0.0625f, 0f, u = 2, v = 16, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, 0f, 1f, 0f, 0f, 0.7068f, 0f, 0.7074f, 0f, -0.0625f, 0.0625f, 0f, 1f)),
+        MobBox("body", -0.0625f, -0.0937f, -0.1875f, 0.0625f, 0.0938f, 0.1875f, u = 0, v = 0, offsetY = 0.0938f),
     )
 }

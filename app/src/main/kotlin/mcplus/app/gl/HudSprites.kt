@@ -57,6 +57,8 @@ class HudSprites(val sheet: SpriteSheet) {
             add("gui_loom" to "assets/minecraft/textures/gui/container/loom.png")
             add("gui_cartography" to "assets/minecraft/textures/gui/container/cartography_table.png")
             add("gui_villager" to "assets/minecraft/textures/gui/container/villager.png")
+            add("gui_dispenser" to "assets/minecraft/textures/gui/container/dispenser.png")
+            add("gui_crafter" to "assets/minecraft/textures/gui/container/crafter.png")
             // Подложки иконок эффектов: обычная и «фоновая» (маяк, кондуит).
             add("effect_background" to "hud/effect_background.png")
             add("effect_background_ambient" to "hud/effect_background_ambient.png")

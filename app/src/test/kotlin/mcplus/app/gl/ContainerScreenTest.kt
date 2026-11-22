@@ -94,4 +94,45 @@ class ContainerScreenTest {
         assertEquals(20f, bySlot.getValue(4).y)
         assertTrue(bySlot.getValue(5).y >= 84f, "инвентарь игрока ниже слотов воронки")
     }
+
+    @Test
+    fun `a dispenser draws a 3x3 grid in the middle`() {
+        val dispenser = OpenContainer(7, "generic_3x3", "Dispenser", 45)
+        val bySlot = ContainerScreen.cells(dispenser).associateBy { it.menuSlot }
+
+        assertEquals("gui_dispenser", ContainerScreen.layout(dispenser).background)
+        assertEquals(62f, bySlot.getValue(0).x)
+        assertEquals(17f, bySlot.getValue(0).y)
+        assertEquals(62f + 2 * 18f, bySlot.getValue(2).x)
+        assertEquals(17f + 2 * 18f, bySlot.getValue(8).y)
+        assertEquals(84f, bySlot.getValue(9).y, "инвентарь игрока под сеткой")
+    }
+
+    @Test
+    fun `a crafter keeps its grid on the left`() {
+        val crafter = OpenContainer(8, "crafter_3x3", "Crafter", 45)
+        val bySlot = ContainerScreen.cells(crafter).associateBy { it.menuSlot }
+
+        assertEquals("gui_crafter", ContainerScreen.layout(crafter).background)
+        assertEquals(26f, bySlot.getValue(0).x)
+        assertEquals(26f + 2 * 18f, bySlot.getValue(2).x)
+        assertEquals(17f, bySlot.getValue(0).y)
+    }
+
+    @Test
+    fun `a merchant panel is wider and shifts the player inventory right`() {
+        val merchant = OpenContainer(9, "merchant", "Farmer", 39)
+        val layout = ContainerScreen.layout(merchant)
+        val bySlot = ContainerScreen.cells(merchant).associateBy { it.menuSlot }
+
+        assertEquals(276, layout.width)
+        assertEquals(108, layout.playerX)
+        assertEquals(136f, bySlot.getValue(0).x)
+        assertEquals(220f, bySlot.getValue(2).x)
+        assertEquals(108f, bySlot.getValue(3).x, "инвентарь сдвинут вправо")
+        // Клик по панели попадает в те же слоты, что и нарисованы: центр панели шире 176.
+        val (screenX, screenY) = ContainerScreen.screenPointOf(merchant, bySlot.getValue(2)!!, 1280, 720)
+        val (x, y) = ContainerScreen.panelPoint(merchant, screenX, screenY, 1280, 720)
+        assertEquals(bySlot.getValue(2), ContainerScreen.slotAt(merchant, x, y))
+    }
 }

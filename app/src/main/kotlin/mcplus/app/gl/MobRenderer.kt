@@ -428,6 +428,9 @@ class MobRenderer(
             "wither" to "entity/wither/wither.png",
             "vex" to "entity/illager/vex.png",
             "ravager" to "entity/illager/ravager.png",
+            "armor_stand" to "entity/armorstand/armorstand.png",
+            "pufferfish" to "entity/fish/pufferfish.png",
+            "tropical_fish" to "entity/fish/tropical_a.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

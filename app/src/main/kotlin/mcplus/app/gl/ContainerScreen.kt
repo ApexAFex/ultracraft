@@ -79,6 +79,14 @@ object ContainerScreen {
                 84, width = 276, playerX = 108,
             )
         },
+        // Раздатчик и выбрасыватель: сетка 3×3 по центру панели.
+        "generic_3x3" to {
+            Layout("gui_dispenser", 166, (0 until 9).map { slot(it, 62f + (it % 3) * 18f, 17f + (it / 3) * 18f) }, 84)
+        },
+        // Станок-крафтер: та же сетка 3×3, но левее — справа у него ячейки включения.
+        "crafter_3x3" to {
+            Layout("gui_crafter", 166, (0 until 9).map { slot(it, 26f + (it % 3) * 18f, 17f + (it / 3) * 18f) }, 84)
+        },
     )
 
     fun layout(container: OpenContainer): Layout {

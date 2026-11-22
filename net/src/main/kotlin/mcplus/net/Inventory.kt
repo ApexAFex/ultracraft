@@ -33,6 +33,16 @@ class Inventory(
         val customName: String? = null,
         /** Зачарования: пары «номер зачарования, уровень» (реестр зачарований встроен). */
         val enchantments: List<Pair<Int, Int>> = emptyList(),
+        /** Редкость: 0 — обычная, 1 — необычная, 2 — редкая, 3 — эпическая. */
+        val rarity: Int = 0,
+        /** Цвет кожи: компонент `dyed_color` (0 — не покрашено). */
+        val dyedColor: Int = 0,
+        /** Строки описания из компонента `lore`. */
+        val lore: List<String> = emptyList(),
+        /** Предел стопки из компонента `max_stack_size` (0 — обычный для предмета). */
+        val maxStackSize: Int = 0,
+        /** `enchantment_glint_override`: блеск включают или выключают принудительно. */
+        val glintOverride: Boolean? = null,
     ) {
         val isEmpty: Boolean get() = count <= 0
 
@@ -253,10 +263,16 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
 
     val added = reader.readVarInt()
     val removed = reader.readVarInt()
-    // Патч компонентов: износ, имя и зачарования читаются, остальное неизвестно по длине.
+    // Патч компонентов: износ, имя, описание, редкость и зачарования читаются, остальное
+    // неизвестно по длине — такой стек помечается «неизвестным», но пакет не рвётся.
     var damage = 0
     var customName: String? = null
     val enchantments = ArrayList<Pair<Int, Int>>()
+    var rarity = 0
+    var dyedColor = 0
+    var lore: List<String> = emptyList()
+    var maxStackSize = 0
+    var glintOverride: Boolean? = null
     repeat(added) {
         val id = reader.readVarInt()
         when (ComponentTable.active.nameOf(id)) {
@@ -265,9 +281,23 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
             "max_damage", "repair_cost" -> reader.readVarInt()
             // `unbreakable` — компонент без полезной нагрузки.
             "unbreakable" -> Unit
-            "custom_name" -> customName = mcplus.net.componentText(
+            // Предел стопки и редкость — тоже по одному VarInt.
+            "max_stack_size" -> maxStackSize = reader.readVarInt()
+            "rarity" -> rarity = reader.readVarInt()
+            // Цвет кожи — обычный int (0xRRGGBB).
+            "dyed_color" -> dyedColor = reader.readInt()
+            "enchantment_glint_override" -> glintOverride = reader.readBoolean()
+            "custom_name", "item_name" -> customName = mcplus.net.componentText(
                 mcplus.protocol.nbt.NbtReader.read(reader),
             )
+            // Описание: количество строк и сами строки компонентами NBT.
+            "lore" -> {
+                val lines = reader.readVarInt()
+                if (lines !in 0..MAX_LORE_LINES) throw UnreadableStack(count)
+                lore = (0 until lines).map {
+                    mcplus.net.componentText(mcplus.protocol.nbt.NbtReader.read(reader))
+                }
+            }
             "enchantments", "stored_enchantments" -> {
                 val size = reader.readVarInt()
                 if (size !in 0..MAX_ENCHANTMENTS) throw UnreadableStack(count)
@@ -279,7 +309,18 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
     }
     repeat(removed) { reader.readVarInt() }
 
-    return Inventory.Stack(itemId, count, damage, customName, enchantments)
+    return Inventory.Stack(
+        itemId = itemId,
+        count = count,
+        damage = damage,
+        customName = customName,
+        enchantments = enchantments,
+        rarity = rarity,
+        dyedColor = dyedColor,
+        lore = lore,
+        maxStackSize = maxStackSize,
+        glintOverride = glintOverride,
+    )
 }
 
 /** То же, но нечитаемый стек превращается в «неизвестный предмет» с количеством. */
@@ -294,3 +335,6 @@ internal class UnreadableStack(val count: Int) : RuntimeException()
 
 /** Больше зачарований на одном предмете в игре не бывает. */
 private const val MAX_ENCHANTMENTS = 64
+
+/** Предел строк описания: в игре `ItemLore.MAX_LINES`. */
+private const val MAX_LORE_LINES = 256

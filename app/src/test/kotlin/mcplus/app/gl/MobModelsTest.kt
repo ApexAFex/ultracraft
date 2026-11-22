@@ -548,6 +548,42 @@ class MobModelsTest {
     }
 
     @Test
+    fun `armor stand is thin sticks on a base plate`() {
+        assertEquals(MobFamily.ARMOR_STAND, MobModels.familyOf("armor_stand"))
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.ARMOR_STAND))
+        assertTrue(MobRenderer.TEXTURES["armor_stand"] != null, "стойка без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.ARMOR_STAND)
+        assertEquals(11, boxes.size)
+        assertTrue(boxes.any { it.name == "base_plate" }, "у стойки есть подставка")
+        assertEquals(3, boxes.count { it.name.endsWith("_stick") }, "поперечная палка и две боковые")
+        // Палочные руки тонкие: четверть блока против полутора у игрока.
+        val arm = boxes.first { it.name == "right_arm" }
+        assertTrue(arm.maxX - arm.minX <= 0.2f, "рука стойки тонкая: ${arm.maxX - arm.minX}")
+    }
+
+    @Test
+    fun `pufferfish and tropical fish are tiny fish of their own`() {
+        val cases = listOf(
+            Triple("pufferfish", MobFamily.PUFFERFISH, 32 to 32),
+            Triple("tropical_fish", MobFamily.TROPICAL_FISH, 32 to 32),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+        val puffer = MobModels.boxes(MobFamily.PUFFERFISH)
+        assertEquals(6, puffer.size)
+        // Иглобрюх — шарик меньше блока: 3 пикселя в поперечнике.
+        val body = puffer.first { it.name == "body" }
+        assertTrue(body.maxX - body.minX < 0.25f, "тело иглобрюха маленькое")
+        assertEquals(5, MobModels.boxes(MobFamily.TROPICAL_FISH).size)
+        // Боковые плавники тропической рыбы повёрнуты — у них матрица.
+        assertEquals(2, MobModels.boxes(MobFamily.TROPICAL_FISH).count { it.matrix != null })
+    }
+
+    @Test
     fun `wither has three heads and is drawn twice as large`() {
         assertEquals(MobFamily.WITHER, MobModels.familyOf("wither"))
         assertEquals(64 to 64, MobModels.textureSize(MobFamily.WITHER))
