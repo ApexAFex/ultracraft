@@ -849,6 +849,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     }
 
                     fun demoPlace(hit: Raycast.Hit) {
+                        // Дверь, люк, калитка, рычаг и кнопка звучат при нажатии — звук
+                        // играет клиент, сервер его не присылает.
+                        val clicked = blocks.nameOf(world.blockAt(hit.x, hit.y, hit.z))
+                        BlockSounds.openSound(clicked)?.let { event ->
+                            sound.play(event, hit.x + 0.5, hit.y + 0.5, hit.z + 0.5)
+                        }
                         val state = heldBlockState()
                         if (state == null) {
                             println("Ставить нечего: в руке нет блока")
@@ -908,7 +914,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     var tradeScroll = 0
     // Номер окна, для которого уже выбрана сделка: новый житель — новая торговля.
     var tradeScreenId = -1
-    var statisticsType = 8
+    var statisticsType = 0
     var statisticsScroll = 0
     var statisticsLeftWasDown = false
     var statisticsRightWasDown = false
@@ -3295,6 +3301,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 rows,
                                 statisticsScroll,
                                 selectedType = StatisticsScreen.TYPES[statisticsType],
+                                // Иконки предметов только у «предметных» видов счётчиков:
+                                // у убитых мобов и своих счётчиков иконки не из атласа блоков.
+                                iconLayer = if (StatisticsScreen.TYPES[statisticsType] <= 5) {
+                                    { name: String -> atlas.layerForItem(name) }
+                                } else {
+                                    null
+                                },
                             )
                         } else if (advancementsOpen) {
                             // Экран достижений: вкладки и дерево; клик по вкладке — выше.
@@ -3326,6 +3339,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     },
                                     air = if (air.fraction < 1f) air.fraction else null,
                                 )
+                                // Полоска использования: сколько ещё держать кнопку, пока
+                                // едим или пьём.
+                                if (usingItem != null && usingKind != null) {
+                                    val total = (useEndNanos - useStartNanos).coerceAtLeast(1L)
+                                    val done = (System.nanoTime() - useStartNanos).toFloat() / total
+                                    hud.drawUseProgress(done)
+                                }
                                 // Индикатор перезарядки удара.
                                 if (lastAttackNanos != 0L) {
                                     val attackAge = (System.nanoTime() - lastAttackNanos) / 600_000_000.0

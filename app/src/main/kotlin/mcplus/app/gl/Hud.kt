@@ -306,6 +306,8 @@ class Hud(
         scroll: Int,
         /** Какой вид счётчика выбран: его строка в колонке подсвечена. */
         selectedType: Int = 0,
+        /** Слой иконки по имени предмета (null — рисовать без иконок). */
+        iconLayer: ((String) -> Int)? = null,
     ) {
         val text = this.text ?: return
         val s = HudLayout.scale(height).toFloat()
@@ -345,10 +347,24 @@ class Hud(
             val visible = StatisticsScreen.visibleRows(height)
             val from = scroll.coerceIn(0, maxOf(0, rows.size - visible))
             var y = top + 56f * s
+            // Иконки предметов: в игре у строк статистики они есть, и по ним видно,
+            // о каком предмете речь, даже если имя обрезано.
+            val icons = if (iconLayer != null) ArrayList<Pair<HudRect, Int>>() else null
             for (row in rows.drop(from).take(visible)) {
-                labels += TextRenderer.ScreenLabel(left, y, row.name, s)
+                val layer = iconLayer?.invoke(row.name) ?: 0
+                if (icons != null && layer > 0) {
+                    icons += HudRect(left, y - 1f * s, 11f * s, 11f * s) to layer
+                    labels += TextRenderer.ScreenLabel(left + 14f * s, y, row.name, s)
+                } else {
+                    labels += TextRenderer.ScreenLabel(left, y, row.name, s)
+                }
                 labels += TextRenderer.ScreenLabel(width * 0.72f, y, row.text, s)
                 y += 14f * s
+            }
+            if (icons != null && icons.isNotEmpty()) {
+                renderer.begin()
+                for ((rect, layer) in icons) renderer.icon(rect, layer)
+                renderer.draw()
             }
             if (rows.size > visible) {
                 labels += TextRenderer.ScreenLabel(
@@ -854,6 +870,20 @@ class Hud(
             val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
             renderer.icon(slotRect, atlas.layerForItem(name))
             drawGlint(slotRect, stack)
+            drawWear(slotRect, stack, s)
+        }
+        // Выбранный слот хотбара в инвентаре игрока внутри контейнера — тоже с рамкой.
+        val hotbarCell = ContainerScreen.cells(container).firstOrNull {
+            it.menuSlot == container.playerStart + 27 + inventory.selected.coerceIn(0, 8)
+        }
+        if (hotbarCell != null) {
+            val x = ox + (hotbarCell.x + 1f) * s
+            val y = oy + (hotbarCell.y + 1f) * s
+            val size = 16f * s
+            renderer.rect(x, y, size, 2f * s, 0xFFFFFF, 0.9f)
+            renderer.rect(x, y + size - 2f * s, size, 2f * s, 0xFFFFFF, 0.9f)
+            renderer.rect(x, y, 2f * s, size, 0xFFFFFF, 0.9f)
+            renderer.rect(x + size - 2f * s, y, 2f * s, size, 0xFFFFFF, 0.9f)
         }
         // Сделка в строке списка: что платим (до двух стеков) и что получаем.
         if (tradeRows.isNotEmpty() && itemName != null) {
@@ -1318,7 +1348,25 @@ class Hud(
             val slotRect = HudRect(cell.centreX - size / 2f, cell.centreY - size / 2f, size, size)
             renderer.icon(slotRect, atlas.layerForItem(name))
             drawGlint(slotRect, stack)
+            // Полоска прочности прямо в хотбаре: видно, когда инструмент почти сломан,
+            // не открывая инвентарь.
+            drawWear(slotRect, stack, s)
         }
+    }
+
+    /** Полоска износа под иконкой: зелёная, жёлтая, красная — как в игре. */
+    private fun drawWear(rect: HudRect, stack: Inventory.Stack, s: Float) {
+        val max = itemStats.of(stack.itemId)?.maxDamage ?: 0
+        if (max <= 0 || stack.damage <= 0) return
+        val fraction = ((max - stack.damage).toFloat() / max).coerceIn(0f, 1f)
+        val color = when {
+            fraction > 0.5f -> 0x35C035
+            fraction > 0.25f -> 0xD0C020
+            else -> 0xD03020
+        }
+        val barWidth = rect.width - 4f * s
+        renderer.rect(rect.x + 2f * s, rect.y + rect.height - 4f * s, barWidth, 3f * s, 0x101010, 0.85f)
+        renderer.rect(rect.x + 2f * s, rect.y + rect.height - 4f * s, barWidth * fraction, 3f * s, color, 0.95f)
     }
 
     /**
@@ -1459,6 +1507,28 @@ class Hud(
         val length = 7f * s
         renderer.rect(rect.centreX - length / 2f, rect.centreY - thickness / 2f, length, thickness, 0xFFFFFF, 0.85f)
         renderer.rect(rect.centreX - thickness / 2f, rect.centreY - length / 2f, thickness, length, 0xFFFFFF, 0.85f)
+    }
+
+    /**
+     * Полоска использования предмета под прицелом: еда, зелье, лук.
+     *
+     * В игре видно, сколько ещё держать кнопку; без полоски непонятно, доедаем мы или
+     * просто держим еду в руке.
+     */
+    fun drawUseProgress(fraction: Float) {
+        val s = HudLayout.scale(height).toFloat()
+        val crosshair = HudLayout.crosshair(width, height)
+        val barWidth = 24f * s
+        val barHeight = 3f * s
+        val left = crosshair.centreX - barWidth / 2f
+        val top = crosshair.centreY + 12f * s
+        val filled = fraction.coerceIn(0f, 1f)
+        renderer.begin()
+        renderer.rect(left - s, top - s, barWidth + 2f * s, barHeight + 2f * s, 0x101010, 0.75f)
+        if (filled > 0f) {
+            renderer.rect(left, top, barWidth * filled, barHeight, 0xE8E8E8, 0.95f)
+        }
+        renderer.draw()
     }
 
     /**
