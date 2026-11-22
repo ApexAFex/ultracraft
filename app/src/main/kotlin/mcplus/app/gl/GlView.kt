@@ -2227,8 +2227,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         val riding = session?.ridingId?.let { id -> entities.firstOrNull { it.id == id } }
                         if (riding != null && !paused) {
                             player.x = riding.x
-                            // Глаза чуть выше палубы: иначе камера смотрит из корпуса.
-                            player.y = riding.y + 0.35
+                            // Глаза на высоте сиденья своего транспорта: в лодке одно, на лошади другое.
+                            player.y = riding.y + VehicleSeat.eyeOffset(entityTypes.nameOf(riding.type))
                             player.z = riding.z
                             session?.sendPlayerInput(
                                 forward = input.forward > 0.1,

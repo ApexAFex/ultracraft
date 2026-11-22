@@ -119,6 +119,10 @@ class MobModelsTest {
         val tentacle0 = MobModels.limbAngle("tentacle0", 1f, 1f)
         val tentacle3 = MobModels.limbAngle("tentacle3", 1f, 1f)
         assertTrue(tentacle0 != tentacle3, "щупальца не двигаются синхронно")
+        // Хвост и уши качаются даже когда моб стоит: иначе он выглядит статуей.
+        assertTrue(MobModels.limbAngle("tail", 1f, 0f) != 0f, "хвост качается в покое")
+        assertTrue(MobModels.limbAngle("tail2", 1f, 1f) != MobModels.limbAngle("tail1", 1f, 1f))
+        assertTrue(MobModels.limbAngle("right_ear", 1f, 1f) != 0f, "уши шевелятся")
         // Голова и тело не качаются от ходьбы.
         assertEquals(0f, MobModels.limbAngle("head", 1f, 1f))
         assertEquals(0f, MobModels.limbAngle("body", 1f, 1f))

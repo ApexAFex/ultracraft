@@ -345,6 +345,16 @@ object MobModels {
             val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
             return kotlin.math.sin(phase * 0.5f + index) * amount.coerceIn(0f, 1f) * 0.12f
         }
+        // Хвост и уши качаются всегда, но слабо: даже стоящий моб не выглядит статуей.
+        if (key.contains("tail") || key.contains("mane")) {
+            val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
+            val speed = 0.35f
+            return kotlin.math.sin(phase * speed + index) * (0.10f + 0.12f * amount.coerceIn(0f, 1f))
+        }
+        if (key.contains("ear")) {
+            val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
+            return kotlin.math.sin(phase * 0.25f + index) * amount.coerceIn(0f, 1f) * 0.06f
+        }
         if (key.contains("arm")) {
             // Руки идут в противофазе с одноимённой ногой: правая рука вперёд — правая нога назад.
             val side = sideOf(key) ?: return 0f

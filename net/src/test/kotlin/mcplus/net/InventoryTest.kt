@@ -486,6 +486,33 @@ class InventoryTest {
     }
 
     @Test
+    fun `a bundle counts its contents and keeps its name`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val id = dataComponentId("bundle_contents")
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(id)
+                .writeVarInt(2)    // два предмета в мешке
+                .writeVarInt(1).writeVarInt(1).writeVarInt(0).writeVarInt(0)
+                .writeVarInt(3).writeVarInt(2).writeVarInt(0).writeVarInt(0)
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            assertEquals(2, inventory.stackIn(0)?.bundleCount)
+            assertEquals("stone", inventory.heldName())
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `a renamed enchanted sword is a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()

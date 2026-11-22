@@ -54,6 +54,8 @@ class Inventory(
         /** Фейерверк: время взлёта и число зарядов (`fireworks`). */
         val fireworksFlight: Int = 0,
         val fireworkStars: Int = 0,
+        /** Сколько предметов в мешке (`bundle_contents`). */
+        val bundleCount: Int = 0,
     ) {
         val isEmpty: Boolean get() = count <= 0
 
@@ -291,6 +293,7 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
     var potionColor = 0
     var fireworksFlight = 0
     var fireworkStars = 0
+    var bundleCount = 0
     repeat(added) {
         val id = reader.readVarInt()
         when (ComponentTable.active.nameOf(id)) {
@@ -400,6 +403,14 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
                 repeat(colors) { reader.readInt() }
             }
 
+            // Мешок: список вложенных стеков тем же форматом, что и заряды арбалета.
+            "bundle_contents" -> {
+                val items = reader.readVarInt()
+                if (items !in 0..MAX_PROJECTILES) throw UnreadableStack(count)
+                repeat(items) { skipTemplateStack(reader) }
+                bundleCount = items
+            }
+
             else -> throw UnreadableStack(count)
         }
     }
@@ -423,6 +434,7 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
         potionColor = potionColor,
         fireworksFlight = fireworksFlight,
         fireworkStars = fireworkStars,
+        bundleCount = bundleCount,
     )
 }
 

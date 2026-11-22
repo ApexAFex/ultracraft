@@ -77,6 +77,10 @@ object ItemTooltip {
         if (stack.fireworksFlight > 0 || stack.fireworkStars > 0) {
             result += "Ракета: ${stack.fireworkStars} зар., взлёт ${stack.fireworksFlight}" to 0xC8C8A0
         }
+        // Мешок: сколько предметов внутри.
+        if (stack.bundleCount > 0) {
+            result += "В мешке: ${stack.bundleCount}" to 0xC8C8A0
+        }
         return result
     }
 
