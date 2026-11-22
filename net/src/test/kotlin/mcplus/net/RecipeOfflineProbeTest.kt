@@ -35,7 +35,11 @@ class RecipeOfflineProbeTest {
         System.setProperty("mcplus.tagExtra", "0")
         val book = RecipeBook()
         book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, body)
-        println("боевой разбор сохранённого пакета: рецептов ${book.size} из ${body.size} байт")
+        val withResult = book.all().count { it.result > 0 }
+        println(
+            "боевой разбор: рецептов ${book.size}, из них с настоящим результатом $withResult " +
+                "(правильная раскладка даст 136 и все с результатом)",
+        )
         // Первые разобранные рецепты печатаем: по ним видно, те ли это предметы.
         for (recipe in book.all().take(3)) {
             println("  рецепт ${recipe.id}: результат ${recipe.result}, ингредиенты ${recipe.ingredients}")
