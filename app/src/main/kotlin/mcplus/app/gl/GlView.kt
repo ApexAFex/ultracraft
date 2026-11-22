@@ -980,6 +980,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var lastAttackNanos = 0L
     /** Нажали ли уже «слезь» на транспорте: одно нажатие — одна команда. */
     var dismountSent = false
+    /** Когда последний раз играл звук транспорта (вёсла, вагонетка). */
+    var vehicleSoundNanos = 0L
                     var invLastClickNanos = 0L
                     var invLastClickSlot = -1
                     var cameraMode = cameraModeAtStart
@@ -2267,8 +2269,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 session?.dismount()
                             }
                             if (!sneakHeld) dismountSent = false
+                            // Вёсла и стук вагонетки: эти звуки играет клиент.
+                            val moving = kotlin.math.abs(input.forward) > 0.1 ||
+                                kotlin.math.abs(input.strafe) > 0.1
+                            val event = VehicleSounds.eventFor(
+                                entityTypes.nameOf(riding.type), moving,
+                            )
+                            if (event != null && VehicleSounds.due(System.nanoTime(), vehicleSoundNanos)) {
+                                vehicleSoundNanos = System.nanoTime()
+                                sound.play(event, riding.x, riding.y, riding.z)
+                            }
                         } else {
                             dismountSent = false
+                            vehicleSoundNanos = 0L
                         }
 
                         // Слушатель — в камере, шаги — по пройденному пути и блоку под ногами.
@@ -3435,6 +3448,15 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     "Режим: ${session?.joinResult?.joinGame?.gameModeName ?: "?"}",
                                     "Мир: ${session?.joinResult?.joinGame?.dimensionName ?: "?"}",
                                     "Чанк: ${kotlin.math.floor(player.x).toInt() shr 4}, ${kotlin.math.floor(player.z).toInt() shr 4}",
+                                    // Транспорт в отладке: по нему видно, что мы «приклеены»
+                                    // к сущности, а не просто стоим на её месте.
+                                    "Транспорт: " + (
+                                        session?.ridingId?.let { id ->
+                                            entities.firstOrNull { it.id == id }
+                                                ?.let { entityTypes.nameOf(it.type) }
+                                                ?: "сущность $id"
+                                        } ?: "нет"
+                                        ),
                                     "Сущностей: ${entities.size}, чанков: ${renderer.chunkCount}",
                                     "Биом: " + (
                                         biomeNames.getOrNull(
