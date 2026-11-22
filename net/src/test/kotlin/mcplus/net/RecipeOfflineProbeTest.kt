@@ -5,11 +5,11 @@ import java.io.File
 import kotlin.test.Test
 
 /**
- * Офлайн-перебор ширины значения тега по сохранённому пакету рецептов.
+ * Офлайн-перебор раскладки записи рецепта по сохранённому пакету.
  *
- * Пакет лежит в `screenshots/recipes-packet.bin` (его пишет клиент при сбое разбора).
- * Тест не проверяет поведение, а печатает, сколько записей разбирается при разной ширине
- * значения тега: так формат подбирается без запуска игры и сервера.
+ * Пакет пишет клиент при сбое разбора (`screenshots/recipes-packet.bin`). Тест гоняет
+ * несколько вариантов раскладки и печатает, сколько записей из 136 разбирается каждым:
+ * так формат подбирается перебором, без запуска игры и сервера.
  */
 class RecipeOfflineProbeTest {
 
@@ -20,103 +20,100 @@ class RecipeOfflineProbeTest {
             ?.readBytes()
 
     @Test
-    fun `which tag width parses the most records`() {
+    fun `print how many records each layout parses`() {
         val body = packet() ?: run {
             println("пакета рецептов нет — перебор пропущен")
             return
         }
-        for (tagWidth in 1..4) {
-            val result = runCatching { walk(body, tagWidth) }
-            println(
-                "ширина тега $tagWidth → записей ${result.getOrNull() ?: -1}, " +
-                    "причина: ${result.exceptionOrNull()?.message ?: "нет"}",
-            )
+        for (tagWidth in 1..3) {
+            for (gridCount in listOf(false, true)) {
+                for (entryExtra in listOf(false, true)) {
+                    val parsed = runCatching { walk(body, tagWidth, gridCount, entryExtra) }
+                    println(
+                        "тег=$tagWidth счётчик_сетки=$gridCount байт_после_флага=$entryExtra → " +
+                            "записей ${parsed.getOrNull() ?: -1} (${parsed.exceptionOrNull()?.message})",
+                    )
+                }
+            }
         }
     }
 
-    /** Разбирает записи, пока не сломается; возвращает число целых записей. */
-    private fun walk(body: ByteArray, tagWidth: Int): Int {
+    private fun walk(body: ByteArray, tagWidth: Int, gridCount: Boolean, entryExtra: Boolean): Int {
         val reader = ByteReader(body)
         val count = reader.readVarInt()
         var done = 0
-        repeat(count) {
-            reader.readVarInt()          // номер описания
-            readDisplay(reader, tagWidth)
-            readSlots(reader, tagWidth)  // содержимое
-            reader.readBoolean()         // подсветка
-            reader.readVarInt()          // поле после флага
-            done++
+        for (i in 0 until count) {
+            try {
+                reader.readVarInt()
+                readDisplay(reader, tagWidth, gridCount)
+                readSlots(reader, tagWidth, gridCount)
+                reader.readBoolean()
+                if (entryExtra) reader.readVarInt()
+                done++
+            } catch (e: Exception) {
+                // Возвращаем то, что успело разобраться: именно это число и сравниваем.
+                return done
+            }
         }
         return done
     }
 
-    private fun readDisplay(reader: ByteReader, tagWidth: Int) {
+    private fun readDisplay(reader: ByteReader, tagWidth: Int, gridCount: Boolean) {
         when (reader.readVarInt()) {
             0 -> {
-                readSlots(reader, tagWidth)
-                readSlot(reader, tagWidth)
-                readSlot(reader, tagWidth)
+                readSlots(reader, tagWidth, gridCount)
+                readSlot(reader, tagWidth, gridCount)
+                readSlot(reader, tagWidth, gridCount)
             }
             1 -> {
                 val w = reader.readVarInt()
                 val h = reader.readVarInt()
-                repeat(w * h) { readSlot(reader, tagWidth) }
-                readSlot(reader, tagWidth)
-                readSlot(reader, tagWidth)
+                val cells = if (gridCount) {
+                    reader.readVarInt().also { if (it != w * h) error("счётчик не совпал") }
+                } else {
+                    w * h
+                }
+                repeat(cells) { readSlot(reader, tagWidth, gridCount) }
+                readSlot(reader, tagWidth, gridCount)
+                readSlot(reader, tagWidth, gridCount)
             }
             2 -> {
-                repeat(3) { readSlot(reader, tagWidth) }
-                readSlot(reader, tagWidth)
+                repeat(4) { readSlot(reader, tagWidth, gridCount) }
                 reader.readVarInt()
                 reader.readFloat()
             }
-            3 -> {
-                readSlot(reader, tagWidth)
-                readSlot(reader, tagWidth)
-                readSlot(reader, tagWidth)
-            }
-            4 -> {
-                repeat(5) { readSlot(reader, tagWidth) }
-            }
-            else -> throw IllegalArgumentException("вид рецепта")
+            3 -> repeat(3) { readSlot(reader, tagWidth, gridCount) }
+            4 -> repeat(5) { readSlot(reader, tagWidth, gridCount) }
+            else -> error("вид рецепта")
         }
     }
 
-    private fun readSlots(reader: ByteReader, tagWidth: Int) {
+    private fun readSlots(reader: ByteReader, tagWidth: Int, gridCount: Boolean) {
         val n = reader.readVarInt()
-        repeat(n) { readSlot(reader, tagWidth) }
+        if (n > 64) error("слотов: $n")
+        repeat(n) { readSlot(reader, tagWidth, gridCount) }
     }
 
-    private fun readSlot(reader: ByteReader, tagWidth: Int) {
+    private fun readSlot(reader: ByteReader, tagWidth: Int, gridCount: Boolean) {
         when (reader.readVarInt()) {
             0, 1 -> Unit
-            2 -> readSlot(reader, tagWidth)
-            3 -> {
-                readSlot(reader, tagWidth)
-                throw IllegalArgumentException("условие на компонент")
-            }
+            2 -> readSlot(reader, tagWidth, gridCount)
+            3 -> error("условие на компонент")
             4 -> reader.readVarInt()
-            5 -> {
-                reader.readVarInt()
-                reader.readVarInt()
-                reader.readVarInt()
-                reader.readVarInt()
-            }
+            5 -> repeat(4) { reader.readVarInt() }
             6 -> repeat(tagWidth) { reader.readByte() }
             7 -> {
-                readSlot(reader, tagWidth)
+                readSlot(reader, tagWidth, gridCount)
                 reader.readVarInt()
             }
-            8 -> repeat(3) { readSlot(reader, tagWidth) }
-            9 -> {
-                readSlot(reader, tagWidth)
-                readSlot(reader, tagWidth)
-            }
+            8 -> repeat(3) { readSlot(reader, tagWidth, gridCount) }
+            9 -> repeat(2) { readSlot(reader, tagWidth, gridCount) }
             10 -> {
                 val n = reader.readVarInt()
-                repeat(n) { readSlot(reader, tagWidth) }
+                if (n > 64) error("вариантов: $n")
+                repeat(n) { readSlot(reader, tagWidth, gridCount) }
             }
-            else -> throw IllegalArgumentException("вид слота")
+            else -> error("вид слота")
         }
     }
 }
