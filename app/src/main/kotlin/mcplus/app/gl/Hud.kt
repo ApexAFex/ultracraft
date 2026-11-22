@@ -700,6 +700,10 @@ class Hud(
     var anvilField: HudRect? = null
         private set
 
+    /** Прямоугольники строк списка сделок у жителя: индекс строки — номер сделки. */
+    var tradeRows: List<Pair<Int, HudRect>> = emptyList()
+        private set
+
     /** Экран контейнера: фон своего меню, слоты и подписи в экранном слое. */
     fun drawContainerScreen(
         container: OpenContainer,
@@ -708,15 +712,41 @@ class Hud(
         mouseY: Double,
         /** Что набрано в поле имени наковальни (пусто — показываем имя предмета). */
         anvilText: String = "",
+        /** Сделки жителя: список слева рисуется только по ним. */
+        trades: mcplus.net.Trades? = null,
+        /** Выбранная сделка (её предметы лежат в слотах входа). */
+        selectedTrade: Int = -1,
+        /** С какой сделки начинается видимый список: у жителя видно семь строк. */
+        tradeScroll: Int = 0,
+        /** Номер предмета → имя для иконок в списке сделок. */
+        itemName: ((Int) -> String)? = null,
     ) {
         val layout = ContainerScreen.layout(container)
         val s = ContainerScreen.scale(height)
-        val ox = ContainerScreen.originX(width, s)
+        val ox = ContainerScreen.originX(width, layout, s)
         val oy = ContainerScreen.originY(height, layout.panelHeight, s)
-        val panel = HudRect(ox, oy, ContainerScreen.GUI_WIDTH * s, layout.panelHeight * s)
+        val panel = HudRect(ox, oy, layout.width * s, layout.panelHeight * s)
         renderer.begin()
-        if (!renderer.spriteSub(layout.background, panel, 0, 0, 176, layout.panelHeight)) {
+        if (!renderer.spriteSub(layout.background, panel, 0, 0, layout.width, layout.panelHeight)) {
             renderer.rect(panel, 0x101018, 0.85f)
+        }
+        // Список сделок жителя: семь строк по 20 пикселей, начиная с (5, 16).
+        tradeRows = emptyList()
+        if (container.type == "merchant" && trades != null) {
+            val rows = ArrayList<Pair<Int, HudRect>>(TRADE_ROWS)
+            for (row in 0 until TRADE_ROWS) {
+                val index = tradeScroll + row
+                val offer = trades.offers.getOrNull(index) ?: break
+                val rect = HudRect(ox + 5f * s, oy + (16f + row * 20f) * s, 88f * s, 20f * s)
+                rows += index to rect
+                val tint = when {
+                    index == selectedTrade -> 0x6A5ACD
+                    offer.remaining == 0 -> 0x402020
+                    else -> 0x202028
+                }
+                renderer.rect(rect, tint, 0.35f)
+            }
+            tradeRows = rows
         }
         // У наковальни в текстуре красное поле имени: рисуем поверх тёмное, как EditBox.
         anvilField = null
@@ -777,6 +807,23 @@ class Hud(
                 atlas.layerForItem(name),
             )
         }
+        // Сделка в строке списка: что платим (до двух стеков) и что получаем.
+        if (tradeRows.isNotEmpty() && itemName != null) {
+            for ((index, rect) in tradeRows) {
+                val offer = trades?.offers?.getOrNull(index) ?: continue
+                fun icon(column: Int, itemId: Int) {
+                    if (itemId < 0) return
+                    val name = itemName.invoke(itemId)
+                    renderer.icon(
+                        HudRect(rect.x + column * 20f * s + 2f * s, rect.y + 2f * s, 16f * s, 16f * s),
+                        atlas.layerForItem(name),
+                    )
+                }
+                icon(0, offer.costA.itemId)
+                offer.costB?.let { icon(1, it.itemId) }
+                offer.result?.let { icon(3, it.itemId) }
+            }
+        }
         val carried = inventory.nameOf(container.carriedOrNull())
         if (carried != null) {
             renderer.icon(
@@ -810,6 +857,32 @@ class Hud(
                     )
                 }
             }
+            if (labels.isNotEmpty()) text?.drawScreen(labels)
+        }
+        // Торговля: количество предметов сделки рядом с иконками и уровень торговца снизу.
+        if (container.type == "merchant" && trades != null) {
+            val labels = ArrayList<TextRenderer.ScreenLabel>()
+            for ((index, rect) in tradeRows) {
+                val offer = trades.offers.getOrNull(index) ?: continue
+                val small = s * 0.7f
+                labels += TextRenderer.ScreenLabel(
+                    rect.x + 10f * s, rect.y + 10f * s, offer.priceA.toString(), small,
+                )
+                offer.priceB?.let { price ->
+                    labels += TextRenderer.ScreenLabel(
+                        rect.x + 30f * s, rect.y + 10f * s, price.toString(), small,
+                    )
+                }
+                val resultCount = offer.result?.count ?: 1
+                if (resultCount > 1) {
+                    labels += TextRenderer.ScreenLabel(
+                        rect.x + 70f * s, rect.y + 10f * s, resultCount.toString(), small,
+                    )
+                }
+            }
+            labels += TextRenderer.ScreenLabel(
+                ox + 8f * s, oy + 152f * s, trades.levelName(), s * 0.7f,
+            )
             if (labels.isNotEmpty()) text?.drawScreen(labels)
         }
         drawContainerOverlay(container, inventory, mouseX, mouseY)
@@ -1478,6 +1551,8 @@ class Hud(
         const val CHAT_LINES = 10
         const val CHAT_VISIBLE_SECONDS = 8.0
         const val CHAT_FADE_SECONDS = 2.0
+        /** Сделок жителя видно в списке сразу; остальные — прокруткой. */
+        const val TRADE_ROWS = 7
     }
 
     override fun close() {

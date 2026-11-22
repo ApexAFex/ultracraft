@@ -178,6 +178,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     /** Демо-режим возрождается сам через столько наносекунд после смерти. */
     private const val DEMO_RESPAWN_NANOS = 8_000_000_000L
 
+    /** Дальность руки: на сколько блоков достаёт клик по сущности. */
+    private const val ENTITY_REACH = 3.5
+
+    /** У кого ПКМ открывает экран: житель и странствующий торговец. */
+    private val TRADER_TYPES = setOf("villager", "wandering_trader")
+
     fun run(
         world: World,
         blocks: BlockTable,
@@ -246,6 +252,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         captureAfterUseSeconds: Double? = null,
         /** Какой слот хотбара выбрать после входа (0..8), -1 — не трогать. */
         heldSlotAtStart: Int = -1,
+        /** На каком кадре открыть торговлю у ближайшего жителя (проверка без мыши). */
+        tradeAtFrame: Int = -1,
         /** Снять снимок через столько секунд после первого субтитра. */
         captureAfterSoundSeconds: Double? = null,
         /** Возродиться сразу после входа, если игрок умер в прошлый раз. */
@@ -716,6 +724,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var usingItem: String? = null
                     var usingKind: mcplus.net.Consumable? = null
                     var useTriggered = false
+                    /** Открывали ли торговлю у жителя по флагу `--trade`. */
+                    var tradeTriggered = false
 
                     /** Крошки от еды: маленькие иконки предмета, падающие на землю. */
                     class Crumb(
@@ -872,6 +882,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     var anvilText = ""
     var anvilEditing = false
     var renameSent = false
+    // Торговля у жителя: выбранная сделка и с какой начинается видимый список.
+    var selectedTrade = -1
+    var tradeScroll = 0
+    // Номер окна, для которого уже выбрана сделка: новый житель — новая торговля.
+    var tradeScreenId = -1
     var statisticsType = 8
     var statisticsScroll = 0
     var statisticsLeftWasDown = false
@@ -1312,7 +1327,16 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             val buttonIndex = hud.containerButtons.indexOfFirst {
                                 it.contains(input.mouseX, input.mouseY)
                             }
-                            if (buttonIndex >= 0) {
+                            val tradeRow = hud.tradeRows.indexOfFirst { (_, rect) ->
+                                rect.contains(input.mouseX, input.mouseY)
+                            }
+                            if (tradeRow >= 0) {
+                                // Строка списка сделок: сервер сам положит предметы в слоты.
+                                val offer = hud.tradeRows[tradeRow].first
+                                session?.selectTrade(offer)
+                                selectedTrade = offer
+                                println("Торговля: выбрана сделка ${offer + 1}")
+                            } else if (buttonIndex >= 0) {
                                 session?.buttonClick(buttonIndex)
                                 println("Кнопка меню: ${buttonIndex + 1}")
                             } else if (
@@ -3125,9 +3149,28 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         lastItemTotal = totalItems
                         if (openContainer != null && inventory != null) {
+                            val merchantTrades = session?.trades?.takeIf { it.belongsTo(openContainer.id) }
+                            if (tradeScreenId != openContainer.id) {
+                                tradeScreenId = openContainer.id
+                                selectedTrade = -1
+                                tradeScroll = 0
+                            }
+                            // Первый товар выбирается сам: так в слотах входа сразу видно цену.
+                            if (
+                                openContainer.type == "merchant" && selectedTrade < 0 &&
+                                merchantTrades != null && merchantTrades.offers.isNotEmpty()
+                            ) {
+                                selectedTrade = 0
+                                session?.selectTrade(0)
+                                println("Торговля: выбран товар 1 из ${merchantTrades.offers.size}")
+                            }
                             hud.drawContainerScreen(
                                 openContainer, inventory, input.mouseX, input.mouseY,
                                 anvilText = if (anvilEditing) anvilText else "",
+                                trades = merchantTrades,
+                                selectedTrade = selectedTrade,
+                                tradeScroll = tradeScroll,
+                                itemName = { id -> itemTable.nameOf(id) },
                             )
                         } else if (inventory != null && inventoryOpen) {
                             hud.drawInventoryScreen(inventory, input.mouseX, input.mouseY)
@@ -3446,6 +3489,46 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         val leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
                         val rightDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS
                         val middleDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS
+
+                        // Сущность под прицелом: по ней ПКМ открывает торговлю у жителя, а у
+                        // остальных — их собственный экран. Ближайший живой моб на луче взгляда
+                        // в пределах руки; блок под прицелом при этом не трогаем.
+                        val aimedEntity = if (
+                            inventoryOpen || advancementsOpen || openContainer != null ||
+                            dead || chat.open || paused
+                        ) {
+                            null
+                        } else {
+                            val direction = camera.forward()
+                            var best: mcplus.net.TrackedEntity? = null
+                            var bestDistance = ENTITY_REACH
+                            for (entity in entities) {
+                                val name = entityTypes.nameOf(entity.type)
+                                if (!EntityRay.isLiving(name)) continue
+                                val (boxWidth, boxHeight, boxDepth) = EntityRay.boxOf(name)
+                                val halfW = boxWidth / 2.0
+                                val halfD = boxDepth / 2.0
+                                val distance = EntityRay.distance(
+                                    camera.x, camera.y, camera.z,
+                                    direction[0].toDouble(), direction[1].toDouble(), direction[2].toDouble(),
+                                    entity.x - halfW, entity.y, entity.z - halfD,
+                                    entity.x + halfW, entity.y + boxHeight, entity.z + halfD,
+                                ) ?: continue
+                                if (distance in 0.0..bestDistance) {
+                                    bestDistance = distance
+                                    best = entity
+                                }
+                            }
+                            // Блок под прицелом ближе моба — значит, клик по блоку.
+                            val blockDistance = target?.let {
+                                kotlin.math.sqrt(
+                                    (it.x + 0.5 - camera.x) * (it.x + 0.5 - camera.x) +
+                                        (it.y + 0.5 - camera.y) * (it.y + 0.5 - camera.y) +
+                                        (it.z + 0.5 - camera.z) * (it.z + 0.5 - camera.z),
+                                )
+                            } ?: Double.MAX_VALUE
+                            if (blockDistance < bestDistance) null else best
+                        }
                         // The demo "holds" the button so the self-test also exercises the progress.
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
@@ -3502,14 +3585,24 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         aimTarget = if (inventoryOpen || advancementsOpen || openContainer != null || dead || chat.open) null else miningTarget
 
                         if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
-                            rightDown && !rightWasDown && target != null
+                            rightDown && !rightWasDown && aimedEntity != null
+                        ) {
+                            val entity = aimedEntity
+                            session?.interact(entity.id, 0.0, 1.0, 0.0)
+                            println(
+                                "ПКМ по сущности ${entityTypes.nameOf(entity.type)} id=${entity.id}",
+                            )
+                            swingNanos = System.nanoTime()
+                        }
+                        if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
+                            rightDown && !rightWasDown && target != null && aimedEntity == null
                         ) {
                             demoPlace(target)
                         }
                         // Правый клик по воздуху — `Use Item`: так едят, натягивают лук и
                         // бросают жемчуг. Раньше клик мимо блока просто пропадал.
                         if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
-                            rightDown && !rightWasDown && target == null
+                            rightDown && !rightWasDown && target == null && aimedEntity == null
                         ) {
                             beginUseItem()
                         }
@@ -3522,6 +3615,20 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             useTriggered = true
                             println("Использовать предмет: ${session?.inventory?.heldName() ?: "пусто"}")
                             beginUseItem()
+                        }
+                        // Проверка без мыши: открыть торговлю у ближайшего жителя. Прицел
+                        // наводить не надо — для снимка экрана достаточно самого факта ПКМ.
+                        if (tradeAtFrame >= 0 && frame >= tradeAtFrame && !tradeTriggered &&
+                            !inventoryOpen && !advancementsOpen && openContainer == null && !dead
+                        ) {
+                            val trader = entities.firstOrNull {
+                                entityTypes.nameOf(it.type) in TRADER_TYPES
+                            }
+                            if (trader != null) {
+                                tradeTriggered = true
+                                session?.interact(trader.id, 0.0, 1.0, 0.0)
+                                println("Торговля: ПКМ по ${entityTypes.nameOf(trader.type)} id=${trader.id}")
+                            }
                         }
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
                         // Демо бьёт ближайшую сущность, если она в пределах руки.

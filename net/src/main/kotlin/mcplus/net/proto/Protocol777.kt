@@ -137,6 +137,8 @@ object Protocol777 {
         const val UPDATE_ADVANCEMENTS: Int = 0x85
         /** Статистика игрока: карта «вид счётчика → (номер → значение)». */
         const val AWARD_STATS: Int = 0x03
+        /** Товары жителя: список сделок с ценами и количеством использований. */
+        const val MERCHANT_OFFERS: Int = 0x35
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00
@@ -167,6 +169,10 @@ object Protocol777 {
         const val SWING_ARM: Int = 0x3F
         const val USE_ITEM_ON: Int = 0x42
         const val USE_ITEM: Int = 0x43
+        /** Выбор сделки в экране жителя: номер строки списка. */
+        const val SELECT_TRADE: Int = 0x34
+        /** Взаимодействие с сущностью: ПКМ по жителю открывает его экран. */
+        const val INTERACT: Int = 0x1A
     }
 }
 

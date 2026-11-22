@@ -15,12 +15,19 @@ object ContainerScreen {
 
     data class Cell(val menuSlot: Int, val x: Float, val y: Float)
 
-    /** Фон меню, высота картинки и слоты контейнера (без инвентаря игрока). */
+    /**
+     * Фон меню, его ширина и высота и слоты контейнера (без инвентаря игрока).
+     *
+     * Ширина у всех меню 176 пикселей, кроме торговли у жителя: там панель 276 — слева
+     * список сделок, справа три слота, и инвентарь игрока сдвинут вправо на 100 пикселей.
+     */
     data class Layout(
         val background: String,
         val panelHeight: Int,
         val slots: List<Cell>,
         val playerY: Int,
+        val width: Int = GUI_WIDTH,
+        val playerX: Int = 8,
     )
 
     private fun slot(index: Int, x: Float, y: Float) = Cell(index, x, y)
@@ -64,6 +71,14 @@ object ContainerScreen {
         "cartography_table" to {
             Layout("gui_cartography", 166, listOf(slot(0, 15f, 15f), slot(1, 50f, 15f), slot(2, 145f, 40f)), 84)
         },
+        // Житель: панель шире обычной (список сделок слева), слоты 136/162 → 220.
+        "merchant" to {
+            Layout(
+                "gui_villager", 166,
+                listOf(slot(0, 136f, 37f), slot(1, 162f, 37f), slot(2, 220f, 37f)),
+                84, width = 276, playerX = 108,
+            )
+        },
     )
 
     fun layout(container: OpenContainer): Layout {
@@ -94,10 +109,14 @@ object ContainerScreen {
         cells += layout.slots
         val playerStart = container.playerStart
         for (index in 0 until 27) {
-            cells += Cell(playerStart + index, 8f + (index % 9) * 18f, layout.playerY.toFloat() + (index / 9) * 18f)
+            cells += Cell(
+                playerStart + index,
+                layout.playerX + (index % 9) * 18f,
+                layout.playerY.toFloat() + (index / 9) * 18f,
+            )
         }
         for (index in 0 until 9) {
-            cells += Cell(playerStart + 27 + index, 8f + index * 18f, layout.playerY + 58f)
+            cells += Cell(playerStart + 27 + index, layout.playerX + index * 18f, layout.playerY + 58f)
         }
         return cells
     }
@@ -111,20 +130,24 @@ object ContainerScreen {
 
     fun originX(width: Int, scale: Float): Float = (width - GUI_WIDTH * scale) / 2f
 
+    /** Левый край панели: ширина у меню бывает разной (у торговли жителя — 276). */
+    fun originX(width: Int, layout: Layout, scale: Float): Float =
+        (width - layout.width * scale) / 2f
+
     fun originY(height: Int, panelHeight: Int, scale: Float): Float =
         (height - panelHeight * scale) / 2f
 
     fun screenPointOf(container: OpenContainer, cell: Cell, width: Int, height: Int): Pair<Double, Double> {
         val layout = layout(container)
         val scale = scale(height)
-        return (originX(width, scale) + (cell.x + 9f) * scale).toDouble() to
+        return (originX(width, layout, scale) + (cell.x + 9f) * scale).toDouble() to
             (originY(height, layout.panelHeight, scale) + (cell.y + 9f) * scale).toDouble()
     }
 
     fun panelPoint(container: OpenContainer, mouseX: Double, mouseY: Double, width: Int, height: Int): Pair<Float, Float> {
         val layout = layout(container)
         val scale = scale(height)
-        return ((mouseX - originX(width, scale)) / scale).toFloat() to
+        return ((mouseX - originX(width, layout, scale)) / scale).toFloat() to
             ((mouseY - originY(height, layout.panelHeight, scale)) / scale).toFloat()
     }
 

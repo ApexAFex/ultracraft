@@ -44,6 +44,16 @@ class Session internal constructor(
     /** Статистика игрока: приходит пакетом `Award Stats` и обновляется при изменениях. */
     val stats = Stats()
 
+    /** Сделки открытого жителя; null — экран торговли ещё не присылал список. */
+    @Volatile
+    var trades: Trades? = null
+        private set
+
+    /** Сколько раз подряд `Merchant Offers` не разобрался: чтобы не спамить в консоль. */
+    @Volatile
+    var tradesUnreadable: Int = 0
+        private set
+
     /** Строка над хотбаром и большой заголовок: приходят компонентами. */    @Volatile
     var actionBar: String? = null
         private set
@@ -185,11 +195,15 @@ class Session internal constructor(
                     routeMenuPacket(packet)
 
                 Protocol777.Play.OPEN_SCREEN ->
-                    container = readOpenScreen(packet.body, menuTable)
+                    container = readOpenScreen(packet.body, menuTable).also {
+                        // Новый экран — старый список сделок к нему не относится.
+                        if (it?.type != "merchant") trades = null
+                    }
 
                 Protocol777.Play.CONTAINER_CLOSE -> {
                     val id = ByteReader(packet.body).readVarInt()
                     if (container?.id == id) container = null
+                    if (trades?.containerId == id) trades = null
                 }
 
                 Protocol777.Play.SET_HEALTH,
@@ -254,6 +268,24 @@ class Session internal constructor(
                 Protocol777.Play.AWARD_STATS -> {
                     if (stats.onPacket(packet.id, packet.body) && stats.packets == 1) {
                         println("Статистика: ${stats.size} счётчиков в ${stats.activeTypes().size} видах")
+                    }
+                }
+
+                Protocol777.Play.MERCHANT_OFFERS -> {
+                    val parsed = Trades.parse(packet.body)
+                    if (parsed == null) {
+                        if (tradesUnreadable == 0) {
+                            println("Товары жителя: пакет не разобрался (незнакомый компонент предмета)")
+                        }
+                        tradesUnreadable++
+                    } else {
+                        trades = parsed
+                        if (parsed.offers.isNotEmpty()) {
+                            println(
+                                "Товары жителя: ${parsed.offers.size} сделок, " +
+                                    "уровень ${parsed.villagerLevel} (${parsed.levelName()})",
+                            )
+                        }
                     }
                 }
 
@@ -378,6 +410,40 @@ class Session internal constructor(
                 ByteWriter().writeVarInt(containerId).writeVarInt(button).toByteArray(),
             ),
         )
+    }
+
+    /**
+     * Выбирает сделку в экране жителя (`Select Trade`).
+     *
+     * Номер — строка списка с нуля; сервер сам разложит предметы по слотам входа. Проверяем
+     * только те сделки, которые нам прислали: чужой номер сервер молча игнорирует.
+     */
+    fun selectTrade(index: Int) {
+        val list = trades ?: return
+        if (index !in list.offers.indices) return
+        send(Packet(Protocol777.Play.SELECT_TRADE, SelectTrade.packet(index)))
+    }
+
+    /**
+     * ПКМ по сущности (`Interact`).
+     *
+     * Точка попадания передаётся смещением от ног сущности (так же считает и ванильный
+     * клиент: `hitVec.subtract(entity.position())`) и упаковывается в [LpVec3]. Рука —
+     * основная (`0`), вторичное действие — `false`: им пользуются, чтобы сесть в вагонетку.
+     */
+    fun interact(
+        entityId: Int,
+        offsetX: Double,
+        offsetY: Double,
+        offsetZ: Double,
+        secondary: Boolean = false,
+    ) {
+        val writer = ByteWriter()
+            .writeVarInt(entityId)
+            .writeVarInt(INTERACT_HAND_MAIN)
+        LpVec3.write(writer, offsetX, offsetY, offsetZ)
+        writer.writeBoolean(secondary)
+        send(Packet(Protocol777.Play.INTERACT, writer.toByteArray()))
     }
 
     /**
@@ -619,6 +685,9 @@ class Session internal constructor(
 
         /** Client Command action: «пришли мою статистику». */
         const val REQUEST_STATS = 1
+
+        /** Основная рука в `Interact`: 0 — правая, 1 — левая. */
+        const val INTERACT_HAND_MAIN = 0
 
         /** How long one poll waits during [drain]; small enough to react quickly. */
         const val POLL_TIMEOUT_MS = 100

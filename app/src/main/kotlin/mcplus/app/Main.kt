@@ -940,6 +940,8 @@ private fun windowCommand(args: List<String>) {
     var showTab = false
     var startAdvancements = false
     var useItemAtFrame = -1
+    /** Кадр, на котором открыть торговлю у ближайшего жителя. */
+    var tradeAtFrame = -1
     var captureAfterUseSeconds: Double? = null
     var heldSlotAtStart = -1
     var captureAfterSoundSeconds: Double? = null
@@ -974,6 +976,8 @@ private fun windowCommand(args: List<String>) {
             "--rename" -> renameAfterOpen = args.getOrNull(++index) ?: fail("--rename ждёт имя")
             "--use-item" -> useItemAtFrame =
                 args.getOrNull(++index)?.toIntOrNull() ?: fail("--use-item ждёт номер кадра")
+            "--trade" -> tradeAtFrame =
+                args.getOrNull(++index)?.toIntOrNull() ?: fail("--trade ждёт номер кадра")
             "--after-use" -> captureAfterUseSeconds =
                 args.getOrNull(++index)?.toDoubleOrNull() ?: fail("--after-use ждёт секунды")
             "--held" -> heldSlotAtStart =
@@ -1107,6 +1111,7 @@ private fun windowCommand(args: List<String>) {
             startStatistics = startStatistics,
             renameAfterOpen = renameAfterOpen,
             useItemAtFrame = useItemAtFrame,
+            tradeAtFrame = tradeAtFrame,
             captureAfterUseSeconds = captureAfterUseSeconds,
             heldSlotAtStart = heldSlotAtStart,
             captureAfterSoundSeconds = captureAfterSoundSeconds,
@@ -1562,6 +1567,7 @@ private fun printUsage() {
     --skin PATH    свой скин из файла PNG (проверка рисования кожи без сети)
     --slim         скин из файла — тонкая модель рук (Алекс), без сети метаданных нет
     --use-item N   нажать «использовать предмет» на кадре N (проверка еды)
+    --trade N      открыть торговлю у ближайшего жителя на кадре N
     --after-use N  снять снимок через N секунд после начала еды
     --held N       выбрать слот хотбара 1..9 после входа
     --after-sound N снять снимок через N секунд после первого субтитра
