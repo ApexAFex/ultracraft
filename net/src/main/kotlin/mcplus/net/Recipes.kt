@@ -58,6 +58,9 @@ class RecipeBook {
             val recipe = readDisplay(reader)
             val contents = readSlotList(reader)
             reader.readBoolean() // «подсвечен»
+            // После флага в записи идёт ещё один байт: его смысл неизвестен, но без него
+            // следующая запись начинается не с вида рецепта (проверено на живом пакете).
+            reader.readByte()
             if (recipe != null) {
                 parsed[displayId] = recipe.copy(ingredients = recipe.ingredients + contents)
             }
@@ -120,7 +123,7 @@ class RecipeBook {
         3 -> { readSlot(reader); skipPredicate(reader); -1 }
         4 -> reader.readVarInt()                     // предмет
         5 -> readTemplateStack(reader)               // стек с компонентами
-        6 -> { reader.readVarInt(); -1 }              // тег: номер в реестре тегов, не строка
+        6 -> { reader.readShort(); -1 }               // тег: два байта значения (проверено по байтам)
         7 -> { readSlot(reader); reader.readVarInt(); -1 }       // крашеный
         8 -> { readSlot(reader); readSlot(reader); readSlot(reader); -1 } // отделка
         9 -> { val inner = readSlot(reader); readSlot(reader); inner }    // с остатком

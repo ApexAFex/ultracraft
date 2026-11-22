@@ -24,12 +24,13 @@ class RecipeBookTest {
         writer.writeVarInt(1)          // один ингредиент
         // Тег — номер в реестре тегов, а не строка: на живом сервере он занимает один VarInt
         // (это видно по байтам пакета: `06 02` — тег №2).
-        writer.writeVarInt(6).writeVarInt(2)
+        writer.writeVarInt(6).writeShort(2)
         writer.writeVarInt(5)          // item_stack
         writer.writeVarInt(20).writeVarInt(1).writeVarInt(0).writeVarInt(0) // 1 дуб. доска
         writer.writeVarInt(0)          // станция: пусто
         writer.writeVarInt(0)          // доп. содержимое
         writer.writeBoolean(false)     // не подсвечен
+        writer.writeByte(0)            // байт после флага (см. разбор)
         writer.writeBoolean(false)     // не заменять книгу
 
         book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, writer.toByteArray())
