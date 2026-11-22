@@ -91,9 +91,37 @@ class MobModelsTest {
         val left = MobModels.limbAngle("legFL", phase = 1f, amount = 1f)
         val right = MobModels.limbAngle("legFR", phase = 1f, amount = 1f)
 
-        assertTrue(left > 0f && right < 0f, "ноги должны идти крест-накрест")
+        // Диагональные пары идут вместе: передняя левая с задней правой.
+        val backRight = MobModels.limbAngle("legBR", phase = 1f, amount = 1f)
+        val backLeft = MobModels.limbAngle("legBL", phase = 1f, amount = 1f)
+        assertTrue(left * right < 0f, "ноги должны идти крест-накрест")
+        assertEquals(left, backRight, "левая передняя и правая задняя — вместе")
+        assertEquals(right, backLeft, "правая передняя и левая задняя — вместе")
         assertEquals(0f, MobModels.limbAngle("body", 1f, 1f))
-        assertEquals(0f, MobModels.limbAngle("legFL", 1f, 0f))
+        assertEquals(0f, MobModels.limbAngle("legFL", 1f, 0f) + 0f)
+    }
+
+    @Test
+    fun `names from dumped models animate too`() {
+        // Лошадь: `left_hind_leg`; паук: `left_mid_leg`; дракон: `left_wing_base`.
+        val horseHind = MobModels.limbAngle("left_hind_leg", 1f, 1f)
+        val horseFront = MobModels.limbAngle("left_front_leg", 1f, 1f)
+        assertTrue(horseHind != 0f && horseFront != 0f, "ноги лошади качаются")
+        assertTrue(horseHind * horseFront < 0f, "передняя и задняя в противофазе")
+
+        // У паука средние ноги — тоже ноги, а не неподвижные пластины.
+        assertTrue(MobModels.limbAngle("left_mid_leg", 1f, 1f) != 0f)
+        // У дракона машут оба сегмента крыла, и в разные стороны.
+        val wingBase = MobModels.limbAngle("left_wing_base", 1f, 1f)
+        val wingTip = MobModels.limbAngle("right_wing_tip", 1f, 1f)
+        assertTrue(wingBase < 0f && wingTip > 0f, "крылья машут в противофазе")
+        // Щупальца гаста качаются каждое со своим сдвигом.
+        val tentacle0 = MobModels.limbAngle("tentacle0", 1f, 1f)
+        val tentacle3 = MobModels.limbAngle("tentacle3", 1f, 1f)
+        assertTrue(tentacle0 != tentacle3, "щупальца не двигаются синхронно")
+        // Голова и тело не качаются от ходьбы.
+        assertEquals(0f, MobModels.limbAngle("head", 1f, 1f))
+        assertEquals(0f, MobModels.limbAngle("body", 1f, 1f))
     }
 
     @Test

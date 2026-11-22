@@ -73,6 +73,10 @@ object ItemTooltip {
         if (stack.chargedCount > 0) {
             result += "Заряды: ${stack.chargedCount}" to 0xC8C8A0
         }
+        // Фейерверк: сколько зарядов и как высоко взлетит (1 — ниже, 2 — выше).
+        if (stack.fireworksFlight > 0 || stack.fireworkStars > 0) {
+            result += "Ракета: ${stack.fireworkStars} зар., взлёт ${stack.fireworksFlight}" to 0xC8C8A0
+        }
         return result
     }
 

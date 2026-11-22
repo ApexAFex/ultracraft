@@ -51,6 +51,9 @@ class Inventory(
         /** Номер зелья из реестра и его цвет (`potion_contents`). */
         val potionId: Int = -1,
         val potionColor: Int = 0,
+        /** Фейерверк: время взлёта и число зарядов (`fireworks`). */
+        val fireworksFlight: Int = 0,
+        val fireworkStars: Int = 0,
     ) {
         val isEmpty: Boolean get() = count <= 0
 
@@ -286,6 +289,8 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
     var chargedCount = 0
     var potionId = -1
     var potionColor = 0
+    var fireworksFlight = 0
+    var fireworkStars = 0
     repeat(added) {
         val id = reader.readVarInt()
         when (ComponentTable.active.nameOf(id)) {
@@ -366,6 +371,17 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
                 }
             }
 
+            // Фейерверк: список взрывов (форма, цвета, шлейф и мерцание) и время взлёта.
+            // Ракеты без этого компонента не бывает, поэтому без разбора предмет был «неизвестным».
+            "fireworks" -> {
+                val stars = reader.readVarInt()
+                if (stars !in 0..MAX_FIREWORK_STARS) throw UnreadableStack(count)
+                repeat(stars) { skipFireworkExplosion(reader) }
+                fireworksFlight = reader.readVarInt()
+                fireworkStars = stars
+            }
+            "firework_explosion" -> skipFireworkExplosion(reader)
+
             else -> throw UnreadableStack(count)
         }
     }
@@ -387,6 +403,8 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
         chargedCount = chargedCount,
         potionId = potionId,
         potionColor = potionColor,
+        fireworksFlight = fireworksFlight,
+        fireworkStars = fireworkStars,
     )
 }
 
@@ -405,6 +423,27 @@ private const val MAX_ENCHANTMENTS = 64
 
 /** Зарядов в арбалете или предметов в мешке больше этого не бывает. */
 private const val MAX_PROJECTILES = 64
+
+/** Больше зарядов в ракете в игре не бывает. */
+private const val MAX_FIREWORK_STARS = 8
+
+/**
+ * Пропустить описание одного взрыва фейерверка.
+ *
+ * Порядок полей взят из `FireworkExplosion.STREAM_CODEC`: форма, цвета, цвета затухания,
+ * шлейф, мерцание. Списки цветов — длина VarInt и сами цвета.
+ */
+private fun skipFireworkExplosion(reader: ByteReader) {
+    reader.readVarInt()
+    val colors = reader.readVarInt()
+    if (colors !in 0..MAX_FIREWORK_STARS * 2) throw UnreadableStack(colors)
+    repeat(colors) { reader.readInt() }
+    val fade = reader.readVarInt()
+    if (fade !in 0..MAX_FIREWORK_STARS * 2) throw UnreadableStack(fade)
+    repeat(fade) { reader.readInt() }
+    reader.readBoolean()
+    reader.readBoolean()
+}
 
 /**
  * Пропустить вложенный стек без компонентов (`ItemStackTemplate`: предмет, количество, патч).

@@ -324,15 +324,45 @@ object MobModels {
     const val CUBE_SIZE_FIELD = 18
 
     /** Угол качания коробки: ноги идут крест-накрест, крылья машут вверх-вниз. */
+    /**
+     * Угол качания части при ходьбе.
+     *
+     * Имена частей приходят из моделей игры, и они разные: у коровы `legFL`, у лошади
+     * `left_hind_leg`, у паука `left_mid_leg`, у дракона `left_wing_base`, у гаста
+     * `tentacle3`. Раньше анимировались только шесть имён, поэтому почти все модели,
+     * собранные из дампов, ходили с неподвижными ногами. Здесь имя разбирается на
+     * «сторона» и «перед/зад», а диагональные пары качаются в противофазе, как в игре.
+     */
     fun limbAngle(name: String, phase: Float, amount: Float): Float {
         val swing = kotlin.math.sin(phase) * amount.coerceIn(0f, 1f) * MAX_SWING
-        return when (name) {
-            "legFL", "legBR" -> swing
-            "legFR", "legBL" -> -swing
-            "wingL" -> -swing * 0.6f
-            "wingR" -> swing * 0.6f
-            else -> 0f
+        val key = name.lowercase()
+        // Крылья и щупальца — отдельные движения: у крыльев мах, у щупалец медленное качание.
+        if (key.contains("wing")) {
+            val side = sideOf(key) ?: return 0f
+            return swing * 0.6f * side
         }
+        if (key.contains("tentacle")) {
+            val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
+            return kotlin.math.sin(phase * 0.5f + index) * amount.coerceIn(0f, 1f) * 0.12f
+        }
+        if (key.contains("arm")) {
+            // Руки идут в противофазе с одноимённой ногой: правая рука вперёд — правая нога назад.
+            val side = sideOf(key) ?: return 0f
+            return -swing * side * 0.8f
+        }
+        if (!key.contains("leg")) return 0f
+        val side = sideOf(key) ?: return 0f
+        val back = key.contains("hind") || key.contains("back") || key.startsWith("legb")
+        // Диагональ: левая передняя и правая задняя идут вместе.
+        return if (back) -swing * side else swing * side
+    }
+
+    /** Сторона части: −1 слева, +1 справа, null если сторона не указана. */
+    private fun sideOf(key: String): Float? = when {
+        key.contains("left") || key.endsWith("l") && key.length <= 6 -> -1f
+        key.contains("right") || key.endsWith("r") && key.length <= 6 -> 1f
+        // Глаза и уши бывают парными без слова «left»: `ear1`, `ear2`.
+        else -> null
     }
 
     private const val MAX_SWING = 0.7f

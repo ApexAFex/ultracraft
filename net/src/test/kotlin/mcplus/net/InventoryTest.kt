@@ -426,6 +426,39 @@ class InventoryTest {
     }
 
     @Test
+    fun `a firework rocket keeps its flight and stars`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val id = dataComponentId("fireworks")
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(id)
+                .writeVarInt(1)                 // один взрыв
+                .writeVarInt(2)                 // форма: звезда
+                .writeVarInt(2).writeInt(0xFF0000).writeInt(0x00FF00)  // цвета
+                .writeVarInt(0)                 // без затухания
+                .writeBoolean(true)             // шлейф
+                .writeBoolean(false)            // без мерцания
+                .writeVarInt(2)                 // взлёт 2
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(1, parsed.fireworkStars)
+            assertEquals(2, parsed.fireworksFlight)
+            assertEquals("stone", inventory.heldName(), "ракета остаётся известным предметом")
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `a renamed enchanted sword is a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()
