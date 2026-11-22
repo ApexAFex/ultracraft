@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, BOAT, MINECART, NONE,
 }
 
 /**
@@ -113,6 +113,9 @@ object MobModels {
         "snow_golem" -> MobFamily.SNOW_GOLEM
         // Верблюд: длинные ноги, горб и голова на вытянутой шее, лист 128×128.
         "camel" -> MobFamily.CAMEL
+        "wither" -> MobFamily.WITHER
+        "vex" -> MobFamily.VEX
+        "ravager" -> MobFamily.RAVAGER
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -147,6 +150,10 @@ object MobModels {
         // Ванильный VillagerRenderer рисует модель в 0.9375 масштаба.
         "villager", "zombie_villager", "wandering_trader", "witch" -> 0.9375f
 
+        // Иссушитель нарисован вдвое крупнее модели: так он и выходит на 3,5 блока.
+        "wither" -> 2f
+        // Гиганта ванильный рендерер рисует зомби в шесть раз больше — двенадцать блоков.
+        "giant" -> 6f
         // Модель спрута — 33 пикселя в высоту (тело и щупальца), в игре её рисуют в 0.7.
         "squid", "glow_squid" -> 0.7f
         // Гаст — куб в блок и щупальца; в игре модель растянута вчетверо (4×4 блока).
@@ -195,6 +202,9 @@ object MobModels {
         MobFamily.WITCH -> 64 to 128
         MobFamily.SNOW_GOLEM -> 64 to 64
         MobFamily.CAMEL -> 128 to 128
+        MobFamily.WITHER -> 64 to 64
+        MobFamily.VEX -> 32 to 32
+        MobFamily.RAVAGER -> 128 to 128
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -242,6 +252,9 @@ object MobModels {
         MobFamily.WITCH -> WITCH
         MobFamily.SNOW_GOLEM -> SNOW_GOLEM
         MobFamily.CAMEL -> CAMEL
+        MobFamily.WITHER -> WITHER
+        MobFamily.VEX -> VEX
+        MobFamily.RAVAGER -> RAVAGER
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -1082,5 +1095,59 @@ object MobModels {
         MobBox("hump", -0.2812f, 0f, -0.3437f, 0.2813f, 0.3125f, 0.3438f, u = 74, v = 0, offsetY = 2f, offsetZ = -0.0312f),
         MobBox("tail", -0.0937f, -0.875f, 0f, 0.0938f, 0f, 0f, u = 122, v = 0, offsetY = 1.8125f, offsetZ = 0.8125f),
         MobBox("left_front_leg", -0.1562f, -1.4375f, -0.1562f, 0.1563f, -0.125f, 0.1563f, u = 0, v = 0, offsetX = 0.3063f, offsetY = 1.4375f, offsetZ = -0.6562f),
+    )
+
+    /**
+     * Иссушитель (`WitherBossModel`): три головы, рёбра, плечи и хвост.
+     *
+     * Модель маленькая (около 1,4 блока), поэтому в игре её рисуют вдвое крупнее — отсюда
+     * `scaleOf("wither") = 2`. Рёбра и хвост в ванильной модели повёрнуты, у них матрица.
+     */
+    private val WITHER = listOf(
+        MobBox("shoulders", -0.625f, -0.4312f, -0.0312f, 0.625f, -0.2437f, 0.1563f, u = 0, v = 16, offsetY = 1.4183f),
+        MobBox("ribcage", 0f, -0.625f, 0f, 0.1875f, 0f, 0.1875f, u = 0, v = 22, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9793f, -0.2026f, 0f, 0f, 0.2026f, 0.9793f, 0f, -0.125f, 0.987f, -0.0312f, 1f)),
+        MobBox("ribcage", -0.25f, -0.2187f, 0.0313f, 0.4375f, -0.0937f, 0.1563f, u = 24, v = 22, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9793f, -0.2026f, 0f, 0f, 0.2026f, 0.9793f, 0f, -0.125f, 0.987f, -0.0312f, 1f)),
+        MobBox("ribcage", -0.25f, -0.375f, 0.0313f, 0.4375f, -0.25f, 0.1563f, u = 24, v = 22, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9793f, -0.2026f, 0f, 0f, 0.2026f, 0.9793f, 0f, -0.125f, 0.987f, -0.0312f, 1f)),
+        MobBox("ribcage", -0.25f, -0.5312f, 0.0313f, 0.4375f, -0.4062f, 0.1563f, u = 24, v = 22, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9793f, -0.2026f, 0f, 0f, 0.2026f, 0.9793f, 0f, -0.125f, 0.987f, -0.0312f, 1f)),
+        MobBox("tail", 0f, -0.375f, 0f, 0.1875f, 0f, 0.1875f, u = 12, v = 22, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6727f, -0.74f, 0f, 0f, 0.74f, 0.6727f, 0f, -0.125f, 0.375f, 0.0954f, 1f)),
+        MobBox("left_head", -0.25f, -0.125f, -0.25f, 0.125f, 0.25f, 0.125f, u = 32, v = 0, offsetX = 0.625f, offsetY = 1.1683f),
+        MobBox("right_head", -0.25f, -0.125f, -0.25f, 0.125f, 0.25f, 0.125f, u = 32, v = 0, offsetX = -0.5f, offsetY = 1.1683f),
+        MobBox("center_head", -0.25f, -0.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 0, v = 0, offsetY = 1.4183f),
+    )
+
+    /**
+     * Всполох (`VexModel`): маленькая фигурка с крыльями-плоскостями.
+     *
+     * Крылья в модели повёрнуты на 90°, поэтому они стоят поперёк тела, как и в игре.
+     */
+    private val VEX = listOf(
+        MobBox("head", -0.1562f, 0f, -0.1562f, 0.1563f, 0.3125f, 0.1563f, u = 0, v = 0, offsetY = 0.375f),
+        MobBox("body", -0.0937f, -0.25f, -0.0625f, 0.0938f, 0f, 0.0625f, u = 0, v = 10, offsetY = 0.375f),
+        MobBox("body", -0.0937f, -0.375f, -0.0625f, 0.0938f, -0.0625f, 0.0625f, u = 0, v = 16, offsetY = 0.375f),
+        MobBox("right_arm", -0.0781f, -0.2187f, -0.0625f, 0.0469f, 0.0313f, 0.0625f, u = 23, v = 0, offsetX = -0.1094f, offsetY = 0.5156f),
+        MobBox("left_arm", -0.0469f, -0.2187f, -0.0625f, 0.0781f, 0.0313f, 0.0625f, u = 23, v = 6, offsetX = 0.1094f, offsetY = 0.5156f),
+        MobBox("right_wing", 0f, -0.3125f, 0f, 0f, 0f, 0.5f, u = 16, v = 14, offsetX = -0.0312f, offsetY = 0.4688f, offsetZ = 0.0625f),
+        MobBox("left_wing", 0f, -0.3125f, 0f, 0f, 0f, 0.5f, u = 16, v = 14, offsetX = 0.0313f, offsetY = 0.4688f, offsetZ = 0.0625f),
+    )
+
+    /**
+     * Разоритель (`RavagerModel`): четыре толстые ноги, тело, шея, огромная голова и рога.
+     *
+     * Тело и рога повёрнуты в ванильной модели, поэтому у них матрица; высота — больше двух
+     * блоков, как и в игре.
+     */
+    private val RAVAGER = listOf(
+        MobBox("right_front_leg", -0.25f, -2.3125f, -0.25f, 0.25f, 0f, 0.25f, u = 64, v = 0, offsetX = -0.5f, offsetY = 2.3125f, offsetZ = -0.3125f),
+        MobBox("right_hind_leg", -0.25f, -2.3125f, -0.25f, 0.25f, 0f, 0.25f, u = 96, v = 0, offsetX = -0.5f, offsetY = 2.3125f, offsetZ = 1.125f),
+        MobBox("left_hind_leg", -0.25f, -2.3125f, -0.25f, 0.25f, 0f, 0.25f, u = 96, v = 0, offsetX = 0.5f, offsetY = 2.3125f, offsetZ = 1.125f),
+        MobBox("neck", -0.3125f, -0.5625f, -1.125f, 0.3125f, 0.0625f, 0f, u = 68, v = 73, offsetY = 1.9375f, offsetZ = 0.3438f),
+        MobBox("head", -0.5f, 0f, -0.875f, 0.5f, 1.25f, 0.125f, u = 0, v = 0, offsetY = 0.9375f, offsetZ = -0.7187f),
+        MobBox("head", -0.125f, -0.125f, -1.125f, 0.125f, 0.375f, -0.875f, u = 0, v = 0, offsetY = 0.9375f, offsetZ = -0.7187f),
+        MobBox("right_horn", 0f, 0f, -0.125f, 0.125f, 0.875f, 0.125f, u = 74, v = 55, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.4536f, -0.8912f, 0f, 0f, 0.8912f, 0.4536f, 0f, -0.625f, 1.8125f, -1.2187f, 1f)),
+        MobBox("mouth", -0.5f, -0.1875f, -1f, 0.5f, 0f, 0f, u = 0, v = 36, offsetY = 1.5f, offsetZ = -0.25f),
+        MobBox("left_horn", 0f, 0f, -0.125f, 0.125f, 0.875f, 0.125f, u = 74, v = 55, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.4536f, -0.8912f, 0f, 0f, 0.8912f, 0.4536f, 0f, 0.5f, 1.8125f, -1.2187f, 1f)),
+        MobBox("body", -0.4375f, -0.375f, -0.4375f, 0.4375f, 0.625f, 0.8125f, u = 0, v = 55, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.4375f, 0.125f, 1f)),
+        MobBox("body", -0.375f, -1.1875f, -0.4375f, 0.375f, -0.375f, 0.6875f, u = 0, v = 91, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.4375f, 0.125f, 1f)),
+        MobBox("left_front_leg", -0.25f, -2.3125f, -0.25f, 0.25f, 0f, 0.25f, u = 64, v = 0, offsetX = 0.5f, offsetY = 2.3125f, offsetZ = -0.3125f),
     )
 }

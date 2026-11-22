@@ -31,6 +31,8 @@ object HumanoidLook {
         "parched" -> "entity/skeleton/parched.png"
         "wither_skeleton" -> "entity/skeleton/wither_skeleton.png"
         "enderman" -> "entity/enderman/enderman.png"
+        // Гигант — тот же зомби, только в метаданных у него нет отдельной модели.
+        "giant" -> "entity/zombie/zombie.png"
         else -> null
     }
 

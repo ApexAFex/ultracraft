@@ -539,6 +539,59 @@ class MobModelsTest {
     }
 
     @Test
+    fun `giant is a zombie six times larger`() {
+        // Своей модели у гиганта нет: это зомби, нарисованный в шесть раз больше.
+        assertEquals("entity/zombie/zombie.png", HumanoidLook.lookOf("giant"))
+        assertTrue(HumanoidLook.isHumanoid("giant"))
+        assertEquals(6f, MobModels.scaleOf("giant"))
+        assertEquals(MobFamily.NONE, MobModels.familyOf("giant"), "модель берётся у гуманоида")
+    }
+
+    @Test
+    fun `wither has three heads and is drawn twice as large`() {
+        assertEquals(MobFamily.WITHER, MobModels.familyOf("wither"))
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.WITHER))
+        assertTrue(MobRenderer.TEXTURES["wither"] != null, "иссушитель без текстуры")
+        assertEquals(2f, MobModels.scaleOf("wither"), "в игре модель рисуют вдвое крупнее")
+
+        val boxes = MobModels.boxes(MobFamily.WITHER)
+        assertEquals(9, boxes.size)
+        assertEquals(3, boxes.count { it.name.endsWith("head") }, "три головы")
+        assertTrue(boxes.count { it.name == "ribcage" } == 4, "рёбра — четыре коробки")
+        // С учётом масштаба иссушитель выше трёх блоков.
+        val top = (boxes.maxOf { it.offsetY + it.maxY } * MobModels.scaleOf("wither"))
+        assertTrue(top > 3f, "рост иссушителя: $top")
+    }
+
+    @Test
+    fun `ravager is a heavy quadruped taller than two blocks`() {
+        assertEquals(MobFamily.RAVAGER, MobModels.familyOf("ravager"))
+        assertEquals(128 to 128, MobModels.textureSize(MobFamily.RAVAGER))
+        assertTrue(MobRenderer.TEXTURES["ravager"] != null, "разоритель без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.RAVAGER)
+        assertEquals(12, boxes.size)
+        assertEquals(4, boxes.count { it.name.endsWith("leg") })
+        assertEquals(2, boxes.count { it.name.endsWith("horn") })
+        val leg = boxes.first { it.name == "right_front_leg" }
+        assertTrue(leg.maxY - leg.minY > 2f, "нога длиннее двух блоков")
+    }
+
+    @Test
+    fun `vex is a tiny flying figure with flat wings`() {
+        assertEquals(MobFamily.VEX, MobModels.familyOf("vex"))
+        assertEquals(32 to 32, MobModels.textureSize(MobFamily.VEX))
+        assertTrue(MobRenderer.TEXTURES["vex"] != null, "всполох без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.VEX)
+        assertEquals(7, boxes.size)
+        val wings = boxes.filter { it.name.endsWith("wing") }
+        assertEquals(2, wings.size)
+        assertTrue(wings.all { it.minX == it.maxX }, "крылья — плоскости без толщины")
+        assertTrue(wings.all { it.maxZ - it.minZ >= 0.5f }, "крылья длиной в полблока")
+    }
+
+    @Test
     fun `camel has long legs, a hump and a head on a neck`() {
         assertEquals(MobFamily.CAMEL, MobModels.familyOf("camel"))
         assertEquals(128 to 128, MobModels.textureSize(MobFamily.CAMEL))

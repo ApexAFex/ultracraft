@@ -40,6 +40,13 @@ class PlayerRenderer(
         val swing: Float = 0f,
         /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
         val hurt: Float = 0f,
+        /**
+         * Крупнее обычного игрока.
+         *
+         * Ванильный `GiantRenderer` рисует зомби в шесть раз больше — так получается
+         * двенадцатиблочный гигант, и никакой отдельной модели у него нет.
+         */
+        val scale: Float = 1f,
         /** Игрок крадётся: модель ниже, как в ванили. */
         val sneak: Boolean = false,
         /** Зомби и его родня держат руки вперёд, а не опущенными вдоль тела. */
@@ -166,10 +173,11 @@ class PlayerRenderer(
         val yawRadians = -Math.toRadians(player.yaw.toDouble()).toFloat()
         val c = cos(yawRadians)
         val s = sin(yawRadians)
+        val k = player.scale
 
-        model[0] = c; model[1] = 0f; model[2] = -s; model[3] = 0f
-        model[4] = 0f; model[5] = 1f; model[6] = 0f; model[7] = 0f
-        model[8] = s; model[9] = 0f; model[10] = c; model[11] = 0f
+        model[0] = c * k; model[1] = 0f; model[2] = -s * k; model[3] = 0f
+        model[4] = 0f; model[5] = k; model[6] = 0f; model[7] = 0f
+        model[8] = s * k; model[9] = 0f; model[10] = c * k; model[11] = 0f
         model[12] = player.x.toFloat()
         model[13] = player.y.toFloat() - if (player.sneak) CROUCH_DROP else 0f
         model[14] = player.z.toFloat()

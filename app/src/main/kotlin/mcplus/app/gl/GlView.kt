@@ -2579,6 +2579,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         humanoids += humanoid.copy(
                                             texture = humanoidRenderer.textureFor(look),
                                             armsForward = HumanoidLook.armsForward(name),
+                                            scale = MobModels.scaleOf(name),
                                         )
 
                                     name == "item" -> {                                        // Выпавший предмет: мини-куб блока, если это блок.
