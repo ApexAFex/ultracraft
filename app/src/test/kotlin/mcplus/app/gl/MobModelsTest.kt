@@ -539,6 +539,61 @@ class MobModelsTest {
     }
 
     @Test
+    fun `witch wears a hat on top of the villager model`() {
+        assertEquals(MobFamily.WITCH, MobModels.familyOf("witch"))
+        assertEquals(64 to 128, MobModels.textureSize(MobFamily.WITCH), "лист ведьмы вдвое выше")
+        assertTrue(MobRenderer.TEXTURES["witch"] != null, "ведьма без текстуры")
+        assertEquals(0.9375f, MobModels.scaleOf("witch"), "как у жителя")
+
+        val boxes = MobModels.boxes(MobFamily.WITCH)
+        assertEquals(15, boxes.size)
+        // Шляпа — четыре коробки одна над другой плюс поля; у полей своя матрица.
+        assertEquals(5, boxes.count { it.name.startsWith("hat") })
+        // Верх шляпы задан матрицей (смещение в 13-м числе по столбцам).
+        val topY = boxes.filter { it.name.startsWith("hat") && it.matrix != null }
+            .maxOf { it.maxY + it.matrix!![13] }
+        assertTrue(topY > 2.6f, "шляпа поднимает модель выше двух блоков: $topY")
+        // Руки сложены: три коробки с общим наклоном, значит у них одна матрица.
+        val arms = boxes.filter { it.name == "arms" }
+        assertEquals(3, arms.size)
+        assertEquals(arms[0].matrix!!.toList(), arms[1].matrix!!.toList())
+    }
+
+    @Test
+    fun `fish are small models of their own`() {
+        val cases = listOf(
+            Triple("cod", MobFamily.COD, 32 to 32),
+            Triple("salmon", MobFamily.SALMON, 32 to 32),
+            Triple("tadpole", MobFamily.TADPOLE, 16 to 16),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+
+        assertEquals(7, MobModels.boxes(MobFamily.COD).size, "голова, нос, тело, хвост и три плавника")
+        assertEquals(8, MobModels.boxes(MobFamily.SALMON).size, "два тела, голова, хвост и плавники")
+        assertEquals(2, MobModels.boxes(MobFamily.TADPOLE).size, "тело и хвост")
+
+        // Рыба меньше блока: длина трески — 7 пикселей модели, то есть 0,44 блока.
+        val cod = MobModels.boxes(MobFamily.COD)
+        val length = cod.maxOf { it.maxZ } - cod.minOf { it.minZ }
+        assertTrue(length in 0.4f..0.8f, "длина трески: $length")
+        assertTrue(cod.all { it.maxY - it.minY <= 0.3f }, "треска должна быть плоской")
+
+        // Головастик ещё меньше: его тело три пикселя в ширину.
+        val tadpole = MobModels.boxes(MobFamily.TADPOLE)
+        assertTrue(tadpole.maxOf { it.maxX } - tadpole.minOf { it.minX } <= 0.25f)
+        assertTrue(tadpole.all { it.minY + it.offsetY >= -0.001f }, "головастик не уходит под ноль")
+
+        // Один и тот же лист 32×32 у трески и лосося, но боковые плавники повёрнуты:
+        // у них матрица, а не три угла — как у модели из игры.
+        assertEquals(2, MobModels.boxes(MobFamily.SALMON).count { it.matrix != null })
+        assertEquals(2, MobModels.boxes(MobFamily.COD).count { it.matrix != null })
+    }
+
+    @Test
     fun `bat has flat wings on both sides`() {
         val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }

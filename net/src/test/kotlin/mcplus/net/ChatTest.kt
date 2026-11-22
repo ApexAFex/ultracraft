@@ -89,6 +89,18 @@ class ChatTest {
     }
 
     @Test
+    fun `a component that arrives as a json string is read`() {
+        // Имя из команды: сервер присылает его строкой с JSON внутри.
+        assertEquals("Фермер", componentText(NbtString("""{"text":"Фермер"}""")))
+        assertEquals("Дом", componentText(NbtString("""{"text":"Дом","color":"gold"}""")))
+        assertEquals("a\"b", componentText(NbtString("""{"text":"a\"b"}""")))
+        assertEquals("", componentText(NbtString("""{"color":"gold"}""")), "без текста — пусто")
+        // Обычная строка JSON-ом не считается и остаётся как есть, без кодов формата.
+        assertEquals("просто текст", componentText(NbtString("просто текст")))
+        assertEquals("зелёный", componentText(NbtString("§aзелёный")))
+    }
+
+    @Test
     fun `action bar messages are not chat`() {
         val body = compound("text" to stringTag("hello")) + byteArrayOf(1)
         assertNull(readSystemChat(body))

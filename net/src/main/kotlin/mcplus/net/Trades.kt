@@ -115,6 +115,20 @@ class Trades(
         }
 
         /**
+         * Позиция прокрутки списка сделок после колеса мыши.
+         *
+         * @param scroll текущая первая видимая строка
+         * @param delta -1 вверх, +1 вниз
+         * @param visible сколько строк помещается в списке
+         * @param total сколько сделок всего
+         */
+        fun scrollAfter(scroll: Int, delta: Int, visible: Int, total: Int): Int {
+            if (visible <= 0) return 0
+            val last = (total - visible).coerceAtLeast(0)
+            return (scroll + delta).coerceIn(0, last)
+        }
+
+        /**
          * @return null, если тело не разобралось (обрыв или незнакомый компонент предмета).
          */
         fun parse(body: ByteArray): Trades? = runCatching {

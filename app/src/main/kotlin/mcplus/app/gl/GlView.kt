@@ -184,6 +184,16 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     /** У кого ПКМ открывает экран: житель и странствующий торговец. */
     private val TRADER_TYPES = setOf("villager", "wandering_trader")
 
+    /** Демо-снимок мобов: насколько далеко и с каким шагом ставится ряд. */
+    private const val DEMO_DISTANCE = 6.5f
+    private const val DEMO_SIDE_STEP = 1.05f
+
+    /** Рыбы: на демо-снимке их поворачивают боком, иначе виден только нос. */
+    private val FISH_TYPES = setOf("cod", "salmon", "tadpole", "tropical_fish", "pufferfish")
+
+    /** Сколько сделок жителя видно в списке одновременно (как в ванильном экране). */
+    private const val TRADE_ROWS = 7
+
     fun run(
         world: World,
         blocks: BlockTable,
@@ -1234,6 +1244,14 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val current = session?.inventory?.selected ?: 0
                                 session?.selectSlot(Math.floorMod(current + input.scrollSlotDelta, 9))
                             }
+                        }
+                        // Колесо в экране торговли листает сделки, а не хотбар: у жителя их
+                        // бывает больше семи, и без прокрутки до остальных не добраться.
+                        if (openContainer?.type == "merchant" && input.scrollSlotDelta != 0) {
+                            val total = session?.trades?.offers?.size ?: 0
+                            tradeScroll = mcplus.net.Trades.scrollAfter(
+                                tradeScroll, input.scrollSlotDelta, TRADE_ROWS, total,
+                            )
                         }
                         if (input.escapeRequested) {
                             when {
@@ -2808,7 +2826,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             )
                             val faceCamera = 180f - CameraAngles.degrees(camera.yaw)
                             val demoMobs = samples.mapIndexed { index, sample ->
-                                val side = (index - (samples.size - 1) / 2f) * 1.05f
+                                val side = (index - (samples.size - 1) / 2f) * DEMO_SIDE_STEP
                                 val layers = when (sample.name) {
                                     "villager" -> VillagerLook.layers(
                                         sample.type, sample.profession, sample.level,
@@ -2820,11 +2838,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     else -> emptyList()
                                 }
                                 MobRenderer.Mob(
-                                    x = camera.x + forward[0] * 6.5 + right[0] * side,
+                                    x = camera.x + forward[0] * DEMO_DISTANCE + right[0] * side,
                                     // В воздухе: трава и склоны иначе закрывают половину модели.
                                     y = camera.y + 0.4,
-                                    z = camera.z + forward[2] * 6.5 + right[2] * side,
-                                    yaw = faceCamera,
+                                    z = camera.z + forward[2] * DEMO_DISTANCE + right[2] * side,
+                                    // Рыба вытянута вдоль тела: чтобы на снимке был виден бок,
+                                    // её поворачиваем на 90°, а не лицом к камере.
+                                    yaw = if (sample.name in FISH_TYPES) faceCamera - 90f else faceCamera,
                                     walkPhase = 0f,
                                     walkAmount = 0f,
                                     family = MobModels.familyOf(sample.name),

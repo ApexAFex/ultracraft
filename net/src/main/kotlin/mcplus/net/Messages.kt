@@ -332,8 +332,57 @@ fun componentRuns(tag: NbtTag, inherited: Int = TEXT_WHITE): List<StyledRun> = w
 /** Убирает коды форматирования `§a`, `§l` и подобные: шрифт клиента их не рисует. */
 internal fun stripFormatting(text: String): String = text.replace(Regex("§."), "")
 
+/**
+ * Текст из компонента, пришедшего **строкой** с JSON внутри.
+ *
+ * Имя, заданное командой (`/summon ... {CustomName:"{\"text\":\"Фермер\"}"}`), сервер
+ * присылает строкой компонента, а не готовым NBT-словарём. Без этой ветки в заголовке
+ * экрана и над головой моба висел сырой JSON. Разбираем самый частый вид — `"text"`.
+ */
+internal fun jsonComponentText(raw: String): String? {
+    val trimmed = raw.trim()
+    if (!trimmed.startsWith("{")) return null
+    val match = JSON_TEXT.find(trimmed) ?: return ""
+    return stripFormatting(unescapeJson(match.groupValues[1]))
+}
+
+private val JSON_TEXT = Regex("\"text\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+
+private fun unescapeJson(text: String): String {
+    if ('\\' !in text) return text
+    val out = StringBuilder(text.length)
+    var index = 0
+    while (index < text.length) {
+        val c = text[index]
+        if (c != '\\' || index + 1 >= text.length) {
+            out.append(c)
+            index++
+            continue
+        }
+        when (val next = text[index + 1]) {
+            'n' -> out.append('\n')
+            't' -> out.append('\t')
+            'r' -> out.append('\r')
+            'u' -> {
+                val hex = text.substring(index + 2, minOf(index + 6, text.length))
+                val code = hex.toIntOrNull(16)
+                if (code != null) {
+                    out.append(code.toChar())
+                    index += 4
+                } else {
+                    out.append(next)
+                }
+            }
+
+            else -> out.append(next)
+        }
+        index += 2
+    }
+    return out.toString()
+}
+
 internal fun componentText(tag: NbtTag): String = when (tag) {
-    is NbtString -> stripFormatting(tag.value)
+    is NbtString -> jsonComponentText(tag.value) ?: stripFormatting(tag.value)
     is NbtCompound -> {
         val extra = tag.list("extra")?.joinToString("") { componentText(it) }.orEmpty()
         // Числа в аргументах перевода приходят компонентом с пустым именем поля:

@@ -196,6 +196,16 @@ class TradesTest {
     }
 
     @Test
+    fun `scrolling stops at the first and last trade`() {
+        // Сделок 10, видно 7: прокрутка идёт от 0 до 3.
+        assertEquals(0, Trades.scrollAfter(0, -1, 7, 10), "выше первой строки не уехать")
+        assertEquals(1, Trades.scrollAfter(0, 1, 7, 10))
+        assertEquals(3, Trades.scrollAfter(3, 1, 7, 10), "ниже последней тоже")
+        assertEquals(0, Trades.scrollAfter(0, 1, 7, 5), "если всё влезло — не листаем")
+        assertEquals(0, Trades.scrollAfter(0, 1, 0, 5))
+    }
+
+    @Test
     fun `an empty list is valid`() {
         val trades = Trades.parse(packet(emptyList(), canRestock = false))
         assertEquals(0, trades?.offers?.size)

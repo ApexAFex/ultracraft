@@ -419,6 +419,10 @@ class MobRenderer(
             "elder_guardian" to "entity/guardian/guardian_elder.png",
             "allay" to "entity/allay/allay.png",
             "warden" to "entity/warden/warden.png",
+            "cod" to "entity/fish/cod.png",
+            "salmon" to "entity/fish/salmon.png",
+            "tadpole" to "entity/tadpole/tadpole.png",
+            "witch" to "entity/witch/witch.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

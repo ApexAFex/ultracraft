@@ -1,0 +1,18 @@
+﻿SIZE	32	32
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/head	0.000	20.000	-7.200	0.000	0.000	0.000
+CUBE	root/head	-1.000	-2.000	-3.000	1.000	2.000	0.000	22.0	0.0
+PART	root/left_fin	1.500	21.500	-7.200	0.000	0.000	0.785
+CUBE	root/left_fin	0.000	0.000	0.000	2.000	0.000	2.000	0.0	0.0
+PART	root/body_back	0.000	20.000	0.800	0.000	0.000	0.000
+CUBE	root/body_back	-1.500	-2.500	0.000	1.500	2.500	8.000	0.0	13.0
+PART	root/body_back/top_back_fin	0.000	-4.500	-1.000	0.000	0.000	0.000
+CUBE	root/body_back/top_back_fin	0.000	0.000	0.000	0.000	2.000	4.000	0.0	2.0
+PART	root/body_back/back_fin	0.000	0.000	8.000	0.000	0.000	0.000
+CUBE	root/body_back/back_fin	0.000	-2.500	0.000	0.000	2.500	6.000	20.0	10.0
+PART	root/right_fin	-1.500	21.500	-7.200	0.000	0.000	-0.785
+CUBE	root/right_fin	-2.000	0.000	0.000	0.000	0.000	2.000	-4.0	0.0
+PART	root/body_front	0.000	20.000	-7.200	0.000	0.000	0.000
+CUBE	root/body_front	-1.500	-2.500	0.000	1.500	2.500	8.000	0.0	0.0
+PART	root/body_front/top_front_fin	0.000	-4.500	5.000	0.000	0.000	0.000
+CUBE	root/body_front/top_front_fin	0.000	0.000	0.000	0.000	2.000	3.000	2.0	1.0

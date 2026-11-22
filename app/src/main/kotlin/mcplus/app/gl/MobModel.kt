@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.MetaEntry
 
@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, BOAT, MINECART, NONE,
 }
 
 /**
@@ -103,6 +103,12 @@ object MobModels {
         "guardian", "elder_guardian" -> MobFamily.GUARDIAN
         "allay" -> MobFamily.ALLAY
         "warden" -> MobFamily.WARDEN
+        // Рыбы: три маленькие модели, у каждой лист 32×32 или 16×16.
+        "cod" -> MobFamily.COD
+        "salmon" -> MobFamily.SALMON
+        "tadpole" -> MobFamily.TADPOLE
+        // Ведьма: модель жителя с носом, бородавкой и высокой шляпой.
+        "witch" -> MobFamily.WITCH
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -135,7 +141,7 @@ object MobModels {
         "llama", "trader_llama" -> 1.2f
 
         // Ванильный VillagerRenderer рисует модель в 0.9375 масштаба.
-        "villager", "zombie_villager", "wandering_trader" -> 0.9375f
+        "villager", "zombie_villager", "wandering_trader", "witch" -> 0.9375f
 
         // Модель спрута — 33 пикселя в высоту (тело и щупальца), в игре её рисуют в 0.7.
         "squid", "glow_squid" -> 0.7f
@@ -179,6 +185,10 @@ object MobModels {
         MobFamily.GUARDIAN -> 64 to 64
         MobFamily.ALLAY -> 32 to 32
         MobFamily.WARDEN -> 128 to 128
+        MobFamily.COD -> 32 to 32
+        MobFamily.SALMON -> 32 to 32
+        MobFamily.TADPOLE -> 16 to 16
+        MobFamily.WITCH -> 64 to 128
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -220,6 +230,10 @@ object MobModels {
         MobFamily.GUARDIAN -> GUARDIAN
         MobFamily.ALLAY -> ALLAY
         MobFamily.WARDEN -> WARDEN
+        MobFamily.COD -> COD
+        MobFamily.SALMON -> SALMON
+        MobFamily.TADPOLE -> TADPOLE
+        MobFamily.WITCH -> WITCH
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -958,5 +972,72 @@ object MobModels {
             "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
             u = 0, v = 0, offsetX = 0.5625f, offsetY = 0.0625f, rotY = 1.5708f,
         ),
+    )
+
+    /**
+     * Треска (`CodModel`): голова, нос, тело, хвост и два боковых плавника.
+     *
+     * Коробки сняты `tools/mob-dump.ps1`: модель вытянута вдоль +Z, низ на y = 0.
+     * Боковые плавники повёрнуты на 45°, поэтому у них матрица, а не три угла.
+     */
+    private val COD = listOf(
+        MobBox("head", -0.0625f, -0.125f, -0.1875f, 0.0625f, 0.125f, 0f, u = 11, v = 0, offsetY = 0.125f),
+        MobBox("nose", -0.0625f, -0.0625f, -0.0625f, 0.0625f, 0.125f, 0f, u = 0, v = 0, offsetY = 0.125f, offsetZ = -0.1875f),
+        MobBox("left_fin", 0f, 0f, -0.0625f, 0.125f, 0f, 0.0625f, u = 22, v = 4, matrix = floatArrayOf(0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, 0.0625f, 0.0625f, 0f, 1f)),
+        MobBox("top_fin", 0f, 0f, -0.0625f, 0f, 0.0625f, 0.3125f, u = 20, v = -6, offsetY = 0.25f),
+        MobBox("right_fin", -0.125f, 0f, -0.0625f, 0f, 0f, 0.0625f, u = 22, v = 1, matrix = floatArrayOf(0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, -0.0625f, 0.0625f, 0f, 1f)),
+        MobBox("body", -0.0625f, -0.125f, 0f, 0.0625f, 0.125f, 0.4375f, u = 0, v = 0, offsetY = 0.125f),
+        MobBox("tail_fin", 0f, -0.125f, 0f, 0f, 0.125f, 0.25f, u = 22, v = 3, offsetY = 0.125f, offsetZ = 0.4375f),
+    )
+
+    /**
+     * Лосось (`SalmonModel`): переднее и заднее тело, голова, хвост и четыре плавника.
+     *
+     * Модель крупнее трески, но той же раскладки; спинные плавники в дампе плоские.
+     */
+    private val SALMON = listOf(
+        MobBox("head", -0.0625f, -0.125f, -0.1875f, 0.0625f, 0.125f, 0f, u = 22, v = 0, offsetY = 0.1563f, offsetZ = -0.45f),
+        MobBox("left_fin", 0f, 0f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 0, matrix = floatArrayOf(0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, 0.0938f, 0.0625f, -0.45f, 1f)),
+        MobBox("body_back", -0.0937f, -0.1562f, 0f, 0.0938f, 0.1563f, 0.5f, u = 0, v = 13, offsetY = 0.1563f, offsetZ = 0.05f),
+        MobBox("top_back_fin", 0f, -0.125f, 0f, 0f, 0f, 0.25f, u = 0, v = 2, offsetY = 0.4375f, offsetZ = -0.0125f),
+        MobBox("back_fin", 0f, -0.1562f, 0f, 0f, 0.1563f, 0.375f, u = 20, v = 10, offsetY = 0.1563f, offsetZ = 0.55f),
+        MobBox("right_fin", -0.125f, 0f, 0f, 0f, 0f, 0.125f, u = -4, v = 0, matrix = floatArrayOf(0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, -0.0937f, 0.0625f, -0.45f, 1f)),
+        MobBox("body_front", -0.0937f, -0.1562f, 0f, 0.0938f, 0.1563f, 0.5f, u = 0, v = 0, offsetY = 0.1563f, offsetZ = -0.45f),
+        MobBox("top_front_fin", 0f, -0.125f, 0f, 0f, 0f, 0.1875f, u = 2, v = 1, offsetY = 0.4375f, offsetZ = -0.1375f),
+    )
+
+    /**
+     * Головастик (`TadpoleModel`): маленькое тело и длинный хвост, лист всего 16×16.
+     *
+     * В игре его рисуют в половинном масштабе от модели — хвост длиннее тела.
+     */
+    private val TADPOLE = listOf(
+        MobBox("tail", 0f, -0.0625f, 0f, 0f, 0.0625f, 0.4375f, u = 0, v = 0, offsetY = 0.0625f),
+        MobBox("body", -0.0937f, -0.0625f, 0f, 0.0938f, 0.0625f, 0.1875f, u = 0, v = 0, offsetY = 0.0625f, offsetZ = -0.1875f),
+    )
+
+    /**
+     * Ведьма (`WitchModel`): модель жителя с носом, бородавкой и высокой шляпой.
+     *
+     * Шляпа собрана из пяти коробок, каждая повёрнута вокруг своей оси (поля и кончик),
+     * поэтому у них матрица. Руки — три коробки с общим наклоном: две по бокам и одна
+     * поперёк, как в ванильной модели. Лист 64×128 — вдвое выше жительского.
+     */
+    private val WITCH = listOf(
+        MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.625f, 0.25f, u = 0, v = 0, offsetY = 1.5f),
+        MobBox("nose", -0.0625f, -0.1875f, -0.375f, 0.0625f, 0.0625f, -0.25f, u = 24, v = 0, offsetY = 1.625f),
+        MobBox("mole", 0f, -0.25f, -0.4219f, 0.0625f, -0.1875f, -0.3594f, u = 0, v = 0, offsetY = 1.75f),
+        MobBox("hat", 0f, -0.125f, 0f, 0.625f, 0f, 0.625f, u = 0, v = 64, offsetX = -0.3125f, offsetY = 2.1269f, offsetZ = -0.3125f),
+        MobBox("hat_rim", -0.5f, -0.5f, -0.375f, 0.5f, 0.5f, -0.3125f, u = 30, v = 47, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, 1f, 0f, 0f, -1f, -0.0002f, 0f, -0.3125f, 2.1269f, -0.3125f, 1f)),
+        MobBox("hat2", 0f, -0.25f, 0f, 0.4375f, 0f, 0.4375f, u = 0, v = 76, matrix = floatArrayOf(0.9997f, -0.026f, 0f, 0f, 0.026f, 0.9983f, 0.052f, 0f, -0.0014f, -0.052f, 0.9986f, 0f, -0.2031f, 2.3769f, -0.1875f, 1f)),
+        MobBox("hat3", 0f, -0.25f, 0f, 0.25f, 0f, 0.25f, u = 0, v = 87, matrix = floatArrayOf(0.997f, -0.0779f, -0.0027f, 0f, 0.0773f, 0.9847f, 0.1563f, 0f, -0.0095f, -0.156f, 0.9877f, 0f, -0.0875f, 2.6172f, -0.0497f, 1f)),
+        MobBox("hat4", 0f, -0.125f, 0f, 0.0625f, 0f, 0.0625f, u = 0, v = 95, matrix = floatArrayOf(0.9834f, -0.1806f, -0.0191f, 0f, 0.1755f, 0.9176f, 0.3567f, 0f, -0.0469f, -0.3541f, 0.934f, 0f, 0.0301f, 2.7122f, 0.093f, 1f)),
+        MobBox("left_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 22, offsetX = 0.125f, offsetY = 0.75f),
+        MobBox("right_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 22, offsetX = -0.125f, offsetY = 0.75f),
+        MobBox("arms", -0.5f, -0.375f, -0.125f, -0.25f, 0.125f, 0.125f, u = 44, v = 22, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7317f, 0.6816f, 0f, 0f, -0.6816f, 0.7317f, 0f, 0f, 1.3125f, -0.0625f, 1f)),
+        MobBox("arms", 0.25f, -0.375f, -0.125f, 0.5f, 0.125f, 0.125f, u = 44, v = 22, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7317f, 0.6816f, 0f, 0f, -0.6816f, 0.7317f, 0f, 0f, 1.3125f, -0.0625f, 1f)),
+        MobBox("arms", -0.25f, -0.375f, -0.125f, 0.25f, -0.125f, 0.125f, u = 40, v = 38, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7317f, 0.6816f, 0f, 0f, -0.6816f, 0.7317f, 0f, 0f, 1.3125f, -0.0625f, 1f)),
+        MobBox("body", -0.25f, -0.75f, -0.1875f, 0.25f, 0f, 0.1875f, u = 16, v = 20, offsetY = 1.5f),
+        MobBox("jacket", -0.25f, -1.25f, -0.1875f, 0.25f, 0f, 0.1875f, u = 0, v = 38, offsetY = 1.5f),
     )
 }
