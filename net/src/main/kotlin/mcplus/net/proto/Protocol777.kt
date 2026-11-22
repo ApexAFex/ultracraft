@@ -79,6 +79,9 @@ object Protocol777 {
          * и ходить пешком нельзя: сервер двигает транспорт сам.
          */
         const val SET_PASSENGERS: Int = 0x6D
+
+        /** Книга рецептов: список описаний того, что можно скрафтить. */
+        const val RECIPE_BOOK_ADD: Int = 0x4B
         const val REMOVE_ENTITIES: Int = 0x4E
         const val UPDATE_ENTITY_POSITION: Int = 0x36
         const val UPDATE_ENTITY_POSITION_ROTATION: Int = 0x37

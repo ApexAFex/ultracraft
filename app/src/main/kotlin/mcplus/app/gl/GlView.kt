@@ -301,6 +301,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             if (biomeNames.isNotEmpty()) println("Биомы: ${biomeNames.size} названий из реестра")
             // Картины: размеры и текстуры приходят реестром. Если сервер его не прислал,
             // картины рисовать нечем — это видно по нулю.
+            session?.recipes?.let { book -> println("Рецепты: ${book.size} штук в книге") }
             session?.joinResult?.registries?.let { registries ->
                 println("Картины: ${registries.paintingCount} вариантов из реестра")
                 if (System.getenv("MC_DEBUG_REGISTRIES") == "1") {
@@ -598,7 +599,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         itemStats = session?.itemStatsTable ?: mcplus.net.ItemStats.EMPTY,
                     )
                     // Имена зачарований для подсказок предметов: «Острота III», а не номер.
-                    session?.joinResult?.registries?.let { registries ->
+                    session?.recipes?.let { book -> println("Рецепты: ${book.size} штук в книге") }
+            session?.joinResult?.registries?.let { registries ->
                         hud.enchantmentName = { id: Int -> registries.enchantment(id) }
                         hud.trimPatternName = { id: Int -> registries.trimPattern(id) }
                         hud.trimMaterialName = { id: Int -> registries.trimMaterial(id) }

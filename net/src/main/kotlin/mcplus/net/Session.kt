@@ -109,6 +109,9 @@ class Session internal constructor(
     val vitals: Vitals = Vitals()
 
     /** Chat lines: written by the reader thread, read by the game loop. */
+    /** Книга рецептов: что можно скрафтить (приходит при входе). */
+    val recipes: RecipeBook = RecipeBook()
+
     val chat: ChatLog = ChatLog()
 
     /** Time of day and weather: the client only displays them. */
@@ -235,6 +238,10 @@ class Session internal constructor(
                     sky.onPacket(packet.id, packet.body) { joinResult.registries.worldClock(it) }
 
                 Protocol777.Play.BOSS_EVENT -> bossBars.onPacket(packet.body)
+
+                // Книга рецептов: разбор строгий — при незнакомом виде описания книга
+                // остаётся пустой, но пакет не мешает остальным.
+                Protocol777.Play.RECIPE_BOOK_ADD -> recipes.onPacket(packet.id, packet.body)
 
                 // Кто на ком едет. Если в списке пассажиров наш id — мы на транспорте:
                 // сервер двигает лодку или вагонетку сам, нам остаётся клавиши и камера.
