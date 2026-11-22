@@ -2,6 +2,7 @@ package mcplus.app.gl
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -59,5 +60,25 @@ class InventoryScreenTest {
         val scale = InventoryScreen.scale(720)
         assertEquals((1280 - 176 * scale) / 2f, InventoryScreen.originX(1280, scale))
         assertEquals((720 - 166 * scale) / 2f, InventoryScreen.originY(720, scale))
+    }
+    @Test
+    fun `the selected hotbar slot is the one framed`() {
+        for (selected in 0..8) {
+            for (menuSlot in 0..45) {
+                val expected = menuSlot == 36 + selected
+                assertTrue(
+                    InventoryScreen.isSelectedHotbarSlot(menuSlot, selected) == expected,
+                    "слот $menuSlot при выбранном $selected",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `the selection index is clamped to the hotbar`() {
+        assertTrue(InventoryScreen.isSelectedHotbarSlot(36, -5), "отрицательный номер — первый слот")
+        assertTrue(InventoryScreen.isSelectedHotbarSlot(44, 42), "слишком большой — последний слот")
+        assertFalse(InventoryScreen.isSelectedHotbarSlot(45, 0), "слот щита не в хотбаре")
+        assertFalse(InventoryScreen.isSelectedHotbarSlot(35, 8), "основной инвентарь не в хотбаре")
     }
 }

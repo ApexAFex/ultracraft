@@ -693,10 +693,21 @@ class Hud(
         for (cell in InventoryScreen.cells) {
             val stack = inventory.menuSlot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
-            renderer.icon(
-                HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s),
-                atlas.layerForItem(name),
-            )
+            val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
+            renderer.icon(slotRect, atlas.layerForItem(name))
+            drawGlint(slotRect, stack)
+        }
+        // Выбранный слот хотбара обводится белой рамкой, как в игре.
+        InventoryScreen.cells.firstOrNull {
+            InventoryScreen.isSelectedHotbarSlot(it.menuSlot, inventory.selected)
+        }?.let { cell ->
+            val x = ox + (cell.x + 1f) * s
+            val y = oy + (cell.y + 1f) * s
+            val size = 16f * s
+            renderer.rect(x, y, size, 2f * s, 0xFFFFFF, 0.9f)
+            renderer.rect(x, y + size - 2f * s, size, 2f * s, 0xFFFFFF, 0.9f)
+            renderer.rect(x, y, 2f * s, size, 0xFFFFFF, 0.9f)
+            renderer.rect(x + size - 2f * s, y, 2f * s, size, 0xFFFFFF, 0.9f)
         }
         val carried = inventory.nameOf(inventory.carriedOrNull())
         if (carried != null) {
@@ -828,10 +839,9 @@ class Hud(
         for (cell in ContainerScreen.cells(container)) {
             val stack = container.slot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
-            renderer.icon(
-                HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s),
-                atlas.layerForItem(name),
-            )
+            val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
+            renderer.icon(slotRect, atlas.layerForItem(name))
+            drawGlint(slotRect, stack)
         }
         // Сделка в строке списка: что платим (до двух стеков) и что получаем.
         if (tradeRows.isNotEmpty() && itemName != null) {
@@ -1293,10 +1303,9 @@ class Hud(
             val name = inventory.nameOf(stack) ?: continue
             val cell = HudLayout.hotbarSlot(slot, width, height)
             val size = 16f * s
-            renderer.icon(
-                HudRect(cell.centreX - size / 2f, cell.centreY - size / 2f, size, size),
-                atlas.layerForItem(name),
-            )
+            val slotRect = HudRect(cell.centreX - size / 2f, cell.centreY - size / 2f, size, size)
+            renderer.icon(slotRect, atlas.layerForItem(name))
+            drawGlint(slotRect, stack)
         }
     }
 
@@ -1344,6 +1353,23 @@ class Hud(
                 }
             }
         }
+    }
+
+    /**
+     * Блеск зачарования вокруг иконки.
+     *
+     * В игре по зачарованному предмету бежит сиреневый блик отдельным слоем
+     * `enchanted_glint_item`. У нас блика нет, а заливка всего слота выглядела бы как
+     * подсветка выбранного слота, поэтому зачарованный предмет получает сиреневую рамку
+     * и уголок: отличить его от обычного можно с одного взгляда.
+     */
+    private fun drawGlint(rect: HudRect, stack: Inventory.Stack) {
+        if (stack.enchantments.isEmpty() && stack.glintOverride != true) return
+        val line = 1.5f
+        renderer.rect(rect.x, rect.y, rect.width, line, 0xB060FF, 0.85f)
+        renderer.rect(rect.x, rect.y + rect.height - line, rect.width, line, 0xB060FF, 0.85f)
+        renderer.rect(rect.x, rect.y, line, rect.height, 0xB060FF, 0.85f)
+        renderer.rect(rect.x + rect.width - line, rect.y, line, rect.height, 0xB060FF, 0.85f)
     }
 
     private fun drawFood(vitals: Vitals) {

@@ -548,6 +548,24 @@ class MobModelsTest {
     }
 
     @Test
+    fun `creaking stands on the ground after the nested-pose fix`() {
+        assertEquals(MobFamily.CREAKING, MobModels.familyOf("creaking"))
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.CREAKING))
+        assertTrue(MobRenderer.TEXTURES["creaking"] != null, "скрипун без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.CREAKING)
+        assertEquals(15, boxes.size)
+        // Раньше конвейер складывал позы родителей дважды: руки уезжали на полтора блока
+        // вниз, а ноги оказывались выше головы. Теперь лапы стоят на нуле.
+        val feet = boxes.filter { it.name.endsWith("leg") }.minOf { it.minY + it.offsetY }
+        assertTrue(feet >= -0.01f, "лапы скрипуна на земле: $feet")
+        val top = boxes.maxOf { it.maxY + it.offsetY }
+        assertTrue(top in 2f..3.5f, "рост скрипуна около трёх блоков: $top")
+        val head = boxes.filter { it.name == "head" }.maxOf { it.maxY + it.offsetY }
+        assertTrue(head > 2f, "голова высоко: $head")
+    }
+
+    @Test
     fun `happy ghast floats with nine tentacles`() {
         assertEquals(MobFamily.HAPPY_GHAST, MobModels.familyOf("happy_ghast"))
         assertEquals(64 to 64, MobModels.textureSize(MobFamily.HAPPY_GHAST))

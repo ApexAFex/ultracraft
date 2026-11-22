@@ -441,6 +441,7 @@ class MobRenderer(
             "end_crystal" to "entity/end_crystal/end_crystal.png",
             "happy_ghast" to "entity/ghast/happy_ghast.png",
             "cushion" to "entity/cushion/white_cushion.png",
+            "creaking" to "entity/creaking/creaking.png",
             "sulfur_cube" to "entity/sulfur_cube/sulfur_cube_inner.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —

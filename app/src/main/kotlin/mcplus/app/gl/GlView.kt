@@ -182,8 +182,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     private val TRADER_TYPES = setOf("villager", "wandering_trader")
 
     /** Демо-снимок мобов: насколько далеко и с каким шагом ставится ряд. */
-    private const val DEMO_DISTANCE = 6.5f
-    private const val DEMO_SIDE_STEP = 1.05f
+    private const val DEMO_DISTANCE = 4f
+    private const val DEMO_SIDE_STEP = 1.6f
 
     /** Рыбы: на демо-снимке их поворачивают боком, иначе виден только нос. */
     private val FISH_TYPES = setOf("cod", "salmon", "tadpole", "tropical_fish", "pufferfish")
@@ -2873,15 +2873,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             val forward = camera.forward()
                             val right = camera.right()
                             val samples = listOf(
-                                DemoMob("cow"),
-                                DemoMob("pig"),
-                                DemoMob("sheep"),
-                                DemoMob("chicken"),
-                                DemoMob("creeper"),
-                                DemoMob("spider"),
-                                DemoMob("villager", "plains", "farmer", 3),
-                                DemoMob("villager", "snow", "librarian", 1),
-                                DemoMob("zombie_villager", "plains", "butcher", 2),
+                                DemoMob("creaking"),
+                                DemoMob("cushion"),
                             )
                             val faceCamera = 180f - CameraAngles.degrees(camera.yaw)
                             val demoMobs = samples.mapIndexed { index, sample ->

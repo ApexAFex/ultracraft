@@ -73,8 +73,11 @@ for (const part of parts) {
   let y = 0;
   let z = 0;
   let rotatedParent = false;
+  // Позы родителей берутся из КОПИЙ: в `parts` они уже заменены суммой по цепочке, и
+  // второе сложение считало бы родителя дважды (из-за этого у «скрипуна» руки уезжали
+  // на 1,5 блока вниз, а низ модели определялся на 43 пикселя вместо 24).
   for (let depth = 2; depth <= chain.length; depth++) {
-    const parent = poses.get(chain.slice(0, depth).join('/'));
+    const parent = originalPoses.get(chain.slice(0, depth).join('/'));
     if (!parent) continue;
     if (parent.rx !== 0 || parent.ry !== 0 || parent.rz !== 0) rotatedParent = true;
     x += parent.x;

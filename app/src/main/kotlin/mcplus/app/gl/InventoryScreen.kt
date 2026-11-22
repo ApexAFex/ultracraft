@@ -68,6 +68,15 @@ object InventoryScreen {
     /** Центр слота в пикселях фона: удобно для тестов и подсказок. */
     fun centreOf(cell: Cell): Pair<Float, Float> = (cell.x + 9f) to (cell.y + 9f)
 
+    /**
+     * Слот хотбара, выбранный сейчас игроком.
+     *
+     * В инвентаре хотбар — это меню-слоты 36…44 (так их нумерует сервер), поэтому
+     * выбранный слот подсвечивается рамкой, как в игре.
+     */
+    fun isSelectedHotbarSlot(menuSlot: Int, selected: Int): Boolean =
+        menuSlot == 36 + selected.coerceIn(0, 8)
+
     /** Проверка попадания без экрана: центр слота всегда находит этот же слот. */
     fun hitsItself(cell: Cell): Boolean {
         val (x, y) = centreOf(cell)

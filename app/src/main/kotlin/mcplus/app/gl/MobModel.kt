@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, CREAKING, BOAT, MINECART, NONE,
 }
 
 /**
@@ -130,6 +130,7 @@ object MobModels {
         "end_crystal" -> MobFamily.CRYSTAL
         "happy_ghast" -> MobFamily.HAPPY_GHAST
         "cushion" -> MobFamily.CUSHION
+        "creaking" -> MobFamily.CREAKING
         // Серный куб: та же геометрия, что у слизня, но своя текстура.
         "sulfur_cube" -> MobFamily.SLIME
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
@@ -234,6 +235,7 @@ object MobModels {
         MobFamily.CRYSTAL -> 64 to 32
         MobFamily.HAPPY_GHAST -> 64 to 64
         MobFamily.CUSHION -> 64 to 64
+        MobFamily.CREAKING -> 64 to 64
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -295,6 +297,7 @@ object MobModels {
         MobFamily.CRYSTAL -> CRYSTAL
         MobFamily.HAPPY_GHAST -> HAPPY_GHAST
         MobFamily.CUSHION -> CUSHION
+        MobFamily.CREAKING -> CREAKING
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -1411,5 +1414,26 @@ object MobModels {
      */
     private val CUSHION = listOf(
         MobBox("cushion", -1.9375f, 0f, -0.0625f, -0.9375f, 0.25f, 0.9375f, u = 0, v = 0, offsetX = 1.4375f, offsetZ = -0.4375f),
+    )
+
+    /**
+     * Скрипун (CreakingModel): тонкое тело, длинные руки и ноги, голова с ветками вместо глаз, лист 64×64. Части вложены на три уровня, поэтому смещения считаются по всей цепочке родителей — после починки конвейера (он складывал позы дважды) модель встала на землю.
+     */
+    private val CREAKING = listOf(
+        MobBox("head", -0.1875f, 0.625f, -0.1875f, 0.1875f, 0.8125f, 0.1875f, u = 28, v = 31, offsetX = -0.25f, offsetY = 1.875f),
+        MobBox("head", 0.1875f, -0.0625f, 0f, 0.75f, 0.8125f, 0f, u = 12, v = 40, offsetX = -0.25f, offsetY = 1.875f),
+        MobBox("head", -0.75f, 0f, 0f, -0.1875f, 0.875f, 0f, u = 34, v = 12, offsetX = -0.25f, offsetY = 1.875f),
+        MobBox("right_arm", -0.125f, -1.2187f, -0.0937f, 0.0625f, 0.0938f, 0.0938f, u = 22, v = 13, offsetX = -0.5f, offsetY = 1.7813f, offsetZ = 0.0938f),
+        MobBox("right_arm", -0.125f, -1.4687f, -0.0937f, 0.0625f, -1.2187f, 0.0938f, u = 46, v = 0, offsetX = -0.5f, offsetY = 1.7813f, offsetZ = 0.0938f),
+        MobBox("left_arm", 0f, -0.9375f, -0.0937f, 0.1875f, 0.0625f, 0.0938f, u = 30, v = 40, offsetX = 0.3125f, offsetY = 1.75f, offsetZ = 0.0313f),
+        MobBox("left_arm", 0f, 0.0625f, -0.0937f, 0.1875f, 0.3125f, 0.0938f, u = 52, v = 12, offsetX = 0.3125f, offsetY = 1.75f, offsetZ = 0.0313f),
+        MobBox("left_arm", 0f, -1.1875f, -0.0937f, 0.1875f, -0.9375f, 0.0938f, u = 52, v = 19, offsetX = 0.3125f, offsetY = 1.75f, offsetZ = 0.0313f),
+        MobBox("body", 0f, -0.625f, -0.1875f, 0.375f, 0.1875f, 0.125f, u = 0, v = 16, offsetX = -0.0625f, offsetY = 1.625f, offsetZ = 0.0625f),
+        MobBox("body", -0.375f, -0.1875f, -0.1875f, 0f, 0.25f, 0.125f, u = 24, v = 0, offsetX = -0.0625f, offsetY = 1.625f, offsetZ = 0.0625f),
+        MobBox("left_leg", -0.0937f, -1f, -0.0937f, 0.0938f, 0f, 0.0938f, u = 42, v = 40, offsetX = 0.0938f, offsetY = 1f, offsetZ = 0.0313f),
+        MobBox("left_leg", -0.0937f, -0.9812f, -0.2812f, 0.2188f, -0.9812f, 0.2813f, u = 45, v = 55, offsetX = 0.0938f, offsetY = 1f, offsetZ = 0.0313f),
+        MobBox("right_leg", -0.1875f, -1.0937f, -0.0937f, 0f, 0.0938f, 0.0938f, u = 0, v = 34, offsetX = -0.0625f, offsetY = 1.0938f, offsetZ = 0.0313f),
+        MobBox("right_leg", -0.3125f, -1.075f, -0.2812f, 0f, -1.075f, 0.2813f, u = 45, v = 46, offsetX = -0.0625f, offsetY = 1.0938f, offsetZ = 0.0313f),
+        MobBox("right_leg", -0.1875f, 0.0938f, -0.0937f, 0f, 0.2813f, 0.0938f, u = 12, v = 34, offsetX = -0.0625f, offsetY = 1.0938f, offsetZ = 0.0313f),
     )
 }

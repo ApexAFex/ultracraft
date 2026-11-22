@@ -304,6 +304,15 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
                 repeat(size) { enchantments += reader.readVarInt() to reader.readVarInt() }
             }
 
+            // Компоненты без полезной нагрузки: планировщик крыла и «нематериальный снаряд».
+            "glider", "intangible_projectile" -> Unit
+            // Одно число: минимальный заряд удара и множитель длительности зелья — float,
+            // доплата торговцу, уровень зачаруемости и номер карты — VarInt.
+            "minimum_attack_charge", "potion_duration_scale" -> reader.readFloat()
+            "additional_trade_cost", "enchantable", "map_id" -> reader.readVarInt()
+            // Ссылки на модель предмета и стиль подсказки — обычные строки.
+            "item_model", "tooltip_style" -> reader.readString()
+
             else -> throw UnreadableStack(count)
         }
     }

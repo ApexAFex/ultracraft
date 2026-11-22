@@ -214,6 +214,67 @@ class InventoryTest {
     }
 
     @Test
+    fun `payload-free and single-value components are read`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(5)
+                .writeVarInt(0)
+                .writeVarInt(34)   // glider — без полезной нагрузки
+                .writeVarInt(42)   // additional_trade_cost = 7
+                .writeVarInt(7)
+                .writeVarInt(10)   // item_model = "stone"
+                .writeString("minecraft:stone")
+                .writeVarInt(7)    // minimum_attack_charge = 0.5
+                .writeFloat(0.5f)
+                .writeVarInt(26)   // use_cooldown — всё ещё незнакомый
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            // Последний компонент незнаком, поэтому стек «неизвестен», но количество на месте:
+            // значит, предыдущие компоненты прочитаны ровно и пакет не разъехался.
+            assertNull(inventory.heldName())
+            assertEquals(1, inventory.stackIn(0)?.count)
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
+    fun `a glider with only known components stays a known stack`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(3)
+                .writeVarInt(0)
+                .writeVarInt(34)   // glider
+                .writeVarInt(1)    // max_stack_size = 1
+                .writeVarInt(1)
+                .writeVarInt(47)   // dyed_color
+                .writeInt(0xFF0000)
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(1, parsed.maxStackSize)
+            assertEquals(0xFF0000, parsed.dyedColor)
+            assertEquals("stone", inventory.heldName())
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `a renamed enchanted sword is a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()
