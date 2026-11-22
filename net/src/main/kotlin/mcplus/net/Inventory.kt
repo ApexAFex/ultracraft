@@ -48,6 +48,9 @@ class Inventory(
         val trimPattern: Int = -1,
         /** Сколько зарядов в арбалете (компонент `charged_projectiles`). */
         val chargedCount: Int = 0,
+        /** Номер зелья из реестра и его цвет (`potion_contents`). */
+        val potionId: Int = -1,
+        val potionColor: Int = 0,
     ) {
         val isEmpty: Boolean get() = count <= 0
 
@@ -281,6 +284,8 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
     var trimMaterial = -1
     var trimPattern = -1
     var chargedCount = 0
+    var potionId = -1
+    var potionColor = 0
     repeat(added) {
         val id = reader.readVarInt()
         when (ComponentTable.active.nameOf(id)) {
@@ -336,13 +341,29 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
             "trim" -> {
                 trimMaterial = reader.readVarInt()
                 trimPattern = reader.readVarInt()
-            }
-            // Заряженный арбалет: список зарядов тем же форматом, что и обычный стек.
+            }            // Заряженный арбалет: список зарядов тем же форматом, что и обычный стек.
             "charged_projectiles" -> {
                 val shots = reader.readVarInt()
                 if (shots !in 0..MAX_PROJECTILES) throw UnreadableStack(count)
                 repeat(shots) { skipTemplateStack(reader) }
                 chargedCount = shots
+            }
+
+            // Зелье: недописанный вариант, свой цвет, свои эффекты и своё имя.
+            // Свои эффекты встречаются редко, и их формат вложенный — такие зелья остаются
+            // «неизвестными», зато обычные (с номером зелья из реестра) читаются точно.
+            "potion_contents" -> {
+                val hasPotion = reader.readBoolean()
+                if (hasPotion) potionId = reader.readVarInt()
+                val hasColor = reader.readBoolean()
+                if (hasColor) potionColor = reader.readInt()
+                val effects = reader.readVarInt()
+                if (effects != 0) throw UnreadableStack(count)
+                val hasName = reader.readBoolean()
+                if (hasName) {
+                    val text = mcplus.net.componentText(mcplus.protocol.nbt.NbtReader.read(reader))
+                    if (text != null) customName = customName ?: text
+                }
             }
 
             else -> throw UnreadableStack(count)
@@ -364,6 +385,8 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
         trimMaterial = trimMaterial,
         trimPattern = trimPattern,
         chargedCount = chargedCount,
+        potionId = potionId,
+        potionColor = potionColor,
     )
 }
 

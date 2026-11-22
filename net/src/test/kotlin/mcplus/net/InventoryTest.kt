@@ -396,6 +396,36 @@ class InventoryTest {
     }
 
     @Test
+    fun `a potion keeps its registry id and colour`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val id = dataComponentId("potion_contents")
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(id)
+                .writeBoolean(true).writeVarInt(12)     // зелье: исцеление
+                .writeBoolean(true).writeInt(0x385DC6)  // свой цвет
+                .writeVarInt(0)                         // своих эффектов нет
+                .writeBoolean(false)                    // своего имени нет
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(12, parsed.potionId)
+            assertEquals(0x385DC6, parsed.potionColor)
+            assertEquals("stone", inventory.heldName(), "зелье остаётся известным предметом")
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `a renamed enchanted sword is a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()

@@ -51,6 +51,18 @@ object HumanoidLook {
     fun isHumanoid(typeName: String): Boolean = lookOf(typeName) != null
 
     /**
+     * Скин «манекена» — сущности-болванки на модели игрока.
+     *
+     * `Mannequin` в 26.3 наследует `Avatar` (как игрок), поэтому рисуется моделью игрока, а не
+     * мобовой: у мобовой раскладки левые конечности зеркалятся, и скин игрока на ней разъезжается.
+     * Профиль из метаданных пока не читаем — показываем стандартный скин.
+     */
+    fun playerSkin(typeName: String): String? = when (typeName) {
+        "mannequin" -> "entity/player/wide/steve.png"
+        else -> null
+    }
+
+    /**
      * Держит ли моб руки вытянутыми вперёд.
      *
      * В игре это `ZombieModel.setupAnim`: у зомби, кадавра, утопленника и зомби-пиглина

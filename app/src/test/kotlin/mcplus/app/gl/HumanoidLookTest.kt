@@ -80,4 +80,12 @@ class HumanoidLookTest {
         assertNull(HumanoidLook.lookOf("item"))
         assertTrue(!HumanoidLook.isHumanoid("cow"))
     }
+    @Test
+    fun `only the mannequin uses the player skin layout`() {
+        assertEquals("entity/player/wide/steve.png", HumanoidLook.playerSkin("mannequin"))
+        assertNull(HumanoidLook.playerSkin("zombie"), "у зомби мобовая раскладка скина")
+        assertNull(HumanoidLook.playerSkin("cow"))
+        // Манекен не должен попадать в мобовые гуманоиды: у них зеркалятся конечности.
+        assertNull(HumanoidLook.lookOf("mannequin"))
+    }
 }

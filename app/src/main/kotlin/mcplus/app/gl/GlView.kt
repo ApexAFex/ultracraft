@@ -2618,7 +2618,14 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 )
                                 val family = MobModels.familyOf(name)
                                 val look = HumanoidLook.lookOf(name)
+                                val mannequinSkin = HumanoidLook.playerSkin(name)
                                 when {
+                                    // Манекен — модель игрока со стандартным скином.
+                                    mannequinSkin != null ->
+                                        players += humanoid.copy(
+                                            texture = playerRenderer.textureFor(mannequinSkin),
+                                        )
+
                                     look != null && HumanoidLook.slim(name) ->
                                         slimHumanoids += humanoid.copy(
                                             texture = slimHumanoidRenderer.textureFor(look),
@@ -2857,7 +2864,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         for (entity in entities) {
                             val name = entityTypes.nameOf(entity.type)
                             val isPlayer = playerList.nameOf(entity.uuid) != null
-                            if (!isPlayer && HumanoidLook.lookOf(name) == null) continue
+                            // Манекен — тоже гуманоид: броня на нём должна быть видна.
+                            val isHumanoid = HumanoidLook.lookOf(name) != null ||
+                                HumanoidLook.playerSkin(name) != null
+                            if (!isPlayer && !isHumanoid) continue
                             val pieces = HashMap<ArmorLook.Piece, Int>()
                             for ((slot, piece) in ARMOR_EQUIPMENT_SLOTS) {
                                 val itemId = entity.equipmentItem(slot)

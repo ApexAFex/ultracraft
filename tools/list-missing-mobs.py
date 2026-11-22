@@ -2,7 +2,7 @@
 
 Проверяются все места, где клиент выбирает, чем рисовать сущность: модели мобов
 (`MobModel.kt`), гуманоиды (`HumanoidLook.kt`), текстуры (`MobRenderer.kt`), снаряды
-(`Projectiles.kt`), кубы блоков (`BlockEntityLooks.kt`) и особые случаи в `GlView.kt`
+(`Projectiles.kt`), кубы блоков (`BlockEntityLooks.kt`), особые сущности\n(`SpecialEntities.kt`) и особые случаи в `GlView.kt`
 (выпавший предмет, рамка, картина, сфера опыта). Это грубая, но честная проверка:
 имя типа должно встречаться в исходниках, иначе сущность остаётся коробкой.
 """
@@ -22,6 +22,7 @@ sources = [
     "app/src/main/kotlin/mcplus/app/gl/MobRenderer.kt",
     "app/src/main/kotlin/mcplus/app/gl/Projectiles.kt",
     "app/src/main/kotlin/mcplus/app/gl/BlockEntityLooks.kt",
+    "app/src/main/kotlin/mcplus/app/gl/SpecialEntities.kt",
     "app/src/main/kotlin/mcplus/app/gl/GlView.kt",
 ]
 blob = "\n".join((root / path).read_text(encoding="utf-8") for path in sources)
