@@ -60,9 +60,9 @@ class RecipeBook {
             val recipe = readDisplay(reader)
             val contents = readSlotList(reader)
             reader.readBoolean() // «подсвечен»
-            // После флага в записи идёт ещё один байт: его смысл неизвестен, но без него
+            // После флага в записи идёт ещё одно число (VarInt): его смысл неизвестен, но без него
             // следующая запись начинается не с вида рецепта (проверено на живом пакете).
-            reader.readByte()
+            reader.readVarInt()
             onProgress(it + 1)
             if (recipe != null) {
                 parsed[displayId] = recipe.copy(ingredients = recipe.ingredients + contents)
