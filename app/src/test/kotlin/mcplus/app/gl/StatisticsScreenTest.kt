@@ -80,6 +80,20 @@ class StatisticsScreenTest {
     }
 
     @Test
+    fun `time and distance counters are formatted for people`() {
+        // play_time в тиках: 20 тиков — секунда.
+        assertEquals("2 ч 57 мин", StatisticsScreen.formatValue("play_time", 213_568))
+        assertEquals("5 мин 3 с", StatisticsScreen.formatValue("play_time", 6_060))
+        assertEquals("12 с", StatisticsScreen.formatValue("play_time", 240))
+        // walk_one_cm в сантиметрах.
+        assertEquals("34 м", StatisticsScreen.formatValue("walk_one_cm", 3_400))
+        assertEquals("1,2 км", StatisticsScreen.formatValue("walk_one_cm", 120_000))
+        assertEquals("50 см", StatisticsScreen.formatValue("walk_one_cm", 50))
+        // Обычные счётчики остаются числами.
+        assertEquals("7", StatisticsScreen.formatValue("deaths", 7))
+    }
+
+    @Test
     fun `the category column switches the stat type`() {
         for (type in StatisticsScreen.TYPES) {
             assertTrue(StatisticsScreen.shortTitleOf(type).isNotBlank(), "вид $type без короткой подписи")

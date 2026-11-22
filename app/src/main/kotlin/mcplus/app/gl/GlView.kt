@@ -303,8 +303,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             // картины рисовать нечем — это видно по нулю.
             session?.joinResult?.registries?.let { registries ->
                 println("Картины: ${registries.paintingCount} вариантов из реестра")
+                if (System.getenv("MC_DEBUG_REGISTRIES") == "1") {
+                    println("Реестры: " + registries.registryIds.joinToString(", "))
+                    println("Зачарований в реестре: ${registries.enchantmentCount}")
+                }
             }
-
             val pipeline = if (meshThreads > 0) {
                 MeshPipeline(world, blocks, atlas, tints, meshThreads)
             } else {
@@ -594,6 +597,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         textRenderer, atlas, width, height,
                         itemStats = session?.itemStatsTable ?: mcplus.net.ItemStats.EMPTY,
                     )
+                    // Имена зачарований для подсказок предметов: «Острота III», а не номер.
+                    session?.joinResult?.registries?.let { registries ->
+                        hud.enchantmentName = { id: Int -> registries.enchantment(id) }
+                        if (registries.enchantmentCount > 0) {
+                            println("Зачарования: ${registries.enchantmentCount} названий из реестра")
+                        }
+                    }
                     // Небо: своя маленькая текстура (солнце, фазы луны, облака).
                     val skyTextures = SkyTextures.load(directory)
                     if (skyTextures == null) {
@@ -761,6 +771,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 CameraAngles.protocolPitch(player.pitch),
                             ),
                         )
+                        // Взмах рукой при использовании: в ванили рука идёт вверх, и другие
+                        // игроки это видят.
+                        session?.send(mcplus.net.PlayerMovement.swingArm())
+                        swingNanos = System.nanoTime()
                         val kind = consumables.of(name)
                         if (kind == null) return
                         usingItem = name

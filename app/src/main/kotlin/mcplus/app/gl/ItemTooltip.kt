@@ -24,8 +24,14 @@ object ItemTooltip {
      *
      * @param name имя предмета без количества
      * @param maxDamage предел прочности (0 — предмет не изнашивается)
+     * @param enchantmentName имя зачарования по номеру из реестра (null — покажем номер)
      */
-    fun lines(stack: Inventory.Stack, name: String, maxDamage: Int = 0): List<Pair<String, Int>> {
+    fun lines(
+        stack: Inventory.Stack,
+        name: String,
+        maxDamage: Int = 0,
+        enchantmentName: (Int) -> String? = { null },
+    ): List<Pair<String, Int>> {
         val result = ArrayList<Pair<String, Int>>(4)
         val title = buildString {
             append(name)
@@ -37,9 +43,34 @@ object ItemTooltip {
         // Описание идёт серым, как в игре; строки уже разобраны из компонента `lore`.
         for (line in stack.lore) result += line to 0xAAAAAA
         if (stack.enchantments.isNotEmpty()) {
-            val levels = stack.enchantments.joinToString(", ") { it.second.toString() }
-            result += "Зачарования: $levels" to 0x8090C0
+            // «Острота III» вместо «Зачарования: 3»: имя берётся из реестра зачарований,
+            // который сервер присылает при входе.
+            val text = stack.enchantments.joinToString(", ") { (id, level) ->
+                val name = enchantmentName(id) ?: "зачарование $id"
+                "$name ${roman(level)}"
+            }
+            result += text to 0x8090C0
         }
         return result
     }
+
+    /** Римская запись уровня зачарования, как в игре: 1 → I, 5 → V, 10 → X. */
+    fun roman(level: Int): String {
+        if (level <= 0) return level.toString()
+        if (level > 3999) return level.toString()
+        var left = level
+        val builder = StringBuilder()
+        for ((value, symbol) in ROMAN) {
+            while (left >= value) {
+                builder.append(symbol)
+                left -= value
+            }
+        }
+        return builder.toString()
+    }
+
+    private val ROMAN = listOf(
+        1000 to "M", 900 to "CM", 500 to "D", 400 to "CD", 100 to "C", 90 to "XC",
+        50 to "L", 40 to "XL", 10 to "X", 9 to "IX", 5 to "V", 4 to "IV", 1 to "I",
+    )
 }

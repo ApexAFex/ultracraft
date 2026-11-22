@@ -53,6 +53,14 @@ class Registries {
     /** Картины (`minecraft:painting_variant`): размеры и имя текстуры по номеру варианта. */
     private val paintings = mutableListOf<PaintingVariant>()
 
+    /**
+     * Зачарования (`minecraft:enchantment`) в порядке id.
+     *
+     * В компоненте `enchantments` лежат только номера, а в подсказке предмета хочется видеть
+     * «Острота III», а не «Зачарования: 3». Реестр присылается при входе вместе с остальными.
+     */
+    private val enchantments = mutableListOf<String>()
+
     val registryIds = mutableListOf<String>()
 
     fun dimensionType(id: Int): DimensionType? = dimensionTypes.getOrNull(id)
@@ -64,6 +72,11 @@ class Registries {
 
     /** Вариант картины по номеру из `Set Entity Data` или null, если реестр не пришёл. */
     fun painting(id: Int): PaintingVariant? = paintings.getOrNull(id)
+
+    /** Имя зачарования по номеру из компонента `enchantments` или null. */
+    fun enchantment(id: Int): String? = enchantments.getOrNull(id)
+
+    val enchantmentCount: Int get() = enchantments.size
 
     val paintingCount: Int get() = paintings.size
 
@@ -86,6 +99,10 @@ class Registries {
     internal fun addPainting(variant: PaintingVariant) {
         paintings += variant
     }
+
+    internal fun addEnchantment(name: String) {
+        enchantments += name
+    }
 }
 
 internal fun readRegistryData(body: ByteArray, registries: Registries) {
@@ -101,9 +118,30 @@ internal fun readRegistryData(body: ByteArray, registries: Registries) {
         readBiomes(reader, registries)
     } else if (registryId == "minecraft:painting_variant") {
         readPaintingVariants(reader, registries)
+    } else if (registryId == "minecraft:enchantment") {
+        readEnchantments(reader, registries)
     }
     // damage types, chat types… are not needed yet
 }
+
+/**
+ * Зачарования: только имена по порядку.
+ *
+ * Полезная нагрузка (описание, максимумы по уровням) весит много и нам не нужна: для
+ * подсказки предмета хватает имени. NBT всё равно читается целиком — его длину знает читатель.
+ */
+private fun readEnchantments(reader: ByteReader, registries: Registries) {
+    val entryCount = reader.readVarInt()
+    if (entryCount !in 0..MAX_ENCHANTMENTS) throw ProtocolException("Зачарований в реестре: $entryCount")
+
+    repeat(entryCount) {
+        val name = reader.readString().removePrefix("minecraft:")
+        if (reader.readBoolean()) NbtReader.read(reader)
+        registries.addEnchantment(name)
+    }
+}
+
+private const val MAX_ENCHANTMENTS = 512
 
 /**
  * Картины: имя, ширина и высота в блоках, файл текстуры.

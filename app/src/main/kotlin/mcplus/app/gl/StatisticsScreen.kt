@@ -15,7 +15,47 @@ object StatisticsScreen {
     /** Виды счётчиков в порядке номеров (как в игре). */
     val TYPES = listOf(0, 1, 2, 3, 4, 5, 6, 7, 8)
 
-    data class Row(val name: String, val value: Long)
+    data class Row(val name: String, val value: Long, /** Готовое число для экрана. */ val text: String = value.toString())
+
+    /**
+     * Как показать счётчик: время — часами и минутами, расстояние — метрами и километрами.
+     *
+     * В игре `play_time` хранится в тиках, а `walk_one_cm` — в сантиметрах; сырые числа
+     * вроде «213568» ничего не говорят, поэтому на экране они превращаются в «2 ч 57 мин»
+     * и «1,2 км». Остальные счётчики остаются числами.
+     */
+    fun formatValue(counter: String, value: Long): String = when {
+        counter in TIME_COUNTERS -> formatTicks(value)
+        counter.endsWith("_one_cm") -> formatCentimetres(value)
+        else -> value.toString()
+    }
+
+    private val TIME_COUNTERS = setOf(
+        "play_time", "total_world_time", "time_since_death", "time_since_rest",
+    )
+
+    /** Тики (20 в секунду) → «2 ч 57 мин», «5 мин 3 с» или «12 с». */
+    fun formatTicks(ticks: Long): String {
+        val totalSeconds = ticks / 20
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return when {
+            hours > 0 -> "$hours ч $minutes мин"
+            minutes > 0 -> "$minutes мин $seconds с"
+            else -> "$seconds с"
+        }
+    }
+
+    /** Сантиметры → «34 м», «1,2 км». */
+    fun formatCentimetres(centimetres: Long): String {
+        val metres = centimetres / 100
+        return when {
+            metres >= 1000 -> String.format("%.1f км", metres / 1000.0).replace('.', ',')
+            metres > 0 -> "$metres м"
+            else -> "$centimetres см"
+        }
+    }
 
     /** Подпись вида: `mined` → «Добыто блоков», `custom` → «Свои счётчики». */
     fun titleOf(type: Int, names: StatsTable): String = when (type) {
@@ -52,7 +92,10 @@ object StatisticsScreen {
                 8 -> names.customName(id) ?: "счётчик $id"
                 else -> itemName(id) ?: "предмет $id"
             }
-            rows += Row(name, value)
+            // Свои счётчики знают своё имя: по нему видно, время это или расстояние.
+            val counter = if (type == 8) names.customName(id) else null
+            val text = if (counter != null) formatValue(counter, value) else value.toString()
+            rows += Row(name, value, text)
             if (rows.size >= limit) break
         }
         return rows

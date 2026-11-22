@@ -347,7 +347,7 @@ class Hud(
             var y = top + 56f * s
             for (row in rows.drop(from).take(visible)) {
                 labels += TextRenderer.ScreenLabel(left, y, row.name, s)
-                labels += TextRenderer.ScreenLabel(width * 0.72f, y, row.value.toString(), s)
+                labels += TextRenderer.ScreenLabel(width * 0.72f, y, row.text, s)
                 y += 14f * s
             }
             if (rows.size > visible) {
@@ -500,7 +500,12 @@ class Hud(
         if (hovered != null) {
             val tooltipWidth = 170f * s
             val lines = wrapText(text, hovered.description.text, tooltipWidth - 10f * s, s * 0.55f)
-            val status = if (hovered.done) "Выполнено" else "Не выполнено"
+            val status = when {
+                hovered.done -> "Выполнено"
+                // У достижения из нескольких шагов видно, сколько уже сделано.
+                hovered.total > 1 -> "Выполнено ${hovered.progress} из ${hovered.total}"
+                else -> "Не выполнено"
+            }
             val tooltipHeight = (20f + lines.size * 10f + 12f) * s
             val tooltipX = (mouseX.toFloat() + 10f * s).coerceAtMost(width - tooltipWidth - 4f * s)
             val tooltipY = (mouseY.toFloat() + 8f * s)
@@ -736,6 +741,13 @@ class Hud(
     /** Прямоугольники видов счётчиков на экране статистики: номер вида и его строка. */
     var statisticsCategories: List<Pair<Int, HudRect>> = emptyList()
         private set
+
+    /**
+     * Имя зачарования по номеру: реестр приходит при входе, экран его просто спрашивает.
+     *
+     * Без этого в подсказке стояло «Зачарования: 3», а не «Острота III».
+     */
+    var enchantmentName: (Int) -> String? = { null }
 
     /** Прямоугольники строк списка сделок у жителя: индекс строки — номер сделки. */
     var tradeRows: List<Pair<Int, HudRect>> = emptyList()
@@ -974,7 +986,7 @@ class Hud(
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
                 val name = inventory.displayNameOf(stack) ?: continue
-                hoveredLines = ItemTooltip.lines(stack, name, max)
+                hoveredLines = ItemTooltip.lines(stack, name, max, enchantmentName)
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
                 // Белая рамка вокруг слота под курсором.
@@ -1049,7 +1061,7 @@ class Hud(
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
                 val name = inventory.displayNameOf(stack) ?: continue
-                hoveredLines = ItemTooltip.lines(stack, name, max)
+                hoveredLines = ItemTooltip.lines(stack, name, max, enchantmentName)
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
                 // Рамка слота под курсором.

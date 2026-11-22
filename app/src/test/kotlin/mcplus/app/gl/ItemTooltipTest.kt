@@ -57,7 +57,7 @@ class ItemTooltipTest {
             stack(enchantments = listOf(5 to 3)), "Меч",
         )
         assertTrue(enchanted[0].first.endsWith("✦"), "у зачарованного предмета есть метка")
-        assertEquals("Зачарования: 3", enchanted[1].first)
+        assertEquals("зачарование 5 III", enchanted[1].first, "без реестра остаётся номер")
         assertTrue(enchanted.size == 2)
     }
 
@@ -77,5 +77,35 @@ class ItemTooltipTest {
     fun `a forced glint still marks the item`() {
         val lines = ItemTooltip.lines(stack(glint = true), "Палка")
         assertTrue(lines[0].first.endsWith("✦"), "блеск включают и у незачарованного предмета")
+    }
+
+    @Test
+    fun `enchantments are named from the registry with roman levels`() {
+        val names = mapOf(33 to "Острота", 34 to "Прочность")
+        val lines = ItemTooltip.lines(
+            stack(enchantments = listOf(33 to 3, 34 to 5)), "Меч",
+            enchantmentName = { names[it] },
+        )
+        assertEquals("Острота III, Прочность V", lines[1].first)
+        assertEquals(0x8090C0, lines[1].second)
+    }
+
+    @Test
+    fun `an unknown enchantment falls back to its number`() {
+        val lines = ItemTooltip.lines(stack(enchantments = listOf(99 to 2)), "Меч")
+        assertEquals("зачарование 99 II", lines[1].first)
+    }
+
+    @Test
+    fun `roman numerals follow the vanilla style`() {
+        assertEquals("I", ItemTooltip.roman(1))
+        assertEquals("II", ItemTooltip.roman(2))
+        assertEquals("IV", ItemTooltip.roman(4))
+        assertEquals("V", ItemTooltip.roman(5))
+        assertEquals("IX", ItemTooltip.roman(9))
+        assertEquals("X", ItemTooltip.roman(10))
+        assertEquals("XIII", ItemTooltip.roman(13))
+        // Уровней выше 255 в игре не бывает, но функция не должна падать.
+        assertEquals("0", ItemTooltip.roman(0))
     }
 }

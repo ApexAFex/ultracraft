@@ -46,6 +46,9 @@ class Advancements {
         val type: Int,
         val done: Boolean,
         val hidden: Boolean,
+        /** Сколько условий уже выполнено и сколько всего: у достижения их бывает несколько. */
+        val progress: Int = 0,
+        val total: Int = 0,
     )
 
     private data class Entry(
@@ -68,9 +71,15 @@ class Advancements {
     private val entries = ConcurrentHashMap<String, Entry>()
     private val queue = ConcurrentLinkedQueue<Toast>()
 
-    /** Все достижения для экрана, по идентификатору: порядок вкладок задаёт вызывающий. */
+    /**
+     * Все достижения для экрана, по идентификатору: порядок вкладок задаёт вызывающий.
+     *
+     * Скрытые и невыполненные не отдаются: в игре такие достижения не показывают, иначе
+     * по дереву видно все секреты заранее.
+     */
     fun nodes(): List<Node> = entries.entries
         .sortedBy { it.key }
+        .filter { (_, entry) -> !entry.hidden || entry.done }
         .map { (id, entry) ->
             Node(
                 id = id,
@@ -83,6 +92,10 @@ class Advancements {
                 type = entry.type,
                 done = entry.done,
                 hidden = entry.hidden,
+                // Требования — группы «любое из»: выполнено столько шагов, сколько условий
+                // уже отмечено, всего — сколько их в пакете.
+                progress = entry.criteria.size,
+                total = entry.requirements.flatten().distinct().size,
             )
         }
 

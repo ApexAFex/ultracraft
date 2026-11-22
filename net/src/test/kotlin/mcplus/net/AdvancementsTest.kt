@@ -31,6 +31,8 @@ class AdvancementsTest {
         parent: String? = null,
         x: Float = 0f,
         y: Float = 0f,
+        /** Скрытое достижение: бит 2 в маске показа, как в игре. */
+        hidden: Boolean = false,
     ): ByteArray {
         val writer = ByteWriter()
         writer.writeBoolean(reset)             // reset
@@ -48,7 +50,7 @@ class AdvancementsTest {
         writer.writeVarInt(0)                  // added components
         writer.writeVarInt(0)                  // removed components
         writer.writeVarInt(type)               // advancement type
-        writer.writeInt(if (showToast) 2 else 0)
+        writer.writeInt((if (showToast) 2 else 0) or (if (hidden) 4 else 0))
         writer.writeVarInt(1)                  // requirements: one group
         writer.writeVarInt(1)                  // one criterion
         writer.writeString("crit")
@@ -120,6 +122,33 @@ class AdvancementsTest {
             packet(done = false, reset = true),
         )
         assertEquals(false, advancements.nodes().single().done)
+    }
+
+    @Test
+    fun `progress counts the criteria done`() {
+        val advancements = Advancements()
+        advancements.onPacket(Protocol777.Play.UPDATE_ADVANCEMENTS, packet(done = false, reset = true))
+        val node = advancements.nodes().single()
+        assertEquals(0, node.progress, "ни одно условие не выполнено")
+        assertEquals(1, node.total, "в достижении одно условие")
+    }
+
+    @Test
+    fun `a secret advancement is hidden until it is done`() {
+        val advancements = Advancements()
+        // Скрытое и невыполненное в экран не попадает.
+        advancements.onPacket(
+            Protocol777.Play.UPDATE_ADVANCEMENTS,
+            packet(done = false, reset = true, hidden = true),
+        )
+        assertEquals(0, advancements.nodes().size)
+        // Как только выполнено — показывается.
+        advancements.onPacket(
+            Protocol777.Play.UPDATE_ADVANCEMENTS,
+            packet(done = true, reset = true, hidden = true),
+        )
+        assertEquals(1, advancements.nodes().size)
+        assertEquals(true, advancements.nodes().single().hidden)
     }
 
     @Test
