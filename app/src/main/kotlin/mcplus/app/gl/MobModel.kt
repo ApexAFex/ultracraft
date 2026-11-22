@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, BOAT, MINECART, NONE,
 }
 
 /**
@@ -109,6 +109,10 @@ object MobModels {
         "tadpole" -> MobFamily.TADPOLE
         // Ведьма: модель жителя с носом, бородавкой и высокой шляпой.
         "witch" -> MobFamily.WITCH
+        // Снежный голем: три шара и две палки-руки.
+        "snow_golem" -> MobFamily.SNOW_GOLEM
+        // Верблюд: длинные ноги, горб и голова на вытянутой шее, лист 128×128.
+        "camel" -> MobFamily.CAMEL
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -189,6 +193,8 @@ object MobModels {
         MobFamily.SALMON -> 32 to 32
         MobFamily.TADPOLE -> 16 to 16
         MobFamily.WITCH -> 64 to 128
+        MobFamily.SNOW_GOLEM -> 64 to 64
+        MobFamily.CAMEL -> 128 to 128
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -234,6 +240,8 @@ object MobModels {
         MobFamily.SALMON -> SALMON
         MobFamily.TADPOLE -> TADPOLE
         MobFamily.WITCH -> WITCH
+        MobFamily.SNOW_GOLEM -> SNOW_GOLEM
+        MobFamily.CAMEL -> CAMEL
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -1039,5 +1047,40 @@ object MobModels {
         MobBox("arms", -0.25f, -0.375f, -0.125f, 0.25f, -0.125f, 0.125f, u = 40, v = 38, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7317f, 0.6816f, 0f, 0f, -0.6816f, 0.7317f, 0f, 0f, 1.3125f, -0.0625f, 1f)),
         MobBox("body", -0.25f, -0.75f, -0.1875f, 0.25f, 0f, 0.1875f, u = 16, v = 20, offsetY = 1.5f),
         MobBox("jacket", -0.25f, -1.25f, -0.1875f, 0.25f, 0f, 0.1875f, u = 0, v = 38, offsetY = 1.5f),
+    )
+
+    /**
+     * Снежный голем (`SnowGolemModel`): три снежных шара и две палки-руки.
+     *
+     * Руки в ванильной модели повёрнуты каждая вокруг своей оси (одна на 180° вокруг Y),
+     * поэтому у них матрица, а не три угла. Лист 64×64.
+     */
+    private val SNOW_GOLEM = listOf(
+        MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 0, v = 0, offsetY = 1.25f),
+        MobBox("right_arm", -0.0625f, -0.125f, -0.0625f, 0.6875f, 0f, 0.0625f, u = 32, v = 0, matrix = floatArrayOf(-0.5403f, -0.8415f, 0.0004f, 0f, -0.8415f, 0.5403f, 0f, 0f, -0.0002f, -0.0003f, -1f, 0f, -0.3125f, 1.125f, -0.0625f, 1f)),
+        MobBox("upper_body", -0.3125f, 0f, -0.3125f, 0.3125f, 0.625f, 0.3125f, u = 0, v = 16, offsetY = 0.6875f),
+        MobBox("left_arm", -0.0625f, -0.125f, -0.0625f, 0.6875f, 0f, 0.0625f, u = 32, v = 0, matrix = floatArrayOf(0.5403f, -0.8415f, 0f, 0f, 0.8415f, 0.5403f, 0f, 0f, 0f, 0f, 1f, 0f, 0.3125f, 1.125f, 0.0625f, 1f)),
+        MobBox("lower_body", -0.375f, 0f, -0.375f, 0.375f, 0.75f, 0.375f, u = 0, v = 36),
+    )
+
+    /**
+     * Верблюд (`AdultCamelModel`): четыре длинные ноги, тело, горб, шея, голова и уши.
+     *
+     * Коробки ног в ванильной модели заданы от бедра вниз, поэтому у них отрицательный Y
+     * и смещение [MobBox.offsetY] — в игре они так и качаются. Лист 128×128.
+     */
+    private val CAMEL = listOf(
+        MobBox("right_front_leg", -0.1562f, -1.4375f, -0.1562f, 0.1563f, -0.125f, 0.1563f, u = 0, v = 26, offsetX = -0.3062f, offsetY = 1.4375f, offsetZ = -0.6562f),
+        MobBox("right_hind_leg", -0.1562f, -1.4375f, -0.1562f, 0.1563f, -0.125f, 0.1563f, u = 94, v = 16, offsetX = -0.3062f, offsetY = 1.4375f, offsetZ = 0.5938f),
+        MobBox("left_hind_leg", -0.1562f, -1.4375f, -0.1562f, 0.1563f, -0.125f, 0.1563f, u = 58, v = 16, offsetX = 0.3063f, offsetY = 1.4375f, offsetZ = 0.5938f),
+        MobBox("body", -0.4687f, 0f, -1.4687f, 0.4688f, 0.75f, 0.2188f, u = 0, v = 25, offsetY = 1.25f, offsetZ = 0.5938f),
+        MobBox("head", -0.2187f, -0.0625f, -0.9375f, 0.2188f, 0.4375f, 0.25f, u = 60, v = 24, offsetY = 1.4375f, offsetZ = -0.625f),
+        MobBox("head", -0.2187f, 0.4375f, -0.9375f, 0.2188f, 1.3125f, -0.5f, u = 21, v = 0, offsetY = 1.4375f, offsetZ = -0.625f),
+        MobBox("head", -0.1562f, 1f, -1.3125f, 0.1563f, 1.3125f, -0.9375f, u = 50, v = 0, offsetY = 1.4375f, offsetZ = -0.625f),
+        MobBox("right_ear", -0.1562f, -0.0937f, -0.0625f, 0.0313f, -0.0312f, 0.0625f, u = 67, v = 0, offsetX = -0.1562f, offsetY = 2.5f, offsetZ = -0.625f),
+        MobBox("left_ear", -0.0312f, -0.0937f, -0.0625f, 0.1563f, -0.0312f, 0.0625f, u = 45, v = 0, offsetX = 0.1563f, offsetY = 2.5f, offsetZ = -0.625f),
+        MobBox("hump", -0.2812f, 0f, -0.3437f, 0.2813f, 0.3125f, 0.3438f, u = 74, v = 0, offsetY = 2f, offsetZ = -0.0312f),
+        MobBox("tail", -0.0937f, -0.875f, 0f, 0.0938f, 0f, 0f, u = 122, v = 0, offsetY = 1.8125f, offsetZ = 0.8125f),
+        MobBox("left_front_leg", -0.1562f, -1.4375f, -0.1562f, 0.1563f, -0.125f, 0.1563f, u = 0, v = 0, offsetX = 0.3063f, offsetY = 1.4375f, offsetZ = -0.6562f),
     )
 }

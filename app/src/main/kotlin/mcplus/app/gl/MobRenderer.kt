@@ -423,6 +423,8 @@ class MobRenderer(
             "salmon" to "entity/fish/salmon.png",
             "tadpole" to "entity/tadpole/tadpole.png",
             "witch" to "entity/witch/witch.png",
+            "snow_golem" to "entity/snow_golem/snow_golem.png",
+            "camel" to "entity/camel/camel.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

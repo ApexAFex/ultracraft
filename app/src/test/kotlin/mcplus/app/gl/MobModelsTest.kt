@@ -539,6 +539,42 @@ class MobModelsTest {
     }
 
     @Test
+    fun `camel has long legs, a hump and a head on a neck`() {
+        assertEquals(MobFamily.CAMEL, MobModels.familyOf("camel"))
+        assertEquals(128 to 128, MobModels.textureSize(MobFamily.CAMEL))
+        assertTrue(MobRenderer.TEXTURES["camel"] != null, "верблюд без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.CAMEL)
+        assertEquals(12, boxes.size)
+        assertEquals(4, boxes.count { it.name.endsWith("leg") })
+        assertTrue(boxes.any { it.name == "hump" }, "у верблюда есть горб")
+
+        // Ноги длинные: от копыта до тела больше блока.
+        val leg = boxes.first { it.name == "right_front_leg" }
+        assertTrue(leg.offsetY + leg.maxY - (leg.offsetY + leg.minY) > 1.2f, "нога длиннее блока")
+        // Морда выше горба — верблюд смотрит поверх него.
+        val humpTop = boxes.first { it.name == "hump" }.let { it.offsetY + it.maxY }
+        val headTop = boxes.filter { it.name == "head" }.maxOf { it.offsetY + it.maxY }
+        assertTrue(headTop > humpTop, "голова выше горба: $headTop против $humpTop")
+    }
+
+    @Test
+    fun `snow golem is three snowballs and two stick arms`() {
+        assertEquals(MobFamily.SNOW_GOLEM, MobModels.familyOf("snow_golem"))
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.SNOW_GOLEM))
+        assertTrue(MobRenderer.TEXTURES["snow_golem"] != null, "снежный голем без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.SNOW_GOLEM)
+        assertEquals(5, boxes.size, "голова, два шара и две руки")
+        assertEquals(2, boxes.count { it.name.endsWith("arm") })
+        assertTrue(boxes.all { it.matrix == null || it.name.endsWith("arm") }, "матрица только у рук")
+        // Шары растут книзу, как в игре: 0,5 → 0,625 → 0,75 блока.
+        val head = boxes.first { it.name == "head" }
+        val lower = boxes.first { it.name == "lower_body" }
+        assertTrue(lower.maxX - lower.minX > head.maxX - head.minX, "нижний шар самый широкий")
+    }
+
+    @Test
     fun `witch wears a hat on top of the villager model`() {
         assertEquals(MobFamily.WITCH, MobModels.familyOf("witch"))
         assertEquals(64 to 128, MobModels.textureSize(MobFamily.WITCH), "лист ведьмы вдвое выше")
