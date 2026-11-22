@@ -32,7 +32,12 @@ class RecipeBook {
     fun onPacket(packetId: Int, body: ByteArray): Boolean {
         if (packetId != Protocol777.Play.RECIPE_BOOK_ADD) return false
         runCatching { read(body) }
-            .onFailure { println("Рецепты: пакет не разобран — ${it.message}") }
+            .onFailure {
+                // Первые байты пакета печатаем: по ним видно, где разъехался формат,
+                // без этого подбирать номера типов вслепую бессмысленно.
+                val head = body.take(48).joinToString(" ") { byte -> "%02x".format(byte) }
+                println("Рецепты: пакет не разобран — ${it.message}; всего ${body.size} байт: $head")
+            }
         return true
     }
 
@@ -109,7 +114,7 @@ class RecipeBook {
         3 -> { readSlot(reader); skipPredicate(reader); -1 }
         4 -> reader.readVarInt()                     // предмет
         5 -> readTemplateStack(reader)               // стек с компонентами
-        6 -> { reader.readString(); -1 }             // тег (#planks и подобные)
+        6 -> { reader.readVarInt(); -1 }              // тег: номер в реестре тегов, не строка
         7 -> { readSlot(reader); reader.readVarInt(); -1 }       // крашеный
         8 -> { readSlot(reader); readSlot(reader); readSlot(reader); -1 } // отделка
         9 -> { val inner = readSlot(reader); readSlot(reader); inner }    // с остатком

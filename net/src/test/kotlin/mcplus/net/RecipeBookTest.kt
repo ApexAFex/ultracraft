@@ -22,7 +22,9 @@ class RecipeBookTest {
         writer.writeVarInt(7)          // номер описания
         writer.writeVarInt(0)          // shapeless
         writer.writeVarInt(1)          // один ингредиент
-        writer.writeVarInt(6).writeString("minecraft:logs")   // тег
+        // Тег — номер в реестре тегов, а не строка: на живом сервере он занимает один VarInt
+        // (это видно по байтам пакета: `06 02` — тег №2).
+        writer.writeVarInt(6).writeVarInt(2)
         writer.writeVarInt(5)          // item_stack
         writer.writeVarInt(20).writeVarInt(1).writeVarInt(0).writeVarInt(0) // 1 дуб. доска
         writer.writeVarInt(0)          // станция: пусто
