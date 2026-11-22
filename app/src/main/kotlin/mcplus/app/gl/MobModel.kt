@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, BOAT, MINECART, NONE,
 }
 
 /**
@@ -121,6 +121,9 @@ object MobModels {
         // Иглобрюх и тропическая рыба: маленькие модели, лист 32×32.
         "pufferfish" -> MobFamily.PUFFERFISH
         "tropical_fish" -> MobFamily.TROPICAL_FISH
+        "armadillo" -> MobFamily.ARMADILLO
+        "breeze" -> MobFamily.BREEZE
+        "copper_golem" -> MobFamily.COPPER_GOLEM
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -213,6 +216,9 @@ object MobModels {
         MobFamily.ARMOR_STAND -> 64 to 64
         MobFamily.PUFFERFISH -> 32 to 32
         MobFamily.TROPICAL_FISH -> 32 to 32
+        MobFamily.ARMADILLO -> 64 to 64
+        MobFamily.BREEZE -> 32 to 32
+        MobFamily.COPPER_GOLEM -> 64 to 64
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -266,6 +272,9 @@ object MobModels {
         MobFamily.ARMOR_STAND -> ARMOR_STAND
         MobFamily.PUFFERFISH -> PUFFERFISH
         MobFamily.TROPICAL_FISH -> TROPICAL_FISH
+        MobFamily.ARMADILLO -> ARMADILLO
+        MobFamily.BREEZE -> BREEZE
+        MobFamily.COPPER_GOLEM -> COPPER_GOLEM
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -1209,5 +1218,57 @@ object MobModels {
         MobBox("tail", 0f, -0.0937f, 0f, 0f, 0.0938f, 0.375f, u = 22, v = -6, offsetY = 0.0938f, offsetZ = 0.1875f),
         MobBox("right_fin", -0.125f, -0.0625f, 0f, 0f, 0.0625f, 0f, u = 2, v = 16, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, 0f, 1f, 0f, 0f, 0.7068f, 0f, 0.7074f, 0f, -0.0625f, 0.0625f, 0f, 1f)),
         MobBox("body", -0.0625f, -0.0937f, -0.1875f, 0.0625f, 0.0938f, 0.1875f, u = 0, v = 0, offsetY = 0.0938f),
+    )
+
+    /**
+     * Броненосец (`AdultArmadilloModel`): панцирь-куб, тело, голова с ушами, хвост и лапы.
+     *
+     * Нижняя точка модели в дампе — 24 пикселя (у броненосца своя ось), поэтому Y0 задан
+     * руками: без него конвейер поднимает зверя на три с половиной блока в воздух.
+     */
+    private val ARMADILLO = listOf(
+        MobBox("right_front_leg", -0.0625f, -0.1875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 51, v = 43, offsetX = -0.125f, offsetY = 0.1875f, offsetZ = -0.25f),
+        MobBox("right_hind_leg", -0.0625f, -0.1875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 51, v = 31, offsetX = -0.125f, offsetY = 0.1875f, offsetZ = 0.25f),
+        MobBox("left_hind_leg", -0.0625f, -0.1875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 42, v = 31, offsetX = 0.125f, offsetY = 0.1875f, offsetZ = 0.25f),
+        MobBox("cube", -0.3125f, 0f, -0.375f, 0.3125f, 0.625f, 0.25f, u = 0, v = 0),
+        MobBox("body", -0.25f, -0.0625f, -0.625f, 0.25f, 0.4375f, 0.125f, u = 0, v = 20, offsetY = 0.1875f, offsetZ = 0.25f),
+        MobBox("body", -0.25f, -0.0625f, -0.625f, 0.25f, 0.4375f, 0.125f, u = 0, v = 40, offsetY = 0.1875f, offsetZ = 0.25f),
+        MobBox("head_cube", -0.0937f, -0.25f, -0.0625f, 0.0938f, 0.0625f, 0.0625f, u = 43, v = 15, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9238f, 0.383f, 0f, 0f, -0.383f, 0.9238f, 0f, 0f, 0.3125f, -0.4375f, 1f)),
+        MobBox("right_ear_cube", -0.125f, -0.125f, 0f, 0f, 0.1875f, 0f, u = 43, v = 10, matrix = floatArrayOf(0.924f, 0.0666f, 0.3765f, 0f, -0.0001f, 0.9847f, -0.1741f, 0f, -0.3823f, 0.1608f, 0.9099f, 0f, -0.0937f, 0.375f, -0.475f, 1f)),
+        MobBox("left_ear_cube", 0f, -0.125f, 0f, 0.125f, 0.1875f, 0f, u = 47, v = 10, matrix = floatArrayOf(0.924f, -0.0666f, -0.3765f, 0f, 0.0001f, 0.9847f, -0.1741f, 0f, 0.3823f, 0.1608f, 0.9099f, 0f, 0.0938f, 0.375f, -0.475f, 1f)),
+        MobBox("tail", -0.0312f, -0.3696f, 0.0058f, 0.0313f, 0.0054f, 0.0683f, u = 44, v = 53, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.8747f, -0.4847f, 0f, 0f, 0.4847f, 0.8747f, 0f, 0f, 0.375f, 0.3125f, 1f)),
+        MobBox("left_front_leg", -0.0625f, -0.1875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 42, v = 43, offsetX = 0.125f, offsetY = 0.1875f, offsetZ = -0.25f),
+    )
+
+    /**
+     * Вихрь (`BreezeModel`): голова-куб и три палки-вихря, повёрнутые каждая вокруг своей оси.
+     *
+     * Палки в ванильной модели висят на повёрнутых родителях, поэтому у них матрица, а не
+     * три угла. Глаза — отдельный слой текстуры `breeze_eyes`, его пока не рисуем.
+     */
+    private val BREEZE = listOf(
+        MobBox("head", -0.3125f, 0.125f, -0.2625f, 0.3125f, 0.3125f, -0.0125f, u = 4, v = 24, offsetY = 0.5625f),
+        MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 0, v = 0, offsetY = 0.5625f),
+        MobBox("rod_2", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(-0.5002f, 0.0002f, -0.8659f, 0f, -0.3309f, 0.9241f, 0.1914f, 0f, 0.8002f, 0.3823f, -0.4621f, 0f, -0.1624f, 0.5f, 0.0938f, 1f)),
+        MobBox("rod_3", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9238f, -0.383f, 0f, 0f, 0.383f, 0.9238f, 0f, 0f, 0.5f, -0.1875f, 1f)),
+        MobBox("rod_1", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(-0.5002f, 0.0002f, 0.8659f, 0f, 0.3317f, 0.9238f, 0.1914f, 0f, -0.7999f, 0.3829f, -0.4621f, 0f, 0.1624f, 0.5f, 0.0938f, 1f)),
+    )
+
+    /**
+     * Медный голем (`CopperGolemModel`): голова-куб с антенной и носом, тело, руки и ноги.
+     *
+     * Рост — около блока, как и в игре; лист 64×64. Глаза у него отдельным слоем,
+     * его пока не рисуем.
+     */
+    private val COPPER_GOLEM = listOf(
+        MobBox("left_leg", 0f, -0.3125f, -0.125f, 0.25f, 0f, 0.125f, u = 16, v = 27, offsetY = 0.3125f),
+        MobBox("right_leg", -0.25f, -0.3125f, -0.125f, 0f, 0f, 0.125f, u = 0, v = 27, offsetY = 0.3125f),
+        MobBox("body", -0.25f, 0f, -0.1875f, 0.25f, 0.375f, 0.1875f, u = 0, v = 15, offsetY = 0.3125f),
+        MobBox("head", -0.25f, 0f, -0.3125f, 0.25f, 0.3125f, 0.3125f, u = 0, v = 0, offsetY = 0.6875f),
+        MobBox("head", -0.0625f, -0.0625f, -0.375f, 0.0625f, 0.125f, -0.25f, u = 56, v = 0, offsetY = 0.6875f),
+        MobBox("head", -0.0625f, 0.3125f, -0.0625f, 0.0625f, 0.5625f, 0.0625f, u = 37, v = 8, offsetY = 0.6875f),
+        MobBox("head", -0.125f, 0.5625f, -0.125f, 0.125f, 0.8125f, 0.125f, u = 37, v = 0, offsetY = 0.6875f),
+        MobBox("right_arm", -0.1875f, -0.5625f, -0.125f, 0f, 0.0625f, 0.125f, u = 36, v = 16, offsetX = -0.25f, offsetY = 0.6875f),
+        MobBox("left_arm", 0f, -0.5625f, -0.125f, 0.1875f, 0.0625f, 0.125f, u = 50, v = 16, offsetX = 0.25f, offsetY = 0.6875f),
     )
 }

@@ -548,6 +548,40 @@ class MobModelsTest {
     }
 
     @Test
+    fun `armadillo, breeze and copper golem have their own models`() {
+        val cases = listOf(
+            Triple("armadillo", MobFamily.ARMADILLO, 64 to 64),
+            Triple("breeze", MobFamily.BREEZE, 32 to 32),
+            Triple("copper_golem", MobFamily.COPPER_GOLEM, 64 to 64),
+        )
+        for ((name, family, size) in cases) {
+            assertEquals(family, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertEquals(size, MobModels.textureSize(family), "$name: неверный размер листа")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+
+        val armadillo = MobModels.boxes(MobFamily.ARMADILLO)
+        assertEquals(11, armadillo.size)
+        assertTrue(armadillo.any { it.name == "cube" }, "панцирь броненосца — отдельная коробка")
+        // Броненосец стоит на земле: нижняя точка ног там же, где у остальных моделей.
+        val foot = armadillo.first { it.name == "right_front_leg" }
+        assertTrue(foot.minY + foot.offsetY >= -0.001f, "лапа не должна уходить под ноль")
+
+        val breeze = MobModels.boxes(MobFamily.BREEZE)
+        assertEquals(5, breeze.size)
+        assertEquals(3, breeze.count { it.name.startsWith("rod") }, "три палки-вихря")
+        // Все палки повёрнуты вокруг своих осей — с матрицей.
+        assertTrue(breeze.filter { it.name.startsWith("rod") }.all { it.matrix != null })
+
+        val golem = MobModels.boxes(MobFamily.COPPER_GOLEM)
+        assertEquals(9, golem.size)
+        assertTrue(golem.count { it.name == "head" } == 4, "голова, нос и антенна")
+        assertEquals(2, golem.count { it.name.endsWith("arm") })
+        val top = golem.maxOf { it.offsetY + it.maxY }
+        assertTrue(top in 1.3f..1.9f, "рост медного голема с антенной: $top")
+    }
+
+    @Test
     fun `armor stand is thin sticks on a base plate`() {
         assertEquals(MobFamily.ARMOR_STAND, MobModels.familyOf("armor_stand"))
         assertEquals(64 to 64, MobModels.textureSize(MobFamily.ARMOR_STAND))

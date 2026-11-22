@@ -304,6 +304,8 @@ class Hud(
         category: String,
         rows: List<StatisticsScreen.Row>,
         scroll: Int,
+        /** Какой вид счётчика выбран: его строка в колонке подсвечена. */
+        selectedType: Int = 0,
     ) {
         val text = this.text ?: return
         val s = HudLayout.scale(height).toFloat()
@@ -316,6 +318,26 @@ class Hud(
         val labels = ArrayList<TextRenderer.ScreenLabel>()
         labels += TextRenderer.ScreenLabel(left, top, "Статистика", s * 1.6f)
         labels += TextRenderer.ScreenLabel(left, top + 26f * s, category, s * 1.1f)
+
+        // Колонка видов счётчиков слева: по ней переключаются мышью, как в игре.
+        val listX = width * 0.02f
+        var listY = top + 56f * s
+        val categories = ArrayList<Pair<Int, HudRect>>(StatisticsScreen.TYPES.size)
+        for (type in StatisticsScreen.TYPES) {
+            val rect = HudRect(listX, listY - 1f * s, 92f * s, 13f * s)
+            categories += type to rect
+            if (type == selectedType) {
+                renderer.begin()
+                renderer.rect(rect, 0x2E3A55, 0.85f)
+                renderer.draw()
+            }
+            labels += TextRenderer.ScreenLabel(
+                listX + 3f * s, listY, StatisticsScreen.shortTitleOf(type), s * 0.85f,
+                if (type == selectedType) 0xFFFF88 else 0xC0C0C0,
+            )
+            listY += 14f * s
+        }
+        statisticsCategories = categories
 
         if (rows.isEmpty()) {
             labels += TextRenderer.ScreenLabel(left, top + 56f * s, "Пока ничего не накоплено", s)
@@ -700,6 +722,10 @@ class Hud(
     var anvilField: HudRect? = null
         private set
 
+    /** Прямоугольники видов счётчиков на экране статистики: номер вида и его строка. */
+    var statisticsCategories: List<Pair<Int, HudRect>> = emptyList()
+        private set
+
     /** Прямоугольники строк списка сделок у жителя: индекс строки — номер сделки. */
     var tradeRows: List<Pair<Int, HudRect>> = emptyList()
         private set
@@ -896,7 +922,7 @@ class Hud(
     fun drawInventoryOverlay(inventory: Inventory, mouseX: Double, mouseY: Double) {
         val text = this.text ?: return
         val labels = ArrayList<TextRenderer.ScreenLabel>()
-        var hoveredName: String? = null
+        var hoveredLines: List<Pair<String, Int>>? = null
         var hoverX = 0f
         var hoverY = 0f
 
@@ -938,11 +964,7 @@ class Hud(
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
                 val name = inventory.displayNameOf(stack) ?: continue
-                hoveredName = if (max > 0 && stack.damage > 0) {
-                    "$name  ${max - stack.damage}/$max" + if (stack.count > 1) " ×${stack.count}" else ""
-                } else {
-                    name + if (stack.count > 1) " ×${stack.count}" else ""
-                }
+                hoveredLines = ItemTooltip.lines(stack, name, max)
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
                 // Белая рамка вокруг слота под курсором.
@@ -965,7 +987,7 @@ class Hud(
         }
 
         if (labels.isNotEmpty()) text.drawScreen(labels)
-        hoveredName?.let { drawTooltip(it, hoverX, hoverY) }
+        hoveredLines?.let { drawTooltip(it, hoverX, hoverY) }
     }
 
     /** То же поверх экрана контейнера: счётчики, износ и подсказка. */
@@ -982,7 +1004,7 @@ class Hud(
         val scale = slotPixels / 18f
         if (slotPixels <= 1f) return
         val labels = ArrayList<TextRenderer.ScreenLabel>()
-        var hovered: String? = null
+        var hoveredLines: List<Pair<String, Int>>? = null
         var hoverX = 0f
         var hoverY = 0f
 
@@ -1017,11 +1039,7 @@ class Hud(
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
                 val name = inventory.displayNameOf(stack) ?: continue
-                hovered = if (max > 0 && stack.damage > 0) {
-                    "$name  ${max - stack.damage}/$max" + if (stack.count > 1) " ×${stack.count}" else ""
-                } else {
-                    name + if (stack.count > 1) " ×${stack.count}" else ""
-                }
+                hoveredLines = ItemTooltip.lines(stack, name, max)
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
                 // Рамка слота под курсором.
@@ -1034,23 +1052,39 @@ class Hud(
             }
         }
         if (labels.isNotEmpty()) text.drawScreen(labels)
-        hovered?.let { drawTooltip(it, hoverX, hoverY) }
+        hoveredLines?.let { drawTooltip(it, hoverX, hoverY) }
     }
 
     /** Подсказка с названием предмета рядом с курсором, с зажимом по краям экрана. */
     fun drawTooltip(value: String, mouseX: Float, mouseY: Float) {
+        drawTooltip(listOf(value to 0xFFFFFF), mouseX, mouseY)
+    }
+
+    /**
+     * Подсказка в несколько строк: имя своим цветом, описание и метка зачарования.
+     *
+     * Панель растягивается по самой длинной строке, поэтому длинное описание не вылезает
+     * за неё.
+     */
+    fun drawTooltip(lines: List<Pair<String, Int>>, mouseX: Float, mouseY: Float) {
         val text = this.text ?: return
+        if (lines.isEmpty()) return
         val scale = 1.5f
-        val textWidth = text.textWidth(value, scale)
+        val textWidth = lines.maxOf { text.textWidth(it.first, scale) }
         val textHeight = 9f * scale
+        val total = textHeight * lines.size + 1f * (lines.size - 1)
         var left = mouseX + 8f
         var top = mouseY + 8f
         if (left + textWidth + 6f > width) left = mouseX - textWidth - 10f
-        if (top + textHeight + 4f > height) top = mouseY - textHeight - 8f
+        if (top + total + 4f > height) top = mouseY - total - 8f
         renderer.begin()
-        renderer.rect(left - 3f, top - 2f, textWidth + 6f, textHeight + 4f, 0x100010, 0.9f)
+        renderer.rect(left - 3f, top - 2f, textWidth + 6f, total + 4f, 0x100010, 0.9f)
         renderer.draw()
-        text.drawScreen(listOf(TextRenderer.ScreenLabel(left, top, value, scale)))
+        text.drawScreen(
+            lines.mapIndexed { index, (value, color) ->
+                TextRenderer.ScreenLabel(left, top + index * (textHeight + 1f), value, scale, color)
+            },
+        )
     }
 
     /**

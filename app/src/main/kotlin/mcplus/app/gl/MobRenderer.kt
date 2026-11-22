@@ -431,6 +431,9 @@ class MobRenderer(
             "armor_stand" to "entity/armorstand/armorstand.png",
             "pufferfish" to "entity/fish/pufferfish.png",
             "tropical_fish" to "entity/fish/tropical_a.png",
+            "armadillo" to "entity/armadillo/armadillo.png",
+            "breeze" to "entity/breeze/breeze.png",
+            "copper_golem" to "entity/copper_golem/copper_golem.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

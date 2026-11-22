@@ -1182,6 +1182,16 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                             statisticsLeftWasDown = left
                             statisticsRightWasDown = right
+                            // Клик по колонке слева выбирает вид счётчика, как в игре.
+                            if (input.clickRequested) {
+                                val chosen = hud.statisticsCategories.firstOrNull { (_, rect) ->
+                                    rect.contains(input.mouseX, input.mouseY)
+                                }?.first
+                                if (chosen != null) {
+                                    statisticsType = chosen
+                                    statisticsScroll = 0
+                                }
+                            }
                         }
                         if (advancementsOpen && input.clickRequested) {
                             val index = advancementTabRects.indexOfFirst {
@@ -3220,6 +3230,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 ),
                                 rows,
                                 statisticsScroll,
+                                selectedType = StatisticsScreen.TYPES[statisticsType],
                             )
                         } else if (advancementsOpen) {
                             // Экран достижений: вкладки и дерево; клик по вкладке — выше.

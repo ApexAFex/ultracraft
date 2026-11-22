@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import mcplus.net.ItemTable
 import mcplus.net.EntityTable
@@ -77,5 +77,17 @@ class StatisticsScreenTest {
         assertEquals(9, StatisticsScreen.TYPES.size)
         assertEquals(4, StatisticsScreen.visibleRows(240))
         assertTrue(StatisticsScreen.visibleRows(720) >= 10)
+    }
+
+    @Test
+    fun `the category column switches the stat type`() {
+        for (type in StatisticsScreen.TYPES) {
+            assertTrue(StatisticsScreen.shortTitleOf(type).isNotBlank(), "вид $type без короткой подписи")
+        }
+        // Строки колонки идут по порядку номеров видов, а мимо колонки — «ничего».
+        assertEquals(0, StatisticsScreen.typeAtRow(0))
+        assertEquals(8, StatisticsScreen.typeAtRow(8))
+        assertEquals(-1, StatisticsScreen.typeAtRow(9))
+        assertEquals(-1, StatisticsScreen.typeAtRow(-1))
     }
 }
