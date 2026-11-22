@@ -548,6 +548,33 @@ class MobModelsTest {
     }
 
     @Test
+    fun `nautilus has a spiral shell and three mouths`() {
+        for (name in listOf("nautilus", "zombie_nautilus")) {
+            assertEquals(MobFamily.NAUTILUS, MobModels.familyOf(name), "$name должно быть своим семейством")
+            assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
+        }
+        assertEquals(128 to 128, MobModels.textureSize(MobFamily.NAUTILUS))
+
+        val boxes = MobModels.boxes(MobFamily.NAUTILUS)
+        assertEquals(8, boxes.size)
+        assertEquals(3, boxes.count { it.name == "shell" }, "панцирь — три коробки")
+        assertEquals(3, boxes.count { it.name.endsWith("mouth") }, "три губы")
+        // Губы не должны оказаться под полом: смещения считались по цепочке родителей.
+        for (mouth in boxes.filter { it.name.endsWith("mouth") }) {
+            assertTrue(
+                mouth.minY + mouth.offsetY > -0.15f,
+                "${mouth.name} уехал под землю: ${mouth.minY + mouth.offsetY}",
+            )
+        }
+    }
+
+    @Test
+    fun `camel husk reuses the camel model`() {
+        assertEquals(MobFamily.CAMEL, MobModels.familyOf("camel_husk"))
+        assertTrue(MobRenderer.TEXTURES["camel_husk"] != null, "зомби-верблюд без текстуры")
+    }
+
+    @Test
     fun `armadillo, breeze and copper golem have their own models`() {
         val cases = listOf(
             Triple("armadillo", MobFamily.ARMADILLO, 64 to 64),

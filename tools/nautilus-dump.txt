@@ -1,0 +1,16 @@
+﻿SIZE	128	128
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/root	0.000	29.000	-6.000	0.000	0.000	0.000
+PART	root/root/shell	0.000	-13.000	5.000	0.000	0.000	0.000
+CUBE	root/root/shell	-7.000	-10.000	-7.000	7.000	0.000	9.000	0.0	0.0
+CUBE	root/root/shell	-7.000	0.000	-7.000	7.000	8.000	13.000	0.0	26.0
+CUBE	root/root/shell	-7.000	0.000	6.000	7.000	8.000	6.000	48.0	26.0
+PART	root/root/body	0.000	-8.500	12.300	0.000	0.000	0.000
+CUBE	root/root/body	-5.000	-4.510	-3.000	5.000	3.490	11.000	0.0	54.0
+CUBE	root/root/body	-5.000	-4.510	7.000	5.000	3.490	7.000	0.0	76.0
+PART	root/root/body/lower_mouth	0.000	1.490	7.000	0.000	0.000	0.000
+CUBE	root/root/body/lower_mouth	-5.000	-1.980	0.000	5.000	2.020	4.000	54.0	62.0
+PART	root/root/body/upper_mouth	0.000	-2.510	7.000	0.000	0.000	0.000
+CUBE	root/root/body/upper_mouth	-5.000	-2.000	0.000	5.000	2.000	4.000	54.0	54.0
+PART	root/root/body/inner_mouth	0.000	-0.510	7.500	0.000	0.000	0.000
+CUBE	root/root/body/inner_mouth	-3.000	-2.000	-0.500	3.000	2.000	3.500	54.0	70.0

@@ -434,6 +434,9 @@ class MobRenderer(
             "armadillo" to "entity/armadillo/armadillo.png",
             "breeze" to "entity/breeze/breeze.png",
             "copper_golem" to "entity/copper_golem/copper_golem.png",
+            "nautilus" to "entity/nautilus/nautilus.png",
+            "zombie_nautilus" to "entity/nautilus/zombie_nautilus.png",
+            "camel_husk" to "entity/camel/camel_husk.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

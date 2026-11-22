@@ -26,12 +26,6 @@ object GlView {
     /** One server tick: 20 per second. Physics and movement packets both run on it. */
     private const val TICK_SECONDS = 1.0 / 20.0
 
-    /** Гуманоидные мобы, которых рисуем моделью человека с их текстурой. */
-    private val PROJECTILE_TYPES = setOf(
-        "arrow", "spectral_arrow", "snowball", "egg", "ender_pearl", "trident",
-        "experience_bottle", "potion", "fireball", "small_fireball",
-    )
-
     /**
      * Номер поля с вариантом картины в `Set Entity Data`.
      *
@@ -39,6 +33,9 @@ object GlView {
      * 9 — проверено на живом сервере: поле приходит девятым.
      */
     private const val PAINTING_VARIANT_FIELD = 9
+
+    /** Тип поля метаданных «состояние блока»: у падающего блока и ТНТ это номер блока. */
+    private const val BLOCK_STATE_TYPE = 14
 
     /** Слоты `Set Equipment` с бронёй: 2 — ботинки, 3 — штаны, 4 — нагрудник, 5 — шлем. */
     private val ARMOR_EQUIPMENT_SLOTS = listOf(
@@ -2627,12 +2624,23 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         }
                                     }
 
-                                    name in PROJECTILE_TYPES -> {
-                                        val iconName = if (name == "spectral_arrow") "arrow" else name
-                                        worldIcons += Renderer.WorldIcon(
-                                            entity.x, entity.y + 0.3, entity.z, 0.3f,
-                                            atlas.layerForItem(iconName),
-                                        )
+                                    name in Projectiles.TYPES -> {
+                                        // У снаряда либо своя иконка предмета, либо коробка
+                                        // своего цвета: у снаряда шалкера и плевка ламы
+                                        // картинки в игре нет вовсе.
+                                        val icon = Projectiles.iconOf(name)
+                                        if (icon != null) {
+                                            val bob = kotlin.math.sin(
+                                                nowNanos / 1_000_000_000.0 * 4 + entity.id,
+                                            ) * 0.02
+                                            worldIcons += Renderer.WorldIcon(
+                                                entity.x, entity.y + 0.3 + bob, entity.z,
+                                                Projectiles.iconSizeOf(name),
+                                                atlas.layerForItem(icon),
+                                            )
+                                        } else {
+                                            boxes += entity
+                                        }
                                     }
 
                                     name == "experience_orb" -> {
@@ -2690,6 +2698,25 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                 direction,
                                                 variant.width, variant.height, variant.asset,
                                             )
+                                        }
+                                    }
+
+                                    // Падающий песок и подожжённая ТНТ: куб настоящего блока.
+                                    BlockEntityLooks.isBlockEntity(name) -> {
+                                        val state = entity.metadata.entries
+                                            .firstOrNull { it.value.type == BLOCK_STATE_TYPE }
+                                            ?.value?.number?.toInt()
+                                        val blockName = BlockEntityLooks.blockNameOf(name, state, blocks)
+                                        if (blockName != null) {
+                                            cubes += Renderer.BlockCube(
+                                                entity.x, entity.y + 0.49, entity.z, 0.98f,
+                                                atlas.layerFor(blockName, TextureAtlas.Kind.TOP),
+                                                atlas.layerFor(blockName, TextureAtlas.Kind.BOTTOM),
+                                                atlas.layerFor(blockName, TextureAtlas.Kind.SIDE),
+                                                yaw = 0f,
+                                            )
+                                        } else {
+                                            boxes += entity
                                         }
                                     }
 
@@ -2933,7 +2960,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             humanoidRenderer.draw(camera, demoHumanoids)
                             slimHumanoidRenderer.draw(camera, demoSlim)
                         }
-                        entityRenderer.draw(camera, boxes)
+                        entityRenderer.draw(
+                            camera, boxes,
+                        ) { entity ->
+                            Projectiles.appearanceOf(entityTypes.nameOf(entity.type))
+                                ?: EntityRenderer.Appearance()
+                        }
                         paintingRenderer.draw(camera, paintings)
                         if (debris.isNotEmpty()) {
                             val debrisCubes = debris.map {
@@ -3602,6 +3634,15 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             if (hitId >= 0 && hitDistance < blockDistance) {
                                 session?.attack(hitId)
                                 lastAttackNanos = System.nanoTime()
+                                // Удар слышно: своим звуком, как в игре. Кулаком — слабый,
+                                // с предметом в руке — сильный.
+                                val inHand = session?.inventory?.heldName()
+                                val attackSound = if (inHand == null) {
+                                    "entity.player.attack.weak"
+                                } else {
+                                    "entity.player.attack.strong"
+                                }
+                                sound.play(attackSound, camera.x, camera.y, camera.z)
                                 entities.firstOrNull { it.id == hitId }?.let { hitEntity ->
                                     repeat(6) {
                                         pendingParticles += mcplus.net.ParticleSpawn(

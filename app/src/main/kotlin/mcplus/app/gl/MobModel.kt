@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, BOAT, MINECART, NONE,
 }
 
 /**
@@ -112,7 +112,7 @@ object MobModels {
         // Снежный голем: три шара и две палки-руки.
         "snow_golem" -> MobFamily.SNOW_GOLEM
         // Верблюд: длинные ноги, горб и голова на вытянутой шее, лист 128×128.
-        "camel" -> MobFamily.CAMEL
+        "camel", "camel_husk" -> MobFamily.CAMEL
         "wither" -> MobFamily.WITHER
         "vex" -> MobFamily.VEX
         "ravager" -> MobFamily.RAVAGER
@@ -124,6 +124,7 @@ object MobModels {
         "armadillo" -> MobFamily.ARMADILLO
         "breeze" -> MobFamily.BREEZE
         "copper_golem" -> MobFamily.COPPER_GOLEM
+        "nautilus", "zombie_nautilus" -> MobFamily.NAUTILUS
         // Лодки всех пород и с сундуком: модель одна, отличается только текстура.
         else -> when {
             entityName.endsWith("_boat") -> MobFamily.BOAT
@@ -219,6 +220,7 @@ object MobModels {
         MobFamily.ARMADILLO -> 64 to 64
         MobFamily.BREEZE -> 32 to 32
         MobFamily.COPPER_GOLEM -> 64 to 64
+        MobFamily.NAUTILUS -> 128 to 128
         MobFamily.BOAT -> 128 to 64
         MobFamily.MINECART -> 64 to 32
         else -> 64 to 32
@@ -275,6 +277,7 @@ object MobModels {
         MobFamily.ARMADILLO -> ARMADILLO
         MobFamily.BREEZE -> BREEZE
         MobFamily.COPPER_GOLEM -> COPPER_GOLEM
+        MobFamily.NAUTILUS -> NAUTILUS
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
         MobFamily.NONE -> emptyList()
@@ -1270,5 +1273,23 @@ object MobModels {
         MobBox("head", -0.125f, 0.5625f, -0.125f, 0.125f, 0.8125f, 0.125f, u = 37, v = 0, offsetY = 0.6875f),
         MobBox("right_arm", -0.1875f, -0.5625f, -0.125f, 0f, 0.0625f, 0.125f, u = 36, v = 16, offsetX = -0.25f, offsetY = 0.6875f),
         MobBox("left_arm", 0f, -0.5625f, -0.125f, 0.1875f, 0.0625f, 0.125f, u = 50, v = 16, offsetX = 0.25f, offsetY = 0.6875f),
+    )
+
+    /**
+     * Наутилус (`NautilusModel`): спиральный панцирь, тело и три «губы».
+     *
+     * Нижняя точка модели в дампе — 24 пикселя, поэтому Y0 задан руками; у губ смещения
+     * посчитаны по родительской цепочке (в дампе они вложены на два уровня).
+     * Зомби-наутилус — та же модель с другой текстурой.
+     */
+    private val NAUTILUS = listOf(
+        MobBox("shell", -0.4375f, 0f, -0.4375f, 0.4375f, 0.625f, 0.5625f, u = 0, v = 0, offsetY = 0.5f, offsetZ = -0.0625f),
+        MobBox("shell", -0.4375f, -0.5f, -0.4375f, 0.4375f, 0f, 0.8125f, u = 0, v = 26, offsetY = 0.5f, offsetZ = -0.0625f),
+        MobBox("shell", -0.4375f, -0.5f, 0.375f, 0.4375f, 0f, 0.375f, u = 48, v = 26, offsetY = 0.5f, offsetZ = -0.0625f),
+        MobBox("body", -0.3125f, -0.2181f, -0.1875f, 0.3125f, 0.2819f, 0.6875f, u = 0, v = 54, offsetY = 0.2188f, offsetZ = 0.3938f),
+        MobBox("body", -0.3125f, -0.2181f, 0.4375f, 0.3125f, 0.2819f, 0.4375f, u = 0, v = 76, offsetY = 0.2188f, offsetZ = 0.3938f),
+        MobBox("lower_mouth", -0.3125f, -0.1262f, 0f, 0.3125f, 0.1238f, 0.25f, u = 54, v = 62, offsetY = 0.1256f, offsetZ = 0.4563f),
+        MobBox("upper_mouth", -0.3125f, -0.125f, 0f, 0.3125f, 0.125f, 0.25f, u = 54, v = 54, offsetY = 0.3756f, offsetZ = 0.4563f),
+        MobBox("inner_mouth", -0.1875f, -0.125f, -0.0312f, 0.1875f, 0.125f, 0.2188f, u = 54, v = 70, offsetY = 0.2513f, offsetZ = 0.4875f),
     )
 }

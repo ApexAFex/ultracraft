@@ -35,7 +35,19 @@ class EntityRenderer(private val width: Int, private val height: Int) : Closeabl
         GL30.glBindVertexArray(0)
     }
 
-    fun draw(camera: Camera, entities: List<TrackedEntity>) {
+    /**
+     * Как рисовать сущность без модели: размер коробки и цвет.
+     *
+     * По умолчанию — прежняя коробка в рост игрока, но у снарядов она своя: снаряд шалкера
+     * и плевок ламы маленькие и цветные, иначе они выглядели бы как големы.
+     */
+    data class Appearance(val width: Float = WIDTH, val height: Float = HEIGHT, val color: Int = 0x33BFD9)
+
+    fun draw(
+        camera: Camera,
+        entities: List<TrackedEntity>,
+        appearance: (TrackedEntity) -> Appearance = { Appearance() },
+    ) {
         if (entities.isEmpty()) return
 
         GL30.glUseProgram(program)
@@ -43,9 +55,15 @@ class EntityRenderer(private val width: Int, private val height: Int) : Closeabl
         GL30.glBindVertexArray(vao)
 
         for (entity in entities) {
+            val look = appearance(entity)
             GL30.glUniform3f(offsetLocation, entity.x.toFloat(), entity.y.toFloat(), entity.z.toFloat())
-            GL30.glUniform3f(scaleLocation, WIDTH, HEIGHT, WIDTH)
-            GL30.glUniform3f(colorLocation, 0.2f, 0.75f, 0.85f)
+            GL30.glUniform3f(scaleLocation, look.width, look.height, look.width)
+            GL30.glUniform3f(
+                colorLocation,
+                ((look.color shr 16) and 0xFF) / 255f,
+                ((look.color shr 8) and 0xFF) / 255f,
+                (look.color and 0xFF) / 255f,
+            )
             GL30.glDrawArrays(GL30.GL_TRIANGLES, 0, CUBE.size / 3)
         }
 
