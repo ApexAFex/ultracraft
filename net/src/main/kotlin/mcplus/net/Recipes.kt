@@ -32,23 +32,25 @@ class RecipeBook {
     fun onPacket(packetId: Int, body: ByteArray): Boolean {
         if (packetId != Protocol777.Play.RECIPE_BOOK_ADD) return false
         val reader = ByteReader(body)
-        runCatching { read(body, reader) }
-            .onFailure {
-                // Печатаем место, где разбор сломался, и окно байтов вокруг него: по нему
-                // видно, какое поле пропущено, без повторных прогонов вслепую.
-                val at = (body.size - reader.remaining).coerceIn(0, body.size)
-                val from = (at - 8).coerceAtLeast(0)
-                val to = (at + 24).coerceAtMost(body.size)
-                val window = body.copyOfRange(from, to).joinToString(" ") { byte -> "%02x".format(byte) }
-                println(
-                    "Рецепты: пакет не разобран — ${it.message}; сломалось на байте $at из ${body.size}, " +
-                        "окно [$from..$to): $window",
-                )
-            }
+        var parsedRecipes = 0
+        runCatching {
+            read(body, reader) { parsedRecipes = it }
+        }.onFailure {
+            // Печатаем место, где разбор сломался, сколько записей успело разобраться и
+            // окно байтов вокруг: по ним видно, какое поле пропущено, без прогонов вслепую.
+            val at = (body.size - reader.remaining).coerceIn(0, body.size)
+            val from = (at - 8).coerceAtLeast(0)
+            val to = (at + 24).coerceAtMost(body.size)
+            val window = body.copyOfRange(from, to).joinToString(" ") { byte -> "%02x".format(byte) }
+            println(
+                "Рецепты: разбор сломался на байте $at из ${body.size} после $parsedRecipes записей; " +
+                    "окно [$from..$to): $window; причина: ${it.message}",
+            )
+        }
         return true
     }
 
-    private fun read(body: ByteArray, reader: ByteReader) {
+    private fun read(body: ByteArray, reader: ByteReader, onProgress: (Int) -> Unit = {}) {
         val count = reader.readVarInt()
         if (count !in 0..MAX_RECIPES) throw RecipeFormatException("рецептов: $count")
         // Собираем во временную карту: при ошибке книга остаётся прежней, а не полупустой.
@@ -61,6 +63,7 @@ class RecipeBook {
             // После флага в записи идёт ещё один байт: его смысл неизвестен, но без него
             // следующая запись начинается не с вида рецепта (проверено на живом пакете).
             reader.readByte()
+            onProgress(it + 1)
             if (recipe != null) {
                 parsed[displayId] = recipe.copy(ingredients = recipe.ingredients + contents)
             }
