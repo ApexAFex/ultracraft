@@ -213,6 +213,9 @@ class Session internal constructor(
                         // Смерть снимает эффекты: сервер тоже присылает удаления, но после
                         // возрождения на экране не должно остаться иконок прошлой жизни.
                         if (handled && packet.id == Protocol777.Play.RESPAWN) effects.clear()
+                        // После смерти транспорта больше нет: иначе клиент продолжал бы
+                        // держать камеру на сущности, которой уже не существует.
+                        ridingId = null
                     }
 
                 Protocol777.Play.UPDATE_MOB_EFFECT,

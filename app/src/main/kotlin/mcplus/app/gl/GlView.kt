@@ -1927,12 +1927,28 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             // "positive = down". Sending our values unchanged made the server
                             // believe we were looking at a different block, which is why every
                             // block action of ours came back as "Mismatch in destroy block pos".
-                            moveSender?.tick(
-                                player.x, player.y, player.z,
-                                CameraAngles.protocolYaw(player.yaw),
-                                CameraAngles.protocolPitch(player.pitch),
-                                player.onGround,
-                            )
+                            // На транспорте позицию задаёт сервер: свои пакеты движения он
+                            // не ждёт и считает их рассинхроном. Вместо них уходит
+                            // `Move Vehicle` (см. кадр) и байт клавиш.
+                            if (session?.ridingId == null) {
+                                moveSender?.tick(
+                                    player.x, player.y, player.z,
+                                    CameraAngles.protocolYaw(player.yaw),
+                                    CameraAngles.protocolPitch(player.pitch),
+                                    player.onGround,
+                                )
+                                // Клавиши движения — каждый тик, как в игре: по ним сервер
+                                // знает про бег и присед (частицы бега, поза, скорость).
+                                session?.sendPlayerInput(
+                                    forward = forwardInput > 0.1,
+                                    backward = forwardInput < -0.1,
+                                    left = input.strafe < -0.1,
+                                    right = input.strafe > 0.1,
+                                    jump = input.jump,
+                                    sneak = sneakHeld,
+                                    sprint = sprintHeld,
+                                )
+                            }
                             tickCount++
                             steps++
                             tickAccumulator -= TICK_SECONDS
