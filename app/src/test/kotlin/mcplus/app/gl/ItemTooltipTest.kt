@@ -20,6 +20,9 @@ class ItemTooltipTest {
         lore: List<String> = emptyList(),
         enchantments: List<Pair<Int, Int>> = emptyList(),
         glint: Boolean? = null,
+        trimPattern: Int = -1,
+        trimMaterial: Int = -1,
+        chargedCount: Int = 0,
     ) = Inventory.Stack(
         itemId = 1,
         count = count,
@@ -28,7 +31,28 @@ class ItemTooltipTest {
         lore = lore,
         enchantments = enchantments,
         glintOverride = glint,
+        trimPattern = trimPattern,
+        trimMaterial = trimMaterial,
+        chargedCount = chargedCount,
     )
+
+    @Test
+    fun `trim and charged shots get their own lines`() {
+        val trimmed = ItemTooltip.lines(
+            stack(trimPattern = 7, trimMaterial = 3), "Нагрудник",
+            trimPatternName = { if (it == 7) "coast" else null },
+            trimMaterialName = { if (it == 3) "золото" else null },
+        )
+        assertEquals("Отделка: coast (золото)", trimmed[1].first)
+        assertEquals(0xA0A0D0, trimmed[1].second)
+
+        // Без реестра остаются номера, а не пустая строка.
+        val unknown = ItemTooltip.lines(stack(trimPattern = 7, trimMaterial = 3), "Нагрудник")
+        assertEquals("Отделка: узор 7 (материал 3)", unknown[1].first)
+
+        val bow = ItemTooltip.lines(stack(chargedCount = 2), "Арбалет")
+        assertEquals("Заряды: 2", bow[1].first)
+    }
 
     @Test
     fun `rarity picks the vanilla colors`() {

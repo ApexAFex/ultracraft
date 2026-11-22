@@ -31,6 +31,8 @@ object ItemTooltip {
         name: String,
         maxDamage: Int = 0,
         enchantmentName: (Int) -> String? = { null },
+        trimPatternName: (Int) -> String? = { null },
+        trimMaterialName: (Int) -> String? = { null },
     ): List<Pair<String, Int>> {
         val result = ArrayList<Pair<String, Int>>(5)
         val title = buildString {
@@ -60,6 +62,16 @@ object ItemTooltip {
                 "$name ${roman(level)}"
             }
             result += text to 0x8090C0
+        }
+        // Отделка брони: «Отделка: coast (золото)». Без реестра показываем номера.
+        if (stack.trimPattern >= 0 || stack.trimMaterial >= 0) {
+            val pattern = trimPatternName(stack.trimPattern) ?: "узор ${stack.trimPattern}"
+            val material = trimMaterialName(stack.trimMaterial) ?: "материал ${stack.trimMaterial}"
+            result += "Отделка: $pattern ($material)" to 0xA0A0D0
+        }
+        // Заряженный арбалет: сколько зарядов внутри.
+        if (stack.chargedCount > 0) {
+            result += "Заряды: ${stack.chargedCount}" to 0xC8C8A0
         }
         return result
     }

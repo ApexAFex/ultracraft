@@ -774,6 +774,10 @@ class Hud(
      */
     var enchantmentName: (Int) -> String? = { null }
 
+    /** Имена узоров и материалов отделки брони: из реестров `trim_pattern`/`trim_material`. */
+    var trimPatternName: (Int) -> String? = { null }
+    var trimMaterialName: (Int) -> String? = { null }
+
     /** Прямоугольники строк списка сделок у жителя: индекс строки — номер сделки. */
     var tradeRows: List<Pair<Int, HudRect>> = emptyList()
         private set
@@ -1025,7 +1029,9 @@ class Hud(
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
                 val name = inventory.displayNameOf(stack) ?: continue
-                hoveredLines = ItemTooltip.lines(stack, name, max, enchantmentName)
+                hoveredLines = ItemTooltip.lines(
+                    stack, name, max, enchantmentName, trimPatternName, trimMaterialName,
+                )
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
                 // Белая рамка вокруг слота под курсором.
@@ -1100,7 +1106,9 @@ class Hud(
                 mouseY >= py - slotPixels / 2 && mouseY <= py + slotPixels / 2
             ) {
                 val name = inventory.displayNameOf(stack) ?: continue
-                hoveredLines = ItemTooltip.lines(stack, name, max, enchantmentName)
+                hoveredLines = ItemTooltip.lines(
+                    stack, name, max, enchantmentName, trimPatternName, trimMaterialName,
+                )
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
                 // Рамка слота под курсором.

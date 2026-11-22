@@ -332,6 +332,70 @@ class InventoryTest {
     }
 
     @Test
+    fun `the trim component is stored as two registry ids`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val id = dataComponentId("trim")
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(id)
+                .writeVarInt(3)    // материал: золото
+                .writeVarInt(7)    // узор: coast
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(3, parsed.trimMaterial)
+            assertEquals(7, parsed.trimPattern)
+            assertEquals("stone", inventory.heldName(), "броня с отделкой остаётся известной")
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
+    fun `charged projectiles are counted and skipped`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val id = dataComponentId("charged_projectiles")
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(id)
+                .writeVarInt(2)    // два заряда
+                .writeVarInt(1).writeVarInt(1).writeVarInt(0).writeVarInt(0)   // 1 камень
+                .writeVarInt(1).writeVarInt(2).writeVarInt(0).writeVarInt(0)   // 1 гранит
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            assertEquals(2, inventory.stackIn(0)?.chargedCount)
+            assertEquals("stone", inventory.heldName())
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    /** Номер компонента по имени из настоящей таблицы. */
+    private fun dataComponentId(name: String): Int {
+        val table = componentTable()
+        for (id in 0 until 256) {
+            if (table.nameOf(id) == name) return id
+        }
+        error("В таблице нет компонента $name")
+    }
+
+    @Test
     fun `a renamed enchanted sword is a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()

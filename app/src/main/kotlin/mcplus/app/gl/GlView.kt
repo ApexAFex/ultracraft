@@ -600,6 +600,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     // Имена зачарований для подсказок предметов: «Острота III», а не номер.
                     session?.joinResult?.registries?.let { registries ->
                         hud.enchantmentName = { id: Int -> registries.enchantment(id) }
+                        hud.trimPatternName = { id: Int -> registries.trimPattern(id) }
+                        hud.trimMaterialName = { id: Int -> registries.trimMaterial(id) }
+                        if (registries.trimPatternCount > 0) {
+                            println("Отделка: ${registries.trimPatternCount} узоров из реестра")
+                        }
                         if (registries.enchantmentCount > 0) {
                             println("Зачарования: ${registries.enchantmentCount} названий из реестра")
                         }
@@ -3687,12 +3692,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 session?.attack(hitId)
                                 lastAttackNanos = System.nanoTime()
                                 // Удар слышно: своим звуком, как в игре. Кулаком — слабый,
-                                // с предметом в руке — сильный.
+                                // с предметом в руке — сильный; в падении — крит.
                                 val inHand = session?.inventory?.heldName()
-                                val attackSound = if (inHand == null) {
-                                    "entity.player.attack.weak"
-                                } else {
-                                    "entity.player.attack.strong"
+                                val attackSound = when {
+                                    !player.onGround -> "entity.player.attack.crit"
+                                    inHand == null -> "entity.player.attack.weak"
+                                    else -> "entity.player.attack.strong"
                                 }
                                 sound.play(attackSound, camera.x, camera.y, camera.z)
                                 entities.firstOrNull { it.id == hitId }?.let { hitEntity ->

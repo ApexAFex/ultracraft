@@ -43,6 +43,11 @@ class Inventory(
         val maxStackSize: Int = 0,
         /** `enchantment_glint_override`: блеск включают или выключают принудительно. */
         val glintOverride: Boolean? = null,
+        /** Отделка брони: номера материала и узора из компонента `trim`. */
+        val trimMaterial: Int = -1,
+        val trimPattern: Int = -1,
+        /** Сколько зарядов в арбалете (компонент `charged_projectiles`). */
+        val chargedCount: Int = 0,
     ) {
         val isEmpty: Boolean get() = count <= 0
 
@@ -273,6 +278,9 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
     var lore: List<String> = emptyList()
     var maxStackSize = 0
     var glintOverride: Boolean? = null
+    var trimMaterial = -1
+    var trimPattern = -1
+    var chargedCount = 0
     repeat(added) {
         val id = reader.readVarInt()
         when (ComponentTable.active.nameOf(id)) {
@@ -324,6 +332,18 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
             "additional_trade_cost", "enchantable", "map_id" -> reader.readVarInt()
             // Ссылки на модель предмета и стиль подсказки — обычные строки.
             "item_model", "tooltip_style" -> reader.readString()
+            // Отделка брони: материал и узор, оба — номера реестров.
+            "trim" -> {
+                trimMaterial = reader.readVarInt()
+                trimPattern = reader.readVarInt()
+            }
+            // Заряженный арбалет: список зарядов тем же форматом, что и обычный стек.
+            "charged_projectiles" -> {
+                val shots = reader.readVarInt()
+                if (shots !in 0..MAX_PROJECTILES) throw UnreadableStack(count)
+                repeat(shots) { skipTemplateStack(reader) }
+                chargedCount = shots
+            }
 
             else -> throw UnreadableStack(count)
         }
@@ -341,6 +361,9 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
         lore = lore,
         maxStackSize = maxStackSize,
         glintOverride = glintOverride,
+        trimMaterial = trimMaterial,
+        trimPattern = trimPattern,
+        chargedCount = chargedCount,
     )
 }
 
@@ -356,6 +379,24 @@ internal class UnreadableStack(val count: Int) : RuntimeException()
 
 /** Больше зачарований на одном предмете в игре не бывает. */
 private const val MAX_ENCHANTMENTS = 64
+
+/** Зарядов в арбалете или предметов в мешке больше этого не бывает. */
+private const val MAX_PROJECTILES = 64
+
+/**
+ * Пропустить вложенный стек без компонентов (`ItemStackTemplate`: предмет, количество, патч).
+ *
+ * Так читаются заряды арбалета и содержимое мешка: вложенные компоненты нам не нужны, но
+ * их длина должна быть прочитана, иначе поедет весь патч.
+ */
+private fun skipTemplateStack(reader: ByteReader) {
+    val count = reader.readVarInt()
+    if (count <= 0) return
+    reader.readVarInt()
+    val added = reader.readVarInt()
+    if (added != 0) throw UnreadableStack(count)
+    if (reader.readVarInt() != 0) throw UnreadableStack(count)
+}
 
 /** Предел строк описания: в игре `ItemLore.MAX_LINES`. */
 private const val MAX_LORE_LINES = 256

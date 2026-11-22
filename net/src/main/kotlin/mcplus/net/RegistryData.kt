@@ -76,6 +76,19 @@ class Registries {
     /** Имя зачарования по номеру из компонента `enchantments` или null. */
     fun enchantment(id: Int): String? = enchantments.getOrNull(id)
 
+    /**
+     * Узоры и материалы отделки брони (`minecraft:trim_pattern`, `minecraft:trim_material`).
+     *
+     * В компоненте `trim` лежат только номера, а в подсказке хочется видеть «Отделка: coast,
+     * gold». Реестры присылаются при входе, как и остальные.
+     */
+    private val trimPatterns = mutableListOf<String>()
+    private val trimMaterials = mutableListOf<String>()
+
+    fun trimPattern(id: Int): String? = trimPatterns.getOrNull(id)
+    fun trimMaterial(id: Int): String? = trimMaterials.getOrNull(id)
+    val trimPatternCount: Int get() = trimPatterns.size
+
     val enchantmentCount: Int get() = enchantments.size
 
     val paintingCount: Int get() = paintings.size
@@ -103,6 +116,14 @@ class Registries {
     internal fun addEnchantment(name: String) {
         enchantments += name
     }
+
+    internal fun addTrimPattern(name: String) {
+        trimPatterns += name
+    }
+
+    internal fun addTrimMaterial(name: String) {
+        trimMaterials += name
+    }
 }
 
 internal fun readRegistryData(body: ByteArray, registries: Registries) {
@@ -120,6 +141,10 @@ internal fun readRegistryData(body: ByteArray, registries: Registries) {
         readPaintingVariants(reader, registries)
     } else if (registryId == "minecraft:enchantment") {
         readEnchantments(reader, registries)
+    } else if (registryId == "minecraft:trim_pattern") {
+        readNames(reader, registries::addTrimPattern, "узор")
+    } else if (registryId == "minecraft:trim_material") {
+        readNames(reader, registries::addTrimMaterial, "материал")
     }
     // damage types, chat types… are not needed yet
 }
@@ -142,6 +167,21 @@ private fun readEnchantments(reader: ByteReader, registries: Registries) {
 }
 
 private const val MAX_ENCHANTMENTS = 512
+
+/**
+ * Реестр из одних имён: узоры и материалы отделки.
+ *
+ * Содержимое записи (цвет, текстуры) нам не нужно — для подсказки хватает имени, а NBT
+ * всё равно читается целиком, потому что его длину знает читатель.
+ */
+private fun readNames(reader: ByteReader, add: (String) -> Unit, what: String) {
+    val entryCount = reader.readVarInt()
+    if (entryCount !in 0..MAX_ENCHANTMENTS) throw ProtocolException("Записей ($what) в реестре: $entryCount")
+    repeat(entryCount) {
+        add(reader.readString().removePrefix("minecraft:"))
+        if (reader.readBoolean()) NbtReader.read(reader)
+    }
+}
 
 /**
  * Картины: имя, ширина и высота в блоках, файл текстуры.
