@@ -24,6 +24,21 @@ class VehicleSoundsTest {
     }
 
     @Test
+    fun `a minecart sounds different under water`() {
+        assertEquals("entity.minecart.inside", VehicleSounds.eventFor("chest_minecart", true))
+        assertEquals(
+            "entity.minecart.inside.underwater",
+            VehicleSounds.eventFor("chest_minecart", true, underwater = true),
+            "под водой вагонетка стучит глухо",
+        )
+        // Лодка под водой звучит так же: у неё одна запись вёсел.
+        assertEquals(
+            "entity.boat.paddle_water",
+            VehicleSounds.eventFor("oak_boat", true, underwater = true),
+        )
+    }
+
+    @Test
     fun `the pause keeps paddling from turning into noise`() {
         assertTrue(VehicleSounds.due(1_000L, 0L), "первый звук играем сразу")
         assertFalse(VehicleSounds.due(1_000L, 900L), "через 100 нс — рано")

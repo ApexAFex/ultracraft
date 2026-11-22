@@ -18,13 +18,16 @@ object VehicleSounds {
      *
      * @param typeName вид транспорта (`oak_boat`, `chest_minecart`, `horse`…)
      * @param moving жмём ли вперёд или назад
+     * @param underwater мы под водой: у вагонетки для этого своя запись
      * @return имя события или null, если транспорт молчит
      */
-    fun eventFor(typeName: String, moving: Boolean): String? = when {
+    fun eventFor(typeName: String, moving: Boolean, underwater: Boolean = false): String? = when {
         !moving -> null
         typeName.endsWith("_boat") || typeName.endsWith("_chest_boat") ||
             typeName.endsWith("_raft") -> "entity.boat.paddle_water"
-        typeName.endsWith("_minecart") -> "entity.minecart.inside"
+        // Под водой стук вагонетки глухой — в таблице звуков для него отдельное событие.
+        typeName.endsWith("_minecart") ->
+            if (underwater) "entity.minecart.inside.underwater" else "entity.minecart.inside"
         else -> null
     }
 

@@ -2273,7 +2273,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             val moving = kotlin.math.abs(input.forward) > 0.1 ||
                                 kotlin.math.abs(input.strafe) > 0.1
                             val event = VehicleSounds.eventFor(
-                                entityTypes.nameOf(riding.type), moving,
+                                entityTypes.nameOf(riding.type), moving, underwater = air.fraction < 1f,
                             )
                             if (event != null && VehicleSounds.due(System.nanoTime(), vehicleSoundNanos)) {
                                 vehicleSoundNanos = System.nanoTime()
