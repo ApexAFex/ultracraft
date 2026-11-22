@@ -25,7 +25,7 @@ class RecipeOfflineProbeTest {
             println("пакета рецептов нет — перебор пропущен")
             return
         }
-        for (tagWidth in 1..3) {
+        for (tagWidth in 0..3) {
             for (gridCount in listOf(false, true)) {
                 for (entryExtra in listOf(false, true)) {
                     val parsed = runCatching { walk(body, tagWidth, gridCount, entryExtra) }
@@ -101,7 +101,7 @@ class RecipeOfflineProbeTest {
             3 -> error("условие на компонент")
             4 -> reader.readVarInt()
             5 -> repeat(4) { reader.readVarInt() }
-            6 -> repeat(tagWidth) { reader.readByte() }
+            6 -> if (tagWidth == 0) reader.readVarInt() else repeat(tagWidth) { reader.readByte() }
             7 -> {
                 readSlot(reader, tagWidth, gridCount)
                 reader.readVarInt()
