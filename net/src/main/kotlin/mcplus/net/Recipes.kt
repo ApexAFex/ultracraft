@@ -95,18 +95,21 @@ class RecipeBook {
             readSlot(reader)
             Recipe(-1, result, ingredients)
         }
-        // Печь: ингредиент, топливо, результат, станция.
+        // Печь: ингредиент, топливо, результат, станция, время и опыт (проверено по jar).
         2 -> {
             val ingredient = readSlot(reader)
             val fuel = readSlot(reader)
             val result = readSlot(reader)
             readSlot(reader)
+            reader.readVarInt()   // сколько тиков плавится
+            reader.readFloat()    // сколько опыта даёт
             Recipe(-1, result, listOf(ingredient, fuel))
         }
-        // Камнерез: ингредиент и результат.
+        // Камнерез: ингредиент, результат и станция.
         3 -> {
             val ingredient = readSlot(reader)
             val result = readSlot(reader)
+            readSlot(reader)
             Recipe(-1, result, listOf(ingredient))
         }
         // Кузнечный стол: шаблон, основа, добавка, результат.
@@ -115,6 +118,7 @@ class RecipeBook {
             val base = readSlot(reader)
             val addition = readSlot(reader)
             val result = readSlot(reader)
+            readSlot(reader)      // станция
             Recipe(-1, result, listOf(template, base, addition))
         }
         else -> throw RecipeFormatException("вид рецепта $type")
