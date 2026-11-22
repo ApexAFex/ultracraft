@@ -437,6 +437,9 @@ class MobRenderer(
             "nautilus" to "entity/nautilus/nautilus.png",
             "zombie_nautilus" to "entity/nautilus/zombie_nautilus.png",
             "camel_husk" to "entity/camel/camel_husk.png",
+            "ender_dragon" to "entity/enderdragon/dragon.png",
+            "end_crystal" to "entity/end_crystal/end_crystal.png",
+            "sulfur_cube" to "entity/sulfur_cube/sulfur_cube_inner.png",
 
             // Лодки: у каждой породы своя текстура; у лодки с сундуком пока та же —
             // сам сундук на борту не рисуется.

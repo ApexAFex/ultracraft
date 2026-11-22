@@ -77,4 +77,18 @@ object StatisticsScreen {
 
     /** Вид по клику в колонке слева: `-1`, если клик мимо. */
     fun typeAtRow(row: Int): Int = TYPES.getOrElse(row) { -1 }
+
+    /**
+     * Позиция прокрутки списка статистики после колеса мыши.
+     *
+     * @param scroll текущая первая видимая строка
+     * @param delta -1 вверх, +1 вниз
+     * @param rows сколько всего строк
+     * @param visible сколько строк помещается
+     */
+    fun scrollAfter(scroll: Int, delta: Int, rows: Int, visible: Int): Int {
+        if (visible <= 0) return 0
+        val last = (rows - visible).coerceAtLeast(0)
+        return (scroll + delta).coerceIn(0, last)
+    }
 }

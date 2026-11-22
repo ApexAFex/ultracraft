@@ -1,0 +1,10 @@
+﻿SIZE	64	32
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/outer_glass	0.000	24.000	0.000	0.000	0.000	0.000
+CUBE	root/outer_glass	-4.000	-4.000	-4.000	4.000	4.000	4.000	0.0	0.0
+PART	root/outer_glass/inner_glass	0.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/outer_glass/inner_glass	-4.000	-4.000	-4.000	4.000	4.000	4.000	0.0	0.0
+PART	root/outer_glass/inner_glass/cube	0.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/outer_glass/inner_glass/cube	-4.000	-4.000	-4.000	4.000	4.000	4.000	32.0	0.0
+PART	root/base	0.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/base	-6.000	0.000	-6.000	6.000	4.000	6.000	0.0	16.0

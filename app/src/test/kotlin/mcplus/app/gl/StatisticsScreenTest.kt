@@ -90,4 +90,14 @@ class StatisticsScreenTest {
         assertEquals(-1, StatisticsScreen.typeAtRow(9))
         assertEquals(-1, StatisticsScreen.typeAtRow(-1))
     }
+
+    @Test
+    fun `the mouse wheel scrolls the list inside its bounds`() {
+        // 30 строк, видно 12: прокрутка идёт от 0 до 18.
+        assertEquals(1, StatisticsScreen.scrollAfter(0, 1, rows = 30, visible = 12))
+        assertEquals(0, StatisticsScreen.scrollAfter(0, -1, rows = 30, visible = 12))
+        assertEquals(18, StatisticsScreen.scrollAfter(18, 1, rows = 30, visible = 12))
+        assertEquals(0, StatisticsScreen.scrollAfter(0, 1, rows = 5, visible = 12), "всё влезло")
+        assertEquals(0, StatisticsScreen.scrollAfter(4, -1, rows = 30, visible = 0))
+    }
 }

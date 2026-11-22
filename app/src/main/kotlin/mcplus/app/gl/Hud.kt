@@ -1362,6 +1362,21 @@ class Hud(
                     renderer.rect(rect, 0xC07820, 0.95f)
                 }
             }
+            // Насыщение: тонкая золотая полоска под иконкой еды. Числом оно в игре
+            // не рисуется, но насыщение тратится первым — по полоске видно, когда еда
+            // ещё «держит», а когда голод уже пошёл вниз.
+            val saturationShare = (vitals.saturation / Vitals.MAX_SATURATION).coerceIn(0f, 1f)
+            val iconsLit = saturationShare * HudLayout.HEARTS
+            val iconShare = (iconsLit - index).coerceIn(0f, 1f)
+            if (iconShare > 0f) {
+                val barWidth = rect.width * iconShare
+                if (barWidth > 0.5f) {
+                    renderer.rect(
+                        rect.x, rect.y + rect.height - 2f * HudLayout.scale(height),
+                        barWidth, 2f * HudLayout.scale(height), 0xFFD24A, 0.9f,
+                    )
+                }
+            }
         }
     }
 

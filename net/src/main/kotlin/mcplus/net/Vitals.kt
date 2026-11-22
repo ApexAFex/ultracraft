@@ -86,5 +86,8 @@ class Vitals {
         const val MAX_HEALTH = 20f
         const val MAX_FOOD = 20
         const val DEFAULT_SATURATION = 5f
+
+        /** Предел насыщения: игра не даёт ему обогнать уровень еды, то есть 20. */
+        const val MAX_SATURATION = 20f
     }
 }

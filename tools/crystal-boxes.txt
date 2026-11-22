@@ -1,0 +1,4 @@
+        MobBox("base", -0.375f, 0f, -0.375f, 0.375f, 0.25f, 0.375f, u = 0, v = 16),
+        MobBox("outer_glass", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 0, v = 0),
+        MobBox("inner_glass", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 0, v = 0),
+        MobBox("cube", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 32, v = 0),

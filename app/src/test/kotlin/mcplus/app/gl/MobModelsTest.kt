@@ -548,6 +548,56 @@ class MobModelsTest {
     }
 
     @Test
+    fun `end crystal is a cube on a small base`() {
+        assertEquals(MobFamily.CRYSTAL, MobModels.familyOf("end_crystal"))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.CRYSTAL))
+        assertTrue(MobRenderer.TEXTURES["end_crystal"] != null, "кристалл без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.CRYSTAL)
+        assertEquals(4, boxes.size)
+        val base = boxes.first { it.name == "base" }
+        assertEquals(0f, base.minY, "подставка стоит на земле")
+        assertTrue(base.maxY <= 0.3f, "подставка низкая: ${base.maxY}")
+        // Куб висит над подставкой, а не уходит под неё.
+        val glass = boxes.first { it.name == "outer_glass" }
+        assertTrue(glass.minY >= base.maxY, "куб выше подставки")
+        assertTrue(glass.maxY <= 1f, "кристалл не выше блока")
+    }
+
+    @Test
+    fun `sulfur cube uses the slime geometry with its own skin`() {
+        assertEquals(MobFamily.SLIME, MobModels.familyOf("sulfur_cube"))
+        assertEquals(
+            "entity/sulfur_cube/sulfur_cube_inner.png",
+            MobRenderer.TEXTURES["sulfur_cube"],
+            "у серного куба своя текстура",
+        )
+    }
+
+    @Test
+    fun `ender dragon is a huge model with two wings and a tail`() {
+        assertEquals(MobFamily.DRAGON, MobModels.familyOf("ender_dragon"))
+        assertEquals(256 to 256, MobModels.textureSize(MobFamily.DRAGON), "лист дракона большой")
+        assertTrue(MobRenderer.TEXTURES["ender_dragon"] != null, "дракон без текстуры")
+
+        val boxes = MobModels.boxes(MobFamily.DRAGON)
+        assertEquals(64, boxes.size)
+        // Крыло — две коробки (полотно и перепонка) плюс кончик из двух: всего восемь.
+        assertEquals(8, boxes.count { it.name.endsWith("wing") || it.name.endsWith("wing_tip") })
+        assertTrue(boxes.count { it.name.startsWith("tail") } >= 8, "хвост из многих сегментов")
+        assertTrue(boxes.count { it.name.startsWith("neck") } >= 6, "шея из многих сегментов")
+
+        // Размах крыльев — около 14 блоков, вдвое больше туловища.
+        val minX = boxes.minOf { it.minX + it.offsetX }
+        val maxX = boxes.maxOf { it.maxX + it.offsetX }
+        assertTrue(maxX - minX > 10f, "размах крыльев: ${maxX - minX}")
+
+        // Модель стоит на земле: самая нижняя точка — на нуле (Y0 задан руками).
+        val lowest = boxes.filter { it.matrix == null }.minOf { it.minY + it.offsetY }
+        assertTrue(lowest >= -0.01f, "дракон не должен уходить под землю: $lowest")
+    }
+
+    @Test
     fun `nautilus has a spiral shell and three mouths`() {
         for (name in listOf("nautilus", "zombie_nautilus")) {
             assertEquals(MobFamily.NAUTILUS, MobModels.familyOf(name), "$name должно быть своим семейством")

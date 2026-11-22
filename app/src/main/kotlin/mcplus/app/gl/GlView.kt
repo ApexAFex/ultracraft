@@ -1166,6 +1166,23 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         if (statisticsOpen) {
                             if (input.chatScrollUpRequested) statisticsScroll += 5
                             if (input.chatScrollDownRequested) statisticsScroll = maxOf(0, statisticsScroll - 5)
+                            // Колесо мыши листает список построчно.
+                            if (input.scrollSlotDelta != 0) {
+                                val rowsNow = if (session != null && statsTable != null) {
+                                    StatisticsScreen.rows(
+                                        session!!.stats, statsTable,
+                                        itemName = { id -> itemTable.nameOf(id) },
+                                        entityName = { id -> entityTypes.nameOf(id) },
+                                        type = StatisticsScreen.TYPES[statisticsType],
+                                    ).size
+                                } else {
+                                    0
+                                }
+                                statisticsScroll = StatisticsScreen.scrollAfter(
+                                    statisticsScroll, input.scrollSlotDelta, rowsNow,
+                                    StatisticsScreen.visibleRows(height),
+                                )
+                            }
                             val left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS
                             val right = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS
                             if (left && !statisticsLeftWasDown) {
