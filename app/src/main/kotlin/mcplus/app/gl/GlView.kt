@@ -978,6 +978,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var wasInWater = false
                     val air = AirSupply()
                     var lastAttackNanos = 0L
+    /** Нажали ли уже «слезь» на транспорте: одно нажатие — одна команда. */
+    var dismountSent = false
                     var invLastClickNanos = 0L
                     var invLastClickSlot = -1
                     var cameraMode = cameraModeAtStart
@@ -2220,6 +2222,38 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         )
                         tracker.tick(input.deltaSeconds)
                         val entities = tracker.snapshot()
+                        // Едем на транспорте: сервер двигает лодку или вагонетку сам, нам
+                        // остаётся сообщать клавиши и держать камеру на транспорте.
+                        val riding = session?.ridingId?.let { id -> entities.firstOrNull { it.id == id } }
+                        if (riding != null && !paused) {
+                            player.x = riding.x
+                            // Глаза чуть выше палубы: иначе камера смотрит из корпуса.
+                            player.y = riding.y + 0.35
+                            player.z = riding.z
+                            session?.sendPlayerInput(
+                                forward = input.forward > 0.1,
+                                backward = input.forward < -0.1,
+                                left = input.strafe < -0.1,
+                                right = input.strafe > 0.1,
+                                jump = input.jump,
+                                sneak = sneakHeld,
+                                sprint = sprintHeld,
+                            )
+                            session?.sendVehicleMove(
+                                riding.x, riding.y, riding.z,
+                                CameraAngles.protocolYaw(player.yaw),
+                                player.pitch,
+                                true,
+                            )
+                            // Приседание на транспорте — «слезь»: сервер сам высаживает.
+                            if (sneakHeld && !dismountSent) {
+                                dismountSent = true
+                                session?.dismount()
+                            }
+                            if (!sneakHeld) dismountSent = false
+                        } else {
+                            dismountSent = false
+                        }
 
                         // Слушатель — в камере, шаги — по пройденному пути и блоку под ногами.
                         run {

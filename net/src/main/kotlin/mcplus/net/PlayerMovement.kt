@@ -101,5 +101,84 @@ object PlayerMovement {
             .toByteArray(),
     )
 
+    /**
+     * Где, по-нашему, находится транспорт.
+     *
+     * Сервер двигает лодку или вагонетку сам, а это пакет-подтверждение: без него сервер
+     * считает, что транспорт «застрял», и начинает его телепортировать.
+     */
+    fun vehicleMove(
+        x: Double,
+        y: Double,
+        z: Double,
+        yaw: Float,
+        pitch: Float,
+        onGround: Boolean,
+    ): Packet = Packet(
+        Protocol777.Play.MOVE_VEHICLE_SERVERBOUND,
+        mcplus.protocol.ByteWriter()
+            .writeDouble(x).writeDouble(y).writeDouble(z)
+            .writeFloat(yaw).writeFloat(pitch)
+            .writeBoolean(onGround)
+            .toByteArray(),
+    )
+
+    /**
+     * Нажатые клавиши движения одним байтом, как в 26.3.
+     *
+     * Без этого пакета сервер не знает, что мы хотим ехать: у него нет доступа к нашим
+     * клавишам, он видит только этот байт. Биты: 1 вперёд, 2 назад, 4 влево, 8 вправо,
+     * 16 прыжок, 32 шифт, 64 бег.
+     */
+    fun playerInput(
+        forward: Boolean,
+        backward: Boolean,
+        left: Boolean,
+        right: Boolean,
+        jump: Boolean,
+        sneak: Boolean,
+        sprint: Boolean,
+    ): Packet = Packet(
+        Protocol777.Play.PLAYER_INPUT,
+        mcplus.protocol.ByteWriter().writeByte(inputFlags(forward, backward, left, right, jump, sneak, sprint))
+            .toByteArray(),
+    )
+
+    /**
+     * Действие игрока: 0 — присел, 1 — встал, 2 — отпустил клавишу использования и т. д.
+     *
+     * На транспорте приседание означает «слезь»: сервер сам высаживает пассажира.
+     */
+    fun playerCommand(entityId: Int, action: Int): Packet = Packet(
+        Protocol777.Play.PLAYER_COMMAND,
+        mcplus.protocol.ByteWriter()
+            .writeVarInt(entityId)
+            .writeVarInt(action)
+            .writeVarInt(0)
+            .toByteArray(),
+    )
+
     private val EMPTY = ByteArray(0)
 }
+
+/** Битовая маска нажатых клавиш для `player_input`. */
+internal fun inputFlags(
+    forward: Boolean,
+    backward: Boolean,
+    left: Boolean,
+    right: Boolean,
+    jump: Boolean,
+    sneak: Boolean,
+    sprint: Boolean,
+): Int {
+    var flags = 0
+    if (forward) flags = flags or 0x01
+    if (backward) flags = flags or 0x02
+    if (left) flags = flags or 0x04
+    if (right) flags = flags or 0x08
+    if (jump) flags = flags or 0x10
+    if (sneak) flags = flags or 0x20
+    if (sprint) flags = flags or 0x40
+    return flags
+}
+

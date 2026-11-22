@@ -71,6 +71,14 @@ object Protocol777 {
         const val ANIMATE: Int = 0x02
         /** Событие сущности: 2 — получен урон. */
         const val ENTITY_EVENT: Int = 0x22
+
+        /**
+         * Кто на ком едет: `Set Passengers` (0x6D).
+         *
+         * Тело: id транспорта, число пассажиров и их id. Пока наш id в списке — мы едем,
+         * и ходить пешком нельзя: сервер двигает транспорт сам.
+         */
+        const val SET_PASSENGERS: Int = 0x6D
         const val REMOVE_ENTITIES: Int = 0x4E
         const val UPDATE_ENTITY_POSITION: Int = 0x36
         const val UPDATE_ENTITY_POSITION_ROTATION: Int = 0x37
@@ -173,6 +181,15 @@ object Protocol777 {
         const val SELECT_TRADE: Int = 0x34
         /** Взаимодействие с сущностью: ПКМ по жителю открывает его экран. */
         const val INTERACT: Int = 0x1A
+
+        /** Куда едет транспорт: координаты, поворот и «на земле». Сервер двигает его сам. */
+        const val MOVE_VEHICLE_SERVERBOUND: Int = 0x22
+
+        /** Нажатые клавиши движения байтом: вперёд, назад, влево, вправо, прыжок, шифт, бег. */
+        const val PLAYER_INPUT: Int = 0x2B
+
+        /** Действие игрока: 0 — присел (с него начинается спешивание), 1 — встал. */
+        const val PLAYER_COMMAND: Int = 0x2A
     }
 }
 

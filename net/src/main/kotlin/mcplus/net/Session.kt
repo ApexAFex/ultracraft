@@ -233,6 +233,33 @@ class Session internal constructor(
 
                 Protocol777.Play.BOSS_EVENT -> bossBars.onPacket(packet.body)
 
+                // Кто на ком едет. Если в списке пассажиров наш id — мы на транспорте:
+                // сервер двигает лодку или вагонетку сам, нам остаётся клавиши и камера.
+                Protocol777.Play.SET_PASSENGERS -> runCatching {
+                    val body = ByteReader(packet.body)
+                    val vehicle = body.readVarInt()
+                    val count = body.readVarInt()
+                    if (count !in 0..MAX_PASSENGERS) error("пассажиров: $count")
+                    val riders = List(count) { body.readVarInt() }
+                    val own = joinResult.joinGame.entityId
+                    val was = ridingId
+                    ridingId = when {
+                        own in riders -> vehicle
+                        ridingId == vehicle -> null
+                        else -> ridingId
+                    }
+                    // В лог пишем только смену состояния, иначе он тонет в строках.
+                    if (ridingId != was) {
+                        println(
+                            if (ridingId != null) {
+                                "Транспорт: едем на сущности $vehicle"
+                            } else {
+                                "Транспорт: слезли"
+                            },
+                        )
+                    }
+                }.onFailure { println("Транспорт: пакет не разобран — ${it.message}") }
+
                 Protocol777.Play.SET_ACTION_BAR_TEXT -> {
                     actionBar = readComponentText(packet.body)
                     actionBarAtNanos = System.nanoTime()
@@ -530,6 +557,38 @@ class Session internal constructor(
         return (max - stack.damage) to max
     }
 
+    /**
+     * Транспорт, на котором мы едем (номер сущности), или null.
+     *
+     * Пока значение не null, камера едет вместе с транспортом, а клавиши движения уходят
+     * серверу байтом `player_input`: своих клавиш он не видит.
+     */
+    var ridingId: Int? = null
+        private set
+
+    /** Нажатые клавиши движения для сервера: по ним он двигает транспорт. */
+    fun sendPlayerInput(
+        forward: Boolean,
+        backward: Boolean,
+        left: Boolean,
+        right: Boolean,
+        jump: Boolean,
+        sneak: Boolean,
+        sprint: Boolean,
+    ) {
+        send(PlayerMovement.playerInput(forward, backward, left, right, jump, sneak, sprint))
+    }
+
+    /** Где, по-нашему, транспорт: сервер сверяет это со своей позицией. */
+    fun sendVehicleMove(x: Double, y: Double, z: Double, yaw: Float, pitch: Float, onGround: Boolean) {
+        send(PlayerMovement.vehicleMove(x, y, z, yaw, pitch, onGround))
+    }
+
+    /** Слезть: приседание на транспорте — команда «присел», сервер сам высаживает. */
+    fun dismount() {
+        send(PlayerMovement.playerCommand(joinResult.joinGame.entityId, 0))
+    }
+
     /** Закрывает открытый контейнер: сервер должен убрать окно и у себя. */
     fun closeContainer() {
         val open = container ?: return
@@ -706,3 +765,6 @@ class Session internal constructor(
  */
 private fun ByteArray.hexIfSmall(): String =
     if (size in 1..24) " [" + joinToString(" ") { "%02x".format(it) } + "]" else ""
+
+/** Больше пассажиров на одном транспорте не бывает. */
+private const val MAX_PASSENGERS = 64
