@@ -459,6 +459,33 @@ class InventoryTest {
     }
 
     @Test
+    fun `custom model data is four lists and does not corrupt the stack`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val id = dataComponentId("custom_model_data")
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(id)
+                .writeVarInt(1).writeFloat(1.5f)                  // числа
+                .writeVarInt(2).writeBoolean(true).writeBoolean(false)  // флаги
+                .writeVarInt(1).writeString("minecraft:custom")    // строки
+                .writeVarInt(1).writeInt(0x123456)                 // цвета
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            assertEquals("stone", inventory.heldName(), "предмет с моделью датапака остаётся известным")
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `a renamed enchanted sword is a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()

@@ -382,6 +382,24 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
             }
             "firework_explosion" -> skipFireworkExplosion(reader)
 
+            // Модель предмета из датапака: четыре списка — числа, флаги, строки, цвета.
+            // На серверах этим перекрашивают предметы, поэтому без разбора они были
+            // «неизвестными» и теряли имя.
+            "custom_model_data" -> {
+                val floats = reader.readVarInt()
+                if (floats !in 0..MAX_CUSTOM_MODEL_ENTRIES) throw UnreadableStack(count)
+                repeat(floats) { reader.readFloat() }
+                val flags = reader.readVarInt()
+                if (flags !in 0..MAX_CUSTOM_MODEL_ENTRIES) throw UnreadableStack(count)
+                repeat(flags) { reader.readBoolean() }
+                val strings = reader.readVarInt()
+                if (strings !in 0..MAX_CUSTOM_MODEL_ENTRIES) throw UnreadableStack(count)
+                repeat(strings) { reader.readString() }
+                val colors = reader.readVarInt()
+                if (colors !in 0..MAX_CUSTOM_MODEL_ENTRIES) throw UnreadableStack(count)
+                repeat(colors) { reader.readInt() }
+            }
+
             else -> throw UnreadableStack(count)
         }
     }
@@ -426,6 +444,9 @@ private const val MAX_PROJECTILES = 64
 
 /** Больше зарядов в ракете в игре не бывает. */
 private const val MAX_FIREWORK_STARS = 8
+
+/** Списки в `custom_model_data` короткие: это имена моделей и цвета, а не массивы. */
+private const val MAX_CUSTOM_MODEL_ENTRIES = 64
 
 /**
  * Пропустить описание одного взрыва фейерверка.
