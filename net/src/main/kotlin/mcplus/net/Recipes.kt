@@ -123,7 +123,7 @@ class RecipeBook {
         3 -> { readSlot(reader); skipPredicate(reader); -1 }
         4 -> reader.readVarInt()                     // предмет
         5 -> readTemplateStack(reader)               // стек с компонентами
-        6 -> { reader.readShort(); -1 }               // тег: два байта значения (проверено по байтам)
+        6 -> { reader.readVarInt(); -1 }              // тег: номер тега как VarInt
         7 -> { readSlot(reader); reader.readVarInt(); -1 }       // крашеный
         8 -> { readSlot(reader); readSlot(reader); readSlot(reader); -1 } // отделка
         9 -> { val inner = readSlot(reader); readSlot(reader); inner }    // с остатком
