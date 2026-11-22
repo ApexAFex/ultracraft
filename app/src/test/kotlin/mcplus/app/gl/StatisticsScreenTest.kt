@@ -7,6 +7,7 @@ import mcplus.net.StatsTable
 import mcplus.protocol.ByteWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -77,6 +78,20 @@ class StatisticsScreenTest {
         assertEquals(9, StatisticsScreen.TYPES.size)
         assertEquals(4, StatisticsScreen.visibleRows(240))
         assertTrue(StatisticsScreen.visibleRows(720) >= 10)
+    }
+
+    @Test
+    fun `mob counters get a spawn egg icon and items get themselves`() {
+        val mob = rows(6, stats(6 to listOf(0 to 3L)))
+        assertEquals(
+            "${entities.nameOf(0)}_spawn_egg", mob.single().icon,
+            "у моба иконка — яйцо призыва",
+        )
+        val item = rows(0, stats(0 to listOf(0 to 5L)))
+        assertEquals(items.nameOf(0), item.single().icon, "у предмета иконка — сам предмет")
+        // У своих счётчиков иконки нет: там время и расстояния, а не предметы.
+        val custom = rows(8, stats(8 to listOf(0 to 20L)))
+        assertNull(custom.single().icon)
     }
 
     @Test

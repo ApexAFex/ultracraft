@@ -3318,7 +3318,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 selectedType = StatisticsScreen.TYPES[statisticsType],
                                 // Иконки предметов только у «предметных» видов счётчиков:
                                 // у убитых мобов и своих счётчиков иконки не из атласа блоков.
-                                iconLayer = if (StatisticsScreen.TYPES[statisticsType] <= 5) {
+                                iconLayer = if (StatisticsScreen.TYPES[statisticsType] <= 7) {
                                     { name: String -> atlas.layerForItem(name) }
                                 } else {
                                     null

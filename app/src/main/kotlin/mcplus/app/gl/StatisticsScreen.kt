@@ -15,7 +15,14 @@ object StatisticsScreen {
     /** Виды счётчиков в порядке номеров (как в игре). */
     val TYPES = listOf(0, 1, 2, 3, 4, 5, 6, 7, 8)
 
-    data class Row(val name: String, val value: Long, /** Готовое число для экрана. */ val text: String = value.toString())
+    data class Row(
+        val name: String,
+        val value: Long,
+        /** Готовое число для экрана. */
+        val text: String = value.toString(),
+        /** Имя предмета для иконки (у мобов — яйцо призыва) или null. */
+        val icon: String? = name,
+    )
 
     /**
      * Как показать счётчик: время — часами и минутами, расстояние — метрами и километрами.
@@ -95,7 +102,14 @@ object StatisticsScreen {
             // Свои счётчики знают своё имя: по нему видно, время это или расстояние.
             val counter = if (type == 8) names.customName(id) else null
             val text = if (counter != null) formatValue(counter, value) else value.toString()
-            rows += Row(name, value, text)
+            // Иконка строки: у мобов — яйцо призыва этого моба (в атласе нет картинок существ),
+            // у предметов — сам предмет.
+            val icon = when (type) {
+                6, 7 -> entityName(id)?.let { "${it}_spawn_egg" }
+                8 -> null
+                else -> name
+            }
+            rows += Row(name, value, text, icon)
             if (rows.size >= limit) break
         }
         return rows

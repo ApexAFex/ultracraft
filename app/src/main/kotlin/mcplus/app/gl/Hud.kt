@@ -352,7 +352,8 @@ class Hud(
             // о каком предмете речь, даже если имя обрезано.
             val icons = if (iconLayer != null) ArrayList<Pair<HudRect, Int>>() else null
             for (row in rows.drop(from).take(visible)) {
-                val layer = iconLayer?.invoke(row.name) ?: 0
+                val iconName = row.icon
+                val layer = if (iconLayer != null && iconName != null) iconLayer(iconName) else 0
                 if (icons != null && layer > 0) {
                     icons += HudRect(left, y - 1f * s, 11f * s, 11f * s) to layer
                     labels += TextRenderer.ScreenLabel(left + 14f * s, y, row.name, s)
@@ -513,7 +514,9 @@ class Hud(
             0x9FB8D0,
         )
         for ((tabIndex, rect) in tabRects.withIndex()) {
-            val value = tabs[tabIndex].root.title.text
+            val tabData = tabs[tabIndex]
+            // «Сюжет 3/12»: видно, сколько выполнено, не открывая вкладку.
+            val value = "${tabData.root.title.text} ${tabData.done}/${tabData.nodes.size}"
             labels += TextRenderer.ScreenLabel(
                 rect.x + 4f * s,
                 rect.y + 4f * s,
@@ -902,17 +905,29 @@ class Hud(
         if (tradeRows.isNotEmpty() && itemName != null) {
             for ((index, rect) in tradeRows) {
                 val offer = trades?.offers?.getOrNull(index) ?: continue
-                fun icon(column: Int, itemId: Int) {
+                // Цена без числа бессмысленна: на иконках в строке сделки пишем количество.
+                val counts = ArrayList<TextRenderer.ScreenLabel>(3)
+                fun icon(column: Int, itemId: Int, count: Int) {
                     if (itemId < 0) return
                     val name = itemName.invoke(itemId)
-                    renderer.icon(
-                        HudRect(rect.x + column * 20f * s + 2f * s, rect.y + 2f * s, 16f * s, 16f * s),
-                        atlas.layerForItem(name),
-                    )
+                    val cell = HudRect(rect.x + column * 20f * s + 2f * s, rect.y + 2f * s, 16f * s, 16f * s)
+                    renderer.icon(cell, atlas.layerForItem(name))
+                    if (count > 1) {
+                        val value = count.toString()
+                        val width = text?.textWidth(value, s * 0.7f) ?: 0f
+                        counts += TextRenderer.ScreenLabel(
+                            cell.x + cell.width - width - 1f * s,
+                            cell.y + cell.height - 6f * s,
+                            value,
+                            s * 0.7f,
+                            0xFFFFFF,
+                        )
+                    }
                 }
-                icon(0, offer.costA.itemId)
-                offer.costB?.let { icon(1, it.itemId) }
-                offer.result?.let { icon(3, it.itemId) }
+                icon(0, offer.costA.itemId, offer.costA.count)
+                offer.costB?.let { icon(1, it.itemId, it.count) }
+                offer.result?.let { icon(3, it.itemId, it.count) }
+                if (counts.isNotEmpty()) text?.drawScreen(counts)
             }
         }
         val carried = inventory.nameOf(container.carriedOrNull())
@@ -1564,6 +1579,9 @@ class Hud(
         val rect = HudRect(slot.x - slot.width - 4f * s, slot.y, slot.width, slot.height)
         renderer.rect(rect, 0x101010, 0.55f)
         renderer.icon(rect, atlas.layerForItem(name))
+        // Щит в левой руке тоже может быть зачарован или изношен.
+        drawGlint(rect, stack)
+        drawWear(rect, stack, s)
     }
 
     /** Полоска прочности под выбранным слотом: зелёная, жёлтая, красная. */
