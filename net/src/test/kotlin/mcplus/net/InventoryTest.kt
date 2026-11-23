@@ -246,6 +246,77 @@ class InventoryTest {
     }
 
     @Test
+    fun `food, container, stew and horn components are read`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(6)    // шесть компонентов
+                .writeVarInt(0)
+                .writeVarInt(23)   // food: голод 6, насыщение 0.6, есть сытым нельзя
+                .writeVarInt(6).writeFloat(0.6f).writeBoolean(false)
+                .writeVarInt(75)   // base_color = 3
+                .writeVarInt(3)
+                .writeVarInt(65)   // ominous_bottle_amplifier = 1
+                .writeVarInt(1)
+                .writeVarInt(73)   // note_block_sound = "minecraft:block.note_block.harp"
+                .writeString("minecraft:block.note_block.harp")
+                .writeVarInt(63)   // instrument = 2
+                .writeVarInt(2)
+                .writeVarInt(55)   // suspicious_stew_effects: один эффект
+                .writeVarInt(1)
+                .writeVarInt(9).writeVarInt(200)
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(6, parsed.foodNutrition)
+            assertEquals(0.6f, parsed.foodSaturation + 0f)
+            assertEquals(false, parsed.foodAlwaysEat)
+            assertEquals(3, parsed.baseColor)
+            assertEquals(1, parsed.ominousAmplifier)
+            assertEquals("minecraft:block.note_block.harp", parsed.noteSound)
+            assertEquals(2, parsed.instrumentId)
+            assertEquals(listOf(9 to 200), parsed.stewEffects)
+            assertEquals("stone", inventory.heldName(), "стек остался известным")
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
+    fun `a shulker box inside keeps its contents count`() {
+        val previous = ComponentTable.active
+        ComponentTable.active = componentTable()
+        try {
+            val inventory = Inventory(items)
+            val stack = ByteWriter()
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(1)
+                .writeVarInt(0)
+                .writeVarInt(77)   // container: 27 слотов, два заняты
+                .writeVarInt(27)
+                .writeBoolean(true).writeVarInt(1).writeVarInt(4).writeVarInt(0).writeVarInt(0)
+                .writeBoolean(true).writeVarInt(2).writeVarInt(1).writeVarInt(0).writeVarInt(0)
+                .also { writer -> repeat(25) { writer.writeBoolean(false) } }
+                .toByteArray()
+            val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
+            inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
+
+            val parsed = inventory.stackIn(0)!!
+            assertEquals(27, parsed.containerCount)
+            assertEquals("stone", inventory.heldName())
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `a glider with only known components stays a known stack`() {
         val previous = ComponentTable.active
         ComponentTable.active = componentTable()

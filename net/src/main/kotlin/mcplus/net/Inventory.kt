@@ -56,6 +56,22 @@ class Inventory(
         val fireworkStars: Int = 0,
         /** Сколько предметов в мешке (`bundle_contents`). */
         val bundleCount: Int = 0,
+        /** Сколько предметов внутри (`container`): шалкер, сундук в предмете. */
+        val containerCount: Int = 0,
+        /** Еда (`food`): сколько голода даёт, сколько насыщения и можно ли есть сытым. */
+        val foodNutrition: Int = 0,
+        val foodSaturation: Float = 0f,
+        val foodAlwaysEat: Boolean = false,
+        /** Цвет основы (`base_color`): номер красителя, −1 — не задан. */
+        val baseColor: Int = -1,
+        /** Звук нотного блока (`note_block_sound`), если задан. */
+        val noteSound: String? = null,
+        /** Сила дурного зелья (`ominous_bottle_amplifier`), −1 — не задана. */
+        val ominousAmplifier: Int = -1,
+        /** Эффекты подозрительного рагу (`suspicious_stew_effects`): номер и длительность. */
+        val stewEffects: List<Pair<Int, Int>> = emptyList(),
+        /** Инструмент козьего рога (`instrument`): номер из реестра, −1 — не задан. */
+        val instrumentId: Int = -1,
     ) {
         val isEmpty: Boolean get() = count <= 0
 
@@ -294,6 +310,15 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
     var fireworksFlight = 0
     var fireworkStars = 0
     var bundleCount = 0
+    var containerCount = 0
+    var foodNutrition = 0
+    var foodSaturation = 0f
+    var foodAlwaysEat = false
+    var baseColor = -1
+    var noteSound: String? = null
+    var ominousAmplifier = -1
+    var stewEffects: List<Pair<Int, Int>> = emptyList()
+    var instrumentId = -1
     repeat(added) {
         val id = reader.readVarInt()
         when (ComponentTable.active.nameOf(id)) {
@@ -411,6 +436,36 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
                 bundleCount = items
             }
 
+            // Содержимое в предмете (шалкер, сундук): у каждого слота признак «есть» и стопка.
+            "container" -> {
+                val items = reader.readVarInt()
+                if (items !in 0..MAX_CONTAINER_ITEMS) throw UnreadableStack(count)
+                repeat(items) { if (reader.readBoolean()) skipTemplateStack(reader) }
+                containerCount = items
+            }
+
+            // Еда: голод, насыщение и «можно есть сытым» — три поля подряд.
+            "food" -> {
+                foodNutrition = reader.readVarInt()
+                foodSaturation = reader.readFloat()
+                foodAlwaysEat = reader.readBoolean()
+            }
+
+            // Одно число или строка: краситель основы, сила дурного зелья и звук нотного блока.
+            "base_color" -> baseColor = reader.readVarInt()
+            "ominous_bottle_amplifier" -> ominousAmplifier = reader.readVarInt()
+            "note_block_sound" -> noteSound = reader.readString()
+
+            // Козий рог: номер инструмента из реестра.
+            "instrument" -> instrumentId = reader.readVarInt()
+
+            // Подозрительное рагу: список «эффект, длительность».
+            "suspicious_stew_effects" -> {
+                val effects = reader.readVarInt()
+                if (effects !in 0..MAX_STEW_EFFECTS) throw UnreadableStack(count)
+                stewEffects = List(effects) { reader.readVarInt() to reader.readVarInt() }
+            }
+
             else -> throw UnreadableStack(count)
         }
     }
@@ -435,6 +490,15 @@ internal fun readMenuStack(reader: ByteReader): Inventory.Stack? {
         fireworksFlight = fireworksFlight,
         fireworkStars = fireworkStars,
         bundleCount = bundleCount,
+        containerCount = containerCount,
+        foodNutrition = foodNutrition,
+        foodSaturation = foodSaturation,
+        foodAlwaysEat = foodAlwaysEat,
+        baseColor = baseColor,
+        noteSound = noteSound,
+        ominousAmplifier = ominousAmplifier,
+        stewEffects = stewEffects,
+        instrumentId = instrumentId,
     )
 }
 
@@ -484,14 +548,27 @@ private fun skipFireworkExplosion(reader: ByteReader) {
  * Так читаются заряды арбалета и содержимое мешка: вложенные компоненты нам не нужны, но
  * их длина должна быть прочитана, иначе поедет весь патч.
  */
+/**
+ * Пропустить вложенную стопку (`ItemStackTemplate`): предмет, количество и патч компонентов.
+ *
+ * Порядок полей — как у шаблона стопки, а не у обычного стека: сначала номер предмета.
+ * Если во вложенной стопке есть компоненты, длину тела мы не знаем — такой предмет
+ * считается непрочитанным, но пакет от этого не рвётся.
+ */
 private fun skipTemplateStack(reader: ByteReader) {
-    val count = reader.readVarInt()
+    reader.readVarInt()               // предмет
+    val count = reader.readVarInt()   // количество
     if (count <= 0) return
-    reader.readVarInt()
     val added = reader.readVarInt()
     if (added != 0) throw UnreadableStack(count)
     if (reader.readVarInt() != 0) throw UnreadableStack(count)
 }
+
+/** Больше слотов в предмете-контейнере в игре не бывает. */
+private const val MAX_CONTAINER_ITEMS = 256
+
+/** Эффектов в рагу в игре не больше восьми. */
+private const val MAX_STEW_EFFECTS = 8
 
 /** Предел строк описания: в игре `ItemLore.MAX_LINES`. */
 private const val MAX_LORE_LINES = 256

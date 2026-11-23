@@ -126,6 +126,12 @@ class MobModelsTest {
         // Голова и тело не качаются от ходьбы.
         assertEquals(0f, MobModels.limbAngle("head", 1f, 1f))
         assertEquals(0f, MobModels.limbAngle("body", 1f, 1f))
+        // Пасть дракона приоткрыта и двигается: раньше она была намертво зашита.
+        val jaw = MobModels.limbAngle("jaw", 1f, 1f)
+        assertTrue(jaw > 0f && jaw < 0.25f, "пасть приоткрыта, но не распахнута: $jaw")
+        assertTrue(MobModels.limbAngle("jaw", 4f, 1f) != MobModels.limbAngle("jaw", 1f, 1f))
+        // Пять звеньев шеи дракона идут волной, а не одним куском.
+        assertTrue(MobModels.limbAngle("neck0", 1f, 1f) != MobModels.limbAngle("neck3", 1f, 1f))
     }
 
     @Test

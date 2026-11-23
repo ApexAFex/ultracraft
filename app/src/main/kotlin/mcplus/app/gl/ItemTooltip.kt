@@ -33,6 +33,10 @@ object ItemTooltip {
         enchantmentName: (Int) -> String? = { null },
         trimPatternName: (Int) -> String? = { null },
         trimMaterialName: (Int) -> String? = { null },
+        /** Имя эффекта по номеру из реестра: нужно для подозрительного рагу. */
+        effectName: (Int) -> String? = { null },
+        /** Имя инструмента козьего рога; без реестра показываем номер. */
+        instrumentName: (Int) -> String = { "№$it" },
     ): List<Pair<String, Int>> {
         val result = ArrayList<Pair<String, Int>>(5)
         val title = buildString {
@@ -80,6 +84,31 @@ object ItemTooltip {
         // Мешок: сколько предметов внутри.
         if (stack.bundleCount > 0) {
             result += "В мешке: ${stack.bundleCount}" to 0xC8C8A0
+        }
+        // Предмет-контейнер: шалкер или сундук в кармане.
+        if (stack.containerCount > 0) {
+            result += "Внутри: ${stack.containerCount}" to 0xC8C8A0
+        }
+        // Еда: голод и насыщение; «можно есть сытым» — важная подсказка, в игре она есть.
+        if (stack.foodNutrition > 0) {
+            val saturation = String.format("%.1f", stack.foodSaturation).replace('.', ',')
+            val extra = if (stack.foodAlwaysEat) ", можно есть сытым" else ""
+            result += "Еда: ${stack.foodNutrition} (+$saturation)$extra" to 0xC8C8A0
+        }
+        // Дурное зелье: сила эффекта.
+        if (stack.ominousAmplifier >= 0) {
+            result += "Сила дурного зелья: ${stack.ominousAmplifier + 1}" to 0xB090C0
+        }
+        // Подозрительное рагу: какие эффекты и на сколько.
+        if (stack.stewEffects.isNotEmpty()) {
+            val text = stack.stewEffects.joinToString(", ") { (id, ticks) ->
+                "${effectName(id) ?: "эффект $id"} ${ticks / 20} с"
+            }
+            result += "Эффекты: $text" to 0xB090C0
+        }
+        // Козий рог: какой инструмент играет.
+        if (stack.instrumentId >= 0) {
+            result += "Инструмент: ${instrumentName(stack.instrumentId)}" to 0xC8C8A0
         }
         return result
     }

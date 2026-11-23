@@ -345,6 +345,15 @@ object MobModels {
             val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
             return kotlin.math.sin(phase * 0.5f + index) * amount.coerceIn(0f, 1f) * 0.12f
         }
+        // Пасть дракона приоткрыта и медленно двигается: в игре она не стоит на месте.
+        if (key.contains("jaw")) {
+            return (kotlin.math.sin(phase * 0.45f) * 0.5f + 0.5f) * 0.22f
+        }
+        // Шея дракона из пяти звеньев: волна идёт по ней от головы к туловищу.
+        if (key.contains("neck")) {
+            val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
+            return kotlin.math.sin(phase * 0.6f + index * 0.5f) * (0.04f + 0.10f * amount.coerceIn(0f, 1f))
+        }
         // Хвост и уши качаются всегда, но слабо: даже стоящий моб не выглядит статуей.
         if (key.contains("tail") || key.contains("mane")) {
             val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
