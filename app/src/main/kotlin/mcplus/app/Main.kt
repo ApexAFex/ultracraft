@@ -952,6 +952,8 @@ private fun windowCommand(args: List<String>) {
     var skinSlim = false
     var startStatistics = false
     var startRecipeBook = false
+    /** Проверка без мыши: имя результата, который надо скрафтить из книги. */
+    var startCraft: String? = null
     /** Проверка без рук: переименовать предмет в открытой наковальне. */
     var renameAfterOpen: String? = null
     var pauseAtStart = false
@@ -975,6 +977,7 @@ private fun windowCommand(args: List<String>) {
             "--advancements" -> startAdvancements = true
             "--statistics" -> startStatistics = true
             "--recipes" -> startRecipeBook = true
+            "--craft" -> startCraft = args.getOrNull(++index) ?: fail("--craft ждёт имя результата")
             "--rename" -> renameAfterOpen = args.getOrNull(++index) ?: fail("--rename ждёт имя")
             "--use-item" -> useItemAtFrame =
                 args.getOrNull(++index)?.toIntOrNull() ?: fail("--use-item ждёт номер кадра")
@@ -1112,6 +1115,7 @@ private fun windowCommand(args: List<String>) {
             startAdvancements = startAdvancements,
             startStatistics = startStatistics,
             startRecipeBook = startRecipeBook,
+            startCraft = startCraft,
             renameAfterOpen = renameAfterOpen,
             useItemAtFrame = useItemAtFrame,
             tradeAtFrame = tradeAtFrame,
@@ -1565,6 +1569,8 @@ private fun printUsage() {
           --debug        отладочные строки F3 (FPS, координаты, чанки)
           --tab          список игроков по Tab
           --advancements открыть экран достижений (клавиша L в игре)
+          --recipes      открыть книгу рецептов (клавиша B в игре)
+          --craft NAME   скрафтить из книги рецепт с таким результатом (проверка без мыши)
           --particles    нарисовать образцы частиц перед камерой (проверка без сервера)
           --mobs         нарисовать по одному мобу каждого семейства перед камерой
     --skin PATH    свой скин из файла PNG (проверка рисования кожи без сети)

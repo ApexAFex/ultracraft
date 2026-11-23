@@ -128,6 +128,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
      */
     private const val DEMO_PLACE_AT = 600
 
+    /** Сколько держится плашка «сервер не разложил рецепт» — по времени, а не по кадрам. */
+    private const val NOTICE_NANOS = 8_000_000_000L
+
     /**
      * Demo mode opens the inventory screen here, so the self-test also shows it and a screenshot
      * can prove it: slots, item icons and the panel are otherwise only visible to a person at
@@ -222,6 +225,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         /** Открыть экран статистики сразу (проверка без клавиатуры). */
         startStatistics: Boolean = false,
         startRecipeBook: Boolean = false,
+        /** Проверка без мыши: скрафтить из книги рецепт с таким именем результата (`--craft`). */
+        startCraft: String? = null,
         /** Проверка без рук: переименовать предмет в открытой наковальне. */
         renameAfterOpen: String? = null,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
@@ -932,7 +937,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var recipeBookOpen = startRecipeBook
                     var recipeCategory = -1
                     var recipePage = 0
-                    var recipeTabRects: List<HudRect> = emptyList()
+                    var recipeLayout = RecipeBookLayout(emptyList(), emptyList())
+                    // Крафт из книги по клику: проверка «хватает ли» считается по инвентарю,
+                    // поэтому подсветка и подсказка говорят то же, что сделает сервер.
+                    var craftRequest = startCraft
+                    var craftSent = false
+                    var craftBefore: Map<Int, Int>? = null
+                    var craftItemName: String? = null
+                    var craftResultId = -1
+                    var craftLogged = false
+                    // Отказ сервера («разложить нельзя») показываем прямо в книге.
+                    var recipeNotice: String? = null
+                    var recipeNoticeUntil = 0L
+                    var ghostSeen = 0
                     var recipeLeftWasDown = false
                     var recipeRightWasDown = false
                     if (startAdvancements) input.warpCursor(width * 0.5, height * 0.56)
@@ -1303,12 +1320,29 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             recipeLeftWasDown = left
                             recipeRightWasDown = right
                             if (input.clickRequested) {
-                                val chosen = recipeTabRects.indexOfFirst {
+                                val chosen = recipeLayout.tabs.indexOfFirst {
                                     it.contains(input.mouseX, input.mouseY)
                                 }
                                 if (chosen >= 0 && chosen < tabs.size) {
                                     recipeCategory = tabs[chosen]
                                     recipePage = 0
+                                } else {
+                                    // Клик по иконке: «разложи и забери». Проверку не дублируем —
+                                    // сервер сам откажется, если чего-то не хватает; подсветка
+                                    // нужна только чтобы игрок не кликал вслепую.
+                                    val hit = recipeLayout.icons.firstOrNull {
+                                        it.first.contains(input.mouseX, input.mouseY)
+                                    }
+                                    if (hit != null) {
+                                        val recipe = hit.second
+                                        val check = session?.checkRecipe(recipe)
+                                        session?.craftFromBook(recipe)
+                                        println(
+                                            "Крафт: ${itemTable.nameOf(recipe.result) ?: "предмет ${recipe.result}"}" +
+                                                " — " + (check?.let { RecipeBookScreen.craftLine(it, itemTable::nameOf) }
+                                                ?: "нет проверки"),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -3468,7 +3502,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             } else {
                                 emptyList()
                             }
-                            recipeTabRects = hud.drawRecipeBookScreen(
+                            // Что есть под рукой, считаем один раз на кадр: иначе на каждую
+                            // иконку строился бы свой словарь количеств.
+                            val haveNow = session?.craftCounts() ?: emptyMap()
+                            val menuNow = session?.menuType
+                            val tagsNow = session?.itemTags
+                            recipeLayout = hud.drawRecipeBookScreen(
                                 tabs = tabs,
                                 counts = counts,
                                 selected = recipeCategory,
@@ -3478,6 +3517,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 iconLayer = { name -> atlas.layerForItem(name) },
                                 mouseX = input.mouseX,
                                 mouseY = input.mouseY,
+                                craftCheck = { recipe ->
+                                    mcplus.net.Crafting.check(recipe, haveNow, menuNow, tagsNow) { id ->
+                                        itemTable.nameOf(id)
+                                    }
+                                },
+                                notice = recipeNotice,
                             )
                         } else if (advancementsOpen) {
                             // Экран достижений: вкладки и дерево; клик по вкладке — выше.
@@ -3935,6 +3980,58 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                         }
                         if (!inventoryOpen && demo && frame == DEMO_PLACE_AT && target != null) demoPlace(target)
+                        // Проверка без мыши: скрафтить из книги рецепт с заданным результатом.
+                        // Это тот же путь, что и клик по иконке, — проверяется он, а не обход.
+                        if (craftRequest != null && !craftSent && !dead && playerLoadedSent) {
+                            val open = session
+                            // Ждём, пока в инвентаре появится хоть что-нибудь: предметы выдаёт
+                            // сервер после входа, и «разложи» до этого всё равно не сработает.
+                            if (open != null && open.craftCounts().isNotEmpty()) {
+                                val wanted = craftRequest
+                                val recipe = open.recipes.all().firstOrNull { candidate ->
+                                    itemTable.nameOf(candidate.result) == wanted &&
+                                        (candidate.kind == mcplus.net.RecipeKind.SHAPED ||
+                                            candidate.kind == mcplus.net.RecipeKind.SHAPELESS) &&
+                                        !open.checkRecipe(candidate).needsBiggerGrid
+                                }
+                                if (recipe != null) {
+                                    val check = open.checkRecipe(recipe)
+                                    craftBefore = open.craftCounts()
+                                    craftItemName = itemTable.nameOf(recipe.result)
+                                    craftResultId = recipe.result
+                                    craftSent = true
+                                    open.craftFromBook(recipe)
+                                    println(
+                                        "Крафт: $craftItemName (рецепт ${recipe.id}) — " +
+                                            RecipeBookScreen.craftLine(check, itemTable::nameOf),
+                                    )
+                                }
+                            }
+                        }
+                        // Итог: сервер отвечает обновлением слотов, ждём, пока счётчик вырастет.
+                        if (craftSent && !craftLogged) {
+                            val now = session?.craftCounts() ?: emptyMap()
+                            val was = craftBefore?.get(craftResultId) ?: 0
+                            val became = now[craftResultId] ?: 0
+                            if (became != was) {
+                                println("Крафт: $craftItemName — было $was, стало $became")
+                                craftLogged = true
+                            }
+                        }
+                        // Сервер отказал: в выживании раскладывать нечего, и вместо раскладки
+                        // приходит «призрачный» рецепт. Молчать нельзя — игрок решит, что книга
+                        // сломана.
+                        session?.let { open ->
+                            if (open.ghostRecipes > ghostSeen) {
+                                ghostSeen = open.ghostRecipes
+                                recipeNotice = "Сервер не разложил: не хватает предметов"
+                                // По времени, а не по кадрам: в безоконном прогоне кадры летят
+                                // втрое быстрее, и «240 кадров» — это три секунды, а не пятнадцать.
+                                recipeNoticeUntil = System.nanoTime() + NOTICE_NANOS
+                                println("Крафт: сервер не разложил рецепт (${open.ghostRecipes}-й отказ)")
+                            }
+                        }
+                        if (recipeNotice != null && System.nanoTime() > recipeNoticeUntil) recipeNotice = null
                         // Демо бьёт ближайшую сущность, если она в пределах руки.
                         if (demo && frame == 25) {
                             val nearest = tracker.snapshot().minByOrNull { entity ->

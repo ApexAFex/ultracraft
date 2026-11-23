@@ -49,6 +49,14 @@ class OpenContainer(
     fun contents(): List<Pair<Int, Inventory.Stack>> =
         slots.entries.filter { !it.value.isEmpty }.sortedBy { it.key }.map { it.key to it.value }
 
+    /**
+     * Стопки игрока внутри открытого меню: последние 36 слотов.
+     *
+     * Нужны крафту: пока открыт верстак, инвентарь приезжает именно сюда, а не в [Inventory].
+     */
+    fun playerStacks(): List<Inventory.Stack?> =
+        (playerStart until slotCount).map { slots[it] }
+
     internal fun put(index: Int, stack: Inventory.Stack?) {
         if (stack == null || stack.isEmpty) slots.remove(index) else slots[index] = stack
     }

@@ -135,8 +135,10 @@ class RecipeBook {
             RecipeKind.SHAPELESS -> {
                 val ingredients = readSlotList(reader)
                 val (result, count) = readResult(reader)
-                readSlot(reader) // станция
-                Recipe(id, kind, 0, 0, result, count, ingredients)
+                // Станция: предмет, у которого этот рецепт доступен (верстак, печь, камнерез).
+                // Нужна, чтобы экран честно писал «нужен верстак», а не «не хватает предметов».
+                val station = readStation(reader)
+                Recipe(id, kind, 0, 0, result, count, ingredients, station = station)
             }
             RecipeKind.SHAPED -> {
                 val width = reader.readVarInt()
@@ -149,31 +151,31 @@ class RecipeBook {
                     throw RecipeFormatException("сетка $width×$height, а слотов ${cells.size}")
                 }
                 val (result, count) = readResult(reader)
-                readSlot(reader) // станция
-                Recipe(id, kind, width, height, result, count, cells)
+                val station = readStation(reader)
+                Recipe(id, kind, width, height, result, count, cells, station = station)
             }
             RecipeKind.FURNACE -> {
                 val ingredient = readSlot(reader)
                 val fuel = readSlot(reader)
                 val (result, count) = readResult(reader)
-                readSlot(reader) // станция
+                val station = readStation(reader)
                 val ticks = reader.readVarInt()
                 reader.readFloat() // опыт
-                Recipe(id, kind, 0, 0, result, count, listOf(ingredient, fuel), ticks = ticks)
+                Recipe(id, kind, 0, 0, result, count, listOf(ingredient, fuel), station = station, ticks = ticks)
             }
             RecipeKind.STONECUTTER -> {
                 val input = readSlot(reader)
                 val (result, count) = readResult(reader)
-                readSlot(reader) // станция
-                Recipe(id, kind, 0, 0, result, count, listOf(input))
+                val station = readStation(reader)
+                Recipe(id, kind, 0, 0, result, count, listOf(input), station = station)
             }
             RecipeKind.SMITHING -> {
                 val template = readSlot(reader)
                 val base = readSlot(reader)
                 val addition = readSlot(reader)
                 val (result, count) = readResult(reader)
-                readSlot(reader) // станция
-                Recipe(id, kind, 0, 0, result, count, listOf(template, base, addition))
+                val station = readStation(reader)
+                Recipe(id, kind, 0, 0, result, count, listOf(template, base, addition), station = station)
             }
         }
     }
@@ -194,39 +196,58 @@ class RecipeBook {
             // Одиночный предмет в результате тоже встречается.
             4 -> reader.readVarInt() to 1
             else -> {
-                val item = readSlotOfType(type, reader)
+                val item = readSlotOfType(type, reader).itemId
                 item to 1
             }
         }
     }
 
-    /** Слот: номер предмета или −1, если это тег, пустой слот или набор вариантов. */
-    private fun readSlot(reader: ByteReader): Int = readSlotOfType(reader.readVarInt(), reader)
+    /** Слот: конкретный предмет или тег («любые доски»). */
+    private fun readSlot(reader: ByteReader): Ingredient = readSlotOfType(reader.readVarInt(), reader)
 
-    private fun readSlotOfType(type: Int, reader: ByteReader): Int = when (type) {
-        0, 1 -> -1                                   // пусто, любое топливо
-        2 -> { readSlot(reader); -1 }                // любое зелье
-        3 -> { val inner = readSlot(reader); reader.readVarInt(); inner } // с компонентом
-        4 -> reader.readVarInt()                     // предмет
+    /**
+     * Станция рецепта: номер предмета или −1, если станция не названа.
+     *
+     * Пустой слот приходит номером 0 (воздух) — для «станции нет» это то же самое, что −1,
+     * но дальше по коду ноль означал бы «предмет с номером 0», поэтому приводим сразу.
+     */
+    private fun readStation(reader: ByteReader): Int = readSlot(reader).itemId.takeIf { it > 0 } ?: -1
+
+    private fun readSlotOfType(type: Int, reader: ByteReader): Ingredient = when (type) {
+        0, 1 -> Ingredient(-1)                       // пусто, любое топливо
+        2 -> { readSlot(reader); Ingredient(-1) }    // любое зелье
+        3 -> {                                       // с компонентом: предмет тот же
+            val inner = readSlot(reader)
+            reader.readVarInt()
+            inner
+        }
+        4 -> Ingredient(reader.readVarInt())         // предмет
         5 -> {                                       // стопка с компонентами
             val item = reader.readVarInt()
             reader.readVarInt()                      // количество
             val added = reader.readVarInt()
             val removed = reader.readVarInt()
             if (added != 0 || removed != 0) throw RecipeFormatException("слот с компонентами")
-            item
+            Ingredient(item)
         }
-        6 -> { readHolderSet(reader); -1 }           // тег
+        6 -> {                                       // тег или явный список предметов
+            val set = readHolderSet(reader)
+            if (set.tag != null) {
+                Ingredient(-1, set.tag)
+            } else {
+                Ingredient(set.ids.firstOrNull() ?: -1, options = set.ids)
+            }
+        }
         7 -> { val inner = readSlot(reader); readSlot(reader); inner }        // крашеный
         8 -> { val inner = readSlot(reader); readSlot(reader); reader.readVarInt(); inner } // отделка
         9 -> { val inner = readSlot(reader); readSlot(reader); inner }        // с остатком
         10 -> {                                      // набор вариантов: берём первый известный
             val options = reader.readVarInt()
             if (options !in 0..MAX_VARIANTS) throw RecipeFormatException("вариантов: $options")
-            var first = -1
+            var first = Ingredient(-1)
             repeat(options) {
-                val item = readSlot(reader)
-                if (first < 0 && item > 0) first = item
+                val option = readSlot(reader)
+                if (first.itemId < 0 && option.tag == null && option.itemId > 0) first = option
             }
             first
         }
@@ -235,20 +256,18 @@ class RecipeBook {
 
     /**
      * Набор предметов (`HolderSet`): 0 — дальше имя тега строкой, иначе столько−1 номеров.
-     * Возвращаем номера, имя тега нам сейчас не нужно: на иконке всё равно предмет.
+     *
+     * Имя тега сохраняем: по нему из [ItemTags] видно, какие предметы подходят.
      */
-    private fun readHolderSet(reader: ByteReader): List<Int> {
+    private fun readHolderSet(reader: ByteReader): HolderSet {
         val n = reader.readVarInt()
-        if (n == 0) {
-            reader.readString(MAX_IDENTIFIER_BYTES)
-            return emptyList()
-        }
+        if (n == 0) return HolderSet(emptyList(), reader.readString(MAX_IDENTIFIER_BYTES))
         val size = n - 1
         if (size !in 0..MAX_VARIANTS) throw RecipeFormatException("набор из $size предметов")
-        return List(size) { reader.readVarInt() }
+        return HolderSet(List(size) { reader.readVarInt() }, null)
     }
 
-    private fun readSlotList(reader: ByteReader): List<Int> {
+    private fun readSlotList(reader: ByteReader): List<Ingredient> {
         val count = reader.readVarInt()
         if (count !in 0..MAX_CRAFTING_CELLS) throw RecipeFormatException("слотов: $count")
         return List(count) { readSlot(reader) }
@@ -270,8 +289,35 @@ enum class RecipeKind(val wire: Int) {
 }
 
 /**
- * Рецепт: результат и ингредиенты. Ингредиент −1 — это тег или пустая клетка,
- * то есть «подойдёт любой предмет из набора».
+ * Ингредиент рецепта: конкретный предмет или тег («любые доски»).
+ *
+ * В книге почти у каждого рецепта хотя бы одна клетка — тег, поэтому одного номера предмета
+ * мало: имя тега нужно, чтобы найти его содержимое в [ItemTags] и посчитать, что есть в
+ * инвентаре.
+ *
+ * У короткого набора сервер присылает не имя, а **явный список** предметов (доски, камни).
+ * Тогда [options] содержит все варианты, а [itemId] — первый из них: на иконке всё равно
+ * нужен один, но проверить надо любой из списка.
+ */
+data class Ingredient(val itemId: Int, val tag: String? = null, val options: List<Int> = emptyList()) {
+    /** Тег, а не предмет: подойдёт любой предмет из набора. */
+    val isTag: Boolean get() = tag != null
+
+    /** Клетка рецепта, в которой ничего не нужно. */
+    val isEmpty: Boolean get() = itemId == 0 && tag == null
+
+    /** Все подходящие предметы, если список был явным; для тега — пусто (их ищут в [ItemTags]). */
+    val all: Set<Int>
+        get() = if (tag == null && itemId > 0) options.ifEmpty { listOf(itemId) }.toSet() else emptySet()
+}
+
+/** Набор из `HolderSet`: либо явный список номеров, либо имя тега. */
+internal data class HolderSet(val ids: List<Int>, val tag: String?)
+
+/**
+ * Рецепт: результат и ингредиенты.
+ *
+ * У клетки-тега номер предмета −1: конкретный предмет не назван, подойдёт любой из набора.
  */
 data class Recipe(
     val id: Int,
@@ -280,7 +326,10 @@ data class Recipe(
     val height: Int,
     val result: Int,
     val resultCount: Int,
-    val ingredients: List<Int>,
+    /** Клетки состава: предмет или тег — см. [Ingredient]. */
+    val cells: List<Ingredient>,
+    /** Предмет-станция (верстак, печь, камнерез), у которой рецепт доступен; −1 — не известна. */
+    val station: Int = -1,
     val category: Int = -1,
     val group: Int = -1,
     val highlighted: Boolean = false,
@@ -288,6 +337,9 @@ data class Recipe(
     val requirements: Int = 0,
     val ticks: Int = 0,
 ) {
+    /** Номера предметов по клеткам: −1 там, где ингредиент — тег. */
+    val ingredients: List<Int> get() = cells.map { it.itemId }
+
     /** Рецепт пригоден к показу, только если результат — настоящий предмет. */
     val usable: Boolean get() = result > 0
 }

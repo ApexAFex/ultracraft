@@ -32,9 +32,14 @@ class RecipeOfflineProbeTest {
         book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, body)
 
         val usable = book.all().count { it.usable }
+        // Сколько рецептов можно проверить по инвентарю точно: у остальных часть состава —
+        // тег («любые доски»), и список предметов тега приходит другим пакетом.
+        val concrete = book.all().count { recipe ->
+            recipe.ingredients.isNotEmpty() && recipe.ingredients.all { it > 0 }
+        }
         println(
-            "боевой разбор: рецептов ${book.size}, из них с настоящим результатом $usable; " +
-                "категории ${book.countByCategory()}",
+            "боевой разбор: рецептов ${book.size}, из них с настоящим результатом $usable, " +
+                "без наборов в составе $concrete; категории ${book.countByCategory()}",
         )
         // Первые рецепты печатаем: по ним видно, те ли это предметы.
         for (recipe in book.all().take(3)) {

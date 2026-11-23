@@ -30,6 +30,8 @@ class Session internal constructor(
     effectTable: EffectTable = EffectTable.EMPTY,
     private val itemStats: ItemStats = ItemStats.EMPTY,
     private val menuTable: MenuTable = MenuTable.EMPTY,
+    /** Содержимое тегов предметов: приходит в фазе конфигурации, до создания сессии. */
+    val itemTags: ItemTags = ItemTags(),
 ) : Closeable {
 
     /** Табло сервера: цели и очки, выбранная боковая панель. */
@@ -209,6 +211,10 @@ class Session internal constructor(
                     if (trades?.containerId == id) trades = null
                 }
 
+                // Сервер не смог разложить рецепт: не хватает предметов или режим творческий.
+                // Тело не разбираем — важен сам отказ, о нём и сообщаем игроку.
+                Protocol777.Play.PLACE_GHOST_RECIPE -> ghostRecipes++
+
                 Protocol777.Play.SET_HEALTH,
                 Protocol777.Play.SET_EXPERIENCE,
                 Protocol777.Play.RESPAWN ->
@@ -242,6 +248,10 @@ class Session internal constructor(
                 // Книга рецептов: разбор строгий — при незнакомом виде описания книга
                 // остаётся пустой, но пакет не мешает остальным.
                 Protocol777.Play.RECIPE_BOOK_ADD -> recipes.onPacket(packet.id, packet.body)
+
+                // Содержимое тегов («что входит в любые доски»): без него состав рецепта
+                // с набором проверить нечем, и подсветка «можно скрафтить» была бы догадкой.
+                Protocol777.Play.UPDATE_TAGS -> itemTags.onPacket(packet.id, packet.body)
 
                 // Кто на ком едет. Если в списке пассажиров наш id — мы на транспорте:
                 // сервер двигает лодку или вагонетку сам, нам остаётся клавиши и камера.
@@ -432,6 +442,60 @@ class Session internal constructor(
         containerId: Int = container?.id ?: 0,
     ) {
         send(ContainerClicks.click(FORCE_FULL_STATE, menuSlot, button, input, containerId))
+    }
+
+    /** Имя открытого меню (`crafting`, `furnace`…); null — открыт только инвентарь игрока. */
+    val menuType: String? get() = container?.type
+
+    /**
+     * Сколько раз сервер отвечал «рецепт разложить нельзя».
+     *
+     * Так он отвечает, когда предметов не хватает: в выживании перекладывать нечего, и вместо
+     * раскладки приходит «призрачный» рецепт — картинка того, что нужно собрать. Счётчик нужен,
+     * чтобы экран сказал об отказе, а не делал вид, что крафт прошёл.
+     *
+     * В творческом режиме отказа нет: сервер выдаёт предметы сам, даже если в инвентаре пусто.
+     */
+    @Volatile
+    var ghostRecipes: Int = 0
+        private set
+
+    /**
+     * Сколько каждого предмета есть под рукой — из того, что видно в текущем меню.
+     *
+     * Пока открыт контейнер, слоты игрока приезжают в него, а не в [Inventory]: считать по
+     * инвентарю в этот момент значило бы видеть пустоту и врать про «не хватает».
+     */
+    fun craftCounts(): Map<Int, Int> =
+        Crafting.counts(container?.playerStacks() ?: inventory.storedStacks())
+
+    /** Проверка рецепта: чего не хватает, влезает ли в сетку и открыта ли станция. */
+    fun checkRecipe(recipe: Recipe): CraftCheck =
+        Crafting.check(recipe, craftCounts(), menuType, itemTags) { id -> inventory.nameById(id) }
+
+    /**
+     * «Разложи рецепт»: сервер сам перекладывает ингредиенты в сетку крафта.
+     *
+     * Номер окна обязателен: сервер сверяет его со своим и молча выходит при несовпадении,
+     * поэтому отправляем ровно то окно, которое открыто (0 — инвентарь игрока).
+     */
+    fun placeRecipe(displayId: Int, all: Boolean = false) {
+        send(Crafting.placeRecipe(container?.id ?: 0, displayId, all))
+    }
+
+    /**
+     * Крафт из книги в один клик: разложить и забрать результат.
+     *
+     * Два пакета подряд, и это не лишний: `place_recipe` только раскладывает ингредиенты, а
+     * вещь появляется в слоте результата. Забираем её переносом (shift-клик), иначе предмет
+     * так и останется в сетке. Сервер обрабатывает пакеты по порядку, поэтому сетка к моменту
+     * клика уже заполнена. У печи и камнереза забирать нечего — там вещь выдаётся сама.
+     */
+    fun craftFromBook(recipe: Recipe, all: Boolean = true) {
+        placeRecipe(recipe.id, all)
+        if (recipe.kind == RecipeKind.SHAPED || recipe.kind == RecipeKind.SHAPELESS) {
+            clickSlot(RESULT_MENU_SLOT, input = ContainerInput.QUICK_MOVE)
+        }
     }
 
     /**
@@ -766,6 +830,9 @@ class Session internal constructor(
 
         /** A menu state id that never matches, so every click is answered with the full menu. */
         const val FORCE_FULL_STATE = -1
+
+        /** Слот результата в меню крафта — и в инвентаре, и у верстака он нулевой. */
+        const val RESULT_MENU_SLOT = 0
     }
 }
 

@@ -1,5 +1,6 @@
 package mcplus.app.gl
 
+import mcplus.net.CraftCheck
 import mcplus.net.Recipe
 import mcplus.net.RecipeBook
 import mcplus.net.RecipeCategories
@@ -67,10 +68,19 @@ object RecipeBookScreen {
         val result = itemName(recipe.result) ?: "предмет ${recipe.result}"
         val lines = ArrayList<String>(2)
         lines += if (recipe.resultCount > 1) "$result ×${recipe.resultCount}" else result
-        val names = recipe.ingredients.filter { it > 0 }.map { itemName(it) ?: "предмет $it" }
+        val names = recipe.cells.filter { !it.isEmpty }.map { cell ->
+            val tag = cell.tag
+            if (tag != null) {
+                tagLabel(tag)
+            } else {
+                val base = itemName(cell.itemId) ?: "предмет ${cell.itemId}"
+                // Явный список вариантов: называем первый и говорим, что он не один.
+                if (cell.options.size > 1) "$base или ещё ${cell.options.size - 1}" else base
+            }
+        }
         when {
             names.isNotEmpty() -> lines += "Нужно: " + names.distinct().joinToString(", ")
-            recipe.ingredients.isNotEmpty() -> lines += "Нужно: любые подходящие предметы"
+            recipe.cells.isNotEmpty() -> lines += "Без ингредиентов"
             else -> lines += "Без ингредиентов"
         }
         if (recipe.kind == mcplus.net.RecipeKind.FURNACE) {
@@ -79,6 +89,84 @@ object RecipeBookScreen {
         return lines
     }
 
+    /**
+     * Как назвать тег в подсказке.
+     *
+     * Имя тега приходит по-английски (`minecraft:planks`), а «доски» понятнее. Переводим
+     * самые частые наборы, остальные показываем как есть — врать про перевод хуже, чем
+     * показать имя.
+     */
+    fun tagLabel(tag: String): String {
+        val short = tag.substringAfter(':')
+        return TAG_LABELS[short] ?: "набор $short"
+    }
+
+    /**
+     * Строка «можно ли собрать прямо сейчас» — по проверке [mcplus.net.CraftCheck].
+     *
+     * Возвращает null, когда рецепт показать нечем (без результата). Порядок причин важен:
+     * сначала «чего не хватает», потом «где крафтить» — так игрок видит ближайшее действие.
+     */
+    fun craftLine(check: CraftCheck, itemName: (Int) -> String? = { null }): String? {
+        if (check.blocked != null) return null
+        if (check.missing.isNotEmpty()) {
+            val parts = check.missing.take(3).map { missing ->
+                val tag = missing.tag
+                val name = if (tag != null) {
+                    tagLabel(tag)
+                } else {
+                    val base = itemName(missing.itemId) ?: "предмет ${missing.itemId}"
+                    if (missing.variants > 1) "$base или ещё ${missing.variants - 1}" else base
+                }
+                "$name ×${missing.need} (есть ${missing.have})"
+            }
+            val tail = if (check.missing.size > 3) ", ещё ${check.missing.size - 3}" else ""
+            return "Не хватает: " + parts.joinToString(", ") + tail
+        }
+        if (!check.gridAvailable) return "Крафт только в инвентаре или у верстака"
+        if (check.needsStation) {
+            val station = check.stationName ?: "станок"
+            return "Нужен станок: $station"
+        }
+        if (check.needsBiggerGrid) return "Нужен верстак: сетка 3×3"
+        if (check.unknown > 0) {
+            return "Известное есть, набор проверит сервер — ЛКМ"
+        }
+        return "Можно скрафтить — ЛКМ"
+    }
+
+    /**
+     * Цвет подсветки иконки: зелёный — точно собирается, оранжевый — известное набрано, но
+     * часть состава это набор («любые доски»), и правду скажет только сервер. null — нельзя.
+     */
+    fun highlightColor(check: CraftCheck): Int? = when {
+        check.craftable -> 0x3FA34D
+        check.maybeCraftable -> 0xD9A05A
+        else -> null
+    }
+
     /** Заголовок вкладки с числом рецептов: сразу видно, где что искать. */
     fun tabTitle(category: Int, count: Int): String = "${RecipeCategories.titleOf(category)} $count"
+
+    /**
+     * Частые теги по-русски. Полный перевод тегов не нужен: в подсказке важно понять, что
+     * искать, а не как называется набор в датапаке.
+     */
+    private val TAG_LABELS = mapOf(
+        "planks" to "любые доски",
+        "logs" to "любое бревно",
+        "logs_that_burn" to "любое бревно",
+        "wooden_slabs" to "любая деревянная плита",
+        "wooden_stairs" to "любая деревянная лестница",
+        "wooden_buttons" to "любая деревянная кнопка",
+        "wooden_pressure_plates" to "любая деревянная плита-кнопка",
+        "wool" to "любая шерсть",
+        "coals" to "уголь",
+        "stone_crafting_materials" to "любой камень",
+        "stone_bricks" to "любой каменный кирпич",
+        "sand" to "любой песок",
+        "glass" to "любое стекло",
+        "is_fuel" to "любое топливо",
+        "furnace_fuel" to "любое топливо",
+    )
 }

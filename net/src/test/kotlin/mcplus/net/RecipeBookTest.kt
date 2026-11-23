@@ -5,6 +5,7 @@ import mcplus.protocol.ByteWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -60,10 +61,14 @@ class RecipeBookTest {
         val recipe = book.all().single()
         assertEquals(21, recipe.result, "результат — доска")
         assertEquals(4, recipe.resultCount)
-        assertEquals(listOf(-1), recipe.ingredients, "тег остаётся неизвестным номером")
+        // Набор с явным списком — это конкретный предмет, а не тег: так сервер и присылает
+        // «любые доски», когда список короткий.
+        assertEquals(listOf(20), recipe.ingredients, "явный список набора читается как предмет")
+        assertNull(recipe.cells.single().tag)
         assertEquals(RecipeKind.SHAPELESS, recipe.kind)
         assertEquals(3, recipe.category)
         assertEquals(-1, recipe.group)
+        assertEquals(-1, recipe.station, "станция — пустой слот, значит её нет")
         assertTrue(recipe.usable)
     }
 
@@ -95,6 +100,7 @@ class RecipeBookTest {
         assertEquals(2, recipe.height)
         assertEquals(listOf(20, -1, -1, 20), recipe.ingredients)
         assertEquals(23, recipe.result)
+        assertEquals(405, recipe.station, "станция рецепта — верстак")
         assertEquals(5, recipe.group)
         assertEquals(2, recipe.requirements)
         assertTrue(recipe.highlighted, "флаг подсветки — второй бит")
@@ -163,8 +169,31 @@ class RecipeBookTest {
         assertEquals(3, book.all().single().id)
     }
 
-    /** Категории считаются по рецептам: по ним рисуются вкладки книги. */
+    /** Тег в составе приходит именем, а не номером: без имени его содержимое не найти. */
     @Test
+    fun `a tag ingredient keeps the name it came with`() {
+        val book = RecipeBook()
+        val writer = ByteWriter()
+        writer.writeVarInt(1)
+        writer.writeVarInt(11)
+        writer.writeVarInt(0)          // shapeless
+        writer.writeVarInt(1)          // одна клетка
+        writer.writeVarInt(6).writeVarInt(0).writeString("minecraft:planks")
+        writer.writeVarInt(5)          // результат
+        writer.writeVarInt(21).writeVarInt(4).writeVarInt(0).writeVarInt(0)
+        writer.writeVarInt(0)          // станции нет
+        writer.entryTail(category = 0)
+        writer.writeBoolean(false)
+
+        book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, writer.toByteArray())
+
+        val recipe = book.all().single()
+        assertEquals(listOf(-1), recipe.ingredients, "у тега нет номера предмета")
+        assertEquals("minecraft:planks", recipe.cells.single().tag)
+        assertTrue(recipe.cells.single().isTag)
+    }
+
+    /** Категории считаются по рецептам: по ним рисуются вкладки книги. */    @Test
     fun `recipes are counted per category`() {
         fun packet(id: Int, category: Int): ByteArray {
             val writer = ByteWriter()

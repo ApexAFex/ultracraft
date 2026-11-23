@@ -1,9 +1,13 @@
 package mcplus.app.gl
 
+import mcplus.net.CraftCheck
+import mcplus.net.Ingredient
+import mcplus.net.Missing
 import mcplus.net.Recipe
 import mcplus.net.RecipeKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -14,8 +18,12 @@ import kotlin.test.assertTrue
  */
 class RecipeBookScreenTest {
 
-    private fun recipe(id: Int, result: Int, count: Int = 1, ingredients: List<Int> = listOf(4)) =
-        Recipe(id, RecipeKind.SHAPED, 3, 3, result, count, ingredients, category = 0)
+    private fun recipe(
+        id: Int,
+        result: Int,
+        count: Int = 1,
+        cells: List<Ingredient> = listOf(Ingredient(4)),
+    ) = Recipe(id, RecipeKind.SHAPED, 3, 3, result, count, cells, category = 0)
 
     @Test
     fun `pages split the list and clamp to the last one`() {
@@ -61,18 +69,24 @@ class RecipeBookScreenTest {
     @Test
     fun `the tooltip says what comes out and what is needed`() {
         val names = mapOf(20 to "Дубовые доски", 4 to "Бревно")
-        val stack = recipe(1, 20, count = 4, ingredients = listOf(4, 4, 4))
+        val stack = recipe(1, 20, count = 4, cells = listOf(Ingredient(4), Ingredient(4), Ingredient(4)))
         val lines = RecipeBookScreen.tooltip(stack) { names[it] }
         assertEquals("Дубовые доски ×4", lines.first())
         assertEquals("Нужно: Бревно", lines[1], "одинаковые ингредиенты не повторяются")
     }
 
+    /** Набор в составе называется по-русски, если он частый, и «набор …» иначе. */
     @Test
-    fun `a recipe of tags says that any suitable item will do`() {
-        val unknown = recipe(2, 20, ingredients = listOf(-1, -1))
+    fun `a recipe of tags names the sets`() {
+        val unknown = recipe(
+            2,
+            20,
+            cells = listOf(Ingredient(-1, "minecraft:planks"), Ingredient(-1, "minecraft:logs")),
+        )
         val lines = RecipeBookScreen.tooltip(unknown) { null }
         assertEquals("предмет 20", lines.first())
-        assertEquals("Нужно: любые подходящие предметы", lines[1])
+        assertEquals("Нужно: любые доски, любое бревно", lines[1])
+        assertEquals("набор crafting_station", RecipeBookScreen.tagLabel("minecraft:crafting_station"))
     }
 
     @Test
@@ -93,5 +107,45 @@ class RecipeBookScreenTest {
         assertEquals(3, RecipeBookScreen.visibleRows(300), "маленькое окно — минимум 3")
         assertEquals(10, RecipeBookScreen.visibleRows(1600), "большое — максимум 10")
         assertTrue(RecipeBookScreen.perPage(900) >= RecipeBookScreen.COLUMNS * 3)
+    }
+
+    /** Подсказка про крафт: сначала «чего не хватает», потом «где крафтить». */
+    @Test
+    fun `the craft line names what is missing first`() {
+        val check = CraftCheck(missing = listOf(Missing(21, 2, 1), Missing(22, 1, 0)))
+        val line = RecipeBookScreen.craftLine(check) { mapOf(21 to "Палка", 22 to "Железо")[it] }
+        assertEquals("Не хватает: Палка ×2 (есть 1), Железо ×1 (есть 0)", line)
+        assertNull(RecipeBookScreen.highlightColor(check), "не хватает — не подсвечиваем")
+    }
+
+    @Test
+    fun `a craftable recipe says that a click will do it`() {
+        val line = RecipeBookScreen.craftLine(CraftCheck()) { null }
+        assertEquals("Можно скрафтить — ЛКМ", line)
+        assertEquals(0x3FA34D, RecipeBookScreen.highlightColor(CraftCheck()), "зелёный — точно можно")
+    }
+
+    @Test
+    fun `a full inventory of items still needs the right station`() {
+        val table = CraftCheck(needsBiggerGrid = true)
+        assertEquals("Нужен верстак: сетка 3×3", RecipeBookScreen.craftLine(table) { null })
+        assertNull(RecipeBookScreen.highlightColor(table))
+
+        val furnace = CraftCheck(needsStation = true, stationName = "furnace")
+        assertEquals("Нужен станок: furnace", RecipeBookScreen.craftLine(furnace) { null })
+    }
+
+    @Test
+    fun `a chest screen explains that crafting happens elsewhere`() {
+        val line = RecipeBookScreen.craftLine(CraftCheck(gridAvailable = false)) { null }
+        assertEquals("Крафт только в инвентаре или у верстака", line)
+    }
+
+    /** Тег-ингредиент не запрещает клик, но зелёным такой рецепт не красится. */
+    @Test
+    fun `tags make the recipe a maybe, not a sure thing`() {
+        val check = CraftCheck(unknown = 2)
+        assertEquals("Известное есть, набор проверит сервер — ЛКМ", RecipeBookScreen.craftLine(check) { null })
+        assertEquals(0xD9A05A, RecipeBookScreen.highlightColor(check), "оранжевый — проверит сервер")
     }
 }

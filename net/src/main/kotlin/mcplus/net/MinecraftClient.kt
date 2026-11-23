@@ -65,15 +65,21 @@ class MinecraftClient(
         log("соединение с $host:$port установлено")
 
         val connection = Connection(socket)
+        // Наборы приходят в фазе конфигурации, до создания сессии: заводим их заранее и
+        // отдаём сессии готовыми, иначе они потеряются между входом и игрой.
+        val tags = ItemTags()
         return try {
-            Session(connection, handshakeAndLogin(connection), log, itemTable, effectTable, itemStats, menuTable)
+            Session(
+                connection, handshakeAndLogin(connection, tags), log, itemTable, effectTable,
+                itemStats, menuTable, tags,
+            )
         } catch (t: Throwable) {
             connection.close()
             throw t
         }
     }
 
-    private fun handshakeAndLogin(connection: Connection): JoinResult {
+    private fun handshakeAndLogin(connection: Connection, tags: ItemTags): JoinResult {
         connection.send(Packet(Protocol777.Handshake.SERVERBOUND_HANDSHAKE, handshake()))
         connection.send(Packet(Protocol777.Login.START, loginStart()))
 
@@ -132,6 +138,9 @@ class MinecraftClient(
 
                     Protocol777.Configuration.REGISTRY_DATA ->
                         readRegistryData(packet.body, registries)
+
+                    // Содержимое тегов: единственный момент, когда сервер его присылает.
+                    Protocol777.Configuration.UPDATE_TAGS -> tags.onPacket(packet.id, packet.body)
 
                     Protocol777.Configuration.FEATURE_FLAGS ->
                         featureFlags = readFeatureFlags(ByteReader(packet.body))

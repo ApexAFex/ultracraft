@@ -127,12 +127,23 @@ class Inventory(
     fun nameOf(stack: Stack?): String? =
         stack?.takeIf { it.isKnown }?.let { items.nameOf(it.itemId) }
 
+    /** Имя предмета по номеру: нужно там, где стопки нет — например, у станции рецепта. */
+    fun nameById(itemId: Int): String? = if (itemId > 0) items.nameOf(itemId) else null
+
     /** Filled inventory slots in slot order; handy for the console and for tests. */
     fun contents(): List<Pair<Int, Stack>> =
         slots.entries
             .filter { !it.value.isEmpty }
             .mapNotNull { (menuSlot, stack) -> inventorySlotOfMenu(menuSlot)?.let { it to stack } }
             .sortedBy { it.first }
+
+    /**
+     * Стопки, из которых берутся ингредиенты крафта: основной инвентарь и хотбар.
+     *
+     * Это меню-слоты 9..44 — броня, сетка крафта и рука в счёт не идут. Когда открыт контейнер,
+     * слоты игрока приходят в [OpenContainer], и считать нужно по нему — см. Session.
+     */
+    fun storedStacks(): List<Stack?> = (MAIN_MENU_START..HOTBAR_MENU_END).map { slots[it] }
 
     /**
      * Надетое: шлем, нагрудник, штаны, ботинки — в этом порядке.
@@ -278,6 +289,12 @@ class Inventory(
         const val UNKNOWN_ITEM = -1
 
         const val HOTBAR_MENU_START = 36
+
+        /** Последний слот хотбара. */
+        const val HOTBAR_MENU_END = 44
+
+        /** Первый слот основного инвентаря. */
+        const val MAIN_MENU_START = 9
 
         /** Меню-слоты надетой брони: шлем, нагрудник, штаны, ботинки. */
         val ARMOUR_MENU_SLOTS = 5..8
@@ -542,12 +559,6 @@ private fun skipFireworkExplosion(reader: ByteReader) {
     reader.readBoolean()
 }
 
-/**
- * Пропустить вложенный стек без компонентов (`ItemStackTemplate`: предмет, количество, патч).
- *
- * Так читаются заряды арбалета и содержимое мешка: вложенные компоненты нам не нужны, но
- * их длина должна быть прочитана, иначе поедет весь патч.
- */
 /**
  * Пропустить вложенную стопку (`ItemStackTemplate`): предмет, количество и патч компонентов.
  *

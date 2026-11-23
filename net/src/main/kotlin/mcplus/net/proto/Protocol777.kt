@@ -50,6 +50,14 @@ object Protocol777 {
         const val REGISTRY_DATA: Int = 0x07
         const val FEATURE_FLAGS: Int = 0x0D
         const val KNOWN_PACKS: Int = 0x0F
+        /**
+         * Наборы (теги) реестров: какие предметы входят в «любые доски».
+         *
+         * Приходит в **фазе конфигурации**, до входа в мир, — поэтому его ловит
+         * [mcplus.net.MinecraftClient], а не игровая сессия. Номер взят из самой игры
+         * (`ConfigurationProtocols.CLIENTBOUND`, 14-я запись).
+         */
+        const val UPDATE_TAGS: Int = 0x0E
 
         // serverbound
         const val CLIENT_INFORMATION: Int = 0x00
@@ -142,6 +150,11 @@ object Protocol777 {
         const val SET_TIME: Int = 0x73
         const val LIGHT_UPDATE: Int = 0x31
         const val UPDATE_MOB_EFFECT: Int = 0x87
+        /**
+         * Наборы (теги) реестров: какие предметы входят в «любые доски» и подобное.
+         * Без этого пакета состав рецепта с тегом проверить нечем.
+         */
+        const val UPDATE_TAGS: Int = 0x89
         const val REMOVE_MOB_EFFECT: Int = 0x4F
         const val SET_ENTITY_DATA: Int = 0x65
         const val SET_EQUIPMENT: Int = 0x68
@@ -150,6 +163,11 @@ object Protocol777 {
         const val AWARD_STATS: Int = 0x03
         /** Товары жителя: список сделок с ценами и количеством использований. */
         const val MERCHANT_OFFERS: Int = 0x35
+        /**
+         * Ответ на «разложи рецепт», когда разложить нельзя: не хватает предметов.
+         * Тело: номер окна и описание рецепта — нам достаточно самого факта.
+         */
+        const val PLACE_GHOST_RECIPE: Int = 0x40
 
         // serverbound
         const val CONFIRM_TELEPORT: Int = 0x00
@@ -182,6 +200,13 @@ object Protocol777 {
         const val USE_ITEM: Int = 0x43
         /** Выбор сделки в экране жителя: номер строки списка. */
         const val SELECT_TRADE: Int = 0x34
+        /**
+         * «Разложи рецепт»: сервер сам перекладывает ингредиенты из инвентаря в сетку крафта.
+         *
+         * Тело: номер окна (VarInt), номер рецепта из книги (VarInt) и признак «на всю стопку».
+         * Номер рецепта — тот же `id`, что пришёл в записи книги, а не номер предмета.
+         */
+        const val PLACE_RECIPE: Int = 0x27
         /** Взаимодействие с сущностью: ПКМ по жителю открывает его экран. */
         const val INTERACT: Int = 0x1A
 

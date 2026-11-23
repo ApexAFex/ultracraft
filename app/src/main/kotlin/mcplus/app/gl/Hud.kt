@@ -390,7 +390,10 @@ class Hud(
     /**
      * Книга рецептов: вкладки категорий слева и сетка результатов справа.
      *
-     * @return прямоугольники вкладок — по ним кликает вызывающий.
+     * Зелёная рамка — рецепт, который собирается прямо сейчас: [craftCheck] считается по
+     * инвентарю, поэтому подсветка честная, а не «в книге вообще есть».
+     *
+     * @return прямоугольники вкладок и иконок — по ним кликает вызывающий.
      */
     fun drawRecipeBookScreen(
         tabs: List<Int>,
@@ -402,8 +405,10 @@ class Hud(
         iconLayer: (String) -> Int,
         mouseX: Double,
         mouseY: Double,
-    ): List<HudRect> {
-        val text = this.text ?: return emptyList()
+        craftCheck: (mcplus.net.Recipe) -> mcplus.net.CraftCheck = { mcplus.net.CraftCheck() },
+        notice: String? = null,
+    ): RecipeBookLayout {
+        val text = this.text ?: return RecipeBookLayout(emptyList(), emptyList())
         val s = HudLayout.scale(height).toFloat()
         renderer.begin()
         renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x0A0806, 0.92f)
@@ -453,6 +458,8 @@ class Hud(
         )
         val icons = ArrayList<Pair<HudRect, Int>>(shown.size)
         val slots = ArrayList<HudRect>(shown.size)
+        val hits = ArrayList<Pair<HudRect, mcplus.net.Recipe>>(shown.size)
+        val ready = ArrayList<Pair<HudRect, Int>>(shown.size)
         for ((index, recipe) in shown.withIndex()) {
             val (dx, dy) = RecipeBookScreen.cellOrigin(index)
             val rect = HudRect(
@@ -460,12 +467,10 @@ class Hud(
                 RecipeBookScreen.ICON * s, RecipeBookScreen.ICON * s,
             )
             // Тёмная подложка слота: без неё иконки сливаются в сплошное пятно.
-            slots += HudRect(rect.x - 2f * s, rect.y - 2f * s, rect.width + 4f * s, rect.height + 4f * s)
-            if (index == hovered) {
-                renderer.begin()
-                renderer.rect(rect, 0xFFE7A0, 0.35f)
-                renderer.draw()
-            }
+            val slot = HudRect(rect.x - 2f * s, rect.y - 2f * s, rect.width + 4f * s, rect.height + 4f * s)
+            slots += slot
+            hits += rect to recipe
+            RecipeBookScreen.highlightColor(craftCheck(recipe))?.let { ready += slot to it }
             val name = itemName(recipe.result)
             val layer = if (name != null) iconLayer(name) else 0
             if (layer > 0) icons += rect to layer
@@ -475,19 +480,44 @@ class Hud(
             for (rect in slots) renderer.rect(rect, 0x140D08, 0.9f)
             renderer.draw()
         }
+        // Подложка у того, что собирается: зелёная — точно, оранжевая — набор проверит сервер.
+        if (ready.isNotEmpty()) {
+            renderer.begin()
+            for ((rect, colour) in ready) renderer.rect(rect, colour, 0.42f)
+            renderer.draw()
+        }
+        shown.getOrNull(hovered)?.let { _ ->
+            val (dx, dy) = RecipeBookScreen.cellOrigin(hovered)
+            renderer.begin()
+            renderer.rect(
+                HudRect(
+                    gridX + dx - 2f * s, gridY + dy - 2f * s,
+                    (RecipeBookScreen.ICON + 4f) * s, (RecipeBookScreen.ICON + 4f) * s,
+                ),
+                0xFFE7A0, 0.35f,
+            )
+            renderer.draw()
+        }
         if (icons.isNotEmpty()) {
             renderer.begin()
             for ((rect, layer) in icons) renderer.icon(rect, layer)
             renderer.draw()
         }
 
-        val footerY = panel.bottom - 30f * s
+        val footerY = panel.bottom - 42f * s
         val hoveredRecipe = shown.getOrNull(hovered)
         if (hoveredRecipe != null) {
             var lineY = footerY
             for (line in RecipeBookScreen.tooltip(hoveredRecipe, itemName)) {
                 labels += TextRenderer.ScreenLabel(gridX, lineY, line, s * 0.9f)
                 lineY += 12f * s
+            }
+            val check = craftCheck(hoveredRecipe)
+            RecipeBookScreen.craftLine(check, itemName)?.let { line ->
+                labels += TextRenderer.ScreenLabel(
+                    gridX, lineY, line, s * 0.9f,
+                    if (check.craftable) 0x8FE06A else 0xD9A05A,
+                )
             }
         } else {
             labels += TextRenderer.ScreenLabel(
@@ -496,10 +526,13 @@ class Hud(
         }
         labels += TextRenderer.ScreenLabel(
             panel.x + 8f * s, panel.bottom - 12f * s,
-            "B — закрыть, ←/→ — категория, колесо — страница", s * 0.75f, 0x8A7A68,
+            "B — закрыть, ←/→ — категория, колесо — страница, ЛКМ — скрафтить", s * 0.75f, 0x8A7A68,
         )
+        if (notice != null) {
+            labels += TextRenderer.ScreenLabel(panel.x + 8f * s, panel.bottom - 26f * s, notice, s * 0.8f, 0xE08A5A)
+        }
         text.drawScreen(labels)
-        return tabRects
+        return RecipeBookLayout(tabRects, hits)
     }
 
     /**
