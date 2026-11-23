@@ -181,6 +181,14 @@ class TextRenderer(
         val scale: Float,
         /** Цвет букв, 0xRRGGBB. Белый по умолчанию. */
         val color: Int = 0xFFFFFF,
+        /**
+         * Рисовать ли тень под буквами.
+         *
+         * На тёмной подложке (подсказка, чат) тень помогает читать светлый текст, а на
+         * светлой бумаге книги тёмные буквы с тенью того же цвета сливаются в кашу —
+         * поэтому там она выключается, как в ванильной книге.
+         */
+        val shadow: Boolean = true,
     )
 
     /** Ширина строки в пикселях экрана при данном масштабе. */
@@ -192,6 +200,10 @@ class TextRenderer(
      * Тень рисуется отдельным проходом со сдвигом в один пиксель шрифта — как в ванили:
      * белые буквы на светлом небе без неё не читаются. Подписи разных цветов идут
      * отдельными проходами, иначе одна строка покрасила бы весь список.
+     *
+     * Позиции букв округляются до целых пикселей экрана: при дробном масштабе (1.5, 2.55)
+     * глифы иначе ложатся на полпикселя, и NEAREST-выборка превращает буквы в «жирные»
+     * и рваные. Сдвиг тени тоже целый — иначе она размазывается по краю букв.
      */
     fun drawScreen(labels: List<ScreenLabel>, alpha: Float = 1f) {
         if (labels.isEmpty()) return
@@ -211,31 +223,42 @@ class TextRenderer(
         var start = 0
         while (start < labels.size) {
             val color = labels[start].color
+            val shadowed = labels[start].shadow
             var end = start
-            while (end < labels.size && labels[end].color == color) end++
+            while (end < labels.size && labels[end].color == color && labels[end].shadow == shadowed) end++
             val run = labels.subList(start, end)
 
             var characters = 0
             for (label in run) characters += label.text.length
             val glyphs = FloatArrayBuilder(characters * 6 * 5)
-            val shadows = FloatArrayBuilder(characters * 6 * 5)
+            val shadows = FloatArrayBuilder(if (shadowed) characters * 6 * 5 else 0)
             for (label in run) {
-                var pen = label.x
+                val shadowOffset = kotlin.math.max(1f, kotlin.math.round(label.scale))
+                val baseY = kotlin.math.round(label.y)
+                var rawPen = label.x
                 val glyphHeight = GLYPH_PIXELS * label.scale
                 for (char in label.text) {
                     val glyphWidth = font.glyphWidth(char) * label.scale
+                    val pen = kotlin.math.round(rawPen)
                     if (glyphWidth > 0f) {
-                        emitScreen(shadows, pen + label.scale, label.y + label.scale, glyphWidth, glyphHeight, font.uv(char))
-                        emitScreen(glyphs, pen, label.y, glyphWidth, glyphHeight, font.uv(char))
+                        if (shadowed) {
+                            emitScreen(
+                                shadows, pen + shadowOffset, baseY + shadowOffset,
+                                glyphWidth, glyphHeight, font.uv(char),
+                            )
+                        }
+                        emitScreen(glyphs, pen, baseY, glyphWidth, glyphHeight, font.uv(char))
                     }
-                    pen += font.advance(char) * label.scale
+                    rawPen += font.advance(char) * label.scale
                 }
             }
 
             val red = ((color shr 16) and 0xFF) / 255f
             val green = ((color shr 8) and 0xFF) / 255f
             val blue = (color and 0xFF) / 255f
-            drawArray(shadows.toArray(), red * 0.25f, green * 0.25f, blue * 0.25f, alpha, textured = true)
+            if (shadowed) {
+                drawArray(shadows.toArray(), red * 0.25f, green * 0.25f, blue * 0.25f, alpha, textured = true)
+            }
             drawArray(glyphs.toArray(), red, green, blue, alpha, textured = true)
             start = end
         }

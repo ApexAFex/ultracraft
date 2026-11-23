@@ -418,21 +418,21 @@ class Hud(
         renderer.draw()
 
         val labels = ArrayList<TextRenderer.ScreenLabel>()
-        labels += TextRenderer.ScreenLabel(panel.x + 10f * s, panel.y + 8f * s, title, s, 0x3A2415)
+        labels += TextRenderer.ScreenLabel(panel.x + 10f * s, panel.y + 8f * s, title, s, 0x3A2415, shadow = false)
         author?.let {
             labels += TextRenderer.ScreenLabel(
-                panel.x + 10f * s, panel.y + 20f * s, "автор $it", s * 0.8f, 0x6B4A2A,
+                panel.x + 10f * s, panel.y + 20f * s, "автор $it", s * 0.8f, 0x6B4A2A, shadow = false,
             )
         }
         var y = panel.y + 34f * s
         for (line in lines) {
-            labels += TextRenderer.ScreenLabel(panel.x + 10f * s, y, line, s * 0.85f, 0x2A1B10)
+            labels += TextRenderer.ScreenLabel(panel.x + 10f * s, y, line, s * 0.85f, 0x2A1B10, shadow = false)
             y += 10f * s
         }
         labels += TextRenderer.ScreenLabel(
             panel.x + 10f * s, panel.bottom - 14f * s,
             "${index + 1}/$total   клик или стрелки влево/вправо, Esc — закрыть",
-            s * 0.7f, 0x6B4A2A,
+            s * 0.7f, 0x6B4A2A, shadow = false,
         )
         text.drawScreen(labels)
     }
@@ -1361,7 +1361,7 @@ class Hud(
     fun drawTooltip(lines: List<Pair<String, Int>>, mouseX: Float, mouseY: Float) {
         val text = this.text ?: return
         if (lines.isEmpty()) return
-        val scale = 1.5f
+        val scale = 2f
         val textWidth = lines.maxOf { text.textWidth(it.first, scale) }
         val textHeight = 9f * scale
         val total = textHeight * lines.size + 1f * (lines.size - 1)
