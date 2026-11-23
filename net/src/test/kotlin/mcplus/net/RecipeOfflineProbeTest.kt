@@ -3,14 +3,16 @@ package mcplus.net
 import mcplus.net.proto.Protocol777
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Разбор сохранённого пакета рецептов **боевым** кодом, без копии парсера.
  *
  * Клиент пишет `screenshots/recipes-packet.bin` при сбое разбора. Тест скармливает эти байты
- * настоящему [RecipeBook] и печатает, сколько рецептов удалось прочитать и где сбой. Так
- * формат подбирается за секунды, а инструмент не может разойтись с боевым кодом: здесь нет
- * второй реализации разбора, только вызов первой.
+ * настоящему [RecipeBook] и печатает, сколько рецептов удалось прочитать, сколько из них с
+ * настоящим результатом и как они разложены по категориям. Так формат виден за секунды, а
+ * инструмент не может разойтись с боевым кодом: здесь нет второй реализации разбора.
  */
 class RecipeOfflineProbeTest {
 
@@ -26,23 +28,28 @@ class RecipeOfflineProbeTest {
             println("пакета рецептов нет — замер пропущен")
             return
         }
-        for (extra in 0..2) {
-            System.setProperty("mcplus.tagExtra", extra.toString())
-            val book = RecipeBook()
-            book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, body)
-            println("довесок тега $extra → рецептов ${book.size}")
-        }
-        System.setProperty("mcplus.tagExtra", "0")
         val book = RecipeBook()
         book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, body)
-        val withResult = book.all().count { it.result > 0 }
+
+        val usable = book.all().count { it.usable }
         println(
-            "боевой разбор: рецептов ${book.size}, из них с настоящим результатом $withResult " +
-                "(правильная раскладка даст 136 и все с результатом)",
+            "боевой разбор: рецептов ${book.size}, из них с настоящим результатом $usable; " +
+                "категории ${book.countByCategory()}",
         )
-        // Первые разобранные рецепты печатаем: по ним видно, те ли это предметы.
+        // Первые рецепты печатаем: по ним видно, те ли это предметы.
         for (recipe in book.all().take(3)) {
-            println("  рецепт ${recipe.id}: результат ${recipe.result}, ингредиенты ${recipe.ingredients}")
+            println(
+                "  рецепт ${recipe.id}: ${recipe.kind} ${recipe.width}×${recipe.height}, " +
+                    "результат ${recipe.result}×${recipe.resultCount}, " +
+                    "ингредиенты ${recipe.ingredients}, категория ${recipe.category}",
+            )
         }
+
+        // Пакет снят с настоящего сервера, в нём 136 рецептов, и у каждого есть результат.
+        assertEquals(136, book.size, "рецептов в пакете")
+        assertEquals(136, usable, "у каждого рецепта настоящий результат")
+        assertTrue(book.all().all { it.resultCount in 1..64 }, "количество в стопке правдоподобное")
+        assertTrue(book.all().all { it.ingredients.size <= 9 }, "клеток в рецепте не больше девяти")
+        assertTrue(book.all().any { it.kind == RecipeKind.SHAPED }, "есть рецепты с формой")
     }
 }

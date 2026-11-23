@@ -6,16 +6,30 @@ import mcplus.protocol.ByteReader
 /**
  * Книга рецептов: что можно скрафтить и из чего.
  *
- * Сервер присылает список описаний (`recipe_book_add`), где каждый рецепт — это полиморфное
- * `RecipeDisplay`, а внутри — `SlotDisplay` (предмет, стек, тег, набор вариантов). Номера
- * типов идут по порядку регистрации в игре:
- * `RecipeDisplay`: 0 shapeless, 1 shaped, 2 furnace, 3 stonecutter, 4 smithing;
- * `SlotDisplay`: 0 empty, 1 any_fuel, 2 with_any_potion, 3 only_with_component, 4 item,
- * 5 item_stack, 6 tag, 7 dyed, 8 smithing_trim, 9 with_remainder, 10 composite.
+ * Сервер присылает список описаний (`recipe_book_add`). Раскладка снята с самого сервера 26.3
+ * (`ClientboundRecipeBookAddPacket`, `RecipeDisplayEntry` и `net.minecraft...display.*`), а не
+ * угадана: запись — это
+ * `id: VarInt`, `описание`, `группа: необязательный VarInt`, `категория: VarInt`,
+ * `состав: необязательный список Ingredient`, `флаги: байт`; в конце пакета — `replace: Bool`.
  *
- * Разбор сознательно строгий: если встретился тип, формат которого мы не знаем точно,
- * бросаем исключение и не показываем книгу вовсе. Так лучше, чем показать половину рецептов
- * со сдвинутыми предметами: пакет рецептов — один, и ошибка в одном типе портит весь список.
+ * Описание (`RecipeDisplay`) — тип и тело:
+ * 0 shapeless — список слотов, результат, станция;
+ * 1 shaped — ширина, высота, список слотов, результат, станция;
+ * 2 furnace — ингредиент, топливо, результат, станция, тики, опыт;
+ * 3 stonecutter — вход, результат, станция;
+ * 4 smithing — шаблон, основа, добавка, результат, станция.
+ *
+ * Слот (`SlotDisplay`) — тип и тело:
+ * 0 empty, 1 any_fuel — пусто; 2 with_any_potion — слот; 3 only_with_component — слот и
+ * номер компонента; 4 item — номер предмета; 5 item_stack — предмет, количество и патч
+ * компонентов (два числа: добавленные и убранные); 6 tag — набор: число, и если 0, то имя
+ * тега строкой, иначе `число−1` номеров предметов; 7 dyed — два слота;
+ * 8 smithing_trim — два слота и номер узора; 9 with_remainder — два слота;
+ * 10 composite — число и столько слотов.
+ *
+ * Разбор строгий: встретили неизвестный тип — бросаем исключение и не показываем книгу вовсе.
+ * Так лучше, чем показать половину рецептов со сдвинутыми предметами: пакет один, и ошибка
+ * в одном типе портит весь список.
  */
 class RecipeBook {
 
@@ -24,6 +38,12 @@ class RecipeBook {
     val size: Int get() = recipes.size
 
     fun all(): List<Recipe> = recipes.values.toList()
+
+    /** Сколько рецептов в каждой категории — так рисуются вкладки книги. */
+    fun countByCategory(): Map<Int, Int> = recipes.values.groupingBy { it.category }.eachCount()
+
+    /** Рецепты одной категории: их показывает выбранная вкладка. */
+    fun inCategory(category: Int): List<Recipe> = recipes.values.filter { it.category == category }
 
     fun clear() {
         recipes.clear()
@@ -34,10 +54,10 @@ class RecipeBook {
         val reader = ByteReader(body)
         var parsedRecipes = 0
         runCatching {
-            read(body, reader) { parsedRecipes = it }
+            read(reader) { parsedRecipes = it }
         }.onFailure {
-            // Печатаем место, где разбор сломался, сколько записей успело разобраться и
-            // окно байтов вокруг: по ним видно, какое поле пропущено, без прогонов вслепую.
+            // Печатаем место сбоя, сколько записей успело разобраться и окно байтов вокруг:
+            // по ним видно, какое поле пропущено, без прогонов вслепую.
             val at = (body.size - reader.remaining).coerceIn(0, body.size)
             val from = (at - 8).coerceAtLeast(0)
             val to = (at + 24).coerceAtMost(body.size)
@@ -46,11 +66,10 @@ class RecipeBook {
                 "Рецепты: разбор сломался на байте $at из ${body.size} после $parsedRecipes записей; " +
                     "окно [$from..$to): $window; причина: ${it.message}",
             )
-            // Весь пакет кладём на диск: следующий заход сможет разбирать формат офлайн,
-            // без запуска игры и сервера — байтов там все 10 КБ, а не окно в 32.
+            // Весь пакет кладём на диск: формат можно разбирать офлайн, без игры и сервера.
             runCatching {
-                // Сохраняем только настоящий пакет с сервера: синтетические пакеты из тестов
-                // иначе создают мусорные файлы в каталоге тестов.
+                // Только настоящий пакет с сервера: синтетические пакеты из тестов иначе
+                // создают мусорные файлы в каталоге тестов.
                 if (body.size < 1024) return@runCatching
                 val file = java.io.File("screenshots/recipes-packet.bin")
                 file.parentFile?.mkdirs()
@@ -61,97 +80,146 @@ class RecipeBook {
         return true
     }
 
-    private fun read(body: ByteArray, reader: ByteReader, onProgress: (Int) -> Unit = {}) {
+    private fun read(reader: ByteReader, onProgress: (Int) -> Unit = {}) {
         val count = reader.readVarInt()
         if (count !in 0..MAX_RECIPES) throw RecipeFormatException("рецептов: $count")
         // Собираем во временную карту: при ошибке книга остаётся прежней, а не полупустой.
         val parsed = LinkedHashMap<Int, Recipe>(count)
-        repeat(count) {
-            val displayId = reader.readVarInt()
-            val recipe = readDisplay(reader)
-            val contents = readSlotList(reader)
-            reader.readBoolean() // «подсвечен»
-            // После флага в записи идёт ещё одно число (VarInt). Замерено на живом пакете:
-            // без него разбирается 1 запись, с ним — 2, то есть поле реальное.
-            reader.readVarInt()
-
-            onProgress(it + 1)
-            if (recipe != null) {
-                parsed[displayId] = recipe.copy(ingredients = recipe.ingredients + contents)
-            }
+        repeat(count) { index ->
+            val id = reader.readVarInt()
+            val recipe = readEntry(reader, id)
+            onProgress(index + 1)
+            if (recipe != null) parsed[id] = recipe
         }
-        val replace = reader.readBoolean()
+        val replace = reader.readUnsignedByte() != 0
         if (replace) recipes.clear()
         recipes.putAll(parsed)
     }
 
-    /** Описание рецепта: результат и ингредиенты, если удалось их понять. */
-    private fun readDisplay(reader: ByteReader): Recipe? = when (val type = reader.readVarInt()) {
-        // Без формы: список ингредиентов, результат, станция.
-        0 -> {
-            val ingredients = readSlotList(reader)
-            val result = readSlot(reader)
-            readSlot(reader)
-            Recipe(-1, result, ingredients)
+    /** Одна запись: описание, группа, категория, состав и флаги. */
+    private fun readEntry(reader: ByteReader, id: Int): Recipe {
+        var recipe = readDisplay(reader, id)
+        // Группа — необязательный номер одним числом: 0 значит «нет», иначе номер на единицу
+        // больше самого номера (так кодирует `optional(VAR_INT)` в игре).
+        val groupOrNone = reader.readVarInt()
+        val group = if (groupOrNone == 0) -1 else groupOrNone - 1
+        val category = reader.readVarInt()
+        // Состав: необязательный список условий. Нужен только серверу для «можно ли скрафтить»,
+        // на иконку не влияет, поэтому читаем и отбрасываем.
+        val hasRequirements = reader.readUnsignedByte()
+        val requirements = when (hasRequirements) {
+            0 -> emptyList()
+            1 -> {
+                val n = reader.readVarInt()
+                if (n !in 0..MAX_CRAFTING_CELLS) throw RecipeFormatException("состава: $n")
+                List(n) { readHolderSet(reader) }
+            }
+            else -> throw RecipeFormatException("состав: $hasRequirements")
         }
-        // С формой: ширина, высота, сетка, результат, станция.
-        1 -> {
-            val width = reader.readVarInt()
-            val height = reader.readVarInt()
-            val cells = width * height
-            if (cells !in 0..MAX_CRAFTING_CELLS) throw RecipeFormatException("сетка $width×$height")
-            val ingredients = ArrayList<Int>(cells)
-            repeat(cells) { ingredients += readSlot(reader) }
-            val result = readSlot(reader)
-            readSlot(reader)
-            Recipe(-1, result, ingredients)
-        }
-        // Печь: ингредиент, топливо, результат, станция, время и опыт (проверено по jar).
-        2 -> {
-            val ingredient = readSlot(reader)
-            val fuel = readSlot(reader)
-            val result = readSlot(reader)
-            readSlot(reader)
-            reader.readVarInt()   // сколько тиков плавится
-            reader.readFloat()    // сколько опыта даёт
-            Recipe(-1, result, listOf(ingredient, fuel))
-        }
-        // Камнерез: ингредиент, результат и станция.
-        3 -> {
-            val ingredient = readSlot(reader)
-            val result = readSlot(reader)
-            readSlot(reader)
-            Recipe(-1, result, listOf(ingredient))
-        }
-        // Кузнечный стол: шаблон, основа, добавка, результат.
-        4 -> {
-            val template = readSlot(reader)
-            val base = readSlot(reader)
-            val addition = readSlot(reader)
-            val result = readSlot(reader)
-            readSlot(reader)      // станция
-            Recipe(-1, result, listOf(template, base, addition))
-        }
-        else -> throw RecipeFormatException("вид рецепта $type")
+        val flags = reader.readUnsignedByte()
+        recipe = recipe.copy(
+            group = group,
+            category = category,
+            highlighted = flags and FLAG_HIGHLIGHT != 0,
+            notification = flags and FLAG_NOTIFICATION != 0,
+            requirements = requirements.size,
+        )
+        return recipe
     }
 
-    /** Слот: номер предмета или −1, если это тег или пустой слот. */
-    private fun readSlot(reader: ByteReader): Int = when (val type = reader.readVarInt()) {
+    /** Описание рецепта: результат, форма и ингредиенты. */
+    private fun readDisplay(reader: ByteReader, id: Int): Recipe {
+        val type = reader.readVarInt()
+        val kind = RecipeKind.of(type) ?: throw RecipeFormatException("вид рецепта $type")
+        return when (kind) {
+            RecipeKind.SHAPELESS -> {
+                val ingredients = readSlotList(reader)
+                val (result, count) = readResult(reader)
+                readSlot(reader) // станция
+                Recipe(id, kind, 0, 0, result, count, ingredients)
+            }
+            RecipeKind.SHAPED -> {
+                val width = reader.readVarInt()
+                val height = reader.readVarInt()
+                val cells = readSlotList(reader)
+                if (width !in 1..MAX_CRAFTING_SIDE || height !in 1..MAX_CRAFTING_SIDE) {
+                    throw RecipeFormatException("сетка $width×$height")
+                }
+                if (cells.size != width * height) {
+                    throw RecipeFormatException("сетка $width×$height, а слотов ${cells.size}")
+                }
+                val (result, count) = readResult(reader)
+                readSlot(reader) // станция
+                Recipe(id, kind, width, height, result, count, cells)
+            }
+            RecipeKind.FURNACE -> {
+                val ingredient = readSlot(reader)
+                val fuel = readSlot(reader)
+                val (result, count) = readResult(reader)
+                readSlot(reader) // станция
+                val ticks = reader.readVarInt()
+                reader.readFloat() // опыт
+                Recipe(id, kind, 0, 0, result, count, listOf(ingredient, fuel), ticks = ticks)
+            }
+            RecipeKind.STONECUTTER -> {
+                val input = readSlot(reader)
+                val (result, count) = readResult(reader)
+                readSlot(reader) // станция
+                Recipe(id, kind, 0, 0, result, count, listOf(input))
+            }
+            RecipeKind.SMITHING -> {
+                val template = readSlot(reader)
+                val base = readSlot(reader)
+                val addition = readSlot(reader)
+                val (result, count) = readResult(reader)
+                readSlot(reader) // станция
+                Recipe(id, kind, 0, 0, result, count, listOf(template, base, addition))
+            }
+        }
+    }
+
+    /** Результат: слот-стопка даёт предмет и количество, слот-предмет — предмет по одному. */
+    private fun readResult(reader: ByteReader): Pair<Int, Int> {
+        val type = reader.readVarInt()
+        return when (type) {
+            // Стопка: предмет, количество, патч компонентов.
+            5 -> {
+                val item = reader.readVarInt()
+                val count = reader.readVarInt()
+                val added = reader.readVarInt()
+                val removed = reader.readVarInt()
+                if (added != 0 || removed != 0) throw RecipeFormatException("результат с компонентами")
+                item to count.coerceAtLeast(1)
+            }
+            // Одиночный предмет в результате тоже встречается.
+            4 -> reader.readVarInt() to 1
+            else -> {
+                val item = readSlotOfType(type, reader)
+                item to 1
+            }
+        }
+    }
+
+    /** Слот: номер предмета или −1, если это тег, пустой слот или набор вариантов. */
+    private fun readSlot(reader: ByteReader): Int = readSlotOfType(reader.readVarInt(), reader)
+
+    private fun readSlotOfType(type: Int, reader: ByteReader): Int = when (type) {
         0, 1 -> -1                                   // пусто, любое топливо
         2 -> { readSlot(reader); -1 }                // любое зелье
-        3 -> { readSlot(reader); skipPredicate(reader); -1 }
+        3 -> { val inner = readSlot(reader); reader.readVarInt(); inner } // с компонентом
         4 -> reader.readVarInt()                     // предмет
-        5 -> readTemplateStack(reader)               // стек с компонентами
-        6 -> {
-            reader.readVarInt()
-            // Диагностический довесок: перебор в тесте проверяет, не идёт ли после номера
-            // тега ещё несколько байт. В обычной работе он равен нулю.
-            repeat(tagExtra()) { reader.readByte() }
-            -1
+        5 -> {                                       // стопка с компонентами
+            val item = reader.readVarInt()
+            reader.readVarInt()                      // количество
+            val added = reader.readVarInt()
+            val removed = reader.readVarInt()
+            if (added != 0 || removed != 0) throw RecipeFormatException("слот с компонентами")
+            item
         }
-        7 -> { readSlot(reader); reader.readVarInt(); -1 }       // крашеный
-        8 -> { readSlot(reader); readSlot(reader); readSlot(reader); -1 } // отделка
-        9 -> { val inner = readSlot(reader); readSlot(reader); inner }    // с остатком
+        6 -> { readHolderSet(reader); -1 }           // тег
+        7 -> { val inner = readSlot(reader); readSlot(reader); inner }        // крашеный
+        8 -> { val inner = readSlot(reader); readSlot(reader); reader.readVarInt(); inner } // отделка
+        9 -> { val inner = readSlot(reader); readSlot(reader); inner }        // с остатком
         10 -> {                                      // набор вариантов: берём первый известный
             val options = reader.readVarInt()
             if (options !in 0..MAX_VARIANTS) throw RecipeFormatException("вариантов: $options")
@@ -165,51 +233,81 @@ class RecipeBook {
         else -> throw RecipeFormatException("вид слота $type")
     }
 
+    /**
+     * Набор предметов (`HolderSet`): 0 — дальше имя тега строкой, иначе столько−1 номеров.
+     * Возвращаем номера, имя тега нам сейчас не нужно: на иконке всё равно предмет.
+     */
+    private fun readHolderSet(reader: ByteReader): List<Int> {
+        val n = reader.readVarInt()
+        if (n == 0) {
+            reader.readString(MAX_IDENTIFIER_BYTES)
+            return emptyList()
+        }
+        val size = n - 1
+        if (size !in 0..MAX_VARIANTS) throw RecipeFormatException("набор из $size предметов")
+        return List(size) { reader.readVarInt() }
+    }
+
     private fun readSlotList(reader: ByteReader): List<Int> {
         val count = reader.readVarInt()
         if (count !in 0..MAX_CRAFTING_CELLS) throw RecipeFormatException("слотов: $count")
-        val items = ArrayList<Int>(count)
-        repeat(count) { items += readSlot(reader) }
-        return items
-    }
-
-    /**
-     * Стек с компонентами: предмет, количество и патч.
-     *
-     * Компоненты могут быть любыми, а их формат мы знаем не для всех, поэтому здесь
-     * допускается только пустой патч — иначе рецепт считается непонятным и книга не
-     * показывается. Для книги рецептов этого достаточно: количества и компоненты на иконке
-     * не видны.
-     */
-    private fun readTemplateStack(reader: ByteReader): Int {
-        val item = reader.readVarInt()
-        val count = reader.readVarInt()
-        if (count <= 0) return -1
-        val added = reader.readVarInt()
-        val removed = reader.readVarInt()
-        if (added != 0 || removed != 0) throw RecipeFormatException("стек с компонентами")
-        return item
-    }
-
-    /** Условие на компонент (`only_with_component`): формат не разбираем, честно падаем. */
-    private fun skipPredicate(reader: ByteReader) {
-        throw RecipeFormatException("условие на компонент")
+        return List(count) { readSlot(reader) }
     }
 }
 
-/** Рецепт: результат и ингредиенты (номера предметов; −1 — тег или пусто). */
-data class Recipe(val id: Int, val result: Int, val ingredients: List<Int>)
+/** Вид рецепта: номер в пакете и то, как его показывать. */
+enum class RecipeKind(val wire: Int) {
+    SHAPELESS(0),
+    SHAPED(1),
+    FURNACE(2),
+    STONECUTTER(3),
+    SMITHING(4),
+    ;
+
+    companion object {
+        fun of(wire: Int): RecipeKind? = entries.firstOrNull { it.wire == wire }
+    }
+}
+
+/**
+ * Рецепт: результат и ингредиенты. Ингредиент −1 — это тег или пустая клетка,
+ * то есть «подойдёт любой предмет из набора».
+ */
+data class Recipe(
+    val id: Int,
+    val kind: RecipeKind,
+    val width: Int,
+    val height: Int,
+    val result: Int,
+    val resultCount: Int,
+    val ingredients: List<Int>,
+    val category: Int = -1,
+    val group: Int = -1,
+    val highlighted: Boolean = false,
+    val notification: Boolean = false,
+    val requirements: Int = 0,
+    val ticks: Int = 0,
+) {
+    /** Рецепт пригоден к показу, только если результат — настоящий предмет. */
+    val usable: Boolean get() = result > 0
+}
 
 internal class RecipeFormatException(message: String) : RuntimeException(message)
 
-/** Больше рецептов в книге не бывает. */
-/** Диагностический довесок после номера тега (0 в обычной работе). */
-private fun tagExtra(): Int = System.getProperty("mcplus.tagExtra", "0").toIntOrNull() ?: 0
+private const val FLAG_NOTIFICATION = 0x01
+private const val FLAG_HIGHLIGHT = 0x02
 
+/** Больше рецептов в книге не бывает. */
 private const val MAX_RECIPES = 4096
 
 /** Сетка крафта в игре максимум 3×3. */
 private const val MAX_CRAFTING_CELLS = 9
 
+/** Сторона сетки крафта. */
+private const val MAX_CRAFTING_SIDE = 3
+
 /** Вариантов в `composite` — единицы. */
 private const val MAX_VARIANTS = 64
+
+/** Имя тега или станции — короткая строка вида `minecraft:planks`. */
+private const val MAX_IDENTIFIER_BYTES = 256
