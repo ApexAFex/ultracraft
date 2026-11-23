@@ -32,6 +32,8 @@ class ItemTooltipTest {
         canPlaceOn: List<String> = emptyList(),
         hiddenComponents: Set<Int> = emptySet(),
         hideTooltip: Boolean = false,
+        beeCount: Int = 0,
+        entityTypeId: Int = -1,
     ) = Inventory.Stack(
         itemId = 1,
         count = count,
@@ -51,6 +53,8 @@ class ItemTooltipTest {
         canPlaceOn = canPlaceOn,
         hiddenComponents = hiddenComponents,
         hideTooltip = hideTooltip,
+        beeCount = beeCount,
+        entityTypeId = entityTypeId,
     )
 
     @Test
@@ -100,6 +104,19 @@ class ItemTooltipTest {
 
         val anonymous = ItemTooltip.lines(stack(bookTitle = "Без автора", bookPages = 1), "Книга")
         assertEquals("Книга: «Без автора», страниц 1", anonymous[1].first)
+    }
+
+    @Test
+    fun `bees and a bucket of fish name the creature`() {
+        val hive = ItemTooltip.lines(
+            stack(beeCount = 3, entityTypeId = 120), "Улей",
+            entityName = { if (it == 120) "bee" else null },
+        )
+        assertEquals("Существо: bee", hive[1].first)
+        assertEquals("Пчёл внутри: 3", hive[2].first)
+
+        val unknown = ItemTooltip.lines(stack(entityTypeId = 999), "Ведро")
+        assertEquals("Существо: №999", unknown[1].first)
     }
 
     @Test

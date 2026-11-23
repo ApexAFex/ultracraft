@@ -42,6 +42,8 @@ object ItemTooltip {
         attributeName: (Int) -> String? = { mcplus.net.AttributeTable.active.nameOf(it) },
         /** Имя песни по номеру из реестра пластинок. */
         songName: (Int) -> String? = { null },
+        /** Имя вида существа по номеру: нужно для ведра с рыбой и улья с пчёлами. */
+        entityName: (Int) -> String? = { null },
     ): List<Pair<String, Int>> {
         val result = ArrayList<Pair<String, Int>>(5)
         val title = buildString {
@@ -149,6 +151,14 @@ object ItemTooltip {
         if (stack.instrumentId >= 0) {
             result += "Инструмент: ${instrumentName(stack.instrumentId)}" to 0xC8C8A0
         }
+        // Ведро с существом: вид из таблицы существ (рыба, аксолотль, лягушка).
+        if (stack.entityTypeId >= 0) {
+            result += "Существо: ${entityName(stack.entityTypeId) ?: "№${stack.entityTypeId}"}" to 0xC8C8A0
+        }
+        // Улей-предмет с пчёлами.
+        if (stack.beeCount > 0) {
+            result += "Пчёл внутри: ${stack.beeCount}" to 0xC8C8A0
+        }
         return result
     }
 
@@ -180,11 +190,15 @@ object ItemTooltip {
         return id >= 0 && id in stack.hiddenComponents
     }
 
-    /** Список блоков допуска: тег как «тег logs», номер как «блок №9», «… ещё» — как есть. */
+    /** Список блоков допуска: тег как «тег logs», номер — именем блока из реестра. */
     private fun blockList(entries: List<String>): String = entries.joinToString(", ") { entry ->
         when {
             entry.startsWith("…") -> entry
-            entry.startsWith("#") -> "блок №${entry.substring(1)}"
+            entry.startsWith("#") -> {
+                val id = entry.substring(1).toIntOrNull()
+                val name = id?.let { mcplus.net.BlockRegistryTable.active.nameOf(it) }
+                name ?: "блок №${entry.substring(1)}"
+            }
             else -> "тег ${entry.removePrefix("minecraft:")}"
         }
     }

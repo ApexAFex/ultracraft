@@ -954,6 +954,10 @@ private fun windowCommand(args: List<String>) {
     var startRecipeBook = false
     /** Проверка без мыши: имя результата, который надо скрафтить из книги. */
     var startCraft: String? = null
+    /** Проверка без мыши: открыть книгу из руки (`--book`). */
+    var startBook = false
+    /** Страница, на которой открыть книгу. */
+    var startBookPage = 1
     /** Проверка без рук: переименовать предмет в открытой наковальне. */
     var renameAfterOpen: String? = null
     var pauseAtStart = false
@@ -978,6 +982,14 @@ private fun windowCommand(args: List<String>) {
             "--statistics" -> startStatistics = true
             "--recipes" -> startRecipeBook = true
             "--craft" -> startCraft = args.getOrNull(++index) ?: fail("--craft ждёт имя результата")
+            "--book" -> {
+                startBook = true
+                // Необязательный номер страницы: "--book 2".
+                args.getOrNull(index + 1)?.toIntOrNull()?.let {
+                    startBookPage = it
+                    index++
+                }
+            }
             "--rename" -> renameAfterOpen = args.getOrNull(++index) ?: fail("--rename ждёт имя")
             "--use-item" -> useItemAtFrame =
                 args.getOrNull(++index)?.toIntOrNull() ?: fail("--use-item ждёт номер кадра")
@@ -1116,6 +1128,8 @@ private fun windowCommand(args: List<String>) {
             startStatistics = startStatistics,
             startRecipeBook = startRecipeBook,
             startCraft = startCraft,
+            startBook = startBook,
+            startBookPage = startBookPage,
             startInventory = options.inventory,
             hoverAt = options.hover,
             renameAfterOpen = renameAfterOpen,
@@ -1431,6 +1445,13 @@ private fun findAttributeTable(): mcplus.net.AttributeTable {
     return mcplus.net.AttributeTable.load(file)
 }
 
+/** Имена блоков реестра: нужны допускам режима приключений (`can_place_on`). */
+private fun findBlockRegistryTable(): mcplus.net.BlockRegistryTable {
+    val file = tableCandidates("blocks-registry-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.BlockRegistryTable.EMPTY
+    return mcplus.net.BlockRegistryTable.load(file)
+}
+
 /**
  * Строки игры для ключей перевода (`advancements.story.mine_stone.title` и подобных).
  * Файл лежит в jar установленного клиента; если его нет — остаются встроенные переводы,
@@ -1473,6 +1494,7 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session {
     // Разбор стеков читает компонент износа; таблица должна быть готова до первого пакета.
     mcplus.net.ComponentTable.active = findComponentTable()
     mcplus.net.AttributeTable.active = findAttributeTable()
+    mcplus.net.BlockRegistryTable.active = findBlockRegistryTable()
     val account = if (options.online) loadAccount() else null
     val attempts = 3
 
@@ -1596,6 +1618,7 @@ private fun printUsage() {
           --advancements открыть экран достижений (клавиша L в игре)
           --recipes      открыть книгу рецептов (клавиша B в игре)
           --craft NAME   скрафтить из книги рецепт с таким результатом (проверка без мыши)
+          --book [N]     открыть книгу из руки (страница N) — экран чтения без мыши
           --particles    нарисовать образцы частиц перед камерой (проверка без сервера)
           --mobs         нарисовать по одному мобу каждого семейства перед камерой
     --skin PATH    свой скин из файла PNG (проверка рисования кожи без сети)

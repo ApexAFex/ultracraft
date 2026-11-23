@@ -85,8 +85,18 @@ class Registries {
     private val trimPatterns = mutableListOf<String>()
     private val trimMaterials = mutableListOf<String>()
 
+    /**
+     * Песни пластинок (`minecraft:jukebox_song`) в порядке id.
+     *
+     * В компоненте `jukebox_playable` лежит только номер песни; без реестра в подсказке
+     * стояло «Пластинка: №3» вместо названия.
+     */
+    private val songs = mutableListOf<String>()
+
     fun trimPattern(id: Int): String? = trimPatterns.getOrNull(id)
     fun trimMaterial(id: Int): String? = trimMaterials.getOrNull(id)
+    fun song(id: Int): String? = songs.getOrNull(id)
+    val songCount: Int get() = songs.size
     val trimPatternCount: Int get() = trimPatterns.size
 
     val enchantmentCount: Int get() = enchantments.size
@@ -121,6 +131,10 @@ class Registries {
         trimPatterns += name
     }
 
+    internal fun addSong(name: String) {
+        songs += name
+    }
+
     internal fun addTrimMaterial(name: String) {
         trimMaterials += name
     }
@@ -145,6 +159,9 @@ internal fun readRegistryData(body: ByteArray, registries: Registries) {
         readNames(reader, registries::addTrimPattern, "узор")
     } else if (registryId == "minecraft:trim_material") {
         readNames(reader, registries::addTrimMaterial, "материал")
+    } else if (registryId == "minecraft:jukebox_song") {
+        // Песни пластинок: для подсказки хватает имени, звук и длительность не нужны.
+        readNames(reader, registries::addSong, "песня")
     }
     // damage types, chat types… are not needed yet
 }

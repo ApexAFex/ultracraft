@@ -231,6 +231,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         startInventory: Boolean = false,
         /** Точка, где держать курсор на снимке (проверка подсказки): `--hover x,y`. */
         hoverAt: Pair<Int, Int>? = null,
+        /** Открыть книгу из руки сразу: проверка экрана чтения без мыши (`--book`). */
+        startBook: Boolean = false,
+        /** Страница, на которой открыть книгу (1 — первая). */
+        startBookPage: Int = 1,
         /** Проверка без рук: переименовать предмет в открытой наковальне. */
         renameAfterOpen: String? = null,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
@@ -613,12 +617,17 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             session?.joinResult?.registries?.let { registries ->
                         hud.enchantmentName = { id: Int -> registries.enchantment(id) }
                         hud.trimPatternName = { id: Int -> registries.trimPattern(id) }
+                        hud.songName = { id: Int -> registries.song(id) }
+                        hud.entityName = { id: Int -> entityTypes.nameOf(id) }
                         hud.trimMaterialName = { id: Int -> registries.trimMaterial(id) }
                         if (registries.trimPatternCount > 0) {
                             println("Отделка: ${registries.trimPatternCount} узоров из реестра")
                         }
                         if (registries.enchantmentCount > 0) {
                             println("Зачарования: ${registries.enchantmentCount} названий из реестра")
+                        }
+                        if (registries.songCount > 0) {
+                            println("Песни пластинок: ${registries.songCount} названий из реестра")
                         }
                     }
                     // Небо: своя маленькая текстура (солнце, фазы луны, облака).
@@ -956,6 +965,29 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var ghostSeen = 0
                     var recipeLeftWasDown = false
                     var recipeRightWasDown = false
+                    // Экран чтения книги: экраны текста, номер и заголовок из компонента.
+                    var bookScreens: List<List<String>>? = null
+                    var bookIndex = 0
+                    var bookTitle = ""
+                    var bookAuthor: String? = null
+                    var bookTriggered = false
+
+                    /** Открывает книгу из руки: экран чтения вместо «использовать предмет». */
+                    fun openHeldBook(): Boolean {
+                        val stack = session?.inventory?.held() ?: return false
+                        if (stack.bookPagesText.isEmpty()) return false
+                        val screens = BookScreen.screens(
+                            stack.bookPagesText,
+                            BookScreen.charsPerLine(height),
+                            BookScreen.linesPerPage(height),
+                        )
+                        bookScreens = screens
+                        bookIndex = 0
+                        bookTitle = stack.bookTitle ?: "Книга"
+                        bookAuthor = stack.bookAuthor
+                        println("Книга: «$bookTitle», экранов ${screens.size}")
+                        return true
+                    }
                     if (startAdvancements) input.warpCursor(width * 0.5, height * 0.56)
                     // Инвентарь и курсор в заданной точке: так снимок показывает подсказку
                     // под предметом без живой мыши.
@@ -1426,12 +1458,32 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 chat.open -> chat.close()
                                 openContainer != null -> session?.closeContainer()
                                 inventoryOpen -> inventoryOpen = false
+                                bookScreens != null -> bookScreens = null
                                 advancementsOpen -> advancementsOpen = false
                                 statisticsOpen -> statisticsOpen = false
                                 recipeBookOpen -> recipeBookOpen = false
                                 dead -> Unit
                                 paused -> paused = false
                                 else -> paused = true
+                            }
+                        }
+
+                        // Книга: клик по половине панели или стрелки листают страницы.
+                        bookScreens?.let { screens ->
+                            if (input.clickRequested) {
+                                val panel = BookScreen.panel(width, height)
+                                val forward = BookScreen.nextPage(input.mouseX.toFloat(), panel)
+                                bookIndex = if (forward) {
+                                    (bookIndex + 1).coerceAtMost(screens.size - 1)
+                                } else {
+                                    (bookIndex - 1).coerceAtLeast(0)
+                                }
+                            }
+                            if (input.pageNextRequested) {
+                                bookIndex = (bookIndex + 1).coerceAtMost(screens.size - 1)
+                            }
+                            if (input.pagePrevRequested) {
+                                bookIndex = (bookIndex - 1).coerceAtLeast(0)
                             }
                         }
 
@@ -1482,7 +1534,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         // Курсор виден, когда им пользуется экран: инвентарь или экран смерти.
                         // Иначе он снова захвачен и управляет камерой.
-                        input.setCursorVisible(inventoryOpen || advancementsOpen || dead || openContainer != null)
+                        input.setCursorVisible(inventoryOpen || advancementsOpen || dead || openContainer != null || bookScreens != null)
 
                         // Смерть: сервер выставил здоровье в ноль и перестал стримить мир.
                         // Пока игрок не возродился, ходить и копать некуда — экран смерти
@@ -3470,7 +3522,20 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         } else if (inventory != null && inventoryOpen) {
                             hud.drawInventoryScreen(inventory, input.mouseX, input.mouseY)
                         }
-                        if (dead) {
+                        // Книга занимает экран целиком: поверх неё ничего не рисуем.
+                        val openBook = bookScreens
+                        if (openBook != null) {
+                            val shown = bookIndex.coerceIn(0, openBook.size - 1)
+                            hud.drawBookScreen(
+                                title = bookTitle,
+                                author = bookAuthor,
+                                lines = openBook[shown],
+                                index = shown,
+                                total = openBook.size,
+                                width = width,
+                                height = height,
+                            )
+                        } else if (dead) {
                             hud.drawDeathScreen(
                                 where = "Координаты: %.1f, %.1f, %.1f".format(player.x, player.y, player.z),
                                 worldName = session?.joinResult?.joinGame?.dimensionName,
@@ -3884,7 +3949,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // The state machine itself runs in the tick loop: doing it per frame sent
                         // a press and an abort dozens of times per tick while walking.
                         // With the inventory open the same button drags items, so it must not mine.
-                        holdRequested = !inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open && !paused &&
+                        holdRequested = !inventoryOpen && !advancementsOpen && openContainer == null && bookScreens == null && !dead && !chat.open && !paused &&
                             (leftDown || (demo && frame >= 5 && frame < 900))
 
                         // Удар по сущности: если под прицелом моб ближе блока — бьём его.
@@ -3944,7 +4009,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         aimTarget = if (inventoryOpen || advancementsOpen || openContainer != null || dead || chat.open) null else miningTarget
 
-                        if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
+                        if (!inventoryOpen && !advancementsOpen && openContainer == null && bookScreens == null && !dead && !chat.open &&
                             rightDown && !rightWasDown && aimedEntity != null
                         ) {
                             val entity = aimedEntity
@@ -3954,17 +4019,28 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             )
                             swingNanos = System.nanoTime()
                         }
-                        if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
+                        if (!inventoryOpen && !advancementsOpen && openContainer == null && bookScreens == null && !dead && !chat.open &&
                             rightDown && !rightWasDown && target != null && aimedEntity == null
                         ) {
                             demoPlace(target)
                         }
                         // Правый клик по воздуху — `Use Item`: так едят, натягивают лук и
                         // бросают жемчуг. Раньше клик мимо блока просто пропадал.
-                        if (!inventoryOpen && !advancementsOpen && openContainer == null && !dead && !chat.open &&
+                        if (!inventoryOpen && !advancementsOpen && openContainer == null && bookScreens == null && !dead && !chat.open &&
                             rightDown && !rightWasDown && target == null && aimedEntity == null
                         ) {
-                            beginUseItem()
+                            // Книга в руке открывается на клиенте, а не отправкой «используй»:
+                            // в ванили чтение книги — экран, сервер о нём не знает.
+                            if (!openHeldBook()) beginUseItem()
+                        }
+                        // Проверка без мыши: открыть книгу из руки на 30-м кадре.
+                        if (startBook && !bookTriggered && frame >= 30 &&
+                            session?.inventory?.held()?.bookPagesText?.isNotEmpty() == true
+                        ) {
+                            bookTriggered = true
+                            if (openHeldBook()) {
+                                bookIndex = (startBookPage - 1).coerceIn(0, (bookScreens?.size ?: 1) - 1)
+                            }
                         }
                         // Проверка без мыши: щелчок мимо блока на заданном кадре. Ждём,
                         // пока в руке появится предмет, — он приходит от сервера позже.

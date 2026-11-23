@@ -388,6 +388,56 @@ class Hud(
     }
 
     /**
+     * Экран чтения книги: затемнение, «бумага», заголовок, автор и строки страницы.
+     *
+     * @param lines строки текущего экрана — их уже разбил [BookScreen], чтобы рисование
+     *   не занималось переносами слов
+     */
+    fun drawBookScreen(
+        title: String,
+        author: String?,
+        lines: List<String>,
+        index: Int,
+        total: Int,
+        width: Int,
+        height: Int,
+    ) {
+        val text = this.text ?: return
+        val s = HudLayout.scale(height).toFloat()
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x0A0806, 0.88f)
+        renderer.draw()
+
+        val panel = BookScreen.panel(width, height)
+        renderer.begin()
+        renderer.rect(panel, 0xE8DCC0, 0.97f)
+        renderer.rect(panel.x, panel.y, panel.width, 2f * s, 0x6B4A2A, 0.95f)
+        renderer.rect(panel.x, panel.bottom - 2f * s, panel.width, 2f * s, 0x6B4A2A, 0.95f)
+        renderer.rect(panel.x, panel.y, 2f * s, panel.height, 0x6B4A2A, 0.95f)
+        renderer.rect(panel.right - 2f * s, panel.y, 2f * s, panel.height, 0x6B4A2A, 0.95f)
+        renderer.draw()
+
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        labels += TextRenderer.ScreenLabel(panel.x + 10f * s, panel.y + 8f * s, title, s, 0x3A2415)
+        author?.let {
+            labels += TextRenderer.ScreenLabel(
+                panel.x + 10f * s, panel.y + 20f * s, "автор $it", s * 0.8f, 0x6B4A2A,
+            )
+        }
+        var y = panel.y + 34f * s
+        for (line in lines) {
+            labels += TextRenderer.ScreenLabel(panel.x + 10f * s, y, line, s * 0.85f, 0x2A1B10)
+            y += 10f * s
+        }
+        labels += TextRenderer.ScreenLabel(
+            panel.x + 10f * s, panel.bottom - 14f * s,
+            "${index + 1}/$total   клик или стрелки влево/вправо, Esc — закрыть",
+            s * 0.7f, 0x6B4A2A,
+        )
+        text.drawScreen(labels)
+    }
+
+    /**
      * Книга рецептов: вкладки категорий слева и сетка результатов справа.
      *
      * Зелёная рамка — рецепт, который собирается прямо сейчас: [craftCheck] считается по
@@ -929,6 +979,12 @@ class Hud(
     var trimPatternName: (Int) -> String? = { null }
     var trimMaterialName: (Int) -> String? = { null }
 
+    /** Название песни пластинки по номеру из реестра `jukebox_song`. */
+    var songName: (Int) -> String? = { null }
+
+    /** Имя вида существа: для ведра с рыбой и улья с пчёлами. */
+    var entityName: (Int) -> String? = { null }
+
     /** Прямоугольники строк списка сделок у жителя: индекс строки — номер сделки. */
     var tradeRows: List<Pair<Int, HudRect>> = emptyList()
         private set
@@ -1194,6 +1250,8 @@ class Hud(
                 val name = inventory.displayNameOf(stack) ?: continue
                 hoveredLines = ItemTooltip.lines(
                     stack, name, max, enchantmentName, trimPatternName, trimMaterialName,
+                    songName = songName,
+                    entityName = entityName,
                 )
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
@@ -1271,6 +1329,8 @@ class Hud(
                 val name = inventory.displayNameOf(stack) ?: continue
                 hoveredLines = ItemTooltip.lines(
                     stack, name, max, enchantmentName, trimPatternName, trimMaterialName,
+                    songName = songName,
+                    entityName = entityName,
                 )
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()

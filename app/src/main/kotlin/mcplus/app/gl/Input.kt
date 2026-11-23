@@ -62,6 +62,14 @@ class Input(private val window: Long, private val camera: Camera) {
     private var scrollY = 0.0
     private var mouseWasDown = false
 
+    /** Стрелки влево и вправо: листать книгу. */
+    var pagePrevRequested: Boolean = false
+        private set
+    var pageNextRequested: Boolean = false
+        private set
+    private var pagePrevPressed = false
+    private var pageNextPressed = false
+
     /** Позиция курсора, заданная флагом `--hover`: пока не null, окно не спрашиваем. */
     private var frozenX: Double? = null
     private var frozenY: Double? = null
@@ -279,6 +287,14 @@ class Input(private val window: Long, private val camera: Camera) {
         val escape = pressed(GLFW.GLFW_KEY_ESCAPE)
         escapeRequested = escape && !escapePressed
         escapePressed = escape
+
+        // Стрелки влево/вправо листают книгу: другого применения у них нет.
+        val pagePrev = pressed(GLFW.GLFW_KEY_LEFT)
+        pagePrevRequested = pagePrev && !pagePrevPressed
+        pagePrevPressed = pagePrev
+        val pageNext = pressed(GLFW.GLFW_KEY_RIGHT)
+        pageNextRequested = pageNext && !pageNextPressed
+        pageNextPressed = pageNext
 
         val respawn = pressed(GLFW.GLFW_KEY_R) || pressed(GLFW.GLFW_KEY_ENTER)
         respawnRequested = respawn && !respawnPressed

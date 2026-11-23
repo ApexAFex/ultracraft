@@ -89,8 +89,12 @@ class Inventory(
         val bookTitle: String? = null,
         val bookAuthor: String? = null,
         val bookPages: Int = 0,
+        /** Текст страниц книги: нужен экрану чтения, а не только счётчику. */
+        val bookPagesText: List<String> = emptyList(),
         /** Существо в ведре (`entity_data`): номер вида из таблицы существ, −1 — не задан. */
         val entityTypeId: Int = -1,
+        /** Сколько пчёл сидит в улье-предмете (`bees`). */
+        val beeCount: Int = 0,
         /** `tooltip_display`: какие компоненты спрятать в подсказке и спрятать ли её всю. */
         val hiddenComponents: Set<Int> = emptySet(),
         val hideTooltip: Boolean = false,
@@ -392,6 +396,8 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
     var bookTitle: String? = null
     var bookAuthor: String? = null
     var bookPages = 0
+    val bookPagesText = ArrayList<String>()
+    var beeCount = 0
     var entityTypeId = -1
     val hiddenComponents = HashSet<Int>()
     var hideTooltip = false
@@ -627,22 +633,26 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
                 if (generation !in 0..MAX_BOOK_GENERATION) throw UnreadableStack(count)
                 val pages = reader.readVarInt()
                 if (pages !in 0..MAX_BOOK_PAGES) throw UnreadableStack(count)
+                val texts = ArrayList<String>(pages)
                 repeat(pages) {
-                    mcplus.protocol.nbt.NbtReader.read(reader)
+                    texts += mcplus.net.componentText(mcplus.protocol.nbt.NbtReader.read(reader)).orEmpty()
                     if (reader.readBoolean()) mcplus.protocol.nbt.NbtReader.read(reader)
                 }
                 reader.readBoolean()
                 bookPages = pages
+                bookPagesText += texts
             }
             // Черновик книги: только страницы строками.
             "writable_book_content" -> {
                 val pages = reader.readVarInt()
                 if (pages !in 0..MAX_BOOK_PAGES) throw UnreadableStack(count)
+                val texts = ArrayList<String>(pages)
                 repeat(pages) {
-                    reader.readString(MAX_BOOK_PAGE_BYTES)
+                    texts += reader.readString(MAX_BOOK_PAGE_BYTES)
                     if (reader.readBoolean()) reader.readString(MAX_BOOK_PAGE_BYTES)
                 }
                 bookPages = pages
+                bookPagesText += texts
             }
 
             // Данные существа в ведре или в блоке-предмете: номер вида и NBT (его длина известна).
@@ -685,6 +695,19 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
                 val size = reader.readVarInt()
                 if (size !in 0..MAX_KNOWN_RECIPES) throw UnreadableStack(count)
                 repeat(size) { reader.readString(MAX_IDENTIFIER_BYTES) }
+            }
+
+            // Улей с пчёлами: список сидящих внутри — вид существа, NBT, два счётчика тиков.
+            "bees" -> {
+                val size = reader.readVarInt()
+                if (size !in 0..MAX_BEES) throw UnreadableStack(count)
+                repeat(size) {
+                    entityTypeId = reader.readVarInt()
+                    mcplus.protocol.nbt.NbtReader.read(reader)
+                    reader.readVarInt()
+                    reader.readVarInt()
+                }
+                beeCount = size
             }
 
             // Ссылки на записи реестров: вид урона и «чем отделывается».
@@ -741,7 +764,9 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
         bookTitle = bookTitle,
         bookAuthor = bookAuthor,
         bookPages = bookPages,
+        bookPagesText = bookPagesText,
         entityTypeId = entityTypeId,
+        beeCount = beeCount,
         hiddenComponents = hiddenComponents,
         hideTooltip = hideTooltip,
     )
@@ -835,8 +860,16 @@ private fun readBlockPredicateNames(reader: ByteReader, count: Int): List<String
     repeat(predicates) {
         if (reader.readBoolean()) {
             val set = readHolderSetChecked(reader, count)
-            names += set.tag ?: "#${set.ids.firstOrNull() ?: 0}"
-            if (set.ids.size > 1) names += "… ещё ${set.ids.size - 1}"
+            val tag = set.tag
+            if (tag != null) {
+                names += tag
+            } else {
+                // Явный список: показываем до трёх имён, остальные — счётчиком.
+                for (id in set.ids.take(MAX_SHOWN_BLOCKS)) names += "#$id"
+                if (set.ids.size > MAX_SHOWN_BLOCKS) {
+                    names += "… ещё ${set.ids.size - MAX_SHOWN_BLOCKS}"
+                }
+            }
         }
         if (reader.readBoolean()) skipStateProperties(reader, count)
         if (reader.readBoolean()) mcplus.protocol.nbt.NbtReader.read(reader)
@@ -876,6 +909,9 @@ private fun skipComponentMatchers(reader: ByteReader, count: Int) {
     if (reader.readVarInt() != 0) throw UnreadableStack(count)
     if (reader.readVarInt() != 0) throw UnreadableStack(count)
 }
+
+/** Пчёл в улье-предмете больше этого не бывает. */
+private const val MAX_BEES = 4
 
 /** Глубже этого вложенные стопки в игре не встречаются. */
 private const val MAX_STACK_DEPTH = 8
@@ -933,6 +969,9 @@ private const val MAX_BLOCK_PREDICATES = 128
 
 /** Свойств состояния в одном описании блока. */
 private const val MAX_STATE_PROPERTIES = 32
+
+/** Сколько блоков из длинного списка показывать в подсказке. */
+private const val MAX_SHOWN_BLOCKS = 3
 
 /** Больше слотов в предмете-контейнере в игре не бывает. */
 private const val MAX_CONTAINER_ITEMS = 256

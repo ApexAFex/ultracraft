@@ -174,8 +174,8 @@ class InventoryComponentsTest {
             "can_place_on",
         )
 
-        // Первый блок показывается, про остальные — «… ещё».
-        assertEquals(listOf("#9", "… ещё 1"), stack.canPlaceOn)
+        // Оба блока влезают в подсказку: имя резолвится по таблице реестра блоков.
+        assertEquals(listOf("#9", "#10"), stack.canPlaceOn)
     }
 
     @Test
@@ -377,6 +377,61 @@ class InventoryComponentsTest {
         assertTrue(stack.isKnown)
     }
 
+    @Test
+    fun `a hive keeps how many bees sit inside`() {
+        val stack = stackWith(
+            ByteWriter()
+                .writeVarInt(2)                  // две пчелы
+                .writeVarInt(5)                  // вид существа
+                .writeBytes(emptyCompound())     // NBT пчелы
+                .writeVarInt(100)                // тиков в улье
+                .writeVarInt(600)                // минимум тиков
+                .writeVarInt(5)
+                .writeBytes(emptyCompound())
+                .writeVarInt(20)
+                .writeVarInt(600),
+            "bees",
+        )
+
+        assertEquals(2, stack.beeCount)
+        assertEquals(5, stack.entityTypeId, "вид последней пчелы — для подсказки хватает")
+    }
+
+    /**
+     * Те же байты, что прислал живой сервер на улей с двумя пчёлами.
+     *
+     * Снято отладочным выводом: `2, 11, 10, 0, 100, 216, 4, 11, 10, 0, 200, 1, 216, 4`.
+     * Внутри NBT пустой: вид существа идёт отдельным номером, а в NBT у пчелы ничего нет.
+     */
+    @Test
+    fun `a real hive packet from the server has two bees`() {
+        val bytes = byteArrayOf(
+            2, 11, 10, 0, 100, 216.toByte(), 4,
+            11, 10, 0, 200.toByte(), 1, 216.toByte(), 4,
+        )
+        val stack = stackWith(ByteWriter().writeBytes(bytes), "bees")
+        assertEquals(2, stack.beeCount)
+        assertEquals(11, stack.entityTypeId)
+    }
+
+    @Test
+    fun `the book text is kept for the reading screen`() {
+        val stack = stackWith(
+            ByteWriter()
+                .writeString("Записки")
+                .writeBoolean(false)
+                .writeString("mcplus")
+                .writeVarInt(0)
+                .writeVarInt(1)
+                .writeBytes(nbtString("Первая страница"))
+                .writeBoolean(false)
+                .writeBoolean(true),
+            "written_book_content",
+        )
+
+        assertEquals(listOf("Первая страница"), stack.bookPagesText)
+    }
+
     // --- помощники -----------------------------------------------------------------------
 
     /** Стек с одним компонентом: количество 1, предмет 1, патч из одного добавления. */
@@ -417,9 +472,9 @@ class InventoryComponentsTest {
             .toByteArray()
     }
 
-    /** Пустой NBT-состав: тег 0x0A, пустое имя и конец. */
+    /** Пустой NBT-состав: по сети имя корня не пишут, только тег и конец. */
     private fun emptyCompound(): ByteArray =
-        ByteWriter().writeByte(0x0A).writeShort(0).writeByte(0).toByteArray()
+        ByteWriter().writeByte(0x0A).writeByte(0).toByteArray()
 
     private fun componentTable(): ComponentTable {
         val file = listOf("data/components-777.tsv", "../data/components-777.tsv")
