@@ -62,6 +62,10 @@ class Input(private val window: Long, private val camera: Camera) {
     private var scrollY = 0.0
     private var mouseWasDown = false
 
+    /** Позиция курсора, заданная флагом `--hover`: пока не null, окно не спрашиваем. */
+    private var frozenX: Double? = null
+    private var frozenY: Double? = null
+
     /** Символы, набранные с клавиатуры с прошлого кадра (то, что печатает человек). */
     private val typedBuffer = StringBuilder()
 
@@ -211,6 +215,19 @@ class Input(private val window: Long, private val camera: Camera) {
         mouseY = y
     }
 
+    /**
+     * Держит курсор в заданной точке, не спрашивая окно.
+     *
+     * Нужно для снимков без мыши: подсказка под предметом рисуется только под курсором,
+     * а в скрытом окне он может оказаться где угодно.
+     */
+    fun freezeCursor(x: Double, y: Double) {
+        frozenX = x
+        frozenY = y
+        mouseX = x
+        mouseY = y
+    }
+
     fun update() {
         val now = System.nanoTime()
         deltaSeconds = ((now - lastTime) / 1_000_000_000.0).coerceAtMost(0.1)
@@ -351,6 +368,9 @@ class Input(private val window: Long, private val camera: Camera) {
         val (scaleX, scaleY) = framebufferScale()
         mouseX = cursorX[0] * scaleX
         mouseY = cursorY[0] * scaleY
+        // Снимок без мыши (`--hover`): позиция задана флагом и не зависит от окна.
+        frozenX?.let { mouseX = it }
+        frozenY?.let { mouseY = it }
 
         val down = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
         clickRequested = down && !mouseWasDown

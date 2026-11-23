@@ -1116,6 +1116,8 @@ private fun windowCommand(args: List<String>) {
             startStatistics = startStatistics,
             startRecipeBook = startRecipeBook,
             startCraft = startCraft,
+            startInventory = options.inventory,
+            hoverAt = options.hover,
             renameAfterOpen = renameAfterOpen,
             useItemAtFrame = useItemAtFrame,
             tradeAtFrame = tradeAtFrame,
@@ -1178,6 +1180,10 @@ private class LoginOptions(
     val seconds: Int,
     /** (world) position to report the server's block at. */
     val at: Triple<Int, Int, Int>?,
+    /** (window) открыть инвентарь сразу: проверка подсказок под предметом. */
+    val inventory: Boolean,
+    /** (window) точка, где держать курсор на снимке (пиксели кадра). */
+    val hover: Pair<Int, Int>?,
 )
 
 private fun parseLoginArgs(args: List<String>): LoginOptions? {
@@ -1196,6 +1202,8 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     var threads = 0
     var seconds = 20
     var at: Triple<Int, Int, Int>? = null
+    var inventory = false
+    var hover: Pair<Int, Int>? = null
 
     var index = 0
     while (index < args.size) {
@@ -1214,6 +1222,8 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
             "--at" -> at = parsePosition(args.getOrNull(++index) ?: fail("--at требует x,y,z"))
             "--online" -> online = true
             "--verbose" -> verbose = true
+            "--inventory" -> inventory = true
+            "--hover" -> hover = parseScreenPoint(args.getOrNull(++index) ?: fail("--hover ждёт x,y"))
             "--help", "-h" -> { printUsage(); return null }
             else -> if (target == null) target = arg else fail("Лишний аргумент: $arg")
         }
@@ -1221,8 +1231,15 @@ private fun parseLoginArgs(args: List<String>): LoginOptions? {
     }
     return LoginOptions(
         target, name, protocol, verbose, chunks, blocks, online, output,
-        frames, hidden, minecraft, demo, threads, seconds, at,
+        frames, hidden, minecraft, demo, threads, seconds, at, inventory, hover,
     )
+}
+
+/** Parses `x,y` for `--hover`: точка в пикселях кадра. */
+private fun parseScreenPoint(text: String): Pair<Int, Int> {
+    val parts = text.split(',').map { it.trim().toIntOrNull() }
+    if (parts.size != 2 || parts.any { it == null }) fail("--hover ждёт два числа: x,y")
+    return parts[0]!! to parts[1]!!
 }
 
 /** Parses `x,y,z` for `--at`. */
@@ -1407,6 +1424,13 @@ private fun findComponentTable(): mcplus.net.ComponentTable {
     return mcplus.net.ComponentTable.load(file)
 }
 
+/** Имена атрибутов для компонента `attribute_modifiers`, сгенерированы из отчёта регистров. */
+private fun findAttributeTable(): mcplus.net.AttributeTable {
+    val file = tableCandidates("attributes-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.AttributeTable.EMPTY
+    return mcplus.net.AttributeTable.load(file)
+}
+
 /**
  * Строки игры для ключей перевода (`advancements.story.mine_stone.title` и подобных).
  * Файл лежит в jar установленного клиента; если его нет — остаются встроенные переводы,
@@ -1448,6 +1472,7 @@ private const val CACHE_RADIUS = 6
 private fun connect(host: String, port: Int, options: LoginOptions): Session {
     // Разбор стеков читает компонент износа; таблица должна быть готова до первого пакета.
     mcplus.net.ComponentTable.active = findComponentTable()
+    mcplus.net.AttributeTable.active = findAttributeTable()
     val account = if (options.online) loadAccount() else null
     val attempts = 3
 
@@ -1583,6 +1608,8 @@ private fun printUsage() {
     --respawn      возродиться сразу после входа (если умер в прошлый раз)
           --yaw N, --pitch N  повернуть камеру для снимка (градусы)
           --open x,y,z   (window) кликнуть правой кнопкой по блоку — проверка контейнеров
+          --inventory    (window) открыть инвентарь сразу — проверка подсказки под предметом
+          --hover x,y    (window) держать курсор в точке кадра (для снимка подсказки)
           --frames N     выйти после N кадров, сохранив снимок в --out
           --demo         самопроверка: ломает и ставит блок, идёт вперёд
           --seconds N    (watch) сколько секунд наблюдать, по умолчанию 20

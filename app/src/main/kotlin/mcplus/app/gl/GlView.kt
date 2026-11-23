@@ -227,6 +227,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         startRecipeBook: Boolean = false,
         /** Проверка без мыши: скрафтить из книги рецепт с таким именем результата (`--craft`). */
         startCraft: String? = null,
+        /** Открыть инвентарь сразу: проверка подсказок под предметом без клавиатуры. */
+        startInventory: Boolean = false,
+        /** Точка, где держать курсор на снимке (проверка подсказки): `--hover x,y`. */
+        hoverAt: Pair<Int, Int>? = null,
         /** Проверка без рук: переименовать предмет в открытой наковальне. */
         renameAfterOpen: String? = null,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
@@ -953,6 +957,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var recipeLeftWasDown = false
                     var recipeRightWasDown = false
                     if (startAdvancements) input.warpCursor(width * 0.5, height * 0.56)
+                    // Инвентарь и курсор в заданной точке: так снимок показывает подсказку
+                    // под предметом без живой мыши.
+                    if (startInventory) {
+                        inventoryOpen = true
+                        input.setCursorVisible(true)
+                    }
+                    hoverAt?.let { (hoverX, hoverY) -> input.freezeCursor(hoverX.toDouble(), hoverY.toDouble()) }
                     if (startRecipeBook) {
                         // Ставим курсор на первую иконку: так снимок показывает и подсказку.
                         val hudScale = HudLayout.scale(height).toFloat()

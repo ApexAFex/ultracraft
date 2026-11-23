@@ -140,7 +140,7 @@ class InventoryTest {
     @Test
     fun `enchantments and a custom name are read from the component patch`() {
         val previous = ComponentTable.active
-        // Индексы как в data/components-777.tsv: damage, custom_name, attribute_modifiers.
+        // Индексы как в data/components-777.tsv: damage, custom_name, creative_slot_lock.
         ComponentTable.active = componentTable()
         try {
             val inventory = Inventory(items)
@@ -156,7 +156,7 @@ class InventoryTest {
                 .writeByte(0x08)  // NBT: строка
                 .writeShort(name.size)
                 .writeBytes(name)
-                .writeVarInt(16)  // attribute_modifiers — незнакомый компонент
+                .writeVarInt(20)  // creative_slot_lock — незнакомый компонент
             val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
             inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
 

@@ -1,5 +1,6 @@
 package mcplus.app.gl
 
+import mcplus.net.AttributeMod
 import mcplus.net.Inventory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,6 +24,14 @@ class ItemTooltipTest {
         trimPattern: Int = -1,
         trimMaterial: Int = -1,
         chargedCount: Int = 0,
+        attributeMods: List<AttributeMod> = emptyList(),
+        profileName: String? = null,
+        bookTitle: String? = null,
+        bookAuthor: String? = null,
+        bookPages: Int = 0,
+        canPlaceOn: List<String> = emptyList(),
+        hiddenComponents: Set<Int> = emptySet(),
+        hideTooltip: Boolean = false,
     ) = Inventory.Stack(
         itemId = 1,
         count = count,
@@ -34,7 +43,101 @@ class ItemTooltipTest {
         trimPattern = trimPattern,
         trimMaterial = trimMaterial,
         chargedCount = chargedCount,
+        attributeMods = attributeMods,
+        profileName = profileName,
+        bookTitle = bookTitle,
+        bookAuthor = bookAuthor,
+        bookPages = bookPages,
+        canPlaceOn = canPlaceOn,
+        hiddenComponents = hiddenComponents,
+        hideTooltip = hideTooltip,
     )
+
+    @Test
+    fun `attribute modifiers are shown as russian lines`() {
+        val mods = listOf(
+            AttributeMod(3, 7.0, 0, 1, "a:b"),      // +7 к урону в руке
+            AttributeMod(1, 2.5, 0, 6, "c:d"),      // +2,5 к броне на нагруднике
+            AttributeMod(26, 0.2, 1, 0, "e:f"),     // +20% к скорости везде
+        )
+        val lines = ItemTooltip.lines(
+            stack(attributeMods = mods), "Меч",
+            attributeName = { id -> mapOf(3 to "attack_damage", 1 to "armor", 26 to "movement_speed")[id] },
+        )
+
+        assertEquals(listOf("Меч", "+7 к урону (в руке)", "+2,5 к броне (на нагруднике)", "+20% к скорости"), lines.map { it.first })
+        assertEquals(0x4F6FA8, lines[1].second)
+    }
+
+    @Test
+    fun `a hidden modifier is not shown and a custom text wins`() {
+        val mods = listOf(
+            AttributeMod(3, 1.0, 0, 0, "a:b", hidden = true),
+            AttributeMod(3, 1.0, 0, 0, "c:d", display = "Своя строка"),
+        )
+        val lines = ItemTooltip.lines(stack(attributeMods = mods), "Меч")
+        assertEquals(listOf("Меч", "Своя строка"), lines.map { it.first })
+    }
+
+    @Test
+    fun `an unknown attribute keeps its name without underscores`() {
+        val lines = ItemTooltip.lines(
+            stack(attributeMods = listOf(AttributeMod(99, 1.0, 0, 0, "a:b"))), "Меч",
+            attributeName = { "some_new_attribute" },
+        )
+        assertEquals("+1 some new attribute", lines[1].first)
+    }
+
+    @Test
+    fun `a head shows its owner and a book its title`() {
+        val head = ItemTooltip.lines(stack(profileName = "mcplus"), "Голова")
+        assertEquals("Голова: mcplus", head[1].first)
+
+        val book = ItemTooltip.lines(
+            stack(bookTitle = "Записки", bookAuthor = "mcplus", bookPages = 2), "Книга",
+        )
+        assertEquals("Книга: «Записки», автор mcplus, страниц 2", book[1].first)
+
+        val anonymous = ItemTooltip.lines(stack(bookTitle = "Без автора", bookPages = 1), "Книга")
+        assertEquals("Книга: «Без автора», страниц 1", anonymous[1].first)
+    }
+
+    @Test
+    fun `adventure mode restrictions are shown`() {
+        val lines = ItemTooltip.lines(
+            stack(canPlaceOn = listOf("minecraft:stone", "#9")), "Кирка",
+        )
+        assertEquals("Ставится на: тег stone, блок №9", lines[1].first)
+    }
+
+    @Test
+    fun `hide_tooltip leaves only the name`() {
+        val lines = ItemTooltip.lines(
+            stack(lore = listOf("Строка"), enchantments = listOf(5 to 1), hideTooltip = true),
+            "Клинок",
+        )
+        assertEquals(listOf("Клинок ✦"), lines.map { it.first })
+    }
+
+    @Test
+    fun `tooltip_display hides the listed components`() {
+        // Таблица компонентов нужна, чтобы имена стали номерами; в приложении её грузит запуск.
+        val table = listOf("data/components-777.tsv", "../data/components-777.tsv")
+            .map { java.io.File(it) }
+            .firstOrNull { it.isFile }
+            ?: error("Нет таблицы компонентов")
+        mcplus.net.ComponentTable.active = mcplus.net.ComponentTable.load(table)
+        // 13 — enchantments, 11 — lore в data/components-777.tsv.
+        val lines = ItemTooltip.lines(
+            stack(
+                lore = listOf("Строка описания"),
+                enchantments = listOf(5 to 1),
+                hiddenComponents = setOf(13, 11),
+            ),
+            "Клинок",
+        )
+        assertEquals(listOf("Клинок ✦"), lines.map { it.first })
+    }
 
     @Test
     fun `trim and charged shots get their own lines`() {

@@ -257,15 +257,15 @@ class RecipeBook {
     /**
      * Набор предметов (`HolderSet`): 0 — дальше имя тега строкой, иначе столько−1 номеров.
      *
-     * Имя тега сохраняем: по нему из [ItemTags] видно, какие предметы подходят.
+     * Имя тега сохраняем: по нему из [ItemTags] видно, какие предметы подходят. Сам разбор
+     * общий с компонентами предметов — см. [readHolderSet].
      */
-    private fun readHolderSet(reader: ByteReader): HolderSet {
-        val n = reader.readVarInt()
-        if (n == 0) return HolderSet(emptyList(), reader.readString(MAX_IDENTIFIER_BYTES))
-        val size = n - 1
-        if (size !in 0..MAX_VARIANTS) throw RecipeFormatException("набор из $size предметов")
-        return HolderSet(List(size) { reader.readVarInt() }, null)
-    }
+    private fun readHolderSet(reader: ByteReader): HolderSet =
+        try {
+            mcplus.net.readHolderSet(reader, MAX_VARIANTS)
+        } catch (e: HolderSetFormatException) {
+            throw RecipeFormatException(e.message ?: "набор предметов")
+        }
 
     private fun readSlotList(reader: ByteReader): List<Ingredient> {
         val count = reader.readVarInt()
@@ -310,9 +310,6 @@ data class Ingredient(val itemId: Int, val tag: String? = null, val options: Lis
     val all: Set<Int>
         get() = if (tag == null && itemId > 0) options.ifEmpty { listOf(itemId) }.toSet() else emptySet()
 }
-
-/** Набор из `HolderSet`: либо явный список номеров, либо имя тега. */
-internal data class HolderSet(val ids: List<Int>, val tag: String?)
 
 /**
  * Рецепт: результат и ингредиенты.

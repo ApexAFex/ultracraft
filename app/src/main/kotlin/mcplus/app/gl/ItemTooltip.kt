@@ -1,5 +1,6 @@
 package mcplus.app.gl
 
+import mcplus.net.AttributeMod
 import mcplus.net.Inventory
 
 /**
@@ -37,6 +38,10 @@ object ItemTooltip {
         effectName: (Int) -> String? = { null },
         /** Имя инструмента козьего рога; без реестра показываем номер. */
         instrumentName: (Int) -> String = { "№$it" },
+        /** Имя атрибута по номеру: из таблицы `data/attributes-777.tsv`. */
+        attributeName: (Int) -> String? = { mcplus.net.AttributeTable.active.nameOf(it) },
+        /** Имя песни по номеру из реестра пластинок. */
+        songName: (Int) -> String? = { null },
     ): List<Pair<String, Int>> {
         val result = ArrayList<Pair<String, Int>>(5)
         val title = buildString {
@@ -45,6 +50,8 @@ object ItemTooltip {
             if (stack.enchantments.isNotEmpty() || stack.glintOverride == true) append(" ✦")
         }
         result += title to rarityColor(stack.rarity)
+        // `tooltip_display` с флагом «спрятать всё»: остаётся только имя.
+        if (stack.hideTooltip) return result
         // Прочность отдельной строкой: в заголовке она ломала имя, а так видно и остаток,
         // и предел.
         if (maxDamage > 0 && stack.damage > 0) {
@@ -57,8 +64,17 @@ object ItemTooltip {
             result += "Прочность: $left из $maxDamage" to color
         }
         // Описание идёт серым, как в игре; строки уже разобраны из компонента `lore`.
-        for (line in stack.lore) result += line to 0xAAAAAA
-        if (stack.enchantments.isNotEmpty()) {
+        if (!isHidden(stack, "lore")) {
+            for (line in stack.lore) result += line to 0xAAAAAA
+        }
+        // Модификаторы атрибутов: «+2 к урону», «+20 % к скорости». Свой текст сервера
+        // показываем как есть, спрятанные модификаторы не показываем вовсе.
+        for (mod in stack.attributeMods) {
+            if (mod.hidden) continue
+            val text = mod.display ?: attributeLine(mod, attributeName)
+            result += text to 0x4F6FA8
+        }
+        if (stack.enchantments.isNotEmpty() && !isHidden(stack, "enchantments")) {
             // «Острота III» вместо «Зачарования: 3»: имя берётся из реестра зачарований,
             // который сервер присылает при входе.
             val text = stack.enchantments.joinToString(", ") { (id, level) ->
@@ -68,11 +84,34 @@ object ItemTooltip {
             result += text to 0x8090C0
         }
         // Отделка брони: «Отделка: coast (золото)». Без реестра показываем номера.
-        if (stack.trimPattern >= 0 || stack.trimMaterial >= 0) {
+        if ((stack.trimPattern >= 0 || stack.trimMaterial >= 0) && !isHidden(stack, "trim")) {
             val pattern = trimPatternName(stack.trimPattern) ?: "узор ${stack.trimPattern}"
             val material = trimMaterialName(stack.trimMaterial) ?: "материал ${stack.trimMaterial}"
             result += "Отделка: $pattern ($material)" to 0xA0A0D0
         }
+        // Голова с профилем: чья она. Ник приходит компонентом `profile`.
+        stack.profileName?.let { result += "Голова: $it" to 0xC8C8A0 }
+        // Пластинка: какая песня записана.
+        if (stack.songId >= 0) {
+            result += "Пластинка: ${songName(stack.songId) ?: "№${stack.songId}"}" to 0xC8C8A0
+        }
+        // Книга: заголовок, автор и число страниц.
+        stack.bookTitle?.let { title ->
+            val author = stack.bookAuthor?.let { ", автор $it" } ?: ""
+            result += "Книга: «$title»$author, страниц ${stack.bookPages}" to 0xC8C8A0
+        }
+        // Режим приключений: на что можно ставить и что ломать.
+        if (stack.canPlaceOn.isNotEmpty()) {
+            result += "Ставится на: ${blockList(stack.canPlaceOn)}" to 0xA0A0A0
+        }
+        if (stack.canBreak.isNotEmpty()) {
+            result += "Ломает: ${blockList(stack.canBreak)}" to 0xA0A0A0
+        }
+        // Чем чинится предмет: тег или перечень.
+        val repair = stack.repairTag ?: stack.repairIds.takeIf { it.isNotEmpty() }?.joinToString(", ") {
+            "предмет $it"
+        }
+        if (repair != null) result += "Чинится: $repair" to 0xA0A0A0
         // Заряженный арбалет: сколько зарядов внутри.
         if (stack.chargedCount > 0) {
             result += "Заряды: ${stack.chargedCount}" to 0xC8C8A0
@@ -112,6 +151,105 @@ object ItemTooltip {
         }
         return result
     }
+
+    /** Строка модификатора атрибута: «+2 к урону», «+20% к скорости (в руке)». */
+    private fun attributeLine(mod: AttributeMod, name: (Int) -> String?): String {
+        val key = name(mod.attributeId)
+        val label = ATTRIBUTE_LABELS[key]
+            ?: key?.replace('_', ' ')
+            ?: "атрибут ${mod.attributeId}"
+        val value = if (mod.operation == 0) signed(mod.amount) else "${signed(mod.amount * 100)}%"
+        val slot = SLOT_LABELS[mod.slot]
+        return if (slot == null) "$value $label" else "$value $label ($slot)"
+    }
+
+    /** «+2» или «−0,5»: знак всегда, дробная часть через запятую, как в остальном интерфейсе. */
+    private fun signed(value: Double): String {
+        val text = if (value == value.toLong().toDouble()) {
+            value.toLong().toString()
+        } else {
+            String.format("%.2f", value).trimEnd('0').trimEnd('.').replace('.', ',')
+        }
+        return if (value >= 0) "+$text" else text
+    }
+
+    /** Компонент спрятан через `tooltip_display`: его строку не показываем. */
+    private fun isHidden(stack: Inventory.Stack, component: String): Boolean {
+        if (stack.hiddenComponents.isEmpty()) return false
+        val id = mcplus.net.ComponentTable.active.idOf(component)
+        return id >= 0 && id in stack.hiddenComponents
+    }
+
+    /** Список блоков допуска: тег как «тег logs», номер как «блок №9», «… ещё» — как есть. */
+    private fun blockList(entries: List<String>): String = entries.joinToString(", ") { entry ->
+        when {
+            entry.startsWith("…") -> entry
+            entry.startsWith("#") -> "блок №${entry.substring(1)}"
+            else -> "тег ${entry.removePrefix("minecraft:")}"
+        }
+    }
+
+    /**
+     * Подписи атрибутов по-русски: в подсказке «+2 к урону» читается лучше, чем
+     * «+2 attack_damage». Незнакомый атрибут показывается своим именем без подчёркиваний.
+     */
+    private val ATTRIBUTE_LABELS = mapOf(
+        "attack_damage" to "к урону",
+        "attack_speed" to "к скорости атаки",
+        "attack_knockback" to "к отбрасыванию",
+        "armor" to "к броне",
+        "armor_toughness" to "к твёрдости брони",
+        "max_health" to "к здоровью",
+        "max_absorption" to "к поглощению урона",
+        "movement_speed" to "к скорости",
+        "movement_efficiency" to "к эффективности движения",
+        "sneaking_speed" to "к скорости ползком",
+        "flying_speed" to "к скорости полёта",
+        "swimming_speed" to "к скорости плавания",
+        "water_movement_efficiency" to "к плаванию",
+        "knockback_resistance" to "к стойкости к отбрасыванию",
+        "explosion_knockback_resistance" to "к стойкости к взрывам",
+        "luck" to "к удаче",
+        "jump_strength" to "к прыжку",
+        "gravity" to "к гравитации",
+        "scale" to "к размеру",
+        "step_height" to "к высоте шага",
+        "safe_fall_distance" to "к безопасному падению",
+        "fall_damage_multiplier" to "к урону от падения",
+        "oxygen_bonus" to "к запасу воздуха",
+        "burning_time" to "к времени горения",
+        "mining_efficiency" to "к скорости копания",
+        "block_break_speed" to "к скорости ломания",
+        "submerged_mining_speed" to "к копанию под водой",
+        "sweeping_damage_ratio" to "к урону размаха",
+        "block_interaction_range" to "к дальности действия",
+        "entity_interaction_range" to "к дальности до существ",
+        "camera_distance" to "к дальности камеры",
+        "friction_modifier" to "к трению",
+        "bounciness" to "к упругости",
+        "air_drag_modifier" to "к сопротивлению воздуха",
+        "follow_range" to "к дальности следования",
+        "tempt_range" to "к дальности приманки",
+        "name_tag_distance" to "к дальности имени",
+        "below_name_distance" to "к дальности подписи",
+        "spawn_reinforcements" to "к подкреплению",
+        "waypoint_transmit_range" to "к передаче метки",
+        "waypoint_receive_range" to "к приёму метки",
+    )
+
+    /** Слоты `EquipmentSlotGroup`: 0 — где угодно, поэтому подписи нет. */
+    private val SLOT_LABELS = mapOf(
+        1 to "в руке",
+        2 to "в левой руке",
+        3 to "в руках",
+        4 to "на обуви",
+        5 to "на штанах",
+        6 to "на нагруднике",
+        7 to "на шлеме",
+        8 to "на броне",
+        9 to "на теле",
+        10 to "в седле",
+    )
 
     /** Римская запись уровня зачарования, как в игре: 1 → I, 5 → V, 10 → X. */
     fun roman(level: Int): String {
