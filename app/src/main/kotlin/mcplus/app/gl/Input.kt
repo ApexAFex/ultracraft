@@ -40,6 +40,7 @@ class Input(private val window: Long, private val camera: Camera) {
     private var inventoryPressed = false
     private var advancementsPressed = false
     private var statisticsPressed = false
+    private var recipeBookPressed = false
     private var escapePressed = false
     private var respawnPressed = false
     private var chatPressed = false
@@ -79,6 +80,7 @@ class Input(private val window: Long, private val camera: Camera) {
     /** Set once when L is pressed: открыть или закрыть экран достижений. */
     var advancementsToggleRequested: Boolean = false
     var statisticsToggleRequested: Boolean = false
+    var recipeBookToggleRequested: Boolean = false
         private set
 
     /** Set once when Escape is pressed; the caller decides what to close. */
@@ -251,6 +253,11 @@ class Input(private val window: Long, private val camera: Camera) {
         val statistics = pressed(GLFW.GLFW_KEY_K)
         statisticsToggleRequested = statistics && !statisticsPressed
         statisticsPressed = statistics
+
+        // B — книга рецептов: в оригинале её открывают кнопкой у инвентаря, у нас клавишей.
+        val recipeBook = pressed(GLFW.GLFW_KEY_B)
+        recipeBookToggleRequested = recipeBook && !recipeBookPressed
+        recipeBookPressed = recipeBook
 
         val escape = pressed(GLFW.GLFW_KEY_ESCAPE)
         escapeRequested = escape && !escapePressed

@@ -951,6 +951,7 @@ private fun windowCommand(args: List<String>) {
     var skinFile: String? = null
     var skinSlim = false
     var startStatistics = false
+    var startRecipeBook = false
     /** Проверка без рук: переименовать предмет в открытой наковальне. */
     var renameAfterOpen: String? = null
     var pauseAtStart = false
@@ -973,6 +974,7 @@ private fun windowCommand(args: List<String>) {
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
             "--statistics" -> startStatistics = true
+            "--recipes" -> startRecipeBook = true
             "--rename" -> renameAfterOpen = args.getOrNull(++index) ?: fail("--rename ждёт имя")
             "--use-item" -> useItemAtFrame =
                 args.getOrNull(++index)?.toIntOrNull() ?: fail("--use-item ждёт номер кадра")
@@ -1109,6 +1111,7 @@ private fun windowCommand(args: List<String>) {
             showTab = showTab,
             startAdvancements = startAdvancements,
             startStatistics = startStatistics,
+            startRecipeBook = startRecipeBook,
             renameAfterOpen = renameAfterOpen,
             useItemAtFrame = useItemAtFrame,
             tradeAtFrame = tradeAtFrame,

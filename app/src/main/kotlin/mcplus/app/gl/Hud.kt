@@ -388,6 +388,121 @@ class Hud(
     }
 
     /**
+     * Книга рецептов: вкладки категорий слева и сетка результатов справа.
+     *
+     * @return прямоугольники вкладок — по ним кликает вызывающий.
+     */
+    fun drawRecipeBookScreen(
+        tabs: List<Int>,
+        counts: Map<Int, Int>,
+        selected: Int,
+        recipes: List<mcplus.net.Recipe>,
+        page: Int,
+        itemName: (Int) -> String?,
+        iconLayer: (String) -> Int,
+        mouseX: Double,
+        mouseY: Double,
+    ): List<HudRect> {
+        val text = this.text ?: return emptyList()
+        val s = HudLayout.scale(height).toFloat()
+        renderer.begin()
+        renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x0A0806, 0.92f)
+        renderer.draw()
+
+        val panel = HudRect(16f * s, 12f * s, width - 32f * s, height - 24f * s)
+        renderer.begin()
+        renderer.rect(panel, 0x2A1F16, 0.97f)
+        renderer.draw()
+
+        val labels = ArrayList<TextRenderer.ScreenLabel>()
+        labels += TextRenderer.ScreenLabel(panel.x + 8f * s, panel.y + 6f * s, "Книга рецептов", s * 1.3f)
+        val perPage = RecipeBookScreen.perPage(height)
+        val pages = RecipeBookScreen.pageCount(recipes.size, perPage)
+        labels += TextRenderer.ScreenLabel(
+            panel.x + 8f * s, panel.y + 22f * s,
+            "${mcplus.net.RecipeCategories.titleOf(selected)} — ${recipes.size}, " +
+                "страница ${page.coerceIn(0, pages - 1) + 1} из $pages",
+            s * 0.85f, 0xD8C4A0,
+        )
+
+        // Вкладки категорий слева, как в игре.
+        val tabX = panel.x + 8f * s
+        var tabY = panel.y + 42f * s
+        val tabRects = ArrayList<HudRect>(tabs.size)
+        for (category in tabs) {
+            val rect = HudRect(tabX, tabY - 1f * s, 96f * s, 14f * s)
+            tabRects += rect
+            if (category == selected) {
+                renderer.begin()
+                renderer.rect(rect, 0x4A3524, 0.95f)
+                renderer.draw()
+            }
+            labels += TextRenderer.ScreenLabel(
+                tabX + 3f * s, tabY, RecipeBookScreen.tabTitle(category, counts[category] ?: 0),
+                s * 0.8f, if (category == selected) 0xFFE7A0 else 0xB8A891,
+            )
+            tabY += 15f * s
+        }
+
+        // Сетка результатов: под курсором рамка и подсказка.
+        val gridX = panel.x + 112f * s
+        val gridY = panel.y + 42f * s
+        val shown = RecipeBookScreen.pageSlice(recipes, page, perPage)
+        val hovered = RecipeBookScreen.indexAt(
+            (mouseX - gridX).toFloat(), (mouseY - gridY).toFloat(), height,
+        )
+        val icons = ArrayList<Pair<HudRect, Int>>(shown.size)
+        val slots = ArrayList<HudRect>(shown.size)
+        for ((index, recipe) in shown.withIndex()) {
+            val (dx, dy) = RecipeBookScreen.cellOrigin(index)
+            val rect = HudRect(
+                gridX + dx, gridY + dy,
+                RecipeBookScreen.ICON * s, RecipeBookScreen.ICON * s,
+            )
+            // Тёмная подложка слота: без неё иконки сливаются в сплошное пятно.
+            slots += HudRect(rect.x - 2f * s, rect.y - 2f * s, rect.width + 4f * s, rect.height + 4f * s)
+            if (index == hovered) {
+                renderer.begin()
+                renderer.rect(rect, 0xFFE7A0, 0.35f)
+                renderer.draw()
+            }
+            val name = itemName(recipe.result)
+            val layer = if (name != null) iconLayer(name) else 0
+            if (layer > 0) icons += rect to layer
+        }
+        if (slots.isNotEmpty()) {
+            renderer.begin()
+            for (rect in slots) renderer.rect(rect, 0x140D08, 0.9f)
+            renderer.draw()
+        }
+        if (icons.isNotEmpty()) {
+            renderer.begin()
+            for ((rect, layer) in icons) renderer.icon(rect, layer)
+            renderer.draw()
+        }
+
+        val footerY = panel.bottom - 30f * s
+        val hoveredRecipe = shown.getOrNull(hovered)
+        if (hoveredRecipe != null) {
+            var lineY = footerY
+            for (line in RecipeBookScreen.tooltip(hoveredRecipe, itemName)) {
+                labels += TextRenderer.ScreenLabel(gridX, lineY, line, s * 0.9f)
+                lineY += 12f * s
+            }
+        } else {
+            labels += TextRenderer.ScreenLabel(
+                gridX, footerY, "Наведи на предмет — покажу, из чего он", s * 0.85f, 0x9A8A78,
+            )
+        }
+        labels += TextRenderer.ScreenLabel(
+            panel.x + 8f * s, panel.bottom - 12f * s,
+            "B — закрыть, ←/→ — категория, колесо — страница", s * 0.75f, 0x8A7A68,
+        )
+        text.drawScreen(labels)
+        return tabRects
+    }
+
+    /**
      * Экран достижений: вкладки, дерево, значки и подсказка под курсором.
      *
      * @return прямоугольники вкладок — по ним кликает вызывающий.

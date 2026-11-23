@@ -221,6 +221,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         startAdvancements: Boolean = false,
         /** Открыть экран статистики сразу (проверка без клавиатуры). */
         startStatistics: Boolean = false,
+        startRecipeBook: Boolean = false,
         /** Проверка без рук: переименовать предмет в открытой наковальне. */
         renameAfterOpen: String? = null,
         /** Нарисовать перед камерой образцы спрайтов частиц (проверка без сервера). */
@@ -927,7 +928,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     var statisticsRightWasDown = false
                     var advancementTab = 0
                     var advancementTabRects: List<HudRect> = emptyList()
+                    /** Книга рецептов (B): вкладки категорий, страница и прямоугольники вкладок. */
+                    var recipeBookOpen = startRecipeBook
+                    var recipeCategory = -1
+                    var recipePage = 0
+                    var recipeTabRects: List<HudRect> = emptyList()
+                    var recipeLeftWasDown = false
+                    var recipeRightWasDown = false
                     if (startAdvancements) input.warpCursor(width * 0.5, height * 0.56)
+                    if (startRecipeBook) {
+                        // Ставим курсор на первую иконку: так снимок показывает и подсказку.
+                        val hudScale = HudLayout.scale(height).toFloat()
+                        input.warpCursor((136f * hudScale).toDouble(), (62f * hudScale).toDouble())
+                    }
 
                     /** Кадров в секунду для отладочной строки. */
                     var fps = 0
@@ -1076,6 +1089,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
 
                     while (!GLFW.glfwWindowShouldClose(window)) {
                         input.update()
+                        // В режиме проверки книга открыта с самого начала: держим курсор на
+                        // первой иконке, иначе снимок покажет пустую подсказку.
+                        if (startRecipeBook) {
+                            val hudScale = HudLayout.scale(height).toFloat()
+                            input.warpCursor((136f * hudScale).toDouble(), (62f * hudScale).toDouble())
+                        }
 
                         // Покадровая анимация текстур: вода, лава и огонь меняют слой атласа,
                         // когда приходит время следующего кадра. Меши при этом не трогаются.
@@ -1244,6 +1263,55 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                             if (index >= 0) advancementTab = index
                         }
+                        // B — книга рецептов. В отличие от прочих экранов открывается и поверх
+                        // инвентаря: в оригинале она живёт рядом с ним.
+                        if (input.recipeBookToggleRequested && !dead && !chat.open) {
+                            recipeBookOpen = !recipeBookOpen
+                            recipePage = 0
+                            recipeCategory = -1
+                            if (recipeBookOpen) {
+                                advancementsOpen = false
+                                statisticsOpen = false
+                                // Рецепты приходят сами при входе на сервер — просить нечего.
+                            }
+                        }
+                        if (recipeBookOpen) {
+                            val book = session?.recipes
+                            val counts = book?.countByCategory() ?: emptyMap()
+                            val tabs = mcplus.net.RecipeCategories.tabsWith(counts)
+                            if (recipeCategory !in tabs) recipeCategory = tabs.firstOrNull() ?: -1
+                            val total = if (book != null && recipeCategory >= 0) {
+                                RecipeBookScreen.recipesIn(book, recipeCategory).size
+                            } else {
+                                0
+                            }
+                            if (input.scrollSlotDelta != 0) {
+                                val perPage = RecipeBookScreen.perPage(height)
+                                val pages = RecipeBookScreen.pageCount(total, perPage)
+                                recipePage = (recipePage + input.scrollSlotDelta).coerceIn(0, pages - 1)
+                            }
+                            val left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS
+                            val right = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS
+                            if (left && !recipeLeftWasDown) {
+                                recipeCategory = RecipeBookScreen.categoryAfter(tabs, recipeCategory, -1)
+                                recipePage = 0
+                            }
+                            if (right && !recipeRightWasDown) {
+                                recipeCategory = RecipeBookScreen.categoryAfter(tabs, recipeCategory, 1)
+                                recipePage = 0
+                            }
+                            recipeLeftWasDown = left
+                            recipeRightWasDown = right
+                            if (input.clickRequested) {
+                                val chosen = recipeTabRects.indexOfFirst {
+                                    it.contains(input.mouseX, input.mouseY)
+                                }
+                                if (chosen >= 0 && chosen < tabs.size) {
+                                    recipeCategory = tabs[chosen]
+                                    recipePage = 0
+                                }
+                            }
+                        }
                         if (input.hudToggleRequested && !chat.open) {
                             hudHidden = !hudHidden
                         }
@@ -1315,6 +1383,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 inventoryOpen -> inventoryOpen = false
                                 advancementsOpen -> advancementsOpen = false
                                 statisticsOpen -> statisticsOpen = false
+                                recipeBookOpen -> recipeBookOpen = false
                                 dead -> Unit
                                 paused -> paused = false
                                 else -> paused = true
@@ -1871,10 +1940,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val wasOnGround = player.onGround
                                 player.move(
                                     TICK_SECONDS, world, blocks,
-                                    if (chat.open || advancementsOpen || statisticsOpen) 0.0 else forwardInput * inputScale,
-                                    if (chat.open || advancementsOpen || statisticsOpen) 0.0 else input.strafe * inputScale,
-                                    if (chat.open || advancementsOpen || statisticsOpen) false else input.jump,
-                                    if (chat.open || advancementsOpen || statisticsOpen) false else input.descend,
+                                    if (chat.open || advancementsOpen || statisticsOpen || recipeBookOpen) 0.0 else forwardInput * inputScale,
+                                    if (chat.open || advancementsOpen || statisticsOpen || recipeBookOpen) 0.0 else input.strafe * inputScale,
+                                    if (chat.open || advancementsOpen || statisticsOpen || recipeBookOpen) false else input.jump,
+                                    if (chat.open || advancementsOpen || statisticsOpen || recipeBookOpen) false else input.descend,
                                     sneak = sneakHeld,
                                 )
                                 // Приземление после падения: пыль под ногами и звук шага.
@@ -3388,6 +3457,27 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 } else {
                                     null
                                 },
+                            )
+                        } else if (recipeBookOpen) {
+                            // Книга рецептов: вкладки категорий и сетка результатов.
+                            val book = session?.recipes
+                            val counts = book?.countByCategory() ?: emptyMap()
+                            val tabs = mcplus.net.RecipeCategories.tabsWith(counts)
+                            val recipesNow = if (book != null && recipeCategory >= 0) {
+                                RecipeBookScreen.recipesIn(book, recipeCategory)
+                            } else {
+                                emptyList()
+                            }
+                            recipeTabRects = hud.drawRecipeBookScreen(
+                                tabs = tabs,
+                                counts = counts,
+                                selected = recipeCategory,
+                                recipes = recipesNow,
+                                page = recipePage,
+                                itemName = { id -> itemTable.nameOf(id) },
+                                iconLayer = { name -> atlas.layerForItem(name) },
+                                mouseX = input.mouseX,
+                                mouseY = input.mouseY,
                             )
                         } else if (advancementsOpen) {
                             // Экран достижений: вкладки и дерево; клик по вкладке — выше.
