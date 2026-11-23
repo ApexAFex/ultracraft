@@ -68,19 +68,24 @@ object RecipeBookScreen {
         val result = itemName(recipe.result) ?: "предмет ${recipe.result}"
         val lines = ArrayList<String>(2)
         lines += if (recipe.resultCount > 1) "$result ×${recipe.resultCount}" else result
-        val names = recipe.cells.filter { !it.isEmpty }.map { cell ->
+        val names = recipe.cells.filter { !it.isEmpty }.mapNotNull { cell ->
             val tag = cell.tag
-            if (tag != null) {
-                tagLabel(tag)
-            } else {
-                val base = itemName(cell.itemId) ?: "предмет ${cell.itemId}"
-                // Явный список вариантов: называем первый и говорим, что он не один.
-                if (cell.options.size > 1) "$base или ещё ${cell.options.size - 1}" else base
+            val note = cell.note
+            when {
+                note != null -> note
+                tag != null -> tagLabel(tag)
+                // «Предмета нет» уже отсеяно выше; сюда попадает только настоящий номер.
+                cell.itemId <= 0 -> null
+                else -> {
+                    val base = itemName(cell.itemId) ?: "предмет ${cell.itemId}"
+                    // Явный список вариантов: называем первый и говорим, что он не один.
+                    if (cell.options.size > 1) "$base или ещё ${cell.options.size - 1}" else base
+                }
             }
         }
         when {
             names.isNotEmpty() -> lines += "Нужно: " + names.distinct().joinToString(", ")
-            recipe.cells.isNotEmpty() -> lines += "Без ингредиентов"
+            recipe.cells.any { !it.isEmpty } -> lines += "Без ингредиентов"
             else -> lines += "Без ингредиентов"
         }
         if (recipe.kind == mcplus.net.RecipeKind.FURNACE) {

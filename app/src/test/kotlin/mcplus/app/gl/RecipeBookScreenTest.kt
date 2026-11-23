@@ -26,6 +26,23 @@ class RecipeBookScreenTest {
     ) = Recipe(id, RecipeKind.SHAPED, 3, 3, result, count, cells, category = 0)
 
     @Test
+    fun `a note cell is described in words, not as an item number`() {
+        val lines = RecipeBookScreen.tooltip(
+            recipe(1, 100, cells = listOf(Ingredient(4), Ingredient(-1, note = "любое топливо"))),
+        ) { "предмет $it" }
+        assertEquals("предмет 100", lines[0])
+        assertEquals("Нужно: предмет 4, любое топливо", lines[1])
+    }
+
+    @Test
+    fun `an empty cell is skipped in the list of ingredients`() {
+        val lines = RecipeBookScreen.tooltip(
+            recipe(2, 101, cells = listOf(Ingredient(0), Ingredient(4))),
+        ) { "предмет $it" }
+        assertEquals("Нужно: предмет 4", lines[1])
+    }
+
+    @Test
     fun `pages split the list and clamp to the last one`() {
         val list = (0 until 25).map { recipe(it, 100 + it) }
         assertEquals(2, RecipeBookScreen.pageCount(25, 16))

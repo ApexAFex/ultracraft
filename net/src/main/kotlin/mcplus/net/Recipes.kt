@@ -214,8 +214,12 @@ class RecipeBook {
     private fun readStation(reader: ByteReader): Int = readSlot(reader).itemId.takeIf { it > 0 } ?: -1
 
     private fun readSlotOfType(type: Int, reader: ByteReader): Ingredient = when (type) {
-        0, 1 -> Ingredient(-1)                       // пусто, любое топливо
-        2 -> { readSlot(reader); Ingredient(-1) }    // любое зелье
+        // Пустая клетка значит «ничего не нужно». Раньше она превращалась в «предмет −1»,
+        // и подсказка писала «item#-1» (91 клетка в 152 рецептах живого сервера).
+        0 -> Ingredient(0)
+        // «Любое топливо» и «любое зелье» — не предметы: подскажем словами, а не номером.
+        1 -> Ingredient(-1, note = "любое топливо")
+        2 -> { readSlot(reader); Ingredient(-1, note = "любое зелье") }
         3 -> {                                       // с компонентом: предмет тот же
             val inner = readSlot(reader)
             reader.readVarInt()
@@ -244,12 +248,16 @@ class RecipeBook {
         10 -> {                                      // набор вариантов: берём первый известный
             val options = reader.readVarInt()
             if (options !in 0..MAX_VARIANTS) throw RecipeFormatException("вариантов: $options")
-            var first = Ingredient(-1)
+            var concrete: Ingredient? = null
+            var tagged: Ingredient? = null
             repeat(options) {
                 val option = readSlot(reader)
-                if (first.itemId < 0 && option.tag == null && option.itemId > 0) first = option
+                if (concrete == null && option.tag == null && option.itemId > 0) concrete = option
+                // В наборе бывают только теги (камнерез: «любой камень»). Тогда без тега
+                // клетка оставалась «предметом −1», и в подсказке стояло «item#-1».
+                if (tagged == null && option.tag != null) tagged = option
             }
-            first
+            concrete ?: tagged ?: Ingredient(-1)
         }
         else -> throw RecipeFormatException("вид слота $type")
     }
@@ -299,7 +307,13 @@ enum class RecipeKind(val wire: Int) {
  * Тогда [options] содержит все варианты, а [itemId] — первый из них: на иконке всё равно
  * нужен один, но проверить надо любой из списка.
  */
-data class Ingredient(val itemId: Int, val tag: String? = null, val options: List<Int> = emptyList()) {
+data class Ingredient(
+    val itemId: Int,
+    val tag: String? = null,
+    val options: List<Int> = emptyList(),
+    /** Подпись вместо имени предмета: «любое топливо», «любое зелье». */
+    val note: String? = null,
+) {
     /** Тег, а не предмет: подойдёт любой предмет из набора. */
     val isTag: Boolean get() = tag != null
 

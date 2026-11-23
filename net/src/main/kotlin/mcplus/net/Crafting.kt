@@ -89,6 +89,9 @@ object Crafting {
         val needs = LinkedHashMap<String, Need>(recipe.cells.size)
         for (cell in recipe.cells) {
             if (cell.isEmpty) continue
+            // «Любое топливо»/«любое зелье» — не предмет: проверить нечем, и в нехватку
+            // такие клетки не попадают (иначе подсказка писала бы «item#-1»).
+            if (cell.note != null) continue
             val ids = when {
                 cell.tag != null -> tags?.of(cell.tag)
                 else -> cell.all.takeIf { it.isNotEmpty() }

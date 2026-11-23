@@ -98,7 +98,7 @@ class RecipeBookTest {
         assertEquals(RecipeKind.SHAPED, recipe.kind)
         assertEquals(2, recipe.width)
         assertEquals(2, recipe.height)
-        assertEquals(listOf(20, -1, -1, 20), recipe.ingredients)
+        assertEquals(listOf(20, 0, 0, 20), recipe.ingredients, "пустые клетки — ноль, а не «предмет −1»")
         assertEquals(23, recipe.result)
         assertEquals(405, recipe.station, "станция рецепта — верстак")
         assertEquals(5, recipe.group)
@@ -193,7 +193,74 @@ class RecipeBookTest {
         assertTrue(recipe.cells.single().isTag)
     }
 
-    /** Категории считаются по рецептам: по ним рисуются вкладки книги. */    @Test
+    /**
+     * Набор вариантов, в котором только теги (камнерез: «любой камень»).
+     *
+     * Раньше такая клетка оставалась «предметом −1» и в подсказке стояло «item#-1»:
+     * конкретного предмета в наборе нет, а имя тега терялось.
+     */
+    @Test
+    fun `a variant list of tags keeps the first tag`() {
+        val book = RecipeBook()
+        val writer = ByteWriter()
+        writer.writeVarInt(1)
+        writer.writeVarInt(12)
+        writer.writeVarInt(0)          // shapeless
+        writer.writeVarInt(1)          // одна клетка
+        writer.writeVarInt(10)         // набор вариантов
+        writer.writeVarInt(1)          // один вариант
+        writer.writeVarInt(6).writeVarInt(0).writeString("minecraft:stone_crafting_materials")
+        writer.writeVarInt(5)          // результат
+        writer.writeVarInt(21).writeVarInt(1).writeVarInt(0).writeVarInt(0)
+        writer.writeVarInt(0)          // станции нет
+        writer.entryTail(category = 0)
+        writer.writeBoolean(false)
+
+        book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, writer.toByteArray())
+
+        val cell = book.all().single().cells.single()
+        assertEquals("minecraft:stone_crafting_materials", cell.tag)
+        assertTrue(cell.isTag)
+    }
+
+    /**
+     * Пустая клетка и «любое топливо» — не предметы.
+     *
+     * На живом сервере таких клеток 102 из 152 рецептов, и раньше все они превращались
+     * в «предмет −1»: подсказка писала «item#-1», а проверка «хватает ли» считала их
+     * нехваткой.
+     */
+    @Test
+    fun `an empty slot stays empty and fuel gets a note`() {
+        fun recipe(slotType: Int): Recipe {
+            val book = RecipeBook()
+            val writer = ByteWriter()
+            writer.writeVarInt(1)
+            writer.writeVarInt(13)
+            writer.writeVarInt(0)          // shapeless
+            writer.writeVarInt(2)          // две клетки: пустая и «топливо»
+            writer.writeVarInt(slotType)
+            writer.writeVarInt(1)          // «любое топливо» — без тела
+            writer.writeVarInt(5)          // результат
+            writer.writeVarInt(21).writeVarInt(1).writeVarInt(0).writeVarInt(0)
+            writer.writeVarInt(0)
+            writer.entryTail(category = 0)
+            writer.writeBoolean(false)
+            book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, writer.toByteArray())
+            return book.all().single()
+        }
+
+        val empty = recipe(0).cells.first()
+        assertTrue(empty.isEmpty, "пустая клетка ничего не требует")
+        assertEquals(0, empty.itemId)
+
+        val fuel = recipe(1).cells.first()
+        assertTrue(!fuel.isEmpty)
+        assertEquals("любое топливо", fuel.note)
+    }
+
+    /** Категории считаются по рецептам: по ним рисуются вкладки книги. */
+    @Test
     fun `recipes are counted per category`() {
         fun packet(id: Int, category: Int): ByteArray {
             val writer = ByteWriter()
