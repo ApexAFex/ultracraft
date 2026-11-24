@@ -633,7 +633,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // Цвет зелья для иконки: из таблицы `data/potions-777.tsv`,
                         // потому что реестры зелий и эффектов сервер не присылает.
                         hud.potionColor = { id: Int -> mcplus.net.PotionTable.active.colorOf(id) }
-                        hud.effectName = { id: Int -> session?.effects?.nameOf(id) }
+                        // Техническое имя эффекта переводим: `night_vision` → «Ночное зрение».
+                        hud.effectName = { id: Int ->
+                            session?.effects?.nameOf(id)?.let { mcplus.net.ItemNames.effect(it) }
+                        }
                         if (mcplus.net.PotionTable.active.size > 0) {
                             println("Зелья: цветов в таблице ${mcplus.net.PotionTable.active.size}")
                         }

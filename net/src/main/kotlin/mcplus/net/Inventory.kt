@@ -156,7 +156,8 @@ class Inventory(
      * неизвестным, как и раньше.
      */
     fun displayNameOf(stack: Stack?): String? =
-        stack?.customName?.takeIf { it.isNotBlank() } ?: nameOf(stack)
+        stack?.customName?.takeIf { it.isNotBlank() }
+            ?: ItemNames.item(nameOf(stack))
 
     fun nameOf(stack: Stack?): String? =
         stack?.takeIf { it.isKnown }?.let { items.nameOf(it.itemId) }

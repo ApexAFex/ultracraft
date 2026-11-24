@@ -1473,12 +1473,24 @@ private fun findBlockRegistryTable(): mcplus.net.BlockRegistryTable {
  * а незнакомые ключи показываются как есть.
  */
 private fun loadLanguage() {
-    val bytes = mcplus.app.gl.GameFiles.readBytes(
+    // Язык интерфейса русский, поэтому имена предметов и эффектов берём из ru_ru: с en_us в
+    // подсказках были бы "Diamond Pickaxe" при русском остальном тексте. В jar установки
+    // лежит только en_us, остальные языки скачаны в assets/objects — отсюда и второй путь.
+    var language = "ru_ru"
+    var bytes = mcplus.app.gl.GameFiles.readBytes(
         null,
-        "assets/minecraft/lang/en_us.json",
-    ) ?: return
+        "assets/minecraft/lang/ru_ru.json",
+    ) ?: mcplus.app.gl.GameFiles.readAsset(null, "minecraft/lang/ru_ru.json")
+    if (bytes == null) {
+        language = "en_us"
+        bytes = mcplus.app.gl.GameFiles.readBytes(
+            null,
+            "assets/minecraft/lang/en_us.json",
+        )
+    }
+    val data = bytes ?: return
     runCatching {
-        val root = kotlinx.serialization.json.Json.parseToJsonElement(bytes.toString(Charsets.UTF_8))
+        val root = kotlinx.serialization.json.Json.parseToJsonElement(data.toString(Charsets.UTF_8))
             .let { it as kotlinx.serialization.json.JsonObject }
         val texts = HashMap<String, String>(root.size)
         for ((key, value) in root) {
@@ -1486,7 +1498,7 @@ private fun loadLanguage() {
             texts[key] = text
         }
         mcplus.net.Language.load(texts)
-        println("Строк перевода: ${texts.size}")
+        println("Строк перевода: ${texts.size} ($language)")
     }.onFailure { println("Языковой файл не прочитан: ${it.message}") }
 }
 
