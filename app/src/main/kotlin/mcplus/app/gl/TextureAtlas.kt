@@ -125,6 +125,18 @@ class TextureAtlas(
          */
         private val EXTRA_ENTITY_TEXTURES = listOf("experience/experience_orb")
 
+        /**
+         * Предметы, у которых картинка лежит не в `textures/item`, а в `textures/entity`.
+         *
+         * Щит в ванили рисуется моделью из `entity/shield`, отдельного `item/shield.png` нет.
+         * Без этой таблицы иконка щита (например в достижении «Не сегодня») выходила
+         * пурпурной заглушкой «нет текстуры».
+         */
+        private val ITEM_TEXTURE_ALIASES = mapOf(
+            "shield" to "shield/shield_base",
+            "white_banner" to "banner/banner_base",
+        )
+
         fun findMinecraftDirectory(): File? {
             val appData = System.getenv("APPDATA") ?: return null
             val directory = File(appData, ".minecraft")
@@ -180,7 +192,8 @@ class TextureAtlas(
 
                         // Спрайты сущностей (сфера опыта): отдельные файлы, но живут в том
                         // же атласе, чтобы рисоваться тем же шейдером, что иконки предметов.
-                        for (texture in EXTRA_ENTITY_TEXTURES) {
+                        val extraEntity = (EXTRA_ENTITY_TEXTURES + ITEM_TEXTURE_ALIASES.values).distinct()
+                        for (texture in extraEntity) {
                             val entry = zip.getEntry("$ENTITY_TEXTURES$texture.png") ?: continue
                             val image = runCatching {
                                 ImageIO.read(ByteArrayInputStream(zip.getInputStream(entry).readBytes()))
@@ -190,6 +203,12 @@ class TextureAtlas(
                             layers[key] = images.size
                             images += animation?.frames?.first() ?: firstFrame(image)
                             if (animation != null) animations[images.lastIndex] = animation
+                        }
+                        // Предметы с картинкой из entity/: щит и флаг.
+                        for ((item, texture) in ITEM_TEXTURE_ALIASES) {
+                            val source = layers["entity:" + texture] ?: continue
+                            if (layers.containsKey("item:" + item)) continue
+                            layers["item:" + item] = source
                         }
 
                         for (entry in zip.entries()) {
