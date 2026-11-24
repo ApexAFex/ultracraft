@@ -927,6 +927,8 @@ class Hud(
             val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
             renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack, potionColor))
             drawGlint(slotRect, stack)
+            // Полоска износа: в ванили она есть у любого повреждённого предмета в инвентаре.
+            drawWear(slotRect, stack, s)
         }
         // Выбранный слот хотбара обводится белой рамкой, как в игре.
         InventoryScreen.cells.firstOrNull {
@@ -1606,14 +1608,10 @@ class Hud(
 
     /** Полоска износа под иконкой: зелёная, жёлтая, красная — как в игре. */
     private fun drawWear(rect: HudRect, stack: Inventory.Stack, s: Float) {
-        val max = itemStats.of(stack.itemId)?.maxDamage ?: 0
-        if (max <= 0 || stack.damage <= 0) return
-        val fraction = ((max - stack.damage).toFloat() / max).coerceIn(0f, 1f)
-        val color = when {
-            fraction > 0.5f -> 0x35C035
-            fraction > 0.25f -> 0xD0C020
-            else -> 0xD03020
-        }
+        // Компонент max_damage важнее таблицы предметов: датапак мог поменять прочность.
+        val max = if (stack.maxDamage > 0) stack.maxDamage else itemStats.of(stack.itemId)?.maxDamage ?: 0
+        val fraction = WearBar.fraction(stack.damage, max) ?: return
+        val color = WearBar.color(fraction)
         val barWidth = rect.width - 4f * s
         renderer.rect(rect.x + 2f * s, rect.y + rect.height - 4f * s, barWidth, 3f * s, 0x101010, 0.85f)
         renderer.rect(rect.x + 2f * s, rect.y + rect.height - 4f * s, barWidth * fraction, 3f * s, color, 0.95f)
