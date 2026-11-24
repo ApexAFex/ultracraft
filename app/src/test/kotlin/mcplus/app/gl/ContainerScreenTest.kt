@@ -16,6 +16,21 @@ class ContainerScreenTest {
         OpenContainer(id = 1, type = "generic_9x$rows", title = "Chest", slotCount = 9 * rows + 36)
 
     @Test
+    fun `a lectern has a single book slot above the player inventory`() {
+        val container = OpenContainer(
+            id = 3, type = "lectern", title = "Кафедра",
+            slotCount = 1 + OpenContainer.PLAYER_SLOTS,
+        )
+        val layout = ContainerScreen.layout(container)
+        assertEquals(1, layout.slots.size, "у кафедры один слот под книгу")
+        // Слот книги выше инвентаря игрока, иначе он наложится на него.
+        assertTrue(layout.slots[0].y < layout.playerY, "слот книги должен быть выше инвентаря")
+        val cells = ContainerScreen.cells(container)
+        // Один слот книги плюс 27 слотов инвентаря и 9 хотбара.
+        assertEquals(1 + 36, cells.size)
+    }
+
+    @Test
     fun `a chest shows its slots and the player inventory`() {
         val container = chest()
         val cells = ContainerScreen.cells(container)

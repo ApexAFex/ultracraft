@@ -83,6 +83,9 @@ object ContainerScreen {
         "generic_3x3" to {
             Layout("gui_dispenser", 166, (0 until 9).map { slot(it, 62f + (it % 3) * 18f, 17f + (it / 3) * 18f) }, 84)
         },
+        // Кафедра: в ванили это не сетка, а один слот под книгу и её разворот.
+        // Своей текстуры панели у кафедры нет, поэтому фон рисуется тёмной панелью.
+        "lectern" to { Layout("", 166, listOf(slot(0, 80f, 47f)), 84) },
         // Станок-крафтер: та же сетка 3×3, но левее — справа у него ячейки включения.
         "crafter_3x3" to {
             Layout("gui_crafter", 166, (0 until 9).map { slot(it, 26f + (it % 3) * 18f, 17f + (it / 3) * 18f) }, 84)

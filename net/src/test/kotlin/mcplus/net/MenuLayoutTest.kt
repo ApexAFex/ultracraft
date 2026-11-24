@@ -12,6 +12,12 @@ import kotlin.test.assertTrue
  */
 class MenuLayoutTest {
 
+
+    @Test
+    fun `a lectern has one book slot and the player inventory`() {
+        assertEquals(1 + mcplus.net.OpenContainer.PLAYER_SLOTS, MenuLayout.slotCount("lectern"))
+        assertEquals(1, MenuLayout.containerSlots("lectern", 1 + mcplus.net.OpenContainer.PLAYER_SLOTS))
+    }
     @Test
     fun `chest slots grow by nine and the player part stays thirty-six`() {
         assertEquals(45, MenuLayout.slotCount("generic_9x1"))

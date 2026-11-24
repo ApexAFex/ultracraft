@@ -99,7 +99,9 @@ object MenuLayout {
             9 * rows + OpenContainer.PLAYER_SLOTS
         }
 
+        // Кафедра: один слот под книгу и инвентарь игрока.
         type == "crafting" -> 10 + OpenContainer.PLAYER_SLOTS
+        type == "lectern" -> 1 + OpenContainer.PLAYER_SLOTS
         type in FURNACES -> 3 + OpenContainer.PLAYER_SLOTS
         type == "inventory" -> 46
         else -> 0
@@ -116,6 +118,7 @@ object MenuLayout {
         }
 
         type == "crafting" -> 10
+        type == "lectern" -> 1
         type in FURNACES -> 3
         else -> (slotCount - OpenContainer.PLAYER_SLOTS).coerceAtLeast(0)
     }
