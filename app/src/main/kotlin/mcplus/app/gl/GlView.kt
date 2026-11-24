@@ -3086,6 +3086,22 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                 yaw = 0f,
                                             )
                                         }
+                                        // Сундук в лодке и в вагонетке — отдельная модель со
+                                        // своей текстурой, а не блок: в ванили это блок-сущность.
+                                        VehicleLoads.chestOffsetFor(name)?.let { offset ->
+                                            mobs += MobRenderer.Mob(
+                                                x = entity.x,
+                                                y = entity.y + offset,
+                                                z = entity.z,
+                                                yaw = entity.yaw,
+                                                walkPhase = 0f,
+                                                walkAmount = 0f,
+                                                family = MobFamily.CHEST,
+                                                scale = 1f,
+                                                texture = mobRenderer.textureForPath("entity/chest/normal.png"),
+                                                time = (nowNanos / 1_000_000_000.0).toFloat(),
+                                            )
+                                        }
                                     }
                                 }
                             }

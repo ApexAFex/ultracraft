@@ -41,4 +41,28 @@ class VehicleLoadsTest {
         assertTrue(bottom > 0.625, "груз не должен проваливаться в кузов: низ $bottom")
         assertTrue(VehicleLoads.LOAD_SIZE < 1f, "груз в вагоне меньше целого блока")
     }
+
+    @Test
+    fun `chest carts and chest boats get a chest model`() {
+        assertEquals(0.3f, VehicleLoads.chestOffsetFor("chest_minecart"))
+        assertEquals(0.4f, VehicleLoads.chestOffsetFor("oak_chest_boat"))
+        assertEquals(0.4f, VehicleLoads.chestOffsetFor("bamboo_chest_raft"))
+        // У простой вагонетки и простой лодки сундука нет.
+        assertNull(VehicleLoads.chestOffsetFor("minecart"))
+        assertNull(VehicleLoads.chestOffsetFor("oak_boat"))
+    }
+
+    @Test
+    fun `the chest model has a base, a lid and a knob`() {
+        val boxes = MobModels.boxes(MobFamily.CHEST)
+        assertEquals(3, boxes.size, "днище, крышка и замок")
+        assertEquals(1, boxes.count { it.name == "base" })
+        assertEquals(1, boxes.count { it.name == "lid" })
+        // Крышка выше днища и начинается там, где днище кончается.
+        val base = boxes.first { it.name == "base" }
+        val lid = boxes.first { it.name == "lid" }
+        assertEquals(base.maxY, lid.minY, 0.0001f, "крышка стоит на днище")
+        // В основании 14 пикселей, как в ванильной модели сундука.
+        assertEquals(0.875f, base.maxX - base.minX, 0.0001f)
+    }
 }

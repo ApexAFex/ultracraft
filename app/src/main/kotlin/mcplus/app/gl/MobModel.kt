@@ -7,7 +7,7 @@ enum class MobFamily {
     QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
-    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, CREAKING, BOAT, MINECART, NONE,
+    GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, CREAKING, BOAT, MINECART, CHEST, NONE,
 }
 
 /**
@@ -300,6 +300,7 @@ object MobModels {
         MobFamily.CREAKING -> CREAKING
         MobFamily.BOAT -> BOAT
         MobFamily.MINECART -> MINECART
+        MobFamily.CHEST -> CHEST
         MobFamily.NONE -> emptyList()
     }
 
@@ -1094,6 +1095,28 @@ object MobModels {
         MobBox(
             "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
             u = 0, v = 0, offsetX = 0.5625f, offsetY = 0.0625f, rotY = 1.5708f,
+        ),
+    )
+
+    /**
+     * Сундук (`ChestModel`): днище, крышка и замок, лист 64×64.
+     *
+     * В ванили сундук — не блок, а модель блок-сущности: 14×14 пикселей в основании и 14 в
+     * высоту. Развёртка коробок стандартная, поэтому текстура `entity/chest/normal` ложится
+     * как есть: у днища начало (0, 19), у крышки — (0, 0).
+     */
+    private val CHEST = listOf(
+        MobBox(
+            "base", -0.4375f, 0f, -0.4375f, 0.4375f, 0.625f, 0.4375f,
+            u = 0, v = 19,
+        ),
+        MobBox(
+            "lid", -0.4375f, 0.625f, -0.4375f, 0.4375f, 0.9375f, 0.4375f,
+            u = 0, v = 0,
+        ),
+        MobBox(
+            "knob", -0.0625f, 0.6875f, 0.4375f, 0.0625f, 0.8125f, 0.5f,
+            u = 0, v = 0,
         ),
     )
 

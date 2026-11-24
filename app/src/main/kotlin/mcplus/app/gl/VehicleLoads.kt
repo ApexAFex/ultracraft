@@ -29,4 +29,15 @@ object VehicleLoads {
 
     /** Сторона куба: в ванили груз рисуется в масштабе 0.75 от блока. */
     const val LOAD_SIZE = 0.7f
+
+    /**
+     * Высота центра модели сундука над низом сущности или null, если сундука нет.
+     *
+     * Лодка с сундуком: сундук стоит на палубе (низ 0.4). Вагонетка с сундуком: сундук лежит
+     * в кузове (низ 0.3), как в ванильном MinecartRenderer с масштабом 0.75.
+     */
+    fun chestOffsetFor(entityName: String): Float? = when (entityName) {
+        "chest_minecart" -> 0.3f
+        else -> if (entityName.endsWith("_chest_boat") || entityName.endsWith("_chest_raft")) 0.4f else null
+    }
 }
