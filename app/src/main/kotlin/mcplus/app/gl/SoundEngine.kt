@@ -89,6 +89,9 @@ class SoundEngine(private val directory: File?) : Closeable {
     var requested = 0
         private set
 
+    /** Печатать каждое проигранное событие: включается флагом `--sound-log`. */
+    var logEvents: Boolean = false
+
     init {
         available = catalog.isNotEmpty() && initOpenAl()
         if (!available) println("Звук недоступен: нет звукового устройства или sounds.json")
@@ -186,6 +189,7 @@ class SoundEngine(private val directory: File?) : Closeable {
     ) {
         if (!available) return
         requested++
+        if (logEvents) println("Звук: $event @ %.1f %.1f %.1f".format(x, y, z))
         val files = catalog[event] ?: fallback?.let { catalog[it] } ?: return
         val path = files[random.nextInt(files.size)]
         val buffer = bufferFor(path) ?: return
@@ -276,6 +280,32 @@ class StepSoundTimer {
         travelled = 0.0
         nextStep = STEP_DISTANCE
         return true
+    }
+}
+
+/**
+ * Шаги чужой сущности: копит пройденный путь и помнит прошлую точку.
+ *
+ * В ванили шаги всех существ предсказывает клиент: сервер присылает только движение.
+ * У каждой сущности свой счётчик, иначе шаги двух идущих рядом сливались бы в один.
+ */
+class EntityStepTracker {
+    private val timer = StepSoundTimer()
+    private var lastX = Double.NaN
+    private var lastZ = Double.NaN
+
+    /** @return true, когда сущность прошла достаточно для звука шага. */
+    fun advance(x: Double, z: Double): Boolean {
+        if (lastX.isNaN()) {
+            lastX = x
+            lastZ = z
+            return false
+        }
+        val travelled = kotlin.math.hypot(x - lastX, z - lastZ)
+        lastX = x
+        lastZ = z
+        if (travelled <= 0.01) return false
+        return timer.advance(travelled)
     }
 }
 

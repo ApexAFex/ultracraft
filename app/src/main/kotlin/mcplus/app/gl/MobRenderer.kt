@@ -35,6 +35,8 @@ class MobRenderer(
         val overlays: List<Int> = emptyList(),
         /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
         val hurt: Float = 0f,
+        /** Время в секундах: по нему качаются хвосты, уши и щупальца в покое. */
+        val time: Float = 0f,
     )
 
     private class FamilyMesh(
@@ -125,7 +127,7 @@ class MobRenderer(
         for ((index, box) in mesh.boxes.withIndex()) {
             // Вершины коробок уже лежат в координатах модели, поэтому качание — это
             // поворот вокруг оси бедра, без масштабирования коробки.
-            val angle = MobModels.limbAngle(box.name, mob.walkPhase, mob.walkAmount)
+            val angle = MobModels.limbAngle(box.name, mob.walkPhase, mob.walkAmount, mob.time)
             val matrix = if (angle == 0f) {
                 base
             } else {

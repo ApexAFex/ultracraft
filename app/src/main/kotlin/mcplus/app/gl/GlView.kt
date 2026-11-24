@@ -210,6 +210,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         minecraftDirectory: File? = null,
         session: Session? = null,
         demo: Boolean = false,
+        /** Идти вперёд всё время: проверка чужих шагов вторым клиентом (`--walk`). */
+        walkForever: Boolean = false,
+        /** Печатать каждое проигранное событие звука: проверка предсказаний без слуха. */
+        soundLog: Boolean = false,
         meshThreads: Int = 0,
         /** Packets read while the first chunks were awaited; replayed before the loop starts. */
         replay: List<mcplus.protocol.Packet> = emptyList(),
@@ -586,6 +590,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val paintingRenderer = PaintingRenderer(width, height, directory)
                     // Звук: шаги, ломание и установка блоков. Без устройства просто молчит.
                     val sound = SoundEngine(directory)
+                    sound.logEvents = soundLog
                     sound.musicEnabled = Settings.music
                     // Субтитры: последняя подпись звука и время её показа.
                     var subtitleKey: String? = null
@@ -601,6 +606,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val stepTimer = StepSoundTimer()
                     var lastStepX = Double.NaN
                     var lastStepZ = Double.NaN
+                    /** Шаги чужих существ: у каждого свой счётчик пройденного пути. */
+                    val entitySteps = HashMap<Int, EntityStepTracker>()
+                    var otherSteps = 0
+                    var playerSteps = 0
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -1925,8 +1934,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         player.pitch = camera.pitch
 
                         // Demo mode walks forward on its own so the movement packets show up
-                        // in the log without anyone holding a key.
-                        val demoWalking = demo && frame in DEMO_WALK_FROM until DEMO_WALK_TO
+                        // in the log without anyone holding a key. `--walk` держит шаг всё время:
+                        // так проверяют чужие шаги вторым клиентом.
+                        val demoWalking = walkForever || (demo && frame in DEMO_WALK_FROM until DEMO_WALK_TO)
                         val forwardInput = if (demoWalking) 1.0 else input.forward
 
                         // Shift — крадёмся (медленно и ниже глаза), Ctrl — бежим.
@@ -2482,6 +2492,34 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             lastStepX = player.x
                             lastStepZ = player.z
 
+                            // Шаги чужих существ: их движение приходит с сервера, а звук шага
+                            // клиент предсказывает сам, как в ванили. У каждого свой счётчик,
+                            // иначе шаги двух идущих рядом сливались бы в один.
+                            for (entity in entities) {
+                                val name = entityTypes.nameOf(entity.type)
+                                if (name == "item" || name == "experience_orb" || name in Projectiles.TYPES) {
+                                    continue
+                                }
+                                // Чужого игрока узнаём по списку игроков, а не по имени типа:
+                                // сервер присылает его как обычную сущность, и имя типа у него
+                                // не «player».
+                                val isPlayer = playerList.nameOf(entity.uuid) != null
+                                val tracker = entitySteps.getOrPut(entity.id) { EntityStepTracker() }
+                                if (tracker.advance(entity.x, entity.z)) {
+                                    val ground = blockUnderName(blocks, world, entity.x, entity.y, entity.z)
+                                    // В воздухе шагов нет: летящий попугай не топает.
+                                    if (ground.isNotEmpty() && ground != "air" && !ground.endsWith("_air")) {
+                                        sound.play(
+                                            stepEvent(ground),
+                                            entity.x, entity.y, entity.z,
+                                            "block.stone.step",
+                                        )
+                                        otherSteps++
+                                        if (isPlayer) playerSteps++
+                                    }
+                                }
+                            }
+
                             // Звуки мобов: раз в несколько секунд ближайший живой подаёт голос.
                             val now = System.nanoTime()
                             if (sound.available && now - ambientNanos > 4_000_000_000L) {
@@ -3024,6 +3062,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         texture = mobRenderer.textureFor(name),
                                         overlays = villagerLayers(entity, name),
                                         hurt = entity.hurtProgress(System.nanoTime()),
+                                        time = (nowNanos / 1_000_000_000.0).toFloat(),
                                     )
                                 }
                             }
@@ -3150,6 +3189,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 DemoMob("cushion"),
                             )
                             val faceCamera = 180f - CameraAngles.degrees(camera.yaw)
+                            // Время для позы покоя: хвосты, уши и щупальца должны шевелиться.
+                            val demoTime = (System.nanoTime() / 1_000_000_000L % 3600L).toFloat()
                             val demoMobs = samples.mapIndexed { index, sample ->
                                 val side = (index - (samples.size - 1) / 2f) * DEMO_SIDE_STEP
                                 val layers = when (sample.name) {
@@ -3176,6 +3217,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     scale = MobModels.scaleOf(sample.name),
                                     texture = mobRenderer.textureFor(sample.name),
                                     overlays = layers.drop(1).map { mobRenderer.textureForPath(it) },
+                                    time = demoTime,
                                 )
                             }
                             mobRenderer.draw(camera, demoMobs)
@@ -3195,6 +3237,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     family = MobModels.familyOf(typeName),
                                     scale = MobModels.scaleFor(typeName, emptyMap()),
                                     texture = mobRenderer.textureFor(typeName),
+                                    time = demoTime,
                                 )
                             }
                             mobRenderer.draw(camera, demoGround)
@@ -3214,6 +3257,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         family = MobFamily.GHAST,
                                         scale = MobModels.scaleOf("ghast"),
                                         texture = mobRenderer.textureFor("ghast"),
+                                        time = demoTime,
                                     ),
                                 ),
                             )
@@ -4309,6 +4353,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     )
                     println("Анимаций текстур: ${atlas.animations.size}, кадров обновлено: $animatedUploads")
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
+                    println("Шагов чужих существ: $otherSteps (игроков: $playerSteps)")
                 }
             }
         } finally {

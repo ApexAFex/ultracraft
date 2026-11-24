@@ -333,9 +333,14 @@ object MobModels {
      * собранные из дампов, ходили с неподвижными ногами. Здесь имя разбирается на
      * «сторона» и «перед/зад», а диагональные пары качаются в противофазе, как в игре.
      */
-    fun limbAngle(name: String, phase: Float, amount: Float): Float {
+    fun limbAngle(name: String, phase: Float, amount: Float, time: Float = 0f): Float {
         val swing = kotlin.math.sin(phase) * amount.coerceIn(0f, 1f) * MAX_SWING
         val key = name.lowercase()
+        // Вёсла: гребут только когда лодка едет, а в покое стоят неподвижно, как в игре.
+        if (key.contains("paddle")) {
+            val side = if (key.contains("left")) -1f else 1f
+            return kotlin.math.sin(phase * 1.2f) * amount.coerceIn(0f, 1f) * 0.55f * side
+        }
         // Крылья и щупальца — отдельные движения: у крыльев мах, у щупалец медленное качание.
         if (key.contains("wing")) {
             val side = sideOf(key) ?: return 0f
@@ -343,26 +348,26 @@ object MobModels {
         }
         if (key.contains("tentacle")) {
             val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
-            return kotlin.math.sin(phase * 0.5f + index) * amount.coerceIn(0f, 1f) * 0.12f
+            // Щупальца висят и качаются даже у стоящего гаста: время идёт всегда.
+            return kotlin.math.sin(time * 0.9f + index) * (0.06f + 0.12f * amount.coerceIn(0f, 1f))
         }
         // Пасть дракона приоткрыта и медленно двигается: в игре она не стоит на месте.
         if (key.contains("jaw")) {
-            return (kotlin.math.sin(phase * 0.45f) * 0.5f + 0.5f) * 0.22f
+            return (kotlin.math.sin(time * 0.9f) * 0.5f + 0.5f) * 0.22f
         }
         // Шея дракона из пяти звеньев: волна идёт по ней от головы к туловищу.
         if (key.contains("neck")) {
             val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
-            return kotlin.math.sin(phase * 0.6f + index * 0.5f) * (0.04f + 0.10f * amount.coerceIn(0f, 1f))
+            return kotlin.math.sin(time * 1.2f + index * 0.5f) * (0.04f + 0.10f * amount.coerceIn(0f, 1f))
         }
-        // Хвост и уши качаются всегда, но слабо: даже стоящий моб не выглядит статуей.
+        // Хвост и уши качаются всегда, даже когда моб стоит: иначе он выглядит статуей.
         if (key.contains("tail") || key.contains("mane")) {
             val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
-            val speed = 0.35f
-            return kotlin.math.sin(phase * speed + index) * (0.10f + 0.12f * amount.coerceIn(0f, 1f))
+            return kotlin.math.sin(time * 0.9f + index) * (0.10f + 0.12f * amount.coerceIn(0f, 1f))
         }
         if (key.contains("ear")) {
             val index = key.filter { it.isDigit() }.toIntOrNull() ?: 0
-            return kotlin.math.sin(phase * 0.25f + index) * amount.coerceIn(0f, 1f) * 0.06f
+            return kotlin.math.sin(time * 0.7f + index) * (0.05f + 0.04f * amount.coerceIn(0f, 1f))
         }
         if (key.contains("arm")) {
             // Руки идут в противофазе с одноимённой ногой: правая рука вперёд — правая нога назад.
@@ -1035,22 +1040,27 @@ object MobModels {
             "side", -0.8125f, 0.0625f, -0.0625f, 0.3125f, 0.4375f, 0.0625f,
             u = 0, v = 19, offsetX = -0.9375f, offsetY = 0.125f, offsetZ = 0.25f, rotY = 4.712f,
         ),
-        // Вёсла: черенок и лопасть. В ванили они чуть повёрнуты вокруг Z.
+        // Вёсла: черенок и лопасть. В ванили они чуть повёрнуты вокруг Z, а качаются
+        // вокруг точки крепления к борту — поэтому у них свой `pivotY`.
         MobBox(
-            "paddle", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
+            "paddle_right", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
+            pivotY = 0.6875f,
             u = 62, v = 0, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = 0.5625f, rotZ = -0.196f,
         ),
         MobBox(
-            "paddle", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
+            "paddle_right", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
+            pivotY = 0.6875f,
             u = 62, v = 0, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = 0.5625f, rotZ = -0.196f,
         ),
         MobBox(
-            "paddle", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
+            "paddle_left", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
+            pivotY = 0.6875f,
             u = 62, v = 20, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = -0.5625f,
             rotY = 3.1416f, rotZ = -0.196f,
         ),
         MobBox(
-            "paddle", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
+            "paddle_left", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
+            pivotY = 0.6875f,
             u = 62, v = 20, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = -0.5625f,
             rotY = 3.1416f, rotZ = -0.196f,
         ),

@@ -956,6 +956,10 @@ private fun windowCommand(args: List<String>) {
     var startCraft: String? = null
     /** Проверка без мыши: открыть книгу из руки (`--book`). */
     var startBook = false
+    /** Печатать каждое проигранное событие звука (`--sound-log`). */
+    var soundLog = false
+    /** Идти вперёд всё время (`--walk`): второй клиент для проверки чужих шагов. */
+    var walkForever = false
     /** Страница, на которой открыть книгу. */
     var startBookPage = 1
     /** Проверка без рук: переименовать предмет в открытой наковальне. */
@@ -977,6 +981,8 @@ private fun windowCommand(args: List<String>) {
             "--chest-open" -> chestOpenAt =
                 parsePosition(args.getOrNull(++index) ?: fail("--chest-open требует x,y,z"))
             "--debug" -> debug = true
+            "--walk" -> walkForever = true
+            "--sound-log" -> soundLog = true
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
             "--statistics" -> startStatistics = true
@@ -1118,6 +1124,8 @@ private fun windowCommand(args: List<String>) {
             minecraftDirectory = options.minecraft?.let { java.io.File(it) },
             session = it,
             demo = options.demo,
+            walkForever = walkForever,
+            soundLog = soundLog,
             meshThreads = options.threads,
             replay = replay,
             openAt = openAt,
@@ -1613,6 +1621,8 @@ private fun printUsage() {
           --chunks N     размер карты в чанках, по умолчанию 3 (48 блоков)
           --threads N    потоков на сборку мешей, по умолчанию все ядра минус одно
           --hidden       окно без рамки (для снимков)
+          --sound-log    печатать каждое проигранное событие звука
+          --walk         идти вперёд всё время (проверка шагов вторым клиентом)
           --debug        отладочные строки F3 (FPS, координаты, чанки)
           --tab          список игроков по Tab
           --advancements открыть экран достижений (клавиша L в игре)

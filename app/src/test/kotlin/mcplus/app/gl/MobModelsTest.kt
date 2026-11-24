@@ -115,23 +115,37 @@ class MobModelsTest {
         val wingBase = MobModels.limbAngle("left_wing_base", 1f, 1f)
         val wingTip = MobModels.limbAngle("right_wing_tip", 1f, 1f)
         assertTrue(wingBase < 0f && wingTip > 0f, "крылья машут в противофазе")
-        // Щупальца гаста качаются каждое со своим сдвигом.
-        val tentacle0 = MobModels.limbAngle("tentacle0", 1f, 1f)
-        val tentacle3 = MobModels.limbAngle("tentacle3", 1f, 1f)
+        // Щупальца гаста качаются в покое: время идёт, даже когда моб стоит.
+        val tentacle0 = MobModels.limbAngle("tentacle0", phase = 0f, amount = 0f, time = 1f)
+        val tentacle3 = MobModels.limbAngle("tentacle3", phase = 0f, amount = 0f, time = 1f)
+        assertTrue(tentacle0 != 0f, "щупальце качается у стоящего гаста")
         assertTrue(tentacle0 != tentacle3, "щупальца не двигаются синхронно")
+        assertTrue(
+            tentacle0 != MobModels.limbAngle("tentacle0", 0f, 0f, 1.7f),
+            "поза меняется со временем",
+        )
         // Хвост и уши качаются даже когда моб стоит: иначе он выглядит статуей.
-        assertTrue(MobModels.limbAngle("tail", 1f, 0f) != 0f, "хвост качается в покое")
-        assertTrue(MobModels.limbAngle("tail2", 1f, 1f) != MobModels.limbAngle("tail1", 1f, 1f))
-        assertTrue(MobModels.limbAngle("right_ear", 1f, 1f) != 0f, "уши шевелятся")
+        assertTrue(MobModels.limbAngle("tail", 1f, 0f, time = 1.2f) != 0f, "хвост качается в покое")
+        assertTrue(
+            MobModels.limbAngle("tail1", 1f, 1f, 1f) != MobModels.limbAngle("tail2", 1f, 1f, 1f),
+            "звенья хвоста идут волной",
+        )
+        assertTrue(MobModels.limbAngle("right_ear", 1f, 0f, time = 1.5f) != 0f, "уши шевелятся в покое")
+        // Вёсла гребут, пока лодка едет, и стоят на месте в покое.
+        val rightPaddle = MobModels.limbAngle("paddle_right", 1f, 1f)
+        val leftPaddle = MobModels.limbAngle("paddle_left", 1f, 1f)
+        assertTrue(rightPaddle != 0f && leftPaddle != 0f, "вёсла гребут на ходу")
+        assertTrue(rightPaddle * leftPaddle < 0f, "вёсла идут в противофазе")
+        assertEquals(0f, MobModels.limbAngle("paddle_right", 1f, 0f), "на стоянке вёсла неподвижны")
         // Голова и тело не качаются от ходьбы.
         assertEquals(0f, MobModels.limbAngle("head", 1f, 1f))
         assertEquals(0f, MobModels.limbAngle("body", 1f, 1f))
         // Пасть дракона приоткрыта и двигается: раньше она была намертво зашита.
-        val jaw = MobModels.limbAngle("jaw", 1f, 1f)
+        val jaw = MobModels.limbAngle("jaw", 1f, 1f, 1f)
         assertTrue(jaw > 0f && jaw < 0.25f, "пасть приоткрыта, но не распахнута: $jaw")
-        assertTrue(MobModels.limbAngle("jaw", 4f, 1f) != MobModels.limbAngle("jaw", 1f, 1f))
+        assertTrue(MobModels.limbAngle("jaw", 1f, 1f, 4f) != MobModels.limbAngle("jaw", 1f, 1f, 1f))
         // Пять звеньев шеи дракона идут волной, а не одним куском.
-        assertTrue(MobModels.limbAngle("neck0", 1f, 1f) != MobModels.limbAngle("neck3", 1f, 1f))
+        assertTrue(MobModels.limbAngle("neck0", 1f, 1f, 1f) != MobModels.limbAngle("neck3", 1f, 1f, 1f))
     }
 
     @Test
@@ -341,7 +355,12 @@ class MobModelsTest {
         assertEquals(9, boxes.size, "днище, четыре борта и четыре части вёсел")
         assertEquals(1, boxes.count { it.name == "bottom" })
         assertEquals(4, boxes.count { it.name == "side" })
-        assertEquals(4, boxes.count { it.name == "paddle" })
+        assertEquals(4, boxes.count { it.name == "paddle_left" || it.name == "paddle_right" })
+        assertEquals(2, boxes.count { it.name == "paddle_left" })
+        assertTrue(
+            boxes.filter { it.name.startsWith("paddle") }.all { it.pivotY > 0f },
+            "вёсла качаются вокруг точки крепления, а не вокруг пола",
+        )
         assertTrue(boxes.first { it.name == "bottom" }.rotX != 0f, "днище в модели повёрнуто на 90°")
 
         for (wood in listOf("oak", "spruce", "bamboo")) {
