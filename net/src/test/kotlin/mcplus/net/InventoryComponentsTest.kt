@@ -432,6 +432,162 @@ class InventoryComponentsTest {
         assertEquals(listOf("Первая страница"), stack.bookPagesText)
     }
 
+    // --- вторая волна: варианты, цвета, инструмент, экипировка ---------------------------
+
+    @Test
+    fun `animal variants and dye colours are single numbers`() {
+        // Коровы, кошки, собаки приходят номером в реестре вариантов; шерсть и ошейник —
+        // номером красителя. Проверяем, что после одного числа стек остаётся известным.
+        assertTrue(stackWith(ByteWriter().writeVarInt(3), "cow/variant").isKnown)
+        assertTrue(stackWith(ByteWriter().writeVarInt(2), "horse/variant").isKnown)
+        assertTrue(stackWith(ByteWriter().writeVarInt(5), "sheep/color").isKnown)
+        assertTrue(stackWith(ByteWriter().writeVarInt(1), "cushion/color").isKnown)
+    }
+
+    @Test
+    fun `use effects, cooldown and map processing are read exactly`() {
+        assertTrue(
+            stackWith(
+                ByteWriter().writeBoolean(true).writeBoolean(false).writeFloat(0.5f),
+                "use_effects",
+            ).isKnown,
+        )
+        assertTrue(
+            stackWith(
+                ByteWriter().writeFloat(1.5f).writeBoolean(true).writeString("minecraft:test"),
+                "use_cooldown",
+            ).isKnown,
+        )
+        assertTrue(stackWith(ByteWriter().writeVarInt(1), "map_post_processing").isKnown)
+    }
+
+    @Test
+    fun `weapon and attack range keep their numbers`() {
+        // Оружие: урон по прочности и секунды блокировки щита.
+        assertTrue(
+            stackWith(ByteWriter().writeVarInt(2).writeFloat(1.6f), "weapon").isKnown,
+        )
+        // Дальность: шесть чисел подряд.
+        assertTrue(
+            stackWith(ByteWriter().let { w -> repeat(6) { w.writeFloat(3f) }; w }, "attack_range").isKnown,
+        )
+    }
+
+    @Test
+    fun `a tool with rules is read`() {
+        val stack = stackWith(
+            ByteWriter()
+                .writeVarInt(1)                  // одно правило
+                .writeVarInt(2).writeVarInt(9)   // набор из одного блока
+                .writeBoolean(true).writeFloat(7f)  // своя скорость
+                .writeBoolean(false)             // «годится для дропа» не задано
+                .writeFloat(4f)                  // скорость по умолчанию
+                .writeVarInt(2)                  // урон за блок
+                .writeBoolean(true),             // ломать в творческом
+            "tool",
+        )
+
+        assertTrue(stack.isKnown)
+    }
+
+    @Test
+    fun `an equippable item is read`() {
+        val stack = stackWith(
+            ByteWriter()
+                .writeVarInt(1)                  // слот: нагрудник
+                .writeVarInt(5)                  // звук надевания — ссылка
+                .writeBoolean(false)             // облика нет
+                .writeBoolean(false)             // накладки камеры нет
+                .writeBoolean(true).writeVarInt(0).writeString("minecraft:pig") // кому можно
+                .writeBoolean(true).writeBoolean(true).writeBoolean(true)
+                .writeBoolean(false).writeBoolean(false)                 // пять флагов
+                .writeVarInt(6),                 // звук снятия ножницами
+            "equippable",
+        )
+
+        assertTrue(stack.isKnown)
+    }
+
+    @Test
+    fun `damage resistance is a holder set`() {
+        val stack = stackWith(
+            ByteWriter().writeVarInt(0).writeString("minecraft:is_fire"),
+            "damage_resistant",
+        )
+        assertTrue(stack.isKnown)
+    }
+
+    @Test
+    fun `sign text is four lines, a colour and a glow flag`() {
+        val writer = ByteWriter()
+        repeat(4) { writer.writeBytes(nbtString("строка $it")) } // четыре строки
+        writer.writeVarInt(0)                              // отфильтрованных строк нет
+        writer.writeVarInt(15)                             // цвет красителя
+        writer.writeBoolean(true)                          // светящийся текст
+        val stack = stackWith(writer, "sign_text_front")
+        assertTrue(stack.isKnown)
+
+        // Живой сервер присылает ноль отфильтрованных строк; проверим и непустой список.
+        val withFiltered = ByteWriter()
+        repeat(4) { withFiltered.writeBytes(nbtString("")) }
+        withFiltered.writeVarInt(1).writeBytes(nbtString("отфильтровано"))
+        withFiltered.writeVarInt(0).writeBoolean(false)
+        assertTrue(stackWith(withFiltered, "sign_text_back").isKnown)
+    }
+
+    @Test
+    fun `a lodestone tracker may be unbound`() {
+        assertTrue(
+            stackWith(ByteWriter().writeBoolean(false).writeBoolean(false), "lodestone_tracker").isKnown,
+        )
+        // Привязанный: измерение, упакованные координаты и признак «следит».
+        assertTrue(
+            stackWith(
+                ByteWriter()
+                    .writeBoolean(true)
+                    .writeString("minecraft:overworld")
+                    .writeVarLong(123456789L)
+                    .writeBoolean(true),
+                "lodestone_tracker",
+            ).isKnown,
+        )
+    }
+
+    @Test
+    fun `map decorations and a loot table are read`() {
+        assertTrue(
+            stackWith(
+                ByteWriter()
+                    .writeVarInt(1)                  // одна метка
+                    .writeString("home")
+                    .writeVarInt(3)                  // вид метки
+                    .writeDouble(12.5)
+                    .writeDouble(-4.0)
+                    .writeFloat(90f),
+                "map_decorations",
+            ).isKnown,
+        )
+        assertTrue(
+            stackWith(
+                ByteWriter().writeString("minecraft:chests/simple_dungeon").writeLong(42L),
+                "container_loot",
+            ).isKnown,
+        )
+    }
+
+    @Test
+    fun `a break sound is a reference or an inline sound`() {
+        assertTrue(stackWith(ByteWriter().writeVarInt(5), "break_sound").isKnown)
+        // Свой звук: ноль, имя и дальность.
+        assertTrue(
+            stackWith(
+                ByteWriter().writeVarInt(0).writeString("minecraft:block.stone.break")
+                    .writeBoolean(true).writeFloat(16f),
+                "break_sound",
+            ).isKnown,
+        )
+    }
+
     // --- помощники -----------------------------------------------------------------------
 
     /** Стек с одним компонентом: количество 1, предмет 1, патч из одного добавления. */

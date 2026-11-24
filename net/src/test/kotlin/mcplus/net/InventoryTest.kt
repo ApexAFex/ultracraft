@@ -140,7 +140,7 @@ class InventoryTest {
     @Test
     fun `enchantments and a custom name are read from the component patch`() {
         val previous = ComponentTable.active
-        // Индексы как в data/components-777.tsv: damage, custom_name, creative_slot_lock.
+        // Индексы как в data/components-777.tsv: damage, custom_name, compostable.
         ComponentTable.active = componentTable()
         try {
             val inventory = Inventory(items)
@@ -156,7 +156,7 @@ class InventoryTest {
                 .writeByte(0x08)  // NBT: строка
                 .writeShort(name.size)
                 .writeBytes(name)
-                .writeVarInt(20)  // creative_slot_lock — незнакомый компонент
+                .writeVarInt(84)  // compostable — незнакомый компонент
             val body = ByteWriter().writeVarInt(0).writeBytes(stack.toByteArray()).toByteArray()
             inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)
 
@@ -231,7 +231,7 @@ class InventoryTest {
                 .writeString("minecraft:stone")
                 .writeVarInt(7)    // minimum_attack_charge = 0.5
                 .writeFloat(0.5f)
-                .writeVarInt(26)   // use_cooldown — всё ещё незнакомый
+                .writeVarInt(84)   // compostable — всё ещё незнакомый
                 .toByteArray()
             val body = ByteWriter().writeVarInt(0).writeBytes(stack).toByteArray()
             inventory.onPacket(Protocol777.Play.SET_PLAYER_INVENTORY, body)

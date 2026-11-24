@@ -720,6 +720,148 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
                 reader.readFloat()
             }
 
+            // Компоненты без нагрузки: замок творческого слота и «вощёный» блок.
+            "creative_slot_lock", "waxed" -> Unit
+
+            // Варианты животных и существ: номер в реестре вариантов (собака, кошка, корова,
+            // житель, картина…). Для подсказки имя не нужно — важно, что стек читается.
+            "villager/variant", "wolf/variant", "wolf/sound_variant", "pig/variant",
+            "pig/sound_variant", "cow/variant", "cow/sound_variant", "chicken/variant",
+            "chicken/sound_variant", "zombie_nautilus/variant", "frog/variant",
+            "painting/variant", "cat/variant", "cat/sound_variant",
+            // Перечисления: лиса, лосось, попугай, узор тропической рыбы, грибная корова,
+            // кролик, лошадь, лама, аксолотль.
+            "fox/variant", "salmon/size", "parrot/variant", "tropical_fish/pattern",
+            "mooshroom/variant", "rabbit/variant", "horse/variant", "llama/variant",
+            "axolotl/variant" -> reader.readVarInt()
+
+            // Цвета: номер красителя в перечислении (шерсть, ошейник, панцирь, подушка…).
+            "dye", "wolf/collar", "tropical_fish/base_color", "tropical_fish/pattern_color",
+            "cat/collar", "sheep/color", "shulker/color", "cushion/color" -> reader.readVarInt()
+
+            // Как предмет влияет на движение при использовании: два флага и множитель.
+            "use_effects" -> {
+                reader.readBoolean()                    // можно ли бежать
+                reader.readBoolean()                    // вибрации взаимодействия
+                reader.readFloat()                      // множитель скорости
+            }
+
+            // Перезарядка: секунды и необязательная группа перезарядки.
+            "use_cooldown" -> {
+                reader.readFloat()
+                if (reader.readBoolean()) reader.readString(MAX_IDENTIFIER_BYTES)
+            }
+
+            // Обработка карты после копирования (увеличение, пометка): номер вида.
+            "map_post_processing" -> reader.readVarInt()
+
+            // Устойчивость к видам урона: набор ссылок, как у допусков приключений.
+            "damage_resistant" -> readHolderSetChecked(reader, count)
+
+            // Анимация взмаха: вид и длительность в тиках.
+            "attack_animation", "interact_animation" -> {
+                reader.readVarInt()
+                reader.readVarInt()
+            }
+
+            // Отладочная палочка: карта «свойство блока → значение».
+            "debug_stick_state" -> {
+                val size = reader.readVarInt()
+                if (size !in 0..MAX_BLOCK_STATE) throw UnreadableStack(count)
+                repeat(size) {
+                    reader.readString(MAX_BLOCK_STATE_BYTES)
+                    reader.readString(MAX_BLOCK_STATE_BYTES)
+                }
+            }
+
+            // Содержимое с таблицей добычи: имя таблицы и зерно.
+            "container_loot" -> {
+                reader.readString(MAX_IDENTIFIER_BYTES)
+                reader.readLong()
+            }
+
+            // Оружие: урон по прочности за удар и сколько секунд блокирует щит.
+            "weapon" -> {
+                reader.readVarInt()
+                reader.readFloat()
+            }
+
+            // Дальность атаки: шесть чисел (своя, творческая, запас хитбокса, множитель моба).
+            "attack_range" -> repeat(6) { reader.readFloat() }
+
+            // Звук ломания: ссылка на звук, а ноль означает «звук описан здесь» —
+            // тогда идут имя и необязательная фиксированная дальность.
+            "break_sound" -> {
+                if (reader.readVarInt() == 0) {
+                    reader.readString(MAX_IDENTIFIER_BYTES)
+                    if (reader.readBoolean()) reader.readFloat()
+                }
+            }
+
+            // Магнитный компас: необязательная точка привязки (измерение и позиция) и
+            // признак «привязан». Позиция — упакованные координаты одним VarLong.
+            "lodestone_tracker" -> {
+                if (reader.readBoolean()) {
+                    reader.readString(MAX_IDENTIFIER_BYTES)
+                    reader.readVarLong()
+                }
+                reader.readBoolean()
+            }
+
+            // Текст таблички: четыре строки, четыре отфильтрованных, цвет и подсветка.
+            // Строки — компоненты NBT, их длину знает читатель; сами строки не сохраняем.
+            // Текст таблички: четыре строки, отфильтрованные строки (их число, а не всегда
+            // четыре), цвет и подсветка. Строки — компоненты NBT, их длину знает читатель.
+            "sign_text_front", "sign_text_back" -> {
+                repeat(4) { mcplus.protocol.nbt.NbtReader.read(reader) }
+                val filtered = reader.readVarInt()
+                if (filtered !in 0..4) throw UnreadableStack(count)
+                repeat(filtered) { mcplus.protocol.nbt.NbtReader.read(reader) }
+                reader.readVarInt()                     // цвет красителя
+                reader.readBoolean()                    // светящийся текст
+            }
+
+            // Метки на карте: имя, вид, координаты и поворот.
+            "map_decorations" -> {
+                val size = reader.readVarInt()
+                if (size !in 0..MAX_MAP_DECORATIONS) throw UnreadableStack(count)
+                repeat(size) {
+                    reader.readString(MAX_IDENTIFIER_BYTES)
+                    reader.readVarInt()
+                    reader.readDouble()
+                    reader.readDouble()
+                    reader.readFloat()
+                }
+            }
+
+            // Серный куб: поглощённый блок — вложенная стопка.
+            "sulfur_cube_content" -> readTemplateStack(reader)
+
+            // Инструмент: правила «для этих блоков такая скорость», затем общие числа.
+            "tool" -> {
+                val rules = reader.readVarInt()
+                if (rules !in 0..MAX_TOOL_RULES) throw UnreadableStack(count)
+                repeat(rules) {
+                    readHolderSetChecked(reader, count)                  // какие блоки
+                    if (reader.readBoolean()) reader.readFloat()         // своя скорость
+                    if (reader.readBoolean()) reader.readBoolean()       // годится ли для дропа
+                }
+                reader.readFloat()                                       // скорость по умолчанию
+                reader.readVarInt()                                      // урон за блок
+                reader.readBoolean()                                     // ломать в творческом
+            }
+
+            // Что можно надеть: слот, звук, облик, разрешённые существа и флаги.
+            "equippable" -> {
+                reader.readVarInt()                                      // слот экипировки
+                readSoundHolder(reader)                                  // звук надевания
+                if (reader.readBoolean()) reader.readString(MAX_IDENTIFIER_BYTES) // облик
+                if (reader.readBoolean()) reader.readString(MAX_IDENTIFIER_BYTES) // накладка камеры
+                if (reader.readBoolean()) readHolderSetChecked(reader, count)     // кому можно
+                repeat(5) { reader.readBoolean() }                       // пять флагов
+                readSoundHolder(reader)                                  // звук снятия ножницами
+            }
+
             else -> throw UnreadableStack(count)
         }
     }
@@ -778,6 +920,11 @@ internal fun readMenuStackOrUnknown(reader: ByteReader): Inventory.Stack? =
         readMenuStack(reader)
     } catch (e: UnreadableStack) {
         Inventory.Stack(-1, e.count)
+    } catch (e: mcplus.protocol.ProtocolException) {
+        // Компонент с неожиданным телом: сообщение всё равно останется, а клиент не должен
+        // падать из-за одного предмета. Пакет ограничен своей длиной, так что это безопасно.
+        println("Компоненты предмета не прочитались: ${e.message}")
+        Inventory.Stack(-1, 1)
     }
 
 internal class UnreadableStack(val count: Int) : RuntimeException()
@@ -916,6 +1063,19 @@ private const val MAX_BEES = 4
 /** Глубже этого вложенные стопки в игре не встречаются. */
 private const val MAX_STACK_DEPTH = 8
 
+/**
+ * Ссылка на звук: номер в реестре звуков, а ноль означает «звук описан здесь».
+ *
+ * Так же устроены `break_sound` и звуки экипировки: у ссылки VarInt на единицу больше
+ * номера, у своего звука — ноль, имя и необязательная фиксированная дальность.
+ */
+private fun readSoundHolder(reader: ByteReader) {
+    if (reader.readVarInt() == 0) {
+        reader.readString(MAX_IDENTIFIER_BYTES)
+        if (reader.readBoolean()) reader.readFloat()
+    }
+}
+
 /** Больше модификаторов атрибутов на предмете не бывает. */
 private const val MAX_ATTRIBUTE_MODS = 64
 
@@ -972,6 +1132,12 @@ private const val MAX_STATE_PROPERTIES = 32
 
 /** Сколько блоков из длинного списка показывать в подсказке. */
 private const val MAX_SHOWN_BLOCKS = 3
+
+/** Меток на карте больше этого не бывает. */
+private const val MAX_MAP_DECORATIONS = 256
+
+/** Правил инструмента больше этого не бывает. */
+private const val MAX_TOOL_RULES = 64
 
 /** Больше слотов в предмете-контейнере в игре не бывает. */
 private const val MAX_CONTAINER_ITEMS = 256
