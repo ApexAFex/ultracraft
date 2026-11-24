@@ -638,6 +638,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // потому что реестры зелий и эффектов сервер не присылает.
                         hud.potionColor = { id: Int -> mcplus.net.PotionTable.active.colorOf(id) }
                         // Техническое имя эффекта переводим: `night_vision` → «Ночное зрение».
+                        hud.mapScaleLookup = { id: Int -> session?.maps?.scaleOf(id) }
                         hud.effectName = { id: Int ->
                             session?.effects?.nameOf(id)?.let { mcplus.net.ItemNames.effect(it) }
                         }

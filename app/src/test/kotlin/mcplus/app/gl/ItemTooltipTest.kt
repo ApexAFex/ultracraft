@@ -40,6 +40,7 @@ class ItemTooltipTest {
         dyedColor: Int = 0,
         maxDamage: Int = 0,
         potion: Int = -1,
+        map: Int = -1,
     ) = Inventory.Stack(
         itemId = 1,
         count = count,
@@ -67,6 +68,7 @@ class ItemTooltipTest {
         dyedColor = dyedColor,
         maxDamage = maxDamage,
         potionId = potion,
+        mapId = map,
     )
 
     @Test
@@ -134,6 +136,19 @@ class ItemTooltipTest {
         assertEquals("3:00", ItemTooltip.effectTime(3600))
         assertEquals("8:00", ItemTooltip.effectTime(9600))
         assertEquals("0:00", ItemTooltip.effectTime(0))
+    }
+
+    @Test
+    fun `a map shows its number and scale`() {
+        val withScale = ItemTooltip.lines(
+            stack(map = 5), "Карта", mapScale = { if (it == 5) 2 else null },
+        ).map { it.first }
+        assertTrue(withScale.any { it == "Карта №5, масштаб 2" }, "нет строки карты: $withScale")
+        // Без сведений о масштабе остаётся хотя бы номер.
+        val without = ItemTooltip.lines(stack(map = 7), "Карта").map { it.first }
+        assertTrue(without.any { it == "Карта №7" }, "нет номера карты: $without")
+        // Обычный предмет строки о карте не получает.
+        assertTrue(ItemTooltip.lines(stack(), "Меч").none { it.first.startsWith("Карта") })
     }
 
     @Test

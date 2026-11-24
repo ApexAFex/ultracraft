@@ -1010,6 +1010,9 @@ class Hud(
     /** Имя эффекта по номеру: из таблицы `data/effects-777.tsv`. */
     var effectName: (Int) -> String? = { null }
 
+    /** Масштаб карты по номеру: для подсказки предмета. */
+    var mapScaleLookup: (Int) -> Int? = { null }
+
     /** Цвет зелья по номеру: из реестров `potion` и `mob_effect`. */
     var potionColor: (Int) -> Int? = { null }
 
@@ -1285,6 +1288,7 @@ class Hud(
                     entityName = entityName,
                     effectName = effectName,
                     potionEffects = { id -> mcplus.net.PotionTable.active.effectsOf(id) },
+                    mapScale = mapScaleLookup,
                 )
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()

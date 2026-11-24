@@ -38,6 +38,8 @@ object ItemTooltip {
         effectName: (Int) -> String? = { null },
         /** Эффекты зелья по номеру: из таблицы `data/potions-777.tsv`. */
         potionEffects: (Int) -> List<mcplus.net.PotionEffectRef> = { emptyList() },
+        /** Масштаб карты по её номеру: из пакета `Map Data`. */
+        mapScale: (Int) -> Int? = { null },
         /** Имя инструмента козьего рога; без реестра показываем номер. */
         instrumentName: (Int) -> String = { "№$it" },
         /** Имя атрибута по номеру: из таблицы `data/attributes-777.tsv`. */
@@ -149,6 +151,16 @@ object ItemTooltip {
         // Дурное зелье: сила эффекта.
         if (stack.ominousAmplifier >= 0) {
             result += "Сила дурного зелья: ${stack.ominousAmplifier + 1}" to 0xB090C0
+        }
+        // Карта: номер и масштаб, как в ванили в подсказке.
+        if (stack.mapId >= 0) {
+            val scale = mapScale(stack.mapId)
+            val text = if (scale != null) {
+                "Карта №" + stack.mapId + ", масштаб " + scale
+            } else {
+                "Карта №" + stack.mapId
+            }
+            result += text to 0xC8C8A0
         }
         // Зелье: какие эффекты и на сколько. Цвет и эффекты берутся из таблицы
         // `data/potions-777.tsv` — реестры зелий и эффектов сервер не присылает.
