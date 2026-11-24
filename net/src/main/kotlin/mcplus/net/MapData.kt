@@ -78,6 +78,7 @@ class MapData {
 
     private val maps = ConcurrentHashMap<Int, Image>()
     private val decorations = ConcurrentHashMap<Int, List<Decoration>>()
+    private val scales = ConcurrentHashMap<Int, Int>()
 
     /** Картинка по номеру карты; создаётся пустой, если сервер её ещё не присылал. */
     fun imageOf(mapId: Int): Image = maps.getOrPut(mapId) { Image() }
@@ -87,8 +88,19 @@ class MapData {
         decorations[mapId] = decorations[mapId].orEmpty() + decoration
     }
 
+    /**
+     * Подписи значков для списка под картой: как в ванили, где они видны в подсказке.
+     *
+     * Возвращает только непустые подписи, без повторов и в порядке появления.
+     */
+    fun legendOf(mapId: Int): List<String> =
+        decorationsOf(mapId).mapNotNull { it.label?.takeIf { text -> text.isNotBlank() } }.distinct()
+
     /** Значки карты: каждый новый пакет со значками заменяет список целиком. */
     fun decorationsOf(mapId: Int): List<Decoration> = decorations[mapId].orEmpty()
+
+    /** Масштаб карты: 0 — мельче всего, каждый шаг вдвое крупнее. */
+    fun scaleOf(mapId: Int): Int? = scales[mapId]
 
     fun has(mapId: Int): Boolean = maps.containsKey(mapId)
 
@@ -97,6 +109,7 @@ class MapData {
     fun clear() {
         maps.clear()
         decorations.clear()
+        scales.clear()
     }
 
     /** Разбор пакета `Map Data`; возвращает true, если пакет был картой. */
@@ -105,7 +118,8 @@ class MapData {
         runCatching {
             val reader = ByteReader(body)
             val mapId = reader.readVarInt()
-            reader.readByte()  // масштаб
+            val scale = reader.readByte().toInt() and 0xFF
+            scales[mapId] = scale
             reader.readBoolean() // закреплена ли карта
             // Значки (рамки, метки): список может отсутствовать вовсе.
             if (reader.readBoolean()) {

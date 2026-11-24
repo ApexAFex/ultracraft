@@ -42,6 +42,10 @@ class Hud(
         mapImage: ((Int) -> mcplus.net.MapData.Image?)? = null,
         mapColor: (Byte) -> Int = { mcplus.net.MapColors.FALLBACK },
         mapDecorations: (Int) -> List<mcplus.net.MapData.Decoration> = { emptyList() },
+        /** Масштаб карты для подписи под ней. */
+        mapScale: (Int) -> Int? = { null },
+        /** Подписи значков (легенда под картой). */
+        mapLegend: (Int) -> List<String> = { emptyList() },
         /** Нарисовать две пробные метки на карте (--map): живых меток нет. */
         mapDemoMarkers: Boolean = false,
         /** Остаток и максимум прочности предмета в руке (или null). */
@@ -68,7 +72,10 @@ class Hud(
         // Карта в руке: рисуем её настоящими цветами клеток, как в ванили, — иначе
         // заполненная карта выглядит обычной иконкой предмета.
         if (heldMapId >= 0 && mapImage != null) {
-            drawHeldMap(heldMapId, mapImage, mapColor, mapDecorations, mapDemoMarkers)
+            drawHeldMap(
+                heldMapId, mapImage, mapColor, mapDecorations, mapDemoMarkers,
+                mapScale, mapLegend,
+            )
         }
         if (vitals != null) {
             drawArmour(armourPoints)
@@ -1652,6 +1659,8 @@ class Hud(
         mapColor: (Byte) -> Int,
         mapDecorations: (Int) -> List<mcplus.net.MapData.Decoration>,
         demoMarkers: Boolean,
+        mapScale: (Int) -> Int?,
+        mapLegend: (Int) -> List<String>,
     ) {
         val image = mapImage(mapId) ?: return
         val cell = 1.6f
@@ -1675,7 +1684,7 @@ class Hud(
         val markers = mapDecorations(mapId).toMutableList()
         if (demoMarkers) {
             markers += mcplus.net.MapData.Decoration(0, 64, 64, 3, null)
-            markers += mcplus.net.MapData.Decoration(1, 70, 60, 0, null)
+            markers += mcplus.net.MapData.Decoration(1, 70, 60, 0, "Дом")
         }
         for (marker in markers) {
             val dot = 3f
@@ -1691,6 +1700,19 @@ class Hud(
             renderer.rect(cx - dot / 2f, cy - dot / 2f, dot, dot, marker.color(), 1f)
         }
         renderer.draw()
+        // Подпись под картой: масштаб и названия значков, как в ванили в подсказке карты.
+        val labels = ArrayList<String>()
+        mapScale(mapId)?.let { labels += "Масштаб: " }
+        // Легенда — из тех значков, что реально нарисованы (включая пробные).
+        labels += markers.mapNotNull { it.label?.takeIf { text -> text.isNotBlank() } }.distinct()
+        if (labels.isNotEmpty() && text != null) {
+            val lines = labels.mapIndexed { index, line ->
+                TextRenderer.ScreenLabel(
+                    left, top + side + 4f + index * 9f, line, 0.8f, 0xE8D8B0,
+                )
+            }
+            text.drawScreen(lines)
+        }
     }
 
     private fun drawArmour(points: Int) {

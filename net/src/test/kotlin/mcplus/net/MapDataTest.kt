@@ -2,6 +2,7 @@ package mcplus.net
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -135,6 +136,31 @@ class MapDataTest {
         val maps = MapData()
         assertTrue(maps.onPacket(mcplus.net.proto.Protocol777.Play.MAP_DATA, writer.toByteArray()))
         assertEquals(0, maps.imageOf(2).byteAt(0, 0))
+    }
+
+    @Test
+    fun `the map scale is stored for the caption`() {
+        val writer = mcplus.protocol.ByteWriter()
+            .writeVarInt(9).writeByte(2).writeBoolean(false)
+            .writeBoolean(false).writeByte(0)
+        val maps = MapData()
+        assertTrue(maps.onPacket(mcplus.net.proto.Protocol777.Play.MAP_DATA, writer.toByteArray()))
+        assertEquals(2, maps.scaleOf(9))
+        assertNull(maps.scaleOf(10))
+    }
+
+    @Test
+    fun `the legend keeps only unique non-blank labels`() {
+        val maps = MapData()
+        val writer = mcplus.protocol.ByteWriter()
+            .writeVarInt(11).writeByte(0).writeBoolean(false)
+            .writeBoolean(true).writeVarInt(3)
+            .writeVarInt(1).writeByte(1).writeByte(1).writeByte(0).writeBoolean(true).writeString("Дом")
+            .writeVarInt(1).writeByte(2).writeByte(2).writeByte(0).writeBoolean(true).writeString("Дом")
+            .writeVarInt(2).writeByte(3).writeByte(3).writeByte(0).writeBoolean(false)
+            .writeByte(0)
+        assertTrue(maps.onPacket(mcplus.net.proto.Protocol777.Play.MAP_DATA, writer.toByteArray()))
+        assertEquals(listOf("Дом"), maps.legendOf(11))
     }
 
     @Test

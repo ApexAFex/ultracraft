@@ -3824,6 +3824,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     mapImage = { id -> session?.maps?.imageOf(id) },
                                     mapColor = { packed -> mcplus.net.MapColors.active.colorOf(packed) },
                                     mapDecorations = { id -> session?.maps?.decorationsOf(id).orEmpty() },
+                                    mapScale = { id -> session?.maps?.scaleOf(id) },
+                                    mapLegend = { id -> session?.maps?.legendOf(id).orEmpty() },
                                     mapDemoMarkers = mapDemo,
                                     durability = session?.heldDurability(),
                                     attackCooldown = if (lastAttackNanos == 0L) {
