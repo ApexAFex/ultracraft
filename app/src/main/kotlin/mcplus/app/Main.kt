@@ -1453,7 +1453,7 @@ private fun findAttributeTable(): mcplus.net.AttributeTable {
     return mcplus.net.AttributeTable.load(file)
 }
 
-/** Цвета зелий: реестры зелий и эффектов клиенту не присылаются, таблица из jar. */
+/** Цвета и эффекты зелий: реестры зелий и эффектов клиенту не присылаются, таблица из jar. */
 private fun findPotionTable(): mcplus.net.PotionTable {
     val file = tableCandidates("potions-777.tsv").firstOrNull { it.isFile }
         ?: return mcplus.net.PotionTable.EMPTY

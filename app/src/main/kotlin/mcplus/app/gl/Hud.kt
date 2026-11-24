@@ -982,6 +982,9 @@ class Hud(
     /** Название песни пластинки по номеру из реестра `jukebox_song`. */
     var songName: (Int) -> String? = { null }
 
+    /** Имя эффекта по номеру: из таблицы `data/effects-777.tsv`. */
+    var effectName: (Int) -> String? = { null }
+
     /** Цвет зелья по номеру: из реестров `potion` и `mob_effect`. */
     var potionColor: (Int) -> Int? = { null }
 
@@ -1255,6 +1258,8 @@ class Hud(
                     stack, name, max, enchantmentName, trimPatternName, trimMaterialName,
                     songName = songName,
                     entityName = entityName,
+                    effectName = effectName,
+                    potionEffects = { id -> mcplus.net.PotionTable.active.effectsOf(id) },
                 )
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()
@@ -1334,6 +1339,8 @@ class Hud(
                     stack, name, max, enchantmentName, trimPatternName, trimMaterialName,
                     songName = songName,
                     entityName = entityName,
+                    effectName = effectName,
+                    potionEffects = { id -> mcplus.net.PotionTable.active.effectsOf(id) },
                 )
                 hoverX = mouseX.toFloat()
                 hoverY = mouseY.toFloat()

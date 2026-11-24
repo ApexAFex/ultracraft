@@ -39,6 +39,7 @@ class ItemTooltipTest {
         dyedColorSet: Boolean = false,
         dyedColor: Int = 0,
         maxDamage: Int = 0,
+        potion: Int = -1,
     ) = Inventory.Stack(
         itemId = 1,
         count = count,
@@ -65,6 +66,7 @@ class ItemTooltipTest {
         dyedColorSet = dyedColorSet,
         dyedColor = dyedColor,
         maxDamage = maxDamage,
+        potionId = potion,
     )
 
     @Test
@@ -91,6 +93,47 @@ class ItemTooltipTest {
             .map { it.first }
         assertTrue(red.any { it == "Цвет: #FF0000" })
         assertTrue(ItemTooltip.lines(stack(), "Шлем").none { it.first.startsWith("Цвет:") })
+    }
+
+    @Test
+    fun `a potion lists its effects with time and level`() {
+        val lines = ItemTooltip.lines(
+            stack(potion = 4),
+            "Зелье",
+            effectName = { id -> if (id == 15) "Ночное зрение" else null },
+            potionEffects = { id ->
+                if (id == 4) {
+                    listOf(
+                        mcplus.net.PotionEffectRef(15, 3600, 0),
+                        mcplus.net.PotionEffectRef(7, 1800, 2),
+                    )
+                } else {
+                    emptyList()
+                }
+            },
+        ).map { it.first }
+        assertTrue(lines.any { it == "Ночное зрение 3:00" }, "нет строки эффекта: $lines")
+        // Уровень показывается римской цифрой, как у зачарований (amplifier 2 → III).
+        assertTrue(lines.any { it == "эффект 7 III 1:30" }, "нет строки с уровнем: $lines")
+    }
+
+    @Test
+    fun `an instant effect shows no duration`() {
+        val lines = ItemTooltip.lines(
+            stack(potion = 12),
+            "Зелье",
+            effectName = { "Лечение" },
+            potionEffects = { listOf(mcplus.net.PotionEffectRef(6, 1, 1)) },
+        ).map { it.first }
+        assertTrue(lines.any { it == "Лечение II" }, "мгновенный эффект не должен показывать время: $lines")
+    }
+
+    @Test
+    fun `effect time is formatted as minutes and seconds`() {
+        assertEquals("0:01", ItemTooltip.effectTime(20))
+        assertEquals("3:00", ItemTooltip.effectTime(3600))
+        assertEquals("8:00", ItemTooltip.effectTime(9600))
+        assertEquals("0:00", ItemTooltip.effectTime(0))
     }
 
     @Test

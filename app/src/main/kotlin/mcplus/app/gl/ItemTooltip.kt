@@ -34,8 +34,10 @@ object ItemTooltip {
         enchantmentName: (Int) -> String? = { null },
         trimPatternName: (Int) -> String? = { null },
         trimMaterialName: (Int) -> String? = { null },
-        /** Имя эффекта по номеру из реестра: нужно для подозрительного рагу. */
+        /** Имя эффекта по номеру из реестра: нужно для подозрительного рагу и зелий. */
         effectName: (Int) -> String? = { null },
+        /** Эффекты зелья по номеру: из таблицы `data/potions-777.tsv`. */
+        potionEffects: (Int) -> List<mcplus.net.PotionEffectRef> = { emptyList() },
         /** Имя инструмента козьего рога; без реестра показываем номер. */
         instrumentName: (Int) -> String = { "№$it" },
         /** Имя атрибута по номеру: из таблицы `data/attributes-777.tsv`. */
@@ -147,6 +149,17 @@ object ItemTooltip {
         // Дурное зелье: сила эффекта.
         if (stack.ominousAmplifier >= 0) {
             result += "Сила дурного зелья: ${stack.ominousAmplifier + 1}" to 0xB090C0
+        }
+        // Зелье: какие эффекты и на сколько. Цвет и эффекты берутся из таблицы
+        // `data/potions-777.tsv` — реестры зелий и эффектов сервер не присылает.
+        if (stack.potionId >= 0) {
+            for (ref in potionEffects(stack.potionId)) {
+                val name = effectName(ref.effectId) ?: "эффект ${ref.effectId}"
+                val level = if (ref.amplifier > 0) " ${roman(ref.amplifier + 1)}" else ""
+                // Мгновенные эффекты длятся тик: время у них не показывают.
+                val time = if (ref.durationTicks > 1) " ${effectTime(ref.durationTicks)}" else ""
+                result += "$name$level$time" to 0x7F7FFF
+            }
         }
         // Подозрительное рагу: какие эффекты и на сколько.
         if (stack.stewEffects.isNotEmpty()) {
@@ -272,6 +285,12 @@ object ItemTooltip {
         9 to "на теле",
         10 to "в седле",
     )
+
+    /** Время эффекта как в игре: 3600 тиков — это 3:00. */
+    fun effectTime(ticks: Int): String {
+        val seconds = (ticks / 20).coerceAtLeast(0)
+        return "%d:%02d".format(seconds / 60, seconds % 60)
+    }
 
     /** Римская запись уровня зачарования, как в игре: 1 → I, 5 → V, 10 → X. */
     fun roman(level: Int): String {
