@@ -42,6 +42,35 @@ class PistonsTest {
         assertEquals(2, piston.facing)
         assertEquals(0.5f, piston.progress, 0.001f)
         assertTrue(piston.extending)
+        assertTrue(piston.isHead, "головка поршня должна опознаваться")
+        assertEquals("piston", piston.textureBlock())
+    }
+
+    @Test
+    fun `a sticky head uses the sticky piston texture`() {
+        val tag = NbtCompound(
+            linkedMapOf(
+                "blockState" to NbtCompound(
+                    linkedMapOf(
+                        "Name" to NbtString("minecraft:piston_head"),
+                        "Properties" to NbtCompound(linkedMapOf("type" to NbtString("sticky"))),
+                    ),
+                ),
+                "facing" to NbtInt(3),
+                "progress" to NbtFloat(0.25f),
+                "extending" to NbtByte(1),
+            ),
+        )
+        val piston = Pistons.parse(0, 0, 0, tag)!!
+        assertTrue(piston.sticky)
+        assertEquals("sticky_piston", piston.textureBlock())
+    }
+
+    @Test
+    fun `a pushed block keeps its own texture`() {
+        val piston = Pistons.parse(0, 0, 0, pistonTag(block = "minecraft:stone"))!!
+        assertTrue(!piston.isHead)
+        assertEquals("stone", piston.textureBlock())
     }
 
     @Test

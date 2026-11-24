@@ -3417,11 +3417,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 mcplus.net.Pistons.forget(piston.x, piston.y, piston.z)
                                 continue
                             }
-                            val head = piston.blockName.endsWith("piston_head") ||
-                                piston.blockName == "moving_piston"
+                            val head = piston.isHead
                             val (sx, sy, sz) = if (head) piston.headSize() else Triple(1f, 1f, 1f)
-                            // Плита головки смотрит текстурой поршня; обычный блок — своей.
-                            val texture = if (head) "piston" else piston.blockName
+                            // Головка берёт текстуры поршня (липкая — липкого), обычный блок — свои.
+                            val texture = piston.textureBlock()
                             cubes += Renderer.BlockCube(
                                 piston.x + 0.5 + piston.offsetX(),
                                 piston.y + 0.5 + piston.offsetY(),

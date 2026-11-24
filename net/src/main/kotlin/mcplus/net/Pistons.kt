@@ -8,6 +8,7 @@ import mcplus.protocol.nbt.NbtString
 import mcplus.protocol.nbt.int
 import mcplus.protocol.nbt.boolean
 import mcplus.protocol.nbt.float
+import mcplus.protocol.nbt.compound
 import mcplus.protocol.nbt.string
 
 /**
@@ -30,7 +31,24 @@ data class MovingPiston(
     val facing: Int,
     val progress: Float,
     val extending: Boolean,
+    /** Липкая головка: у неё своя текстура (piston_top_sticky). */
+    val sticky: Boolean = false,
 ) {
+    /** Головка ли это поршня (а не толкаемый блок). */
+    val isHead: Boolean
+        get() = blockName.endsWith("piston_head") || blockName == "moving_piston"
+
+    /**
+     * Имя блока, из которого брать текстуры для отрисовки.
+     *
+     * У головки своей текстуры в атласе нет: она составная (верх поршня + бока). Поэтому
+     * головка рисуется текстурами блока поршня, а липкая — липкого.
+     */
+    fun textureBlock(): String = when {
+        !isHead -> blockName
+        sticky -> "sticky_piston"
+        else -> "piston"
+    }
     /**
      * Насколько блок выехал от своего места: 0 — у основания, 1 — на месте.
      *
@@ -128,6 +146,9 @@ object Pistons {
         val name = state.string("Name") ?: return null
         val facing = compound.int("facing") ?: return null
         val progress = compound.float("progress") ?: return null
+        // Свойства блока лежат во вложенном compound Properties; для головки важно 	ype.
+        val properties = state.compound("Properties")
+        val sticky = properties?.string("type") == "sticky"
         return MovingPiston(
             x = x,
             y = y,
@@ -136,6 +157,7 @@ object Pistons {
             facing = facing,
             progress = progress.coerceIn(0f, 1f),
             extending = compound.boolean("extending") ?: true,
+            sticky = sticky,
         )
     }
 
