@@ -67,6 +67,10 @@ class Renderer(
         val red: Float = 1f,
         val green: Float = 1f,
         val blue: Float = 1f,
+        /** Размеры по осям: плита головки поршня тонкая только по одной. */
+        val sizeX: Float = size,
+        val sizeY: Float = size,
+        val sizeZ: Float = size,
     )
 
     private class Part(val vao: Int, val vbo: Int) {
@@ -236,7 +240,9 @@ class Renderer(
 
         val data = FloatArrayBuilder(cubes.size * 6 * 6 * VERTEX_FLOATS)
         for (cube in cubes) {
-            val half = cube.size / 2f
+            val halfX = cube.sizeX / 2f
+            val halfY = cube.sizeY / 2f
+            val halfZ = cube.sizeZ / 2f
             val cx = cube.x.toFloat()
             val cy = cube.y.toFloat()
             val cz = cube.z.toFloat()
@@ -256,48 +262,48 @@ class Renderer(
             }
 
             // Верх и низ.
-            vertex(-half, half, half, cube.top, 0f, 1f, 1f)
-            vertex(half, half, half, cube.top, 1f, 1f, 1f)
-            vertex(half, half, -half, cube.top, 1f, 0f, 1f)
-            vertex(-half, half, half, cube.top, 0f, 1f, 1f)
-            vertex(half, half, -half, cube.top, 1f, 0f, 1f)
-            vertex(-half, half, -half, cube.top, 0f, 0f, 1f)
+            vertex(-halfX, halfY, halfZ, cube.top, 0f, 1f, 1f)
+            vertex(halfX, halfY, halfZ, cube.top, 1f, 1f, 1f)
+            vertex(halfX, halfY, -halfZ, cube.top, 1f, 0f, 1f)
+            vertex(-halfX, halfY, halfZ, cube.top, 0f, 1f, 1f)
+            vertex(halfX, halfY, -halfZ, cube.top, 1f, 0f, 1f)
+            vertex(-halfX, halfY, -halfZ, cube.top, 0f, 0f, 1f)
 
-            vertex(-half, -half, -half, cube.bottom, 0f, 1f, 0.45f)
-            vertex(half, -half, -half, cube.bottom, 1f, 1f, 0.45f)
-            vertex(half, -half, half, cube.bottom, 1f, 0f, 0.45f)
-            vertex(-half, -half, -half, cube.bottom, 0f, 1f, 0.45f)
-            vertex(half, -half, half, cube.bottom, 1f, 0f, 0.45f)
-            vertex(-half, -half, half, cube.bottom, 0f, 0f, 0.45f)
+            vertex(-halfX, -halfY, -halfZ, cube.bottom, 0f, 1f, 0.45f)
+            vertex(halfX, -halfY, -halfZ, cube.bottom, 1f, 1f, 0.45f)
+            vertex(halfX, -halfY, halfZ, cube.bottom, 1f, 0f, 0.45f)
+            vertex(-halfX, -halfY, -halfZ, cube.bottom, 0f, 1f, 0.45f)
+            vertex(halfX, -halfY, halfZ, cube.bottom, 1f, 0f, 0.45f)
+            vertex(-halfX, -halfY, halfZ, cube.bottom, 0f, 0f, 0.45f)
 
             // Бока.
-            vertex(half, -half, -half, cube.side, 0f, 1f, 0.8f)
-            vertex(half, half, -half, cube.side, 0f, 0f, 0.8f)
-            vertex(half, half, half, cube.side, 1f, 0f, 0.8f)
-            vertex(half, -half, -half, cube.side, 0f, 1f, 0.8f)
-            vertex(half, half, half, cube.side, 1f, 0f, 0.8f)
-            vertex(half, -half, half, cube.side, 1f, 1f, 0.8f)
+            vertex(halfX, -halfY, -halfZ, cube.side, 0f, 1f, 0.8f)
+            vertex(halfX, halfY, -halfZ, cube.side, 0f, 0f, 0.8f)
+            vertex(halfX, halfY, halfZ, cube.side, 1f, 0f, 0.8f)
+            vertex(halfX, -halfY, -halfZ, cube.side, 0f, 1f, 0.8f)
+            vertex(halfX, halfY, halfZ, cube.side, 1f, 0f, 0.8f)
+            vertex(halfX, -halfY, halfZ, cube.side, 1f, 1f, 0.8f)
 
-            vertex(-half, -half, half, cube.side, 0f, 1f, 0.8f)
-            vertex(-half, half, half, cube.side, 0f, 0f, 0.8f)
-            vertex(-half, half, -half, cube.side, 1f, 0f, 0.8f)
-            vertex(-half, -half, half, cube.side, 0f, 1f, 0.8f)
-            vertex(-half, half, -half, cube.side, 1f, 0f, 0.8f)
-            vertex(-half, -half, -half, cube.side, 1f, 1f, 0.8f)
+            vertex(-halfX, -halfY, halfZ, cube.side, 0f, 1f, 0.8f)
+            vertex(-halfX, halfY, halfZ, cube.side, 0f, 0f, 0.8f)
+            vertex(-halfX, halfY, -halfZ, cube.side, 1f, 0f, 0.8f)
+            vertex(-halfX, -halfY, halfZ, cube.side, 0f, 1f, 0.8f)
+            vertex(-halfX, halfY, -halfZ, cube.side, 1f, 0f, 0.8f)
+            vertex(-halfX, -halfY, -halfZ, cube.side, 1f, 1f, 0.8f)
 
-            vertex(-half, -half, half, cube.side, 0f, 1f, 0.62f)
-            vertex(half, -half, half, cube.side, 1f, 1f, 0.62f)
-            vertex(half, half, half, cube.side, 1f, 0f, 0.62f)
-            vertex(-half, -half, half, cube.side, 0f, 1f, 0.62f)
-            vertex(half, half, half, cube.side, 1f, 0f, 0.62f)
-            vertex(-half, half, half, cube.side, 0f, 0f, 0.62f)
+            vertex(-halfX, -halfY, halfZ, cube.side, 0f, 1f, 0.62f)
+            vertex(halfX, -halfY, halfZ, cube.side, 1f, 1f, 0.62f)
+            vertex(halfX, halfY, halfZ, cube.side, 1f, 0f, 0.62f)
+            vertex(-halfX, -halfY, halfZ, cube.side, 0f, 1f, 0.62f)
+            vertex(halfX, halfY, halfZ, cube.side, 1f, 0f, 0.62f)
+            vertex(-halfX, halfY, halfZ, cube.side, 0f, 0f, 0.62f)
 
-            vertex(half, -half, -half, cube.side, 0f, 1f, 0.62f)
-            vertex(-half, -half, -half, cube.side, 1f, 1f, 0.62f)
-            vertex(-half, half, -half, cube.side, 1f, 0f, 0.62f)
-            vertex(half, -half, -half, cube.side, 0f, 1f, 0.62f)
-            vertex(-half, half, -half, cube.side, 1f, 0f, 0.62f)
-            vertex(half, half, -half, cube.side, 0f, 0f, 0.62f)
+            vertex(halfX, -halfY, -halfZ, cube.side, 0f, 1f, 0.62f)
+            vertex(-halfX, -halfY, -halfZ, cube.side, 1f, 1f, 0.62f)
+            vertex(-halfX, halfY, -halfZ, cube.side, 1f, 0f, 0.62f)
+            vertex(halfX, -halfY, -halfZ, cube.side, 0f, 1f, 0.62f)
+            vertex(-halfX, halfY, -halfZ, cube.side, 1f, 0f, 0.62f)
+            vertex(halfX, halfY, -halfZ, cube.side, 0f, 0f, 0.62f)
         }
 
         val vertices = data.toArray()

@@ -3409,6 +3409,33 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                             particleRenderer.draw(camera, sprites)
                         }
+                        // Едущие поршни: блок приходит в NBT блок-сущности, а своей модели у
+                        // `moving_piston` нет — рисуем его здесь, со смещением по прогрессу.
+                        for (piston in mcplus.net.Pistons.snapshot()) {
+                            val blockHere = blocks.nameOf(world.blockAt(piston.x, piston.y, piston.z))
+                            if (blockHere != "moving_piston") {
+                                mcplus.net.Pistons.forget(piston.x, piston.y, piston.z)
+                                continue
+                            }
+                            val head = piston.blockName.endsWith("piston_head") ||
+                                piston.blockName == "moving_piston"
+                            val (sx, sy, sz) = if (head) piston.headSize() else Triple(1f, 1f, 1f)
+                            // Плита головки смотрит текстурой поршня; обычный блок — своей.
+                            val texture = if (head) "piston" else piston.blockName
+                            cubes += Renderer.BlockCube(
+                                piston.x + 0.5 + piston.offsetX(),
+                                piston.y + 0.5 + piston.offsetY(),
+                                piston.z + 0.5 + piston.offsetZ(),
+                                1f,
+                                atlas.layerFor(texture, TextureAtlas.Kind.TOP),
+                                atlas.layerFor(texture, TextureAtlas.Kind.BOTTOM),
+                                atlas.layerFor(texture, TextureAtlas.Kind.SIDE),
+                                yaw = 0f,
+                                sizeX = sx,
+                                sizeY = sy,
+                                sizeZ = sz,
+                            )
+                        }
                         // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
                         if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
                         // Подбор: иконка предмета летит от места подбора к игроку и тает.
@@ -4418,6 +4445,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     println("Анимаций текстур: ${atlas.animations.size}, кадров обновлено: $animatedUploads")
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                     println("Шагов чужих существ: $otherSteps (игроков: $playerSteps)")
+                    println("Едущих поршней замечено: ${mcplus.net.Pistons.seen}")
                 }
             }
         } finally {

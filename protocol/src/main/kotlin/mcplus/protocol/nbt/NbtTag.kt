@@ -87,3 +87,13 @@ fun NbtCompound.compound(key: String): NbtCompound? = entries[key] as? NbtCompou
 
 fun NbtCompound.requireCompound(key: String): NbtCompound =
     compound(key) ?: throw ProtocolException("В NBT нет compound-поля '$key'")
+
+/** Число типа `float`; в NBT байт 5. */
+fun NbtCompound.float(key: String): Float? = (entries[key] as? NbtFloat)?.value
+
+/**
+ * Логическое значение: в NBT это байт 0/1.
+ *
+ * В 26.3 многие блок-сущности (поршни) пишут флаги именно байтом, а не настоящим boolean.
+ */
+fun NbtCompound.boolean(key: String): Boolean? = (entries[key] as? NbtByte)?.let { it.value != 0.toByte() }

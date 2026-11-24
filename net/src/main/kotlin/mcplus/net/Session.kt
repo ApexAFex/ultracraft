@@ -308,7 +308,11 @@ class Session internal constructor(
                 Protocol777.Play.SET_CHUNK_CACHE_RADIUS ->
                     serverChunkRadius = runCatching { ByteReader(packet.body).readVarInt() }.getOrDefault(-1)
 
-                Protocol777.Play.BLOCK_ENTITY_DATA -> signs.onPacket(packet.id, packet.body)
+                Protocol777.Play.BLOCK_ENTITY_DATA -> {
+                    // Один пакет — несколько получателей: таблички и едущие поршни.
+                    signs.onPacket(packet.id, packet.body)
+                    mcplus.net.Pistons.onPacket(packet.id, packet.body)
+                }
 
                 Protocol777.Play.UPDATE_ADVANCEMENTS -> advancements.onPacket(packet.id, packet.body)
 
