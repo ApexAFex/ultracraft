@@ -37,7 +37,9 @@ class ItemTintTest {
     @Test
     fun `a potion with its own colour is tinted`() {
         assertEquals(0x00FF88, ItemTint.of(stack(potion = 3, potionColor = 0x00FF88)))
-        // Зелье без своего цвета не красим: цвет по умолчанию берётся из реестра зелий.
+        // Без своего цвета цвет берётся из реестров зелий и эффектов.
+        assertEquals(0x385DC6, ItemTint.of(stack(potion = 3)) { 0x385DC6 })
+        // Нет реестра — не красим наугад.
         assertNull(ItemTint.of(stack(potion = 3)))
     }
 }

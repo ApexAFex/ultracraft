@@ -630,6 +630,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         hud.enchantmentName = { id: Int -> registries.enchantment(id) }
                         hud.trimPatternName = { id: Int -> registries.trimPattern(id) }
                         hud.songName = { id: Int -> registries.song(id) }
+                        // Цвет зелья для иконки: из таблицы `data/potions-777.tsv`,
+                        // потому что реестры зелий и эффектов сервер не присылает.
+                        hud.potionColor = { id: Int -> mcplus.net.PotionTable.active.colorOf(id) }
+                        if (mcplus.net.PotionTable.active.size > 0) {
+                            println("Зелья: цветов в таблице ${mcplus.net.PotionTable.active.size}")
+                        }
                         hud.entityName = { id: Int -> entityTypes.nameOf(id) }
                         hud.trimMaterialName = { id: Int -> registries.trimMaterial(id) }
                         if (registries.trimPatternCount > 0) {

@@ -925,7 +925,7 @@ class Hud(
             val stack = inventory.menuSlot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
             val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
-            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack))
+            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack, potionColor))
             drawGlint(slotRect, stack)
         }
         // Выбранный слот хотбара обводится белой рамкой, как в игре.
@@ -981,6 +981,9 @@ class Hud(
 
     /** Название песни пластинки по номеру из реестра `jukebox_song`. */
     var songName: (Int) -> String? = { null }
+
+    /** Цвет зелья по номеру: из реестров `potion` и `mob_effect`. */
+    var potionColor: (Int) -> Int? = { null }
 
     /** Имя вида существа: для ведра с рыбой и улья с пчёлами. */
     var entityName: (Int) -> String? = { null }
@@ -1088,7 +1091,7 @@ class Hud(
             val stack = container.slot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
             val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
-            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack))
+            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack, potionColor))
             drawGlint(slotRect, stack)
             drawWear(slotRect, stack, s)
         }
@@ -1586,7 +1589,7 @@ class Hud(
             val cell = HudLayout.hotbarSlot(slot, width, height)
             val size = 16f * s
             val slotRect = HudRect(cell.centreX - size / 2f, cell.centreY - size / 2f, size, size)
-            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack))
+            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack, potionColor))
             drawGlint(slotRect, stack)
             // Полоска прочности прямо в хотбаре: видно, когда инструмент почти сломан,
             // не открывая инвентарь.

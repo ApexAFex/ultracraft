@@ -1453,6 +1453,13 @@ private fun findAttributeTable(): mcplus.net.AttributeTable {
     return mcplus.net.AttributeTable.load(file)
 }
 
+/** Цвета зелий: реестры зелий и эффектов клиенту не присылаются, таблица из jar. */
+private fun findPotionTable(): mcplus.net.PotionTable {
+    val file = tableCandidates("potions-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.PotionTable.EMPTY
+    return mcplus.net.PotionTable.load(file)
+}
+
 /** Имена блоков реестра: нужны допускам режима приключений (`can_place_on`). */
 private fun findBlockRegistryTable(): mcplus.net.BlockRegistryTable {
     val file = tableCandidates("blocks-registry-777.tsv").firstOrNull { it.isFile }
@@ -1503,6 +1510,7 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session {
     mcplus.net.ComponentTable.active = findComponentTable()
     mcplus.net.AttributeTable.active = findAttributeTable()
     mcplus.net.BlockRegistryTable.active = findBlockRegistryTable()
+    mcplus.net.PotionTable.active = findPotionTable()
     val account = if (options.online) loadAccount() else null
     val attempts = 3
 
