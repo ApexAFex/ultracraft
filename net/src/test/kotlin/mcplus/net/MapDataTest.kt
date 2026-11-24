@@ -65,7 +65,7 @@ class MapDataTest {
             .writeByte(0)        // поворот
             .writeBoolean(true)
             .writeString("Дом")
-            .writeBoolean(false) // патча цветов нет
+            .writeByte(0)        // патча цветов нет: width = 0
         assertTrue(maps.onPacket(mcplus.net.proto.Protocol777.Play.MAP_DATA, writer.toByteArray()))
         val marker = maps.decorationsOf(7).single()
         assertEquals(1, marker.typeId)
@@ -78,7 +78,7 @@ class MapDataTest {
         // изменились.
         val empty = mcplus.protocol.ByteWriter()
             .writeVarInt(7).writeByte(0).writeBoolean(true)
-            .writeBoolean(false).writeBoolean(false)
+            .writeBoolean(false).writeByte(0)
         maps.onPacket(mcplus.net.proto.Protocol777.Play.MAP_DATA, empty.toByteArray())
         assertEquals(1, maps.decorationsOf(7).size)
     }
@@ -98,6 +98,43 @@ class MapDataTest {
         assertEquals(1f to 0f, MapData.Decoration(0, 0, 0, 3, null).noseOffset())
         // Поворот 4 — снова север: старшие биты не важны.
         assertEquals(0f to -1f, MapData.Decoration(0, 0, 0, 4, null).noseOffset())
+    }
+
+    @Test
+    fun `a real packet with a full map patch is parsed`() {
+        // Настоящие первые байты пакета с карты: ширина 128, высота 128, начало 0,0 и цвета.
+        // Порядок полей снят из MapPatch.read серверного jar: width, height, startX, startY.
+        val writer = mcplus.protocol.ByteWriter()
+            .writeVarInt(0)      // номер карты
+            .writeByte(0)        // масштаб
+            .writeBoolean(true)  // закреплена
+            .writeBoolean(true)  // значки есть
+            .writeVarInt(0)      // но их ноль
+            .writeByte(128)      // width
+            .writeByte(128)      // height
+            .writeByte(0)        // startX
+            .writeByte(0)        // startY
+            .writeVarInt(4)      // четыре цвета (уменьшено для теста)
+            .writeByte(1).writeByte(2).writeByte(3).writeByte(4)
+        val maps = MapData()
+        assertTrue(maps.onPacket(mcplus.net.proto.Protocol777.Play.MAP_DATA, writer.toByteArray()))
+        val image = maps.imageOf(0)
+        // Патч шириной 128 идёт по строке: первые четыре цвета ложатся в первую строку.
+        assertEquals(1, image.byteAt(0, 0))
+        assertEquals(2, image.byteAt(1, 0))
+        assertEquals(3, image.byteAt(2, 0))
+        assertEquals(4, image.byteAt(3, 0))
+    }
+
+    @Test
+    fun `an empty patch is just a zero width`() {
+        val writer = mcplus.protocol.ByteWriter()
+            .writeVarInt(2).writeByte(0).writeBoolean(false)
+            .writeBoolean(false)  // значков нет
+            .writeByte(0)         // width 0 — патча нет
+        val maps = MapData()
+        assertTrue(maps.onPacket(mcplus.net.proto.Protocol777.Play.MAP_DATA, writer.toByteArray()))
+        assertEquals(0, maps.imageOf(2).byteAt(0, 0))
     }
 
     @Test

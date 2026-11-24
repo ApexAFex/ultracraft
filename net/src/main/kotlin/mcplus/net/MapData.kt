@@ -120,14 +120,16 @@ class MapData {
                 }
                 decorations[mapId] = list
             }
-            // Патч цветов: его тоже может не быть, если пришли только значки.
-            if (reader.readBoolean()) {
-                val startX = reader.readByte().toInt() and 0xFF
-                val startY = reader.readByte().toInt() and 0xFF
-                val width = reader.readUnsignedByte()
+            // Патч цветов: в 26.3 он пишется как width(u8), height(u8), startX(u8),
+            // startY(u8), VarInt длина, байты. Пустой патч — это width = 0, и после него в
+            // пакете ничего нет. Порядок полей снят из MapPatch.read серверного jar.
+            val width = reader.readUnsignedByte()
+            if (width > 0) {
                 val height = reader.readUnsignedByte()
+                val startX = reader.readUnsignedByte()
+                val startY = reader.readUnsignedByte()
                 val count = reader.readVarInt()
-                if (count in 0..MAX_PATCH && count >= width * height) {
+                if (count in 0..MAX_PATCH) {
                     val patch = ByteArray(count)
                     for (index in 0 until count) patch[index] = reader.readByte()
                     imageOf(mapId).apply(startX, startY, width, height, patch)
