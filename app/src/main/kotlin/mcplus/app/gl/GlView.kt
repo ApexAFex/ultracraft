@@ -210,6 +210,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         minecraftDirectory: File? = null,
         session: Session? = null,
         demo: Boolean = false,
+        /** Нарисовать три пробных едущих поршня перед камерой (--piston). */
+        pistonDemo: Boolean = false,
         /** Идти вперёд всё время: проверка чужих шагов вторым клиентом (`--walk`). */
         walkForever: Boolean = false,
         /** Печатать каждое проигранное событие звука: проверка предсказаний без слуха. */
@@ -697,6 +699,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var previousY = player.y
                     var previousZ = player.z
                     var playerLoadedSent = false
+                    var pistonDemoAdded = false
 
                     // Название предмета в руке показывается пару секунд после смены слота.
                     var lastSelected = session?.inventory?.selected ?: 0
@@ -2109,8 +2112,38 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 // времени: стоя на месте картинка не должна дёргаться.
                                 if (player.onGround) walkBobPhase += moved * 2.4
                             }
-                            if (ready && !playerLoadedSent) {
-                                // Как в ванили: сначала «кто я и как далеко вижу», и только
+                            // Пробные поршни: три записи перед камерой, чтобы проверить
+                            // отрисовку глазами (сервер в тестовом мире их не выдвигает).
+                            if (pistonDemo && ready && !pistonDemoAdded) {
+                                pistonDemoAdded = true
+                                val forward = camera.forward()
+                                val rightX = -forward[2]
+                                val rightZ = forward[0]
+                                val baseX = (player.x + forward[0] * 5f).toInt()
+                                val baseY = (player.y + 1.0).toInt()
+                                val baseZ = (player.z + forward[2] * 5f).toInt()
+                                // Обычная головка: выехала наполовину.
+                                mcplus.net.Pistons.debugAdd(
+                                    baseX - (rightX * 1.6f).toInt(), baseY,
+                                    baseZ - (rightZ * 1.6f).toInt(),
+                                    "piston_head", facing = 3, progress = 0.5f,
+                                )
+                                // Толкаемый камень: выехал на четверть.
+                                mcplus.net.Pistons.debugAdd(
+                                    baseX, baseY,
+                                    baseZ,
+                                    "stone", facing = 3, progress = 0.25f,
+                                )
+                                // Липкая головка втягивается.
+                                mcplus.net.Pistons.debugAdd(
+                                    baseX + (rightX * 1.6f).toInt(), baseY,
+                                    baseZ + (rightZ * 1.6f).toInt(),
+                                    "piston_head", facing = 3, progress = 0.75f,
+                                    extending = false, sticky = true,
+                                )
+                                println("Пробные поршни: 3 записи")
+                            }
+                            if (ready && !playerLoadedSent) {                                // Как в ванили: сначала «кто я и как далеко вижу», и только
                                 // потом «мой мир готов». Если порядок обратный, сервер успевает
                                 // начать отслеживание с нулевой дальностью, и чужие игроки,
                                 // стоявшие рядом ещё до нашего входа, не присылаются вовсе.
@@ -3413,7 +3446,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // `moving_piston` нет — рисуем его здесь, со смещением по прогрессу.
                         for (piston in mcplus.net.Pistons.snapshot()) {
                             val blockHere = blocks.nameOf(world.blockAt(piston.x, piston.y, piston.z))
-                            if (blockHere != "moving_piston") {
+                            if (!piston.synthetic && blockHere != "moving_piston") {
                                 mcplus.net.Pistons.forget(piston.x, piston.y, piston.z)
                                 continue
                             }

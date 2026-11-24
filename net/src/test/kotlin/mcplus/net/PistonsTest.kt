@@ -134,4 +134,16 @@ class PistonsTest {
         Pistons.clear()
         assertTrue(Pistons.snapshot().isEmpty())
     }
+
+    @Test
+    fun `a synthetic piston is marked so the renderer skips the world check`() {
+        Pistons.clear()
+        Pistons.debugAdd(3, 70, -5, "piston_head", facing = 3, progress = 0.5f, sticky = true)
+        val entry = Pistons.snapshot().single()
+        assertTrue(entry.synthetic, "запись для проверки отрисовки должна быть помечена")
+        assertEquals("sticky_piston", entry.textureBlock())
+        // Выдвижение: прогресс 0.5 значит «половина пути от основания» — смещение -0.5.
+        assertEquals(-0.5f, entry.extendedProgress, 0.001f)
+        Pistons.clear()
+    }
 }

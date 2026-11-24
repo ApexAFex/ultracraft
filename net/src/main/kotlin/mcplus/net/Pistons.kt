@@ -33,6 +33,13 @@ data class MovingPiston(
     val extending: Boolean,
     /** Липкая головка: у неё своя текстура (piston_top_sticky). */
     val sticky: Boolean = false,
+    /**
+     * Запись создана для проверки отрисовки, а не сервером.
+     *
+     * Такую запись не сверяют с миром: настоящего блока moving_piston под ней нет — сервер
+     * в тестовом мире поршни не выдвигает (см. журнал PROJECT.md).
+     */
+    val synthetic: Boolean = false,
 ) {
     /** Головка ли это поршня (а не толкаемый блок). */
     val isHead: Boolean
@@ -169,6 +176,30 @@ object Pistons {
     }
 
     fun clear() = moving.clear()
+
+    /** Добавляет запись для проверки отрисовки (--piston), не трогая разбор пакетов. */
+    fun debugAdd(
+        x: Int,
+        y: Int,
+        z: Int,
+        blockName: String,
+        facing: Int,
+        progress: Float,
+        extending: Boolean = true,
+        sticky: Boolean = false,
+    ) {
+        moving[key(x, y, z)] = MovingPiston(
+            x = x,
+            y = y,
+            z = z,
+            blockName = blockName,
+            facing = facing,
+            progress = progress.coerceIn(0f, 1f),
+            extending = extending,
+            sticky = sticky,
+            synthetic = true,
+        )
+    }
 
     /** Сколько едущих поршней держим одновременно. */
     private const val MAX_TRACKED = 512

@@ -960,6 +960,8 @@ private fun windowCommand(args: List<String>) {
     var soundLog = false
     /** Идти вперёд всё время (`--walk`): второй клиент для проверки чужих шагов. */
     var walkForever = false
+    /** Нарисовать пробные поршни перед камерой (--piston): сервер их не выдвигает. */
+    var pistonDemo = false
     /** Страница, на которой открыть книгу. */
     var startBookPage = 1
     /** Проверка без рук: переименовать предмет в открытой наковальне. */
@@ -982,6 +984,7 @@ private fun windowCommand(args: List<String>) {
                 parsePosition(args.getOrNull(++index) ?: fail("--chest-open требует x,y,z"))
             "--debug" -> debug = true
             "--walk" -> walkForever = true
+            "--piston" -> pistonDemo = true
             "--sound-log" -> soundLog = true
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
@@ -1125,6 +1128,7 @@ private fun windowCommand(args: List<String>) {
             session = it,
             demo = options.demo,
             walkForever = walkForever,
+            pistonDemo = pistonDemo,
             soundLog = soundLog,
             meshThreads = options.threads,
             replay = replay,
