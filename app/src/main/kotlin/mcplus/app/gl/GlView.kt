@@ -3818,27 +3818,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 // Строки чата видны и без открытой строки ввода: раньше они
                                 // рисовались только пока печатаешь.
                                 hud.drawChat(chatLines, System.nanoTime(), chatScroll)
-                                if (mapDemo && !mapDemoAdded) {
-                                    val heldMap = session?.inventory?.held()?.mapId ?: -1
-                                    if (heldMap >= 0) {
-                                        mapDemoAdded = true
-                                        session?.maps?.debugDecoration(
-                                            heldMap,
-                                            mcplus.net.MapData.Decoration(0, 64, 64, 3, null),
-                                        )
-                                        session?.maps?.debugDecoration(
-                                            heldMap,
-                                            mcplus.net.MapData.Decoration(1, 70, 60, 0, "Дом"),
-                                        )
-                                        println("Пробные значки карты: 2")
-                                    }
-                                }
                                 hud.draw(
                                     inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
                                     heldMapId = session?.inventory?.held()?.mapId ?: -1,
                                     mapImage = { id -> session?.maps?.imageOf(id) },
                                     mapColor = { packed -> mcplus.net.MapColors.active.colorOf(packed) },
                                     mapDecorations = { id -> session?.maps?.decorationsOf(id).orEmpty() },
+                                    mapDemoMarkers = mapDemo,
                                     durability = session?.heldDurability(),
                                     attackCooldown = if (lastAttackNanos == 0L) {
                                         1f
