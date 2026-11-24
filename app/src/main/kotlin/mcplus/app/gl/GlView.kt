@@ -3730,7 +3730,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 selected = recipeCategory,
                                 recipes = recipesNow,
                                 page = recipePage,
-                                itemName = { id -> mcplus.net.ItemNames.item(itemTable.nameOf(id)) },
+                                // Для иконки нужно техническое имя, для текста — переведённое:
+                                // иначе атлас ищет «Розовая керамика» и рисует пурпурную заглушку.
+                                itemName = { id -> itemTable.nameOf(id) },
+                                displayName = { id -> mcplus.net.ItemNames.item(itemTable.nameOf(id)) },
                                 iconLayer = { name -> atlas.layerForItem(name) },
                                 mouseX = input.mouseX,
                                 mouseY = input.mouseY,
@@ -3747,7 +3750,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             advancementTabRects = hud.drawAdvancementsScreen(
                                 AdvancementsScreen.tabs(nodes),
                                 advancementTab,
-                                itemName = { id -> mcplus.net.ItemNames.item(itemTable.nameOf(id)) },
+                                itemName = { id -> itemTable.nameOf(id) },
                                 mouseX = input.mouseX,
                                 mouseY = input.mouseY,
                             )

@@ -453,6 +453,8 @@ class Hud(
         page: Int,
         itemName: (Int) -> String?,
         iconLayer: (String) -> Int,
+        /** Имя для текста: переведённое. Для иконок нужно техническое — выше itemName. */
+        displayName: (Int) -> String? = itemName,
         mouseX: Double,
         mouseY: Double,
         craftCheck: (mcplus.net.Recipe) -> mcplus.net.CraftCheck = { mcplus.net.CraftCheck() },
@@ -558,12 +560,12 @@ class Hud(
         val hoveredRecipe = shown.getOrNull(hovered)
         if (hoveredRecipe != null) {
             var lineY = footerY
-            for (line in RecipeBookScreen.tooltip(hoveredRecipe, itemName)) {
+            for (line in RecipeBookScreen.tooltip(hoveredRecipe, displayName)) {
                 labels += TextRenderer.ScreenLabel(gridX, lineY, line, s * 0.9f)
                 lineY += 12f * s
             }
             val check = craftCheck(hoveredRecipe)
-            RecipeBookScreen.craftLine(check, itemName, hoveredRecipe.kind)?.let { line ->
+            RecipeBookScreen.craftLine(check, displayName, hoveredRecipe.kind)?.let { line ->
                 labels += TextRenderer.ScreenLabel(
                     gridX, lineY, line, s * 0.9f,
                     if (check.craftable) 0x8FE06A else 0xD9A05A,
@@ -676,7 +678,9 @@ class Hud(
         }
         for (node in visible) {
             val rect = AdvancementsScreen.nodeRect(node, centerX, centerY, step, icon)
-            val name = itemName(node.iconId)
+            // Пустое имя значит «иконки нет» (бывает у служебных узлов): рисуем слот, а не
+            // пурпурную заглушку, которая выглядит как ошибка загрузки.
+            val name = itemName(node.iconId)?.takeIf { it.isNotBlank() }
             val layer = name?.let { atlas.layerForItem(it) } ?: -1
             if (layer >= 0) renderer.icon(rect, layer) else renderer.rect(rect, 0x3A4450, 1f)
         }

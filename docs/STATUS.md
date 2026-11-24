@@ -63,6 +63,11 @@
 ## Как убедиться самому
 
 ```powershell
+# смоук-прогон шести режимов (2026-11-24: 0 исключений, снимки sweep-*.png)
+foreach ($m in 'world','--mobs','--inventory','--recipes','--advancements','--statistics') {
+  .\app\build\install\app\bin\app.bat window 127.0.0.1:25565 --name mcplus --hidden --no-menu --frames 2000 --out sweep.png $m
+}
+
 # сборка и все тесты (786)
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.13.9-hotspot'
 .\gradlew.bat build

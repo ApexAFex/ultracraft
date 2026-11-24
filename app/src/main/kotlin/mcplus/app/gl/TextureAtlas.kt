@@ -101,6 +101,9 @@ class TextureAtlas(
 
     private val missingLayer: Int = layers["missing"] ?: 0
 
+    /** Слой-заглушка (пурпурная клетка): по нему видно, что текстуры нет. */
+    val missing: Int get() = missingLayer
+
     companion object {
         /** Цвета, которыми атлас запекает траву, листву и воду, пока биом неизвестен. */
         const val TINT_GRASS = 0x79C05A
