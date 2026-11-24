@@ -129,6 +129,9 @@ class Session internal constructor(
     /** Эффекты на нашем игроке: зелья, маяк, зачарования. Иконки рисует HUD. */
     val effects: Effects = Effects(effectTable)
 
+    /** Данные карт: приходят патчами и хранятся кадром 128×128. */
+    val maps: mcplus.net.MapData = mcplus.net.MapData()
+
     /**
      * Открытый контейнер (сундук, верстак, печь) или null, если открыт только инвентарь.
      *
@@ -312,6 +315,8 @@ class Session internal constructor(
 
                 Protocol777.Play.SET_CHUNK_CACHE_RADIUS ->
                     serverChunkRadius = runCatching { ByteReader(packet.body).readVarInt() }.getOrDefault(-1)
+
+                Protocol777.Play.MAP_DATA -> maps.onPacket(packet.id, packet.body)
 
                 Protocol777.Play.BLOCK_ENTITY_DATA -> {
                     // Один пакет — несколько получателей: таблички и едущие поршни.

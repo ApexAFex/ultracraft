@@ -37,6 +37,10 @@ class Hud(
         effects: List<ActiveEffect>,
         itemName: String?,
         itemNameAlpha: Float,
+        /** Карта в руке: номер карты и её картинка (null — карты нет). */
+        heldMapId: Int = -1,
+        mapImage: ((Int) -> mcplus.net.MapData.Image?)? = null,
+        mapColor: (Byte) -> Int = { mcplus.net.MapColors.FALLBACK },
         /** Остаток и максимум прочности предмета в руке (или null). */
         durability: Pair<Int, Int>? = null,
         /** Готовность удара: 0 сразу после удара, 1 когда перезарядка прошла. */
@@ -58,6 +62,11 @@ class Hud(
         drawDurability(inventory, durability, s)
         drawBossBars(bossBars)
         drawEffects(effects, s)
+        // Карта в руке: рисуем её настоящими цветами клеток, как в ванили, — иначе
+        // заполненная карта выглядит обычной иконкой предмета.
+        if (heldMapId >= 0 && mapImage != null) {
+            drawHeldMap(heldMapId, mapImage, mapColor)
+        }
         if (vitals != null) {
             drawArmour(armourPoints)
             drawHearts(vitals)
@@ -1628,6 +1637,37 @@ class Hud(
      * предмета по умолчанию. Каждый значок — два очка, половинка — одно, как в ванили;
      * пустых значков не рисуем, если брони нет вовсе.
      */
+    /**
+     * Карта в руке: 128×128 клеток цветными прямоугольниками.
+     *
+     * В ванили это отдельная текстура, но клеток всего 16384 — их можно нарисовать как
+     * прямоугольники одним пакетом HUD, без своего шейдера и загрузки текстуры.
+     */
+    private fun drawHeldMap(
+        mapId: Int,
+        mapImage: (Int) -> mcplus.net.MapData.Image?,
+        mapColor: (Byte) -> Int,
+    ) {
+        val image = mapImage(mapId) ?: return
+        val cell = 1.6f
+        val side = mcplus.net.MapData.SIZE * cell
+        val left = width - side - 24f
+        val top = height - side - 24f
+        renderer.begin()
+        renderer.rect(left - 2f, top - 2f, side + 4f, side + 4f, 0x2A1F16, 0.9f)
+        for (y in 0 until mcplus.net.MapData.SIZE) {
+            for (x in 0 until mcplus.net.MapData.SIZE) {
+                val packed = image.byteAt(x, y)
+                if (packed.toInt() == 0) continue
+                renderer.rect(
+                    left + x * cell, top + y * cell, cell, cell,
+                    mapColor(packed), 1f,
+                )
+            }
+        }
+        renderer.draw()
+    }
+
     private fun drawArmour(points: Int) {
         if (points <= 0) return
         for (index in 0 until HudLayout.HEARTS) {

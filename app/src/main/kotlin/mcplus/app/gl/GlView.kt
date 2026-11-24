@@ -3817,6 +3817,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 hud.drawChat(chatLines, System.nanoTime(), chatScroll)
                                 hud.draw(
                                     inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
+                                    heldMapId = session?.inventory?.held()?.mapId ?: -1,
+                                    mapImage = { id -> session?.maps?.imageOf(id) },
+                                    mapColor = { packed -> mcplus.net.MapColors.active.colorOf(packed) },
                                     durability = session?.heldDurability(),
                                     attackCooldown = if (lastAttackNanos == 0L) {
                                         1f

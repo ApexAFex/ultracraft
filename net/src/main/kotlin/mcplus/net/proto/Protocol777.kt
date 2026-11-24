@@ -137,6 +137,9 @@ object Protocol777 {
         const val CONTAINER_SET_DATA: Int = 0x13
         const val CONTAINER_CLOSE: Int = 0x11
         const val OPEN_SCREEN: Int = 0x3C
+
+    /** Карта: сетка 128×128 байт цвета и патчи. */
+    const val MAP_DATA: Int = 0x34
         const val SET_HELD_SLOT: Int = 0x6B
         const val SET_CURSOR_ITEM: Int = 0x62
         const val SET_PLAYER_INVENTORY: Int = 0x6E

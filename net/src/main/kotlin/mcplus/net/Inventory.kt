@@ -29,6 +29,8 @@ class Inventory(
         val itemId: Int,
         val count: Int,
         val damage: Int = 0,
+        /** Номер карты из компонента `map_id` (-1 — это не карта). */
+        val mapId: Int = -1,
         /** Имя из компонента `custom_name`: переименованный предмет. */
         val customName: String? = null,
         /** Зачарования: пары «номер зачарования, уровень» (реестр зачарований встроен). */
@@ -373,6 +375,7 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
     var customName: String? = null
     val enchantments = ArrayList<Pair<Int, Int>>()
     var rarity = 0
+    var mapId = -1
     var dyedColor = 0
     var dyedColorSet = false
     var maxDamage = 0
@@ -466,7 +469,8 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
             // Одно число: минимальный заряд удара и множитель длительности зелья — float,
             // доплата торговцу, уровень зачаруемости и номер карты — VarInt.
             "minimum_attack_charge", "potion_duration_scale" -> reader.readFloat()
-            "additional_trade_cost", "enchantable", "map_id" -> reader.readVarInt()
+            "map_id" -> mapId = reader.readVarInt()
+            "additional_trade_cost", "enchantable" -> reader.readVarInt()
             // Ссылки на модель предмета и стиль подсказки — обычные строки.
             "item_model", "tooltip_style" -> reader.readString()
             // Отделка брони: материал и узор, оба — номера реестров.
@@ -962,6 +966,7 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
         customName = customName,
         enchantments = enchantments,
         rarity = rarity,
+        mapId = mapId,
         dyedColor = dyedColor,
         dyedColorSet = dyedColorSet,
         maxDamage = maxDamage,

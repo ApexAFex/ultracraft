@@ -1344,6 +1344,13 @@ private fun findItemTable(explicit: String? = null): mcplus.net.ItemTable {
  * A missing table is not fatal: the client still works, effect icons simply do not appear
  * (the id is unknown, so there is no texture file to load).
  */
+/** Палитра карт: цвета встроены в игру, таблица выгружается из jar. */
+private fun findMapColors(): mcplus.net.MapColors {
+    val file = tableCandidates("map-colors-777.tsv").firstOrNull { it.isFile }
+        ?: return mcplus.net.MapColors.EMPTY
+    return mcplus.net.MapColors.load(file)
+}
+
 private fun findEffectTable(explicit: String? = null): mcplus.net.EffectTable {
     val candidates = buildList {
         explicit?.let { add(java.io.File(it)) }
@@ -1527,6 +1534,7 @@ private fun connect(host: String, port: Int, options: LoginOptions): Session {
     mcplus.net.AttributeTable.active = findAttributeTable()
     mcplus.net.BlockRegistryTable.active = findBlockRegistryTable()
     mcplus.net.PotionTable.active = findPotionTable()
+    mcplus.net.MapColors.active = findMapColors()
     val account = if (options.online) loadAccount() else null
     val attempts = 3
 
