@@ -132,10 +132,19 @@ class TextureAtlas(
          * Без этой таблицы иконка щита (например в достижении «Не сегодня») выходила
          * пурпурной заглушкой «нет текстуры».
          */
-        private val ITEM_TEXTURE_ALIASES = mapOf(
-            "shield" to "shield/shield_base",
-            "white_banner" to "banner/banner_base",
-        )
+        private val ITEM_TEXTURE_ALIASES: Map<String, String> = buildMap {
+            put("shield", "shield/shield_base")
+            // Все шестнадцать флагов рисуются одной базовой картинкой с цветным слоем.
+            for (colour in listOf(
+                "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+                "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black",
+            )) {
+                put(colour + "_banner", "banner/banner_base")
+            }
+        }
+
+        /** Куда смотреть картинку предмета, если её нет в 	extures/item (щит, флаги). */
+        internal fun itemTextureAlias(item: String): String? = ITEM_TEXTURE_ALIASES[item]
 
         fun findMinecraftDirectory(): File? {
             val appData = System.getenv("APPDATA") ?: return null
