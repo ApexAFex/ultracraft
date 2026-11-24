@@ -2097,12 +2097,15 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 if (player.onGround) walkBobPhase += moved * 2.4
                             }
                             if (ready && !playerLoadedSent) {
+                                // Как в ванили: сначала «кто я и как далеко вижу», и только
+                                // потом «мой мир готов». Если порядок обратный, сервер успевает
+                                // начать отслеживание с нулевой дальностью, и чужие игроки,
+                                // стоявшие рядом ещё до нашего входа, не присылаются вовсе.
+                                session?.sendClientInformation(viewDistance)
                                 // "My terrain is up" — lets the server start ticking us now
                                 // instead of waiting out its 60-tick grace period.
                                 session?.send(PlayerMovement.playerLoaded())
                                 playerLoadedSent = true
-                                // Дальность из настроек: сервер меняет радиус стриминга чанков.
-                                session?.sendClientInformation(viewDistance)
                                 // Слот для снимков: еду выдают уже после входа, и она
                                 // попадает в первый свободный слот — значит, его и держим.
                                 if (heldSlotAtStart in 0..8) session?.selectSlot(heldSlotAtStart)
@@ -2501,8 +2504,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     continue
                                 }
                                 // Чужого игрока узнаём по списку игроков, а не по имени типа:
-                                // сервер присылает его как обычную сущность, и имя типа у него
-                                // не «player».
+                                // сервер присылает его как обычную сущность.
                                 val isPlayer = playerList.nameOf(entity.uuid) != null
                                 val tracker = entitySteps.getOrPut(entity.id) { EntityStepTracker() }
                                 if (tracker.advance(entity.x, entity.z)) {
@@ -2515,7 +2517,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             "block.stone.step",
                                         )
                                         otherSteps++
-                                        if (isPlayer) playerSteps++
+                                        if (isPlayer) {
+                                            playerSteps++
+                                            if (playerSteps == 1) {
+                                                println("Первый шаг игрока: %.1f %.1f".format(entity.x, entity.z))
+                                            }
+                                        }
                                     }
                                 }
                             }
