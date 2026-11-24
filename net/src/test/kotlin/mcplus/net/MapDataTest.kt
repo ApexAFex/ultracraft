@@ -90,6 +90,17 @@ class MapDataTest {
     }
 
     @Test
+    fun `the player marker points where it looks`() {
+        // Поворот метки — 0–15, но нам хватает четырёх сторон.
+        assertEquals(0f to -1f, MapData.Decoration(0, 0, 0, 0, null).noseOffset())
+        assertEquals(-1f to 0f, MapData.Decoration(0, 0, 0, 1, null).noseOffset())
+        assertEquals(0f to 1f, MapData.Decoration(0, 0, 0, 2, null).noseOffset())
+        assertEquals(1f to 0f, MapData.Decoration(0, 0, 0, 3, null).noseOffset())
+        // Поворот 4 — снова север: старшие биты не важны.
+        assertEquals(0f to -1f, MapData.Decoration(0, 0, 0, 4, null).noseOffset())
+    }
+
+    @Test
     fun `an unrelated packet is not claimed`() {
         assertTrue(!MapData().onPacket(0x01, ByteArray(0)))
     }
