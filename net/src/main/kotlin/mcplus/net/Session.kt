@@ -221,7 +221,12 @@ class Session internal constructor(
                     vitals.onPacket(packet.id, packet.body).also { handled ->
                         // Смерть снимает эффекты: сервер тоже присылает удаления, но после
                         // возрождения на экране не должно остаться иконок прошлой жизни.
-                        if (handled && packet.id == Protocol777.Play.RESPAWN) effects.clear()
+                        if (handled && packet.id == Protocol777.Play.RESPAWN) {
+                            effects.clear()
+                            // Едущие поршни из прошлой жизни тоже не нужны: после перехода
+                            // в другой мир их координаты ничего не значат.
+                            mcplus.net.Pistons.clear()
+                        }
                         // После смерти транспорта больше нет: иначе клиент продолжал бы
                         // держать камеру на сущности, которой уже не существует.
                         ridingId = null

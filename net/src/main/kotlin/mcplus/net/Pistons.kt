@@ -111,6 +111,9 @@ object Pistons {
     fun accept(x: Int, y: Int, z: Int, tag: mcplus.protocol.nbt.NbtTag?) {
         val compound = tag as? NbtCompound ?: return
         val piston = parse(x, y, z, compound) ?: return
+        // Защита от утечки: сервер может прислать много записей, а забывать их мы умеем
+        // только по смене блока. Больше нескольких сотен одновременно не бывает.
+        if (moving.size >= MAX_TRACKED) moving.clear()
         moving[key(x, y, z)] = piston
         seen++
     }
@@ -144,6 +147,9 @@ object Pistons {
     }
 
     fun clear() = moving.clear()
+
+    /** Сколько едущих поршней держим одновременно. */
+    private const val MAX_TRACKED = 512
 
     private fun key(x: Int, y: Int, z: Int): Long =
         (x.toLong() and 0x3FFFFFF) shl 38 or

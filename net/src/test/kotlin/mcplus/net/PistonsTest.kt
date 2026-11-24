@@ -89,4 +89,20 @@ class PistonsTest {
         Pistons.forget(1, 2, 3)
         assertTrue(Pistons.snapshot().isEmpty())
     }
+
+    @Test
+    fun `tracking does not grow without bound`() {
+        Pistons.clear()
+        // Больше, чем клиент держит одновременно: список должен остаться ограниченным.
+        for (i in 0 until 700) Pistons.accept(i, 64, 0, pistonTag() as NbtTag)
+        assertTrue(Pistons.snapshot().size <= 512, "поршней: ${Pistons.snapshot().size}")
+    }
+
+    @Test
+    fun `respawn clears pistons of the previous world`() {
+        Pistons.accept(5, 6, 7, pistonTag() as NbtTag)
+        assertTrue(Pistons.snapshot().isNotEmpty())
+        Pistons.clear()
+        assertTrue(Pistons.snapshot().isEmpty())
+    }
 }
