@@ -41,6 +41,7 @@ class Hud(
         heldMapId: Int = -1,
         mapImage: ((Int) -> mcplus.net.MapData.Image?)? = null,
         mapColor: (Byte) -> Int = { mcplus.net.MapColors.FALLBACK },
+        mapDecorations: (Int) -> List<mcplus.net.MapData.Decoration> = { emptyList() },
         /** Остаток и максимум прочности предмета в руке (или null). */
         durability: Pair<Int, Int>? = null,
         /** Готовность удара: 0 сразу после удара, 1 когда перезарядка прошла. */
@@ -65,7 +66,7 @@ class Hud(
         // Карта в руке: рисуем её настоящими цветами клеток, как в ванили, — иначе
         // заполненная карта выглядит обычной иконкой предмета.
         if (heldMapId >= 0 && mapImage != null) {
-            drawHeldMap(heldMapId, mapImage, mapColor)
+            drawHeldMap(heldMapId, mapImage, mapColor, mapDecorations)
         }
         if (vitals != null) {
             drawArmour(armourPoints)
@@ -1647,6 +1648,7 @@ class Hud(
         mapId: Int,
         mapImage: (Int) -> mcplus.net.MapData.Image?,
         mapColor: (Byte) -> Int,
+        mapDecorations: (Int) -> List<mcplus.net.MapData.Decoration>,
     ) {
         val image = mapImage(mapId) ?: return
         val cell = 1.6f
@@ -1664,6 +1666,14 @@ class Hud(
                     mapColor(packed), 1f,
                 )
             }
+        }
+        // Значки: рамки, метки игроков. В ванили у каждого своя картинка, у нас — точки.
+        for (marker in mapDecorations(mapId)) {
+            val dot = 3f
+            val mx = left + marker.x * cell - dot / 2f
+            val my = top + marker.y * cell - dot / 2f
+            renderer.rect(mx - 1f, my - 1f, dot + 2f, dot + 2f, 0x101010, 0.9f)
+            renderer.rect(mx, my, dot, dot, marker.color(), 1f)
         }
         renderer.draw()
     }

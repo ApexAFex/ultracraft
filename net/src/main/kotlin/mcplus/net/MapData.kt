@@ -36,16 +36,50 @@ class MapData {
         }
     }
 
+    /** Значок на карте: рамка, метка игрока и так далее. */
+    data class Decoration(
+        val typeId: Int,
+        val x: Int,
+        val y: Int,
+        val rotation: Int,
+        val label: String?,
+    ) {
+        /**
+         * Цвет точки на карте.
+         *
+         * В ванили значки — свои картинки; у нас точка, поэтому цвет выбирается по типу:
+         * игрок белый, рамка зелёная, остальные — по кругу, чтобы отличались.
+         */
+        fun color(): Int = when (typeId) {
+            0 -> 0xFFFFFF   // игрок
+            1 -> 0x00A000   // рамка
+            2 -> 0xD04040   // цель
+            3 -> 0xE09030
+            4 -> 0xE0D040
+            5 -> 0x4070D0
+            6 -> 0x40C0C0
+            7 -> 0x9040C0
+            else -> 0xA0A0A0
+        }
+    }
+
     private val maps = ConcurrentHashMap<Int, Image>()
+    private val decorations = ConcurrentHashMap<Int, List<Decoration>>()
 
     /** Картинка по номеру карты; создаётся пустой, если сервер её ещё не присылал. */
     fun imageOf(mapId: Int): Image = maps.getOrPut(mapId) { Image() }
+
+    /** Значки карты: каждый новый пакет со значками заменяет список целиком. */
+    fun decorationsOf(mapId: Int): List<Decoration> = decorations[mapId].orEmpty()
 
     fun has(mapId: Int): Boolean = maps.containsKey(mapId)
 
     val size: Int get() = maps.size
 
-    fun clear() = maps.clear()
+    fun clear() {
+        maps.clear()
+        decorations.clear()
+    }
 
     /** Разбор пакета `Map Data`; возвращает true, если пакет был картой. */
     fun onPacket(packetId: Int, body: ByteArray): Boolean {
@@ -57,13 +91,16 @@ class MapData {
             reader.readBoolean() // закреплена ли карта
             // Значки (рамки, метки): список может отсутствовать вовсе.
             if (reader.readBoolean()) {
+                val list = ArrayList<Decoration>()
                 repeat(reader.readVarInt().coerceIn(0, MAX_DECORATIONS)) {
-                    reader.readByte()   // тип значка
-                    reader.readByte()   // x
-                    reader.readByte()   // y
-                    reader.readByte()   // поворот
-                    if (reader.readBoolean()) reader.readString() // подпись
+                    val typeId = reader.readVarInt()
+                    val x = reader.readByte().toInt()
+                    val y = reader.readByte().toInt()
+                    val rotation = reader.readByte().toInt()
+                    val label = if (reader.readBoolean()) reader.readString() else null
+                    list += Decoration(typeId, x, y, rotation, label)
                 }
+                decorations[mapId] = list
             }
             // Патч цветов: его тоже может не быть, если пришли только значки.
             if (reader.readBoolean()) {
