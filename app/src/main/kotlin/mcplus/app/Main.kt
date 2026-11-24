@@ -962,6 +962,8 @@ private fun windowCommand(args: List<String>) {
     var walkForever = false
     /** Нарисовать пробные поршни перед камерой (--piston): сервер их не выдвигает. */
     var pistonDemo = false
+    /** Нарисовать пробные значки на карте (--map): живых меток на сервере нет. */
+    var mapDemo = false
     /** Страница, на которой открыть книгу. */
     var startBookPage = 1
     /** Проверка без рук: переименовать предмет в открытой наковальне. */
@@ -985,6 +987,7 @@ private fun windowCommand(args: List<String>) {
             "--debug" -> debug = true
             "--walk" -> walkForever = true
             "--piston" -> pistonDemo = true
+            "--map" -> mapDemo = true
             "--sound-log" -> soundLog = true
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
@@ -1129,6 +1132,7 @@ private fun windowCommand(args: List<String>) {
             demo = options.demo,
             walkForever = walkForever,
             pistonDemo = pistonDemo,
+            mapDemo = mapDemo,
             soundLog = soundLog,
             meshThreads = options.threads,
             replay = replay,
@@ -1664,6 +1668,7 @@ private fun printUsage() {
           --particles    нарисовать образцы частиц перед камерой (проверка без сервера)
           --mobs         нарисовать по одному мобу каждого семейства перед камерой
           --piston       нарисовать три пробных едущих поршня (сервер их не выдвигает)
+          --map          нарисовать пробные значки на карте в руке (метка игрока и рамка)
     --skin PATH    свой скин из файла PNG (проверка рисования кожи без сети)
     --slim         скин из файла — тонкая модель рук (Алекс), без сети метаданных нет
     --use-item N   нажать «использовать предмет» на кадре N (проверка еды)

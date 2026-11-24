@@ -50,6 +50,19 @@ class MapData {
          * В ванили значки — свои картинки; у нас точка, поэтому цвет выбирается по типу:
          * игрок белый, рамка зелёная, остальные — по кругу, чтобы отличались.
          */
+        /**
+         * Куда смотрит метка: смещение «носа» стрелки на клетку по направлению.
+         *
+         * В ванили у метки игрока есть поворот (0–15), и он рисуется стрелкой. У нас точка
+         * с носиком: этого хватает, чтобы понять, куда смотрит игрок.
+         */
+        fun noseOffset(): Pair<Float, Float> = when (rotation and 3) {
+            0 -> 0f to -1f     // север
+            1 -> -1f to 0f     // запад
+            2 -> 0f to 1f      // юг
+            else -> 1f to 0f   // восток
+        }
+
         fun color(): Int = when (typeId) {
             0 -> 0xFFFFFF   // игрок
             1 -> 0x00A000   // рамка
@@ -68,6 +81,11 @@ class MapData {
 
     /** Картинка по номеру карты; создаётся пустой, если сервер её ещё не присылал. */
     fun imageOf(mapId: Int): Image = maps.getOrPut(mapId) { Image() }
+
+    /** Добавляет значок для проверки отрисовки (--map), не трогая разбор пакетов. */
+    fun debugDecoration(mapId: Int, decoration: Decoration) {
+        decorations[mapId] = decorations[mapId].orEmpty() + decoration
+    }
 
     /** Значки карты: каждый новый пакет со значками заменяет список целиком. */
     fun decorationsOf(mapId: Int): List<Decoration> = decorations[mapId].orEmpty()

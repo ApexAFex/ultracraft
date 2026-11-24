@@ -1670,10 +1670,16 @@ class Hud(
         // Значки: рамки, метки игроков. В ванили у каждого своя картинка, у нас — точки.
         for (marker in mapDecorations(mapId)) {
             val dot = 3f
-            val mx = left + marker.x * cell - dot / 2f
-            val my = top + marker.y * cell - dot / 2f
-            renderer.rect(mx - 1f, my - 1f, dot + 2f, dot + 2f, 0x101010, 0.9f)
-            renderer.rect(mx, my, dot, dot, marker.color(), 1f)
+            val cx = left + marker.x * cell
+            val cy = top + marker.y * cell
+            // Носик стрелки: у метки игрока он показывает направление, у остальных не нужен.
+            if (marker.typeId == 0) {
+                val (dx, dy) = marker.noseOffset()
+                renderer.rect(cx + dx * cell - 1.5f, cy + dy * cell - 1.5f, 3f, 3f, 0x101010, 0.9f)
+                renderer.rect(cx + dx * cell - 1f, cy + dy * cell - 1f, 2f, 2f, marker.color(), 1f)
+            }
+            renderer.rect(cx - dot / 2f - 1f, cy - dot / 2f - 1f, dot + 2f, dot + 2f, 0x101010, 0.9f)
+            renderer.rect(cx - dot / 2f, cy - dot / 2f, dot, dot, marker.color(), 1f)
         }
         renderer.draw()
     }

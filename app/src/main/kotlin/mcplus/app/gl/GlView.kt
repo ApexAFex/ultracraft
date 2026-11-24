@@ -212,6 +212,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         demo: Boolean = false,
         /** Нарисовать три пробных едущих поршня перед камерой (--piston). */
         pistonDemo: Boolean = false,
+        /** Добавить пробные значки на карту в руке (--map). */
+        mapDemo: Boolean = false,
         /** Идти вперёд всё время: проверка чужих шагов вторым клиентом (`--walk`). */
         walkForever: Boolean = false,
         /** Печатать каждое проигранное событие звука: проверка предсказаний без слуха. */
@@ -700,6 +702,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var previousZ = player.z
                     var playerLoadedSent = false
                     var pistonDemoAdded = false
+                    var mapDemoAdded = false
 
                     // Название предмета в руке показывается пару секунд после смены слота.
                     var lastSelected = session?.inventory?.selected ?: 0
@@ -3815,6 +3818,21 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 // Строки чата видны и без открытой строки ввода: раньше они
                                 // рисовались только пока печатаешь.
                                 hud.drawChat(chatLines, System.nanoTime(), chatScroll)
+                                if (mapDemo && !mapDemoAdded) {
+                                    val heldMap = session?.inventory?.held()?.mapId ?: -1
+                                    if (heldMap >= 0) {
+                                        mapDemoAdded = true
+                                        session?.maps?.debugDecoration(
+                                            heldMap,
+                                            mcplus.net.MapData.Decoration(0, 64, 64, 3, null),
+                                        )
+                                        session?.maps?.debugDecoration(
+                                            heldMap,
+                                            mcplus.net.MapData.Decoration(1, 70, 60, 0, "Дом"),
+                                        )
+                                        println("Пробные значки карты: 2")
+                                    }
+                                }
                                 hud.draw(
                                     inventory, vitals, bossBars, effects, itemName, itemNameAlpha,
                                     heldMapId = session?.inventory?.held()?.mapId ?: -1,
