@@ -53,6 +53,21 @@ class VehicleLoadsTest {
     }
 
     @Test
+    fun `a hopper cart has a rim and a smaller body`() {
+        val parts = VehicleLoads.hopperParts()
+        assertEquals(2, parts.size, "ободок и тело")
+        val rim = parts[0]
+        val body = parts[1]
+        // Ободок выше тела и шире его — иначе воронка выглядит сплошным кубом.
+        assertTrue(rim.offsetY > body.offsetY)
+        assertTrue(rim.sizeX > body.sizeX)
+        assertTrue(rim.sizeY < body.sizeY, "ободок плоский")
+        // Обе части помещаются в вагонетку и не торчат выше борта больше чем на блок.
+        assertTrue(rim.sizeX < 1f && body.sizeX < 1f)
+        assertTrue(rim.offsetY < 1f)
+    }
+
+    @Test
     fun `the chest model has a base, a lid and a knob`() {
         val boxes = MobModels.boxes(MobFamily.CHEST)
         assertEquals(3, boxes.size, "днище, крышка и замок")

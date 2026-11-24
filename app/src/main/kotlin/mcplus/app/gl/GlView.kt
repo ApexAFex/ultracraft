@@ -3143,6 +3143,24 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                 yaw = 0f,
                                             )
                                         }
+                                        // Воронка в вагонетке: ободок и тело, а не сплошной куб.
+                                        if (name == "hopper_minecart") {
+                                            for (part in VehicleLoads.hopperParts()) {
+                                                cubes += Renderer.BlockCube(
+                                                    entity.x,
+                                                    entity.y + part.offsetY,
+                                                    entity.z,
+                                                    1f,
+                                                    atlas.layerFor("hopper", TextureAtlas.Kind.TOP),
+                                                    atlas.layerFor("hopper", TextureAtlas.Kind.BOTTOM),
+                                                    atlas.layerFor("hopper", TextureAtlas.Kind.SIDE),
+                                                    yaw = 0f,
+                                                    sizeX = part.sizeX,
+                                                    sizeY = part.sizeY,
+                                                    sizeZ = part.sizeZ,
+                                                )
+                                            }
+                                        }
                                         // Сундук в лодке и в вагонетке — отдельная модель со
                                         // своей текстурой, а не блок: в ванили это блок-сущность.
                                         VehicleLoads.chestOffsetFor(name)?.let { offset ->
