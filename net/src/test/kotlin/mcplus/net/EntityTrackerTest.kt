@@ -135,6 +135,48 @@ class EntityTrackerTest {
     }
 
     @Test
+    fun `a teleport with relative rotation adds to the current facing`() {
+        val tracker = EntityTracker()
+        tracker.onPacket(spawn(12, 159, 0.0, 0.0, 0.0))
+        tracker.onPacket(
+            Packet(
+                Protocol777.Play.TELEPORT_ENTITY,
+                ByteWriter()
+                    .writeVarInt(12)
+                    .writeDouble(0.0).writeDouble(0.0).writeDouble(0.0)
+                    .writeDouble(0.0).writeDouble(0.0).writeDouble(0.0)
+                    .writeFloat(45f).writeFloat(10f)
+                    .writeInt(8 or 16)                    // Y_ROT и X_ROT относительно
+                    .writeBoolean(true)
+                    .toByteArray(),
+            ),
+        )
+        tracker.tick(1.0)
+        val entity = tracker.byId(12)!!
+        assertEquals(45f, entity.yaw, 0.01f)
+        assertEquals(10f, entity.pitch, 0.01f)
+    }
+
+    @Test
+    fun `a teleport for an unknown entity is ignored without crashing`() {
+        val tracker = EntityTracker()
+        tracker.onPacket(
+            Packet(
+                Protocol777.Play.TELEPORT_ENTITY,
+                ByteWriter()
+                    .writeVarInt(999)
+                    .writeDouble(1.0).writeDouble(2.0).writeDouble(3.0)
+                    .writeDouble(0.0).writeDouble(0.0).writeDouble(0.0)
+                    .writeFloat(0f).writeFloat(0f)
+                    .writeInt(0)
+                    .writeBoolean(false)
+                    .toByteArray(),
+            ),
+        )
+        assertTrue(tracker.snapshot().isEmpty())
+    }
+
+    @Test
     fun `an unknown packet is not claimed`() {
         val tracker = EntityTracker()
         assertTrue(!tracker.onPacket(Packet(Protocol777.Play.CHUNK_DATA, ByteArray(0))))
