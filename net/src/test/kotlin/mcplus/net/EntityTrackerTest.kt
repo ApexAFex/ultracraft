@@ -89,10 +89,11 @@ class EntityTrackerTest {
                 Protocol777.Play.TELEPORT_ENTITY,
                 ByteWriter()
                     .writeVarInt(10)
-                    .writeVarInt(0)                       // обычный телепорт
                     .writeDouble(100.0).writeDouble(64.0).writeDouble(-50.0)
                     .writeDouble(0.0).writeDouble(0.0).writeDouble(0.0)
                     .writeFloat(90f).writeFloat(0f)
+                    .writeInt(0)                          // ничего не относительно
+                    .writeBoolean(true)                   // на земле
                     .toByteArray(),
             ),
         )
@@ -101,6 +102,36 @@ class EntityTrackerTest {
         assertEquals(100.0, entity.x, 0.001)
         assertEquals(64.0, entity.y, 0.001)
         assertEquals(-50.0, entity.z, 0.001)
+    }
+
+    /**
+     * Телепорт с флагом «относительно»: координаты прибавляются к текущей позиции.
+     *
+     * Именно на этом формате раньше терялись все телепорты: читался несуществующий
+     * «pathType», и сущность оставалась там, где появилась.
+     */
+    @Test
+    fun `a relative teleport adds to the current position`() {
+        val tracker = EntityTracker()
+        tracker.onPacket(spawn(11, 159, 10.0, 20.0, 30.0))
+        tracker.onPacket(
+            Packet(
+                Protocol777.Play.TELEPORT_ENTITY,
+                ByteWriter()
+                    .writeVarInt(11)
+                    .writeDouble(1.0).writeDouble(2.0).writeDouble(3.0)   // прибавка
+                    .writeDouble(0.0).writeDouble(0.0).writeDouble(0.0)
+                    .writeFloat(0f).writeFloat(0f)
+                    .writeInt(1 or 2 or 4)                // X, Y и Z относительно
+                    .writeBoolean(true)
+                    .toByteArray(),
+            ),
+        )
+        tracker.tick(1.0)
+        val entity = tracker.byId(11)!!
+        assertEquals(11.0, entity.x, 0.001)
+        assertEquals(22.0, entity.y, 0.001)
+        assertEquals(33.0, entity.z, 0.001)
     }
 
     @Test

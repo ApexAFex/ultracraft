@@ -382,24 +382,37 @@ class EntityTracker {
     }
 
     /** `entity_position_sync`: path type 0 carries an absolute position and rotation. */
-    private fun readTeleport(body: ByteArray) {        val reader = ByteReader(body)
+    /**
+     * `teleport_entity`: позиция, скорость, поворот и набор флагов «относительно».
+     *
+     * Раньше здесь читался несуществующий `pathType`, и почти любой телепорт отбрасывался:
+     * сущность (и чужой игрок) навсегда застревала там, где появилась. Формат 26.3:
+     * `PositionMoveRotation` (три double позиции, три double скорости, два float поворота),
+     * затем **int** с битами `Relative` и флаг «на земле».
+     *
+     * @see Relative: X=1, Y=2, Z=4, Y_ROT=8, X_ROT=16; DELTA_* касаются скорости.
+     */
+    private fun readTeleport(body: ByteArray) {
+        val reader = ByteReader(body)
         val id = reader.readVarInt()
-        val pathType = reader.readVarInt()
-        if (pathType != 0) return // stepped paths are not handled yet
-
         val x = reader.readDouble()
         val y = reader.readDouble()
         val z = reader.readDouble()
-        reader.readDouble() // velocity X
-        reader.readDouble() // velocity Y
-        reader.readDouble() // velocity Z
+        reader.readDouble() // скорость X
+        reader.readDouble() // скорость Y
+        reader.readDouble() // скорость Z
         val yaw = reader.readFloat()
         val pitch = reader.readFloat()
+        val relatives = reader.readInt()
 
-        entities[id]?.apply {
-            place(x, y, z)
-            look(yaw, pitch)
-        }
+        val entity = entities[id] ?: return
+        val nextX = if (relatives and RELATIVE_X != 0) entity.x + x else x
+        val nextY = if (relatives and RELATIVE_Y != 0) entity.y + y else y
+        val nextZ = if (relatives and RELATIVE_Z != 0) entity.z + z else z
+        val nextYaw = if (relatives and RELATIVE_YAW != 0) entity.yaw + yaw else yaw
+        val nextPitch = if (relatives and RELATIVE_PITCH != 0) entity.pitch + pitch else pitch
+        entity.place(nextX, nextY, nextZ)
+        entity.look(nextYaw, nextPitch)
         movementPackets++
     }
 
@@ -416,6 +429,13 @@ class EntityTracker {
     private companion object {
         /** Byte-encoded angles are parts of a full turn. */
         const val TURN = 360f
+
+        // Биты набора `Relative` из 26.3: 1 << номер в перечислении.
+        const val RELATIVE_X = 1
+        const val RELATIVE_Y = 2
+        const val RELATIVE_Z = 4
+        const val RELATIVE_YAW = 8
+        const val RELATIVE_PITCH = 16
     }
 }
 
