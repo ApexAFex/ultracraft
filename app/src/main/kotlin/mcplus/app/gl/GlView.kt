@@ -1303,8 +1303,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val rowsNow = if (session != null && statsTable != null) {
                                     StatisticsScreen.rows(
                                         session!!.stats, statsTable,
-                                        itemName = { id -> itemTable.nameOf(id) },
-                                        entityName = { id -> entityTypes.nameOf(id) },
+                                        itemName = { id -> mcplus.net.ItemNames.item(itemTable.nameOf(id)) },
+                                        entityName = { id -> mcplus.net.ItemNames.entity(entityTypes.nameOf(id)) },
                                         type = StatisticsScreen.TYPES[statisticsType],
                                     ).size
                                 } else {
@@ -3631,6 +3631,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 trades = merchantTrades,
                                 selectedTrade = selectedTrade,
                                 tradeScroll = tradeScroll,
+                                // Здесь имя нужно для иконки, поэтому техническое, без перевода.
                                 itemName = { id -> itemTable.nameOf(id) },
                             )
                         } else if (inventory != null && inventoryOpen) {
@@ -3662,8 +3663,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             } else {
                                 StatisticsScreen.rows(
                                     stats, statsTable,
-                                    itemName = { id -> itemTable.nameOf(id) },
-                                    entityName = { id -> entityTypes.nameOf(id) },
+                                    itemName = { id -> mcplus.net.ItemNames.item(itemTable.nameOf(id)) },
+                                    entityName = { id -> mcplus.net.ItemNames.entity(entityTypes.nameOf(id)) },
                                     type = StatisticsScreen.TYPES[statisticsType],
                                 )
                             }
@@ -3703,7 +3704,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 selected = recipeCategory,
                                 recipes = recipesNow,
                                 page = recipePage,
-                                itemName = { id -> itemTable.nameOf(id) },
+                                itemName = { id -> mcplus.net.ItemNames.item(itemTable.nameOf(id)) },
                                 iconLayer = { name -> atlas.layerForItem(name) },
                                 mouseX = input.mouseX,
                                 mouseY = input.mouseY,
@@ -3720,7 +3721,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             advancementTabRects = hud.drawAdvancementsScreen(
                                 AdvancementsScreen.tabs(nodes),
                                 advancementTab,
-                                itemName = { id -> itemTable.nameOf(id) },
+                                itemName = { id -> mcplus.net.ItemNames.item(itemTable.nameOf(id)) },
                                 mouseX = input.mouseX,
                                 mouseY = input.mouseY,
                             )

@@ -53,5 +53,24 @@ class ItemNamesTest {
         Language.load(emptyMap())
         assertEquals("Diamond pickaxe", ItemNames.item("diamond_pickaxe"))
         assertEquals("Night vision", ItemNames.effect("night_vision"))
+        assertEquals("Zombie", ItemNames.entity("zombie"))
+    }
+
+    @Test
+    fun `entities are translated by their own key`() {
+        Language.load(
+            mapOf(
+                "item.minecraft.stone" to "Камень",
+                "entity.minecraft.zombie" to "Зомби",
+            ),
+        )
+        try {
+            assertEquals("Зомби", ItemNames.entity("zombie"))
+            // У существа нет перевода — имя очеловечивается, а не берётся из предметов.
+            assertEquals("Copper golem", ItemNames.entity("copper_golem"))
+            assertEquals("Камень", ItemNames.item("stone"))
+        } finally {
+            Language.load(emptyMap())
+        }
     }
 }

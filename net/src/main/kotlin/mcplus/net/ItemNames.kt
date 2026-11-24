@@ -24,6 +24,12 @@ object ItemNames {
         return Language.translate("effect.minecraft.$raw") ?: humanize(raw)
     }
 
+    /** Имя существа: `zombie` → «Зомби». Нужно для статистики и ведра с рыбой. */
+    fun entity(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        return Language.translate("entity.minecraft.$raw") ?: humanize(raw)
+    }
+
     /**
      * Очеловеченное техническое имя: `diamond_pickaxe` → `Diamond pickaxe`.
      *
