@@ -3057,20 +3057,36 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     SpecialEntities.isInvisible(name) -> Unit
 
                                     family == MobFamily.NONE -> boxes += entity
-                                    else -> mobs += MobRenderer.Mob(
-                                        x = entity.x,
-                                        y = entity.y,
-                                        z = entity.z,
-                                        yaw = entity.yaw,
-                                        walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
-                                        walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
-                                        family = family,
-                                        scale = MobModels.scaleFor(name, entity.metadata),
-                                        texture = mobRenderer.textureFor(name),
-                                        overlays = villagerLayers(entity, name),
-                                        hurt = entity.hurtProgress(System.nanoTime()),
-                                        time = (nowNanos / 1_000_000_000.0).toFloat(),
-                                    )
+                                    else -> {
+                                        mobs += MobRenderer.Mob(
+                                            x = entity.x,
+                                            y = entity.y,
+                                            z = entity.z,
+                                            yaw = entity.yaw,
+                                            walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
+                                            walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                            family = family,
+                                            scale = MobModels.scaleFor(name, entity.metadata),
+                                            texture = mobRenderer.textureFor(name),
+                                            overlays = villagerLayers(entity, name),
+                                            hurt = entity.hurtProgress(System.nanoTime()),
+                                            time = (nowNanos / 1_000_000_000.0).toFloat(),
+                                        )
+                                        // Груз вагонетки: настоящий блок кубом сверху —
+                                        // динамит, печь, командный блок или спавнер.
+                                        VehicleLoads.blockFor(name)?.let { load ->
+                                            cubes += Renderer.BlockCube(
+                                                entity.x,
+                                                entity.y + VehicleLoads.LOAD_Y,
+                                                entity.z,
+                                                VehicleLoads.LOAD_SIZE,
+                                                atlas.layerFor(load, TextureAtlas.Kind.TOP),
+                                                atlas.layerFor(load, TextureAtlas.Kind.BOTTOM),
+                                                atlas.layerFor(load, TextureAtlas.Kind.SIDE),
+                                                yaw = 0f,
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
