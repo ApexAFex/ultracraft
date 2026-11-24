@@ -20,7 +20,7 @@
 | Звуки | все серверные события + свои: шаги, ломание, двери, дождь, пещеры | `SoundEventsTest`, лог клиента |
 | Экраны | инвентарь, сундук, печь, варочная, наковальня, торговля, верстак, книга рецептов, чтение книги, достижения, статистика, пауза, меню | снимки в `screenshots/` |
 | Скины игроков | из профиля, включая тонкие модели рук | `SkinTexturesTest`, `PlayerListTest` |
-| Тесты | **805** | `.\gradlew.bat build` |
+| Тесты | **806** | `.\gradlew.bat build` |
 
 ## Где мы лучше игры
 
@@ -68,7 +68,7 @@ foreach ($m in 'world','--mobs','--inventory','--recipes','--advancements','--st
   .\app\build\install\app\bin\app.bat window 127.0.0.1:25565 --name mcplus --hidden --no-menu --frames 2000 --out sweep.png $m
 }
 
-# сборка и все тесты (805)
+# сборка и все тесты (806)
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.13.9-hotspot'
 .\gradlew.bat build
 

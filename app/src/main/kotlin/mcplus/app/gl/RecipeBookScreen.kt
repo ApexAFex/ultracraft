@@ -27,6 +27,18 @@ object RecipeBookScreen {
     /** Сколько иконок на страницу. */
     fun perPage(height: Int): Int = COLUMNS * visibleRows(height)
 
+    /**
+     * Сколько вкладок категорий влезает в панель.
+     *
+     * Категорий больше, чем строк: без ограничения список уезжал под подсказку внизу и
+     * наезжал на неё текстом.
+     */
+    fun maxTabs(panelHeight: Float, scale: Float): Int {
+        if (panelHeight <= 0f || scale <= 0f) return 1
+        // 42 * scale — заголовок, 24 * scale — нижняя подсказка, 15 * scale — шаг вкладки.
+        return ((panelHeight - 66f * scale) / (15f * scale)).toInt().coerceIn(1, 32)
+    }
+
     /** Рецепты категории: в том порядке, в каком их прислал сервер. */
     fun recipesIn(book: RecipeBook, category: Int): List<Recipe> =
         book.inCategory(category).filter { it.result > 0 }

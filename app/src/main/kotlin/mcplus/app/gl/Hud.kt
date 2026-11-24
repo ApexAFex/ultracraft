@@ -505,7 +505,9 @@ class Hud(
         val tabX = panel.x + 8f * s
         var tabY = panel.y + 42f * s
         val tabRects = ArrayList<HudRect>(tabs.size)
-        for (category in tabs) {
+        // Список категорий не должен уезжать под подсказку: показываем столько, сколько влезает.
+        val shownTabs = tabs.take(RecipeBookScreen.maxTabs(panel.height, s))
+        for (category in shownTabs) {
             val rect = HudRect(tabX, tabY - 1f * s, 96f * s, 14f * s)
             tabRects += rect
             if (category == selected) {

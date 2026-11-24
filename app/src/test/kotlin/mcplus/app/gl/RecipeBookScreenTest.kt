@@ -26,6 +26,18 @@ class RecipeBookScreenTest {
     ) = Recipe(id, RecipeKind.SHAPED, 3, 3, result, count, cells, category = 0)
 
     @Test
+    fun `the category list never runs under the hint line`() {
+        // Панель 720p при масштабе 3: заголовок и подсказка занимают 66*scale, шаг 15*scale.
+        val tabs = RecipeBookScreen.maxTabs(600f, 3f)
+        assertTrue(tabs in 1..32, "влезло вкладок: $tabs")
+        assertTrue(tabs < 12, "все двенадцать категорий не должны влезать в 600 пикселей: $tabs")
+        // Панель ниже — вкладок меньше; вырожденные размеры не ломают счёт.
+        assertTrue(RecipeBookScreen.maxTabs(400f, 3f) < tabs)
+        assertEquals(1, RecipeBookScreen.maxTabs(0f, 3f))
+        assertEquals(1, RecipeBookScreen.maxTabs(600f, 0f))
+    }
+
+    @Test
     fun `a note cell is described in words, not as an item number`() {
         val lines = RecipeBookScreen.tooltip(
             recipe(1, 100, cells = listOf(Ingredient(4), Ingredient(-1, note = "любое топливо"))),
