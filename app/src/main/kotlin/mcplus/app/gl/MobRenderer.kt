@@ -37,6 +37,8 @@ class MobRenderer(
         val hurt: Float = 0f,
         /** Время в секундах: по нему качаются хвосты, уши и щупальца в покое. */
         val time: Float = 0f,
+        /** 0 — стоит, 1 — уже упал набок (анимация смерти). */
+        val deathProgress: Float = 0f,
     )
 
     private class FamilyMesh(
@@ -119,9 +121,18 @@ class MobRenderer(
         // Лодка и вагонетка в модели длиной по X, а не по Z: им нужен поворот на 90°.
         val yaw = -Math.toRadians(mob.yaw.toDouble()).toFloat() +
             Math.toRadians(MobModels.yawOffsetOf(mob.family).toDouble()).toFloat()
+        // Смерть: модель заваливается набок вокруг Z и чуть приподнимается, как в ванили.
+        val pose = if (mob.deathProgress > 0f) {
+            Mat4.multiply(
+                Mat4.translate(0f, 0.1f * mob.deathProgress, 0f),
+                Mat4.rotateZ(MobModels.deathAngle(mob.deathProgress)),
+            )
+        } else {
+            Mat4.identity()
+        }
         val base = Mat4.multiply(
             Mat4.translate(mob.x.toFloat(), mob.y.toFloat(), mob.z.toFloat()),
-            Mat4.multiply(Mat4.rotateY(yaw), scale(mob.scale)),
+            Mat4.multiply(Mat4.rotateY(yaw), Mat4.multiply(pose, scale(mob.scale))),
         )
 
         for ((index, box) in mesh.boxes.withIndex()) {

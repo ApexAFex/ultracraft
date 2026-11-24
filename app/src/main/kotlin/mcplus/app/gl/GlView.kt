@@ -610,6 +610,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val entitySteps = HashMap<Int, EntityStepTracker>()
                     var otherSteps = 0
                     var playerSteps = 0
+                    /** Анимация смерти существ: свой отсчёт на каждого. */
+                    val deathAnimator = DeathAnimator()
+                    val deathLogged = HashSet<Int>()
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -3058,19 +3061,30 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
 
                                     family == MobFamily.NONE -> boxes += entity
                                     else -> {
+                                        val deathProgress = deathAnimator.progress(
+                                            entity.id, entity.health, nowNanos,
+                                        )
+                                        if (debug && deathProgress > 0f && deathLogged.add(entity.id)) {
+                                            println("Смерть: $name (id=${entity.id})")
+                                        }
                                         mobs += MobRenderer.Mob(
                                             x = entity.x,
                                             y = entity.y,
                                             z = entity.z,
                                             yaw = entity.yaw,
                                             walkPhase = (entity.walkDistance * WALK_PHASE_PER_BLOCK).toFloat(),
-                                            walkAmount = (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat(),
+                                            walkAmount = if (deathProgress > 0f) {
+                                                0f
+                                            } else {
+                                                (entity.speed / WALK_SPEED).coerceIn(0.0, 1.0).toFloat()
+                                            },
                                             family = family,
                                             scale = MobModels.scaleFor(name, entity.metadata),
                                             texture = mobRenderer.textureFor(name),
                                             overlays = villagerLayers(entity, name),
                                             hurt = entity.hurtProgress(System.nanoTime()),
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
+                                            deathProgress = deathProgress,
                                         )
                                         // Груз вагонетки: настоящий блок кубом сверху —
                                         // динамит, печь, командный блок или спавнер.

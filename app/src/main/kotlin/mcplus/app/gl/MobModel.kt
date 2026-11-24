@@ -57,6 +57,15 @@ data class MobBox(
  */
 object MobModels {
 
+    /**
+     * Наклон упавшего существа в радианах: 0 — стоит, PI/2 — лежит.
+     *
+     * В ванили смерть длится 20 тиков: модель заваливается набок на 90° и чуть приподнимается.
+     * Здесь только угол — чтобы это можно было проверить тестом без OpenGL.
+     */
+    fun deathAngle(progress: Float): Float =
+        (Math.PI / 2.0 * progress.coerceIn(0f, 1f)).toFloat()
+
     fun familyOf(entityName: String): MobFamily = when (entityName) {
         "cow", "mooshroom", "pig", "sheep", "rabbit" -> MobFamily.QUADRUPED
 
