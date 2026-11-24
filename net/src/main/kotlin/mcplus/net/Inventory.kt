@@ -862,6 +862,77 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
                 readSoundHolder(reader)                                  // звук снятия ножницами
             }
 
+            // Превращение блока (лопата, топор, тяпка): ссылка на описание преобразования.
+            "block_transformer" -> reader.readVarInt()
+
+            // Еда жителя: сколько очков сытости.
+            "villager_food" -> reader.readVarInt()
+
+            // Компост: сколько слоёв даёт предмет — число или ссылка на генератор из таблиц.
+            "compostable" -> readResolvableInt(reader)
+
+            // Топливо печи и варочной стойки: время/использования и множитель скорости.
+            "cooking_fuel" -> {
+                readResolvableInt(reader)
+                readResolvableFloat(reader)
+            }
+            "brewing_fuel" -> {
+                readResolvableInt(reader)
+                readResolvableFloat(reader)
+            }
+
+            // Копьё: отбрасывание, сбивание с лошади и два необязательных звука.
+            "piercing_weapon" -> {
+                reader.readBoolean()
+                reader.readBoolean()
+                if (reader.readBoolean()) readSoundHolder(reader)
+                if (reader.readBoolean()) readSoundHolder(reader)
+            }
+
+            // Кинетическое оружие: два числа, три условия и два звука.
+            "kinetic_weapon" -> {
+                reader.readVarInt()                       // перезарядка контакта
+                reader.readVarInt()                       // задержка
+                repeat(3) { if (reader.readBoolean()) readKineticCondition(reader) }
+                reader.readFloat()                        // движение вперёд
+                reader.readFloat()                        // множитель урона
+                if (reader.readBoolean()) readSoundHolder(reader)
+                if (reader.readBoolean()) readSoundHolder(reader)
+            }
+
+            // Блокирование ударов щитом: два числа, список снижений урона, износ и звуки.
+            "blocks_attacks" -> {
+                reader.readFloat()                        // задержка блокировки
+                reader.readFloat()                        // множитель перезарядки
+                val reductions = reader.readVarInt()
+                if (reductions !in 0..MAX_DAMAGE_REDUCTIONS) throw UnreadableStack(count)
+                repeat(reductions) {
+                    reader.readFloat()                    // угол блокировки
+                    if (reader.readBoolean()) readHolderSetChecked(reader, count) // виды урона
+                    reader.readFloat()                    // базовое снижение
+                    reader.readFloat()                    // доля от урона
+                }
+                repeat(3) { reader.readFloat() }          // порог, база и доля износа
+                if (reader.readBoolean()) readHolderSetChecked(reader, count) // что пробивает
+                if (reader.readBoolean()) readSoundHolder(reader)
+                if (reader.readBoolean()) readSoundHolder(reader)
+            }
+
+            // Съедобное: сколько секунд есть, анимация, звук, частицы и эффекты.
+            "consumable" -> {
+                reader.readFloat()                        // секунды
+                reader.readVarInt()                       // вид анимации
+                readSoundHolder(reader)                   // звук еды
+                reader.readBoolean()                      // частицы
+                readConsumeEffects(reader, count)
+            }
+
+            // Смертельная защита (тотем): список эффектов при смерти.
+            "death_protection" -> readConsumeEffects(reader, count)
+
+            // Замок на контейнере: предикат предмета-ключа.
+            "lock" -> readItemPredicate(reader, count)
+
             else -> throw UnreadableStack(count)
         }
     }
@@ -1076,6 +1147,84 @@ private fun readSoundHolder(reader: ByteReader) {
     }
 }
 
+/** Число из таблицы добычи: своё значение или ссылка на генератор. */
+private fun readResolvableInt(reader: ByteReader) {
+    if (reader.readBoolean()) reader.readVarInt() else reader.readString(MAX_IDENTIFIER_BYTES)
+}
+
+/** То же для дробного числа: своё значение или ссылка на генератор. */
+private fun readResolvableFloat(reader: ByteReader) {
+    if (reader.readBoolean()) reader.readFloat() else reader.readString(MAX_IDENTIFIER_BYTES)
+}
+
+/** Условие кинетического оружия: сколько тиков, какая скорость и какая относительная. */
+private fun readKineticCondition(reader: ByteReader) {
+    reader.readVarInt()
+    reader.readFloat()
+    reader.readFloat()
+}
+
+/**
+ * Эффекты потребления (`consumable`, `death_protection`).
+ *
+ * Список полиморфный: сначала номер вида, потом его тело. Виды взяты из реестра
+ * `minecraft:consume_effect_type`: 0 — наложить эффекты, 1 — снять эффекты, 2 — снять все,
+ * 3 — телепортировать, 4 — проиграть звук.
+ */
+private fun readConsumeEffects(reader: ByteReader, count: Int) {
+    val size = reader.readVarInt()
+    if (size !in 0..MAX_CONSUME_EFFECTS) throw UnreadableStack(count)
+    repeat(size) {
+        when (reader.readVarInt()) {
+            0 -> {
+                val effects = reader.readVarInt()
+                if (effects !in 0..MAX_EFFECT_INSTANCES) throw UnreadableStack(count)
+                repeat(effects) { readMobEffect(reader, count, 0) }
+                reader.readFloat()                       // вероятность
+            }
+            1 -> readHolderSetChecked(reader, count)     // какие эффекты снять
+            2 -> Unit                                    // снять все
+            3 -> {
+                reader.readFloat()                       // радиус телепорта
+                reader.readBoolean()                     // направленные частицы
+            }
+            4 -> readSoundHolder(reader)                 // звук
+            else -> throw UnreadableStack(count)
+        }
+    }
+}
+
+/**
+ * Эффект зелья: вид, уровень, длительность, три флага и необязательный скрытый эффект.
+ *
+ * Скрытый эффект вложен сам в себя, поэтому глубина ограничена: иначе испорченный пакет
+ * мог бы увести разбор в бесконечную рекурсию.
+ */
+private fun readMobEffect(reader: ByteReader, count: Int, depth: Int) {
+    if (depth > MAX_EFFECT_NESTING) throw UnreadableStack(count)
+    reader.readVarInt()                                  // вид эффекта
+    reader.readVarInt()                                  // уровень
+    reader.readVarInt()                                  // длительность в тиках
+    reader.readBoolean()                                 // ambient
+    reader.readBoolean()                                 // частицы
+    reader.readBoolean()                                 // значок
+    if (reader.readBoolean()) readMobEffect(reader, count, depth + 1)
+}
+
+/**
+ * Предикат предмета (`lock`): набор предметов, границы количества и компоненты.
+ *
+ * Точные компоненты имеют тела неизвестной длины, поэтому непустой список сразу делает
+ * стек непрочитанным — на практике замки их не используют.
+ */
+private fun readItemPredicate(reader: ByteReader, count: Int) {
+    if (reader.readBoolean()) readHolderSetChecked(reader, count)   // какие предметы подходят
+    if (reader.readBoolean()) reader.readInt()                      // минимум количества
+    if (reader.readBoolean()) reader.readInt()                      // максимум количества
+    if (reader.readVarInt() != 0) throw UnreadableStack(count)      // точные компоненты
+    if (reader.readVarInt() != 0) throw UnreadableStack(count)      // частичные компоненты
+}
+
 /** Больше модификаторов атрибутов на предмете не бывает. */
 private const val MAX_ATTRIBUTE_MODS = 64
 
@@ -1138,6 +1287,18 @@ private const val MAX_MAP_DECORATIONS = 256
 
 /** Правил инструмента больше этого не бывает. */
 private const val MAX_TOOL_RULES = 64
+
+/** Эффектов потребления в одном компоненте. */
+private const val MAX_CONSUME_EFFECTS = 16
+
+/** Эффектов зелья в одном списке. */
+private const val MAX_EFFECT_INSTANCES = 64
+
+/** Глубина вложенных «скрытых» эффектов зелья. */
+private const val MAX_EFFECT_NESTING = 4
+
+/** Снижений урона у щита. */
+private const val MAX_DAMAGE_REDUCTIONS = 16
 
 /** Больше слотов в предмете-контейнере в игре не бывает. */
 private const val MAX_CONTAINER_ITEMS = 256

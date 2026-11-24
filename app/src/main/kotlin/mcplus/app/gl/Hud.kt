@@ -563,7 +563,7 @@ class Hud(
                 lineY += 12f * s
             }
             val check = craftCheck(hoveredRecipe)
-            RecipeBookScreen.craftLine(check, itemName)?.let { line ->
+            RecipeBookScreen.craftLine(check, itemName, hoveredRecipe.kind)?.let { line ->
                 labels += TextRenderer.ScreenLabel(
                     gridX, lineY, line, s * 0.9f,
                     if (check.craftable) 0x8FE06A else 0xD9A05A,

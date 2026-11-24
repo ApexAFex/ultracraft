@@ -43,6 +43,17 @@ class RecipeBookScreenTest {
     }
 
     @Test
+    fun `a stonecutter recipe says the recipe is picked in the menu`() {
+        val line = RecipeBookScreen.craftLine(
+            CraftCheck(), { "предмет $it" }, RecipeKind.STONECUTTER,
+        )
+        assertEquals("Рецепт выбирается в меню камнереза — «разложи» там не работает", line)
+        // У верстака всё как раньше.
+        val grid = RecipeBookScreen.craftLine(CraftCheck(), { "предмет $it" }, RecipeKind.SHAPED)
+        assertEquals("Можно скрафтить — ЛКМ", grid)
+    }
+
+    @Test
     fun `pages split the list and clamp to the last one`() {
         val list = (0 until 25).map { recipe(it, 100 + it) }
         assertEquals(2, RecipeBookScreen.pageCount(25, 16))

@@ -491,11 +491,19 @@ class Session internal constructor(
      * так и останется в сетке. Сервер обрабатывает пакеты по порядку, поэтому сетка к моменту
      * клика уже заполнена. У печи и камнереза забирать нечего — там вещь выдаётся сама.
      */
-    fun craftFromBook(recipe: Recipe, all: Boolean = true) {
+    /**
+     * Разложить рецепт из книги.
+     *
+     * @return false, если станция не умеет «разложи» (камнерез, кузня): там рецепт выбирают
+     *   в самом меню, и отправлять пакет бессмысленно
+     */
+    fun craftFromBook(recipe: Recipe, all: Boolean = true): Boolean {
+        if (!recipe.kind.placeable) return false
         placeRecipe(recipe.id, all)
         if (recipe.kind == RecipeKind.SHAPED || recipe.kind == RecipeKind.SHAPELESS) {
             clickSlot(RESULT_MENU_SLOT, input = ContainerInput.QUICK_MOVE)
         }
+        return true
     }
 
     /**

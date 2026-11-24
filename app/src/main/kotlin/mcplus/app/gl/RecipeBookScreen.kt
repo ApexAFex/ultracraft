@@ -4,6 +4,7 @@ import mcplus.net.CraftCheck
 import mcplus.net.Recipe
 import mcplus.net.RecipeBook
 import mcplus.net.RecipeCategories
+import mcplus.net.RecipeKind
 
 /**
  * Книга рецептов: сетка результатов по категориям, как в оригинале.
@@ -112,8 +113,25 @@ object RecipeBookScreen {
      * Возвращает null, когда рецепт показать нечем (без результата). Порядок причин важен:
      * сначала «чего не хватает», потом «где крафтить» — так игрок видит ближайшее действие.
      */
-    fun craftLine(check: CraftCheck, itemName: (Int) -> String? = { null }): String? {
+    /** То же без вида рецепта: для книги, где вид не важен. */
+    fun craftLine(check: CraftCheck, itemName: (Int) -> String? = { null }): String? =
+        craftLine(check, itemName, null)
+
+    fun craftLine(
+        check: CraftCheck,
+        itemName: (Int) -> String? = { null },
+        /** Вид рецепта: у камнереза и кузни «разложи» не работает. */
+        kind: RecipeKind? = null,
+    ): String? {
         if (check.blocked != null) return null
+        if (kind != null && !kind.placeable) {
+            val station = when (kind) {
+                RecipeKind.STONECUTTER -> "камнереза"
+                RecipeKind.SMITHING -> "кузни"
+                else -> "станка"
+            }
+            return "Рецепт выбирается в меню $station — «разложи» там не работает"
+        }
         if (check.missing.isNotEmpty()) {
             val parts = check.missing.take(3).map { missing ->
                 val tag = missing.tag

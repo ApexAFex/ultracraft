@@ -259,6 +259,60 @@ class RecipeBookTest {
         assertEquals("любое топливо", fuel.note)
     }
 
+    /**
+     * Результат с компонентами: раньше такой рецепт ронял **весь** пакет книги.
+     *
+     * Теперь состав результата читается тем же кодом, что и предметы в инвентаре, поэтому
+     * книга остаётся целой, а у результата просто есть прочность.
+     */
+    @Test
+    fun `a result with components does not break the whole book`() {
+        // Разбор компонентов идёт по таблице игры: без неё id 3 не опознать.
+        val previous = ComponentTable.active
+        ComponentTable.active = listOf("data/components-777.tsv", "../data/components-777.tsv")
+            .map { java.io.File(it) }
+            .firstOrNull { it.isFile }
+            ?.let { ComponentTable.load(it) }
+            ?: ComponentTable.EMPTY
+        try {
+            val book = RecipeBook()
+            val writer = ByteWriter()
+            writer.writeVarInt(1)
+            writer.writeVarInt(21)
+            writer.writeVarInt(0)          // shapeless
+            writer.writeVarInt(1)
+            writer.writeVarInt(6).writeVarInt(0).writeString("minecraft:planks")
+            writer.writeVarInt(5)          // результат — стопка с компонентами
+            writer.writeVarInt(21)         // предмет
+            writer.writeVarInt(1)          // количество
+            writer.writeVarInt(1)          // один компонент
+            writer.writeVarInt(0)
+            writer.writeVarInt(3)          // damage = 5
+            writer.writeVarInt(5)
+            writer.writeVarInt(0)          // станции нет
+            writer.entryTail(category = 0)
+            writer.writeBoolean(false)
+
+            book.onPacket(Protocol777.Play.RECIPE_BOOK_ADD, writer.toByteArray())
+
+            val recipe = book.all().single()
+            assertEquals(21, recipe.result)
+            assertEquals(1, recipe.resultCount)
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    /** У камнереза и кузни «разложи» не работает: это свойство вида рецепта. */
+    @Test
+    fun `only grids and furnaces accept place recipe`() {
+        assertTrue(RecipeKind.SHAPED.placeable)
+        assertTrue(RecipeKind.SHAPELESS.placeable)
+        assertTrue(RecipeKind.FURNACE.placeable)
+        assertFalse(RecipeKind.STONECUTTER.placeable)
+        assertFalse(RecipeKind.SMITHING.placeable)
+    }
+
     /** Категории считаются по рецептам: по ним рисуются вкладки книги. */
     @Test
     fun `recipes are counted per category`() {

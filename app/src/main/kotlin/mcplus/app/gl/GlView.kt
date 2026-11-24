@@ -1379,11 +1379,18 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     if (hit != null) {
                                         val recipe = hit.second
                                         val check = session?.checkRecipe(recipe)
-                                        session?.craftFromBook(recipe)
+                                        val placed = session?.craftFromBook(recipe) ?: false
+                                        if (!placed) {
+                                            // Камнерез и кузня не умеют «разложи»: рецепт там
+                                            // выбирают в самом меню.
+                                            recipeNotice = "Этот станок выбирает рецепт сам — откройте меню"
+                                            recipeNoticeUntil = System.nanoTime() + NOTICE_NANOS
+                                        }
                                         println(
                                             "Крафт: ${itemTable.nameOf(recipe.result) ?: "предмет ${recipe.result}"}" +
-                                                " — " + (check?.let { RecipeBookScreen.craftLine(it, itemTable::nameOf) }
-                                                ?: "нет проверки"),
+                                                " — " + (check?.let { RecipeBookScreen.craftLine(it, itemTable::nameOf, recipe.kind) }
+                                                ?: "нет проверки") +
+                                                if (placed) "" else " (станок не умеет «разложи»)",
                                         )
                                     }
                                 }
@@ -4075,22 +4082,37 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             // сервер после входа, и «разложи» до этого всё равно не сработает.
                             if (open != null && open.craftCounts().isNotEmpty()) {
                                 val wanted = craftRequest
+                                // Рецепт должен подходить к открытому столу: у камнереза
+                                // бессмысленно раскладывать рецепт верстака, а у печи — камнереза.
+                                val menuNow = open.menuType
+                                val suitable: (mcplus.net.RecipeKind) -> Boolean = { kind ->
+                                    when (kind) {
+                                        mcplus.net.RecipeKind.FURNACE ->
+                                            menuNow in setOf("furnace", "blast_furnace", "smoker")
+                                        mcplus.net.RecipeKind.STONECUTTER -> menuNow == "stonecutter"
+                                        mcplus.net.RecipeKind.SMITHING -> false
+                                        else -> mcplus.net.Crafting.gridFor(menuNow) > 0
+                                    }
+                                }
                                 val recipe = open.recipes.all().firstOrNull { candidate ->
                                     itemTable.nameOf(candidate.result) == wanted &&
-                                        (candidate.kind == mcplus.net.RecipeKind.SHAPED ||
-                                            candidate.kind == mcplus.net.RecipeKind.SHAPELESS) &&
+                                        candidate.kind.placeable &&
+                                        suitable(candidate.kind) &&
                                         !open.checkRecipe(candidate).needsBiggerGrid
                                 }
-                                if (recipe != null) {
-                                    val check = open.checkRecipe(recipe)
+                                val check = recipe?.let { open.checkRecipe(it) }
+                                if (recipe != null && check != null && !check.needsStation) {
                                     craftBefore = open.craftCounts()
                                     craftItemName = itemTable.nameOf(recipe.result)
                                     craftResultId = recipe.result
                                     craftSent = true
-                                    open.craftFromBook(recipe)
+                                    val placed = open.craftFromBook(recipe)
+                                    if (placed && recipe.kind == mcplus.net.RecipeKind.FURNACE) {
+                                        println("Крафт: $craftItemName — разложено в печи, результат заберём после плавки")
+                                    }
                                     println(
                                         "Крафт: $craftItemName (рецепт ${recipe.id}) — " +
-                                            RecipeBookScreen.craftLine(check, itemTable::nameOf),
+                                            RecipeBookScreen.craftLine(check, itemTable::nameOf, recipe.kind),
                                     )
                                 }
                             }

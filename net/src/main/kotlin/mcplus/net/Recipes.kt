@@ -185,13 +185,11 @@ class RecipeBook {
         val type = reader.readVarInt()
         return when (type) {
             // Стопка: предмет, количество, патч компонентов.
+            // Стопка с компонентами: состав читается тем же кодом, что и у предметов
+            // в инвентаре. Раньше любой компонент в результате ронял **весь** пакет книги.
             5 -> {
-                val item = reader.readVarInt()
-                val count = reader.readVarInt()
-                val added = reader.readVarInt()
-                val removed = reader.readVarInt()
-                if (added != 0 || removed != 0) throw RecipeFormatException("результат с компонентами")
-                item to count.coerceAtLeast(1)
+                val stack = readTemplateStack(reader)
+                (stack?.itemId ?: -1) to (stack?.count?.coerceAtLeast(1) ?: 1)
             }
             // Одиночный предмет в результате тоже встречается.
             4 -> reader.readVarInt() to 1
@@ -227,12 +225,7 @@ class RecipeBook {
         }
         4 -> Ingredient(reader.readVarInt())         // предмет
         5 -> {                                       // стопка с компонентами
-            val item = reader.readVarInt()
-            reader.readVarInt()                      // количество
-            val added = reader.readVarInt()
-            val removed = reader.readVarInt()
-            if (added != 0 || removed != 0) throw RecipeFormatException("слот с компонентами")
-            Ingredient(item)
+            Ingredient(readTemplateStack(reader)?.itemId ?: -1)
         }
         6 -> {                                       // тег или явный список предметов
             val set = readHolderSet(reader)
@@ -283,12 +276,15 @@ class RecipeBook {
 }
 
 /** Вид рецепта: номер в пакете и то, как его показывать. */
-enum class RecipeKind(val wire: Int) {
-    SHAPELESS(0),
-    SHAPED(1),
-    FURNACE(2),
-    STONECUTTER(3),
-    SMITHING(4),
+enum class RecipeKind(val wire: Int, val placeable: Boolean) {
+    SHAPELESS(0, true),
+    SHAPED(1, true),
+    FURNACE(2, true),
+    // В 26.3 «разложи рецепт» умеют только меню с сеткой и печи: `StonecutterMenu` и
+    // `ItemCombinerMenu` (кузня) — не `RecipeBookMenu`, сервер такой пакет игнорирует.
+    // У камнереза рецепт выбирают кнопкой в меню, у кузни — двумя входами.
+    STONECUTTER(3, false),
+    SMITHING(4, false),
     ;
 
     companion object {

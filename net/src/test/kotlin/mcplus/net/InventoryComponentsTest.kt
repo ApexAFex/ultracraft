@@ -588,6 +588,134 @@ class InventoryComponentsTest {
         )
     }
 
+    // --- третья волна: еда, оружие, щит, числа из таблиц --------------------------------
+
+    @Test
+    fun `a consumable lists its animation, sound and effects`() {
+        val plain = stackWith(
+            ByteWriter()
+                .writeFloat(1.6f)                // секунды еды
+                .writeVarInt(1)                  // анимация «есть»
+                .writeVarInt(5)                  // звук — ссылка
+                .writeBoolean(true)              // частицы есть
+                .writeVarInt(0),                 // эффектов нет
+            "consumable",
+        )
+        assertTrue(plain.isKnown)
+
+        val withEffect = stackWith(
+            ByteWriter()
+                .writeFloat(1.6f)
+                .writeVarInt(1)
+                .writeVarInt(5)
+                .writeBoolean(false)
+                .writeVarInt(1)                  // один эффект
+                .writeVarInt(0)                  // наложить эффекты
+                .writeVarInt(1)                  // один эффект в списке
+                .writeVarInt(3)                  // вид эффекта
+                .writeVarInt(1)                  // уровень
+                .writeVarInt(200)                // длительность
+                .writeBoolean(false).writeBoolean(true).writeBoolean(true)
+                .writeBoolean(false)             // скрытого эффекта нет
+                .writeFloat(1f),                 // вероятность
+            "consumable",
+        )
+        assertTrue(withEffect.isKnown)
+    }
+
+    @Test
+    fun `death protection holds a list of effects`() {
+        val stack = stackWith(
+            ByteWriter()
+                .writeVarInt(1)                  // один эффект
+                .writeVarInt(1)                  // снять эффекты
+                .writeVarInt(0).writeString("minecraft:harmful"), // набор-тег
+            "death_protection",
+        )
+        assertTrue(stack.isKnown)
+    }
+
+    @Test
+    fun `piercing and kinetic weapons keep their numbers`() {
+        assertTrue(
+            stackWith(
+                ByteWriter()
+                    .writeBoolean(true).writeBoolean(false)   // отбрасывание и сбивание
+                    .writeBoolean(false)                      // звука нет
+                    .writeBoolean(true).writeVarInt(7),       // звук попадания — ссылка
+                "piercing_weapon",
+            ).isKnown,
+        )
+        assertTrue(
+            stackWith(
+                ByteWriter()
+                    .writeVarInt(10).writeVarInt(5)           // перезарядка и задержка
+                    .writeBoolean(true).writeVarInt(60).writeFloat(0.5f).writeFloat(0.2f)
+                    .writeBoolean(false).writeBoolean(false)  // два других условия не заданы
+                    .writeFloat(0.7f).writeFloat(1.5f)        // движение и урон
+                    .writeBoolean(false).writeBoolean(false),
+                "kinetic_weapon",
+            ).isKnown,
+        )
+    }
+
+    @Test
+    fun `a shield lists damage reductions and wear`() {
+        val stack = stackWith(
+            ByteWriter()
+                .writeFloat(0.25f).writeFloat(1f)         // задержка и перезарядка
+                .writeVarInt(1)                           // одно снижение
+                .writeFloat(90f)                          // угол
+                .writeBoolean(false)                      // все виды урона
+                .writeFloat(0f).writeFloat(1f)            // база и доля
+                .writeFloat(0f).writeFloat(1f).writeFloat(1f) // износ
+                .writeBoolean(false)                      // что пробивает — не задано
+                .writeBoolean(true).writeVarInt(9)        // звук блокировки
+                .writeBoolean(false),
+            "blocks_attacks",
+        )
+        assertTrue(stack.isKnown)
+    }
+
+    @Test
+    fun `loot table numbers may be constants or references`() {
+        assertTrue(stackWith(ByteWriter().writeBoolean(true).writeVarInt(2), "compostable").isKnown)
+        assertTrue(
+            stackWith(
+                ByteWriter().writeBoolean(false).writeString("minecraft:test_provider"),
+                "compostable",
+            ).isKnown,
+        )
+        assertTrue(
+            stackWith(
+                ByteWriter()
+                    .writeBoolean(true).writeVarInt(200)      // время горения
+                    .writeBoolean(true).writeFloat(1.5f),     // множитель скорости
+                "cooking_fuel",
+            ).isKnown,
+        )
+    }
+
+    @Test
+    fun `a lock with no item filter is readable`() {
+        val stack = stackWith(
+            ByteWriter()
+                .writeBoolean(false)              // предметы не заданы
+                .writeBoolean(false)              // минимум количества не задан
+                .writeBoolean(true).writeInt(1)   // максимум — одна штука
+                .writeVarInt(0)                   // точных компонентов нет
+                .writeVarInt(0),                  // частичных нет
+            "lock",
+        )
+        assertTrue(stack.isKnown)
+    }
+
+    @Test
+    fun `a block transformer and villager food are single numbers`() {
+        assertTrue(stackWith(ByteWriter().writeVarInt(4), "block_transformer").isKnown)
+        assertTrue(stackWith(ByteWriter().writeVarInt(5), "villager_food").isKnown)
+    }
+
     // --- помощники -----------------------------------------------------------------------
 
     /** Стек с одним компонентом: количество 1, предмет 1, патч из одного добавления. */
