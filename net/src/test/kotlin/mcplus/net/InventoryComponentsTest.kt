@@ -716,6 +716,30 @@ class InventoryComponentsTest {
         assertTrue(stackWith(ByteWriter().writeVarInt(5), "villager_food").isKnown)
     }
 
+    @Test
+    fun `unbreakable is a flag without a payload`() {
+        val stack = stackWith(ByteWriter(), "unbreakable")
+        assertTrue(stack.unbreakable, "предмет с unbreakable нельзя сломать")
+    }
+
+    @Test
+    fun `repair cost and max damage are separate numbers`() {
+        val withCost = stackWith(ByteWriter().writeVarInt(7), "repair_cost")
+        assertEquals(7, withCost.repairCost)
+        val withLimit = stackWith(ByteWriter().writeVarInt(250), "max_damage")
+        assertEquals(250, withLimit.maxDamage)
+        // Раньше оба компонента читались в одну ветку и значение просто терялось.
+        assertEquals(0, withLimit.repairCost)
+        assertEquals(0, withCost.maxDamage)
+    }
+
+    @Test
+    fun `a dyed colour is remembered even when it is black`() {
+        val stack = stackWith(ByteWriter().writeInt(0), "dyed_color")
+        assertEquals(0, stack.dyedColor)
+        assertTrue(stack.dyedColorSet, "чёрный цвет — тоже настоящий цвет, а не «не покрашено»")
+    }
+
     // --- помощники -----------------------------------------------------------------------
 
     /** Стек с одним компонентом: количество 1, предмет 1, патч из одного добавления. */

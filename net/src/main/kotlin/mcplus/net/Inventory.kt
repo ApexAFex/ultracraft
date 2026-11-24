@@ -37,6 +37,14 @@ class Inventory(
         val rarity: Int = 0,
         /** Цвет кожи: компонент `dyed_color` (0 — не покрашено). */
         val dyedColor: Int = 0,
+        /** Компонент `dyed_color` пришёл: чёрный цвет тоже настоящий. */
+        val dyedColorSet: Boolean = false,
+        /** Предел прочности из компонента `max_damage` (0 — брать из таблицы предметов). */
+        val maxDamage: Int = 0,
+        /** Цена ремонта из компонента `repair_cost` (0 — обычная). */
+        val repairCost: Int = 0,
+        /** Компонент `unbreakable`: предмет нельзя сломать. */
+        val unbreakable: Boolean = false,
         /** Строки описания из компонента `lore`. */
         val lore: List<String> = emptyList(),
         /** Предел стопки из компонента `max_stack_size` (0 — обычный для предмета). */
@@ -365,6 +373,10 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
     val enchantments = ArrayList<Pair<Int, Int>>()
     var rarity = 0
     var dyedColor = 0
+    var dyedColorSet = false
+    var maxDamage = 0
+    var repairCost = 0
+    var unbreakable = false
     var lore: List<String> = emptyList()
     var maxStackSize = 0
     var glintOverride: Boolean? = null
@@ -405,15 +417,19 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
         val id = reader.readVarInt()
         when (ComponentTable.active.nameOf(id)) {
             "damage" -> damage = reader.readVarInt()
-            // Размер прочности и цена ремонта — по одному числу.
-            "max_damage", "repair_cost" -> reader.readVarInt()
-            // `unbreakable` — компонент без полезной нагрузки.
-            "unbreakable" -> Unit
+            // Предел прочности и цена ремонта — по одному числу каждый.
+            "max_damage" -> maxDamage = reader.readVarInt()
+            "repair_cost" -> repairCost = reader.readVarInt()
+            // `unbreakable` — компонент без полезной нагрузки, но сам факт важен.
+            "unbreakable" -> unbreakable = true
             // Предел стопки и редкость — тоже по одному VarInt.
             "max_stack_size" -> maxStackSize = reader.readVarInt()
             "rarity" -> rarity = reader.readVarInt()
             // Цвет кожи — обычный int (0xRRGGBB).
-            "dyed_color" -> dyedColor = reader.readInt()
+            "dyed_color" -> {
+                dyedColor = reader.readInt()
+                dyedColorSet = true
+            }
             "enchantment_glint_override" -> glintOverride = reader.readBoolean()
             "custom_name", "item_name" -> customName = mcplus.net.componentText(
                 mcplus.protocol.nbt.NbtReader.read(reader),
@@ -946,6 +962,10 @@ private fun readStackAt(reader: ByteReader, template: Boolean, depth: Int): Inve
         enchantments = enchantments,
         rarity = rarity,
         dyedColor = dyedColor,
+        dyedColorSet = dyedColorSet,
+        maxDamage = maxDamage,
+        repairCost = repairCost,
+        unbreakable = unbreakable,
         lore = lore,
         maxStackSize = maxStackSize,
         glintOverride = glintOverride,

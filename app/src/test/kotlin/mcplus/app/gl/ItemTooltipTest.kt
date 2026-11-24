@@ -34,6 +34,11 @@ class ItemTooltipTest {
         hideTooltip: Boolean = false,
         beeCount: Int = 0,
         entityTypeId: Int = -1,
+        unbreakable: Boolean = false,
+        repairCost: Int = 0,
+        dyedColorSet: Boolean = false,
+        dyedColor: Int = 0,
+        maxDamage: Int = 0,
     ) = Inventory.Stack(
         itemId = 1,
         count = count,
@@ -55,7 +60,38 @@ class ItemTooltipTest {
         hideTooltip = hideTooltip,
         beeCount = beeCount,
         entityTypeId = entityTypeId,
+        unbreakable = unbreakable,
+        repairCost = repairCost,
+        dyedColorSet = dyedColorSet,
+        dyedColor = dyedColor,
+        maxDamage = maxDamage,
     )
+
+    @Test
+    fun `an unbreakable item says so and keeps the durability line`() {
+        val lines = ItemTooltip.lines(
+            stack(damage = 5, unbreakable = true, maxDamage = 100), "Кирка",
+        ).map { it.first }
+        assertTrue(lines.any { it == "Неразрушимый" }, "в подсказке нет строки о неразрушимости")
+        assertTrue(lines.any { it.startsWith("Прочность: 95") }, "предел из компонента не учтён")
+    }
+
+    @Test
+    fun `a repair cost is shown as a separate line`() {
+        val lines = ItemTooltip.lines(stack(repairCost = 4), "Меч").map { it.first }
+        assertTrue(lines.any { it == "Цена ремонта: 4" })
+    }
+
+    @Test
+    fun `a dyed item shows its colour including black`() {
+        val black = ItemTooltip.lines(stack(dyedColorSet = true, dyedColor = 0), "Шлем")
+            .map { it.first }
+        assertTrue(black.any { it == "Цвет: #000000" }, "чёрная кожа без строки цвета")
+        val red = ItemTooltip.lines(stack(dyedColorSet = true, dyedColor = 0xFF0000), "Шлем")
+            .map { it.first }
+        assertTrue(red.any { it == "Цвет: #FF0000" })
+        assertTrue(ItemTooltip.lines(stack(), "Шлем").none { it.first.startsWith("Цвет:") })
+    }
 
     @Test
     fun `attribute modifiers are shown as russian lines`() {

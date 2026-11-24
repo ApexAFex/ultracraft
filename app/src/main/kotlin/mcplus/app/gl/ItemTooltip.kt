@@ -55,15 +55,23 @@ object ItemTooltip {
         // `tooltip_display` с флагом «спрятать всё»: остаётся только имя.
         if (stack.hideTooltip) return result
         // Прочность отдельной строкой: в заголовке она ломала имя, а так видно и остаток,
-        // и предел.
-        if (maxDamage > 0 && stack.damage > 0) {
-            val left = (maxDamage - stack.damage).coerceAtLeast(0)
+        // и предел. Компонент `max_damage` важнее таблицы предметов: датапак мог его поменять.
+        val durabilityLimit = if (stack.maxDamage > 0) stack.maxDamage else maxDamage
+        if (durabilityLimit > 0 && stack.damage > 0) {
+            val left = (durabilityLimit - stack.damage).coerceAtLeast(0)
             val color = when {
-                left.toFloat() / maxDamage > 0.5f -> 0x7FD07F
-                left.toFloat() / maxDamage > 0.25f -> 0xD8C860
+                left.toFloat() / durabilityLimit > 0.5f -> 0x7FD07F
+                left.toFloat() / durabilityLimit > 0.25f -> 0xD8C860
                 else -> 0xD07070
             }
-            result += "Прочность: $left из $maxDamage" to color
+            result += "Прочность: $left из $durabilityLimit" to color
+        }
+        // «Неразрушимый» и цена ремонта: в игре это отдельные строки подсказки.
+        if (stack.unbreakable) result += "Неразрушимый" to 0x55FFFF
+        if (stack.repairCost > 0) result += "Цена ремонта: ${stack.repairCost}" to 0xA0A0A0
+        // Покрашенная кожа: сам цвет, иначе непонятно, чем предмет отличается от обычного.
+        if (stack.dyedColorSet) {
+            result += "Цвет: #%06X".format(stack.dyedColor and 0xFFFFFF) to 0xA0A0A0
         }
         // Описание идёт серым, как в игре; строки уже разобраны из компонента `lore`.
         if (!isHidden(stack, "lore")) {
