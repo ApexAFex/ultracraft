@@ -67,7 +67,7 @@ class HudRenderer(
         GL30.glEnableVertexAttribArray(1)
         GL30.glVertexAttribPointer(2, 1, GL30.GL_FLOAT, false, ICON_FLOATS * 4, 4L * 4)
         GL30.glEnableVertexAttribArray(2)
-        GL30.glVertexAttribPointer(3, 1, GL30.GL_FLOAT, false, ICON_FLOATS * 4, 5L * 4)
+        GL30.glVertexAttribPointer(3, 3, GL30.GL_FLOAT, false, ICON_FLOATS * 4, 5L * 4)
         GL30.glEnableVertexAttribArray(3)
         GL30.glBindVertexArray(0)
     }
@@ -137,17 +137,29 @@ class HudRenderer(
     }
 
     /** Иконка предмета из массивной текстуры блоков. */
-    fun icon(rect: HudRect, layer: Int, shade: Float = 1f) {
+    /**
+     * Иконка предмета из атласа.
+     *
+     * @param shade затемнение (1 — как есть)
+     * @param tint цвет-множитель (0xRRGGBB) или null: крашеная кожа и зелья так и выглядят
+     *        цветными, как в игре
+     */
+    fun icon(rect: HudRect, layer: Int, shade: Float = 1f, tint: Int? = null) {
         ensureIcons()
         var offset = iconCount
         iconCount += ICON_FLOATS * 6
+        val red = if (tint == null) shade else ((tint shr 16) and 0xFF) / 255f * shade
+        val green = if (tint == null) shade else ((tint shr 8) and 0xFF) / 255f * shade
+        val blue = if (tint == null) shade else (tint and 0xFF) / 255f * shade
         fun put(x: Float, y: Float, u: Float, v: Float) {
             icons[offset++] = x
             icons[offset++] = y
             icons[offset++] = u
             icons[offset++] = v
             icons[offset++] = layer.toFloat()
-            icons[offset++] = shade
+            icons[offset++] = red
+            icons[offset++] = green
+            icons[offset++] = blue
         }
         put(rect.x, rect.y, 0f, 0f)
         put(rect.right, rect.bottom, 1f, 1f)
@@ -310,7 +322,7 @@ class HudRenderer(
 
     private companion object {
         const val GUI_FLOATS = 8
-        const val ICON_FLOATS = 6
+        const val ICON_FLOATS = 8
 
         fun whiteImage(): BufferedImage = BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB).apply {
             for (y in 0 until 2) for (x in 0 until 2) setRGB(x, y, 0xFFFFFFFF.toInt())
@@ -350,10 +362,10 @@ class HudRenderer(
             layout(location = 0) in vec2 aPos;
             layout(location = 1) in vec2 aUv;
             layout(location = 2) in float aLayer;
-            layout(location = 3) in float aShade;
+            layout(location = 3) in vec3 aShade;
             uniform vec2 uScreen;
             out vec3 vUv;
-            out float vShade;
+            out vec3 vShade;
             void main() {
                 vUv = vec3(aUv, aLayer);
                 vShade = aShade;
@@ -365,7 +377,7 @@ class HudRenderer(
         const val ICON_FRAGMENT_SHADER = """
             #version 330 core
             in vec3 vUv;
-            in float vShade;
+            in vec3 vShade;
             uniform sampler2DArray uAtlas;
             out vec4 FragColor;
             void main() {

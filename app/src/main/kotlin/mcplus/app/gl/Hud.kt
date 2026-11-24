@@ -925,7 +925,7 @@ class Hud(
             val stack = inventory.menuSlot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
             val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
-            renderer.icon(slotRect, atlas.layerForItem(name))
+            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack))
             drawGlint(slotRect, stack)
         }
         // Выбранный слот хотбара обводится белой рамкой, как в игре.
@@ -1088,7 +1088,7 @@ class Hud(
             val stack = container.slot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
             val slotRect = HudRect(ox + (cell.x + 1f) * s, oy + (cell.y + 1f) * s, 16f * s, 16f * s)
-            renderer.icon(slotRect, atlas.layerForItem(name))
+            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack))
             drawGlint(slotRect, stack)
             drawWear(slotRect, stack, s)
         }
@@ -1586,7 +1586,7 @@ class Hud(
             val cell = HudLayout.hotbarSlot(slot, width, height)
             val size = 16f * s
             val slotRect = HudRect(cell.centreX - size / 2f, cell.centreY - size / 2f, size, size)
-            renderer.icon(slotRect, atlas.layerForItem(name))
+            renderer.icon(slotRect, atlas.layerForItem(name), tint = ItemTint.of(stack))
             drawGlint(slotRect, stack)
             // Полоска прочности прямо в хотбаре: видно, когда инструмент почти сломан,
             // не открывая инвентарь.
