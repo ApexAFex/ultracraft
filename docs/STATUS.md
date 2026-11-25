@@ -63,10 +63,23 @@
 ## Как убедиться самому
 
 ```powershell
-# смоук-прогон шести режимов (2026-11-24: 0 исключений, снимки sweep-*.png)
-foreach ($m in 'world','--mobs','--inventory','--recipes','--advancements','--statistics') {
-  .\app\build\install\app\bin\app.bat window 127.0.0.1:25565 --name mcplus --hidden --no-menu --frames 2000 --out sweep.png $m
-}
+# смоук-прогон девяти режимов (2026-11-25: 0 исключений, снимки sweep-*.png)
+$exe = '.\app\build\install\app\bin\app.bat'
+$base = 'window 127.0.0.1:25565 --name mcplus --hidden --no-menu --frames 1500'
+& $exe $base.Split(' ') --inventory --hover 427,564 --out screenshots\sweep-inventory.png
+& $exe $base.Split(' ') --recipes --out screenshots\sweep-recipes.png
+& $exe $base.Split(' ') --advancements --out screenshots\sweep-advancements.png
+& $exe $base.Split(' ') --statistics --out screenshots\sweep-statistics.png
+& $exe $base.Split(' ') --mobs --pitch -55 --out screenshots\sweep-mobs.png
+& $exe $base.Split(' ') --demo --out screenshots\sweep-demo.png
+& $exe $base.Split(' ') --piston --out screenshots\sweep-piston.png
+& $exe $base.Split(' ') --held 1 --map --out screenshots\sweep-map.png
+& $exe $base.Split(' ') --sound-log --out screenshots\sweep-sounds.png
+
+# В конце каждого прогона печатается сводка: «Карт получено», «Карт в рамках нарисовано»,
+# «Звуков сыграно», «Едущих поршней замечено». По ним видно, работает ли путь, без разглядывания
+# пикселей. Флаги с пробелами (`--hover 427,564`, `--pitch -55`) нельзя склеивать в одну строку:
+# клиент ругнётся «лишний аргумент» и снимка не будет.
 
 # сборка и все тесты (817)
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.13.9-hotspot'
