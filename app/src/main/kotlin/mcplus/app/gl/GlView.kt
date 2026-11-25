@@ -3112,6 +3112,20 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             val white =
                                                 atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
                                             val tile = 1f / MapFrame.TILES
+                                            // Подложка рамки: плоская плита с текстурой рамки,
+                                            // чтобы карта смотрелась картиной в рамке, а не
+                                            // висела сама по себе на стене.
+                                            val frameLayer =
+                                                atlas.layerFor(frameName, TextureAtlas.Kind.SIDE)
+                                            cubes += Renderer.BlockCube(
+                                                entity.x + normalX * 0.01f,
+                                                entity.y + 0.5,
+                                                entity.z + normalZ * 0.01f,
+                                                1f,
+                                                frameLayer, frameLayer, frameLayer,
+                                                yaw = frameYaw,
+                                                sizeX = 1.06f, sizeY = 1.06f, sizeZ = 0.01f,
+                                            )
                                             for (part in tiles) {
                                                 val localX = (part.x + 0.5f) * tile - 0.5f
                                                 val localY = 0.5f - (part.y + 0.5f) * tile
