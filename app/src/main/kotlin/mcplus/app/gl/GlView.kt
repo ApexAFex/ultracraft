@@ -973,6 +973,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     var tradeScreenId = -1
     var statisticsType = 0
     var statisticsScroll = 0
+    /** Поиск по счётчикам статистики: печатается прямо на экране. */
+    var statisticsQuery = ""
     var statisticsLeftWasDown = false
     var statisticsRightWasDown = false
                     var advancementTab = 0
@@ -1292,6 +1294,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             if (openContainer == null && !inventoryOpen) {
                                 statisticsOpen = !statisticsOpen
                                 statisticsScroll = 0
+                                statisticsQuery = ""
                                 if (statisticsOpen) {
                                     advancementsOpen = false
                                     // Сервер присылает статистику только по запросу.
@@ -1305,6 +1308,16 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             session?.requestStats()
                         }
                         if (statisticsOpen) {
+                            // Поиск: буквы и цифры добавляются в строку, Backspace стирает.
+                            val typed = input.takeTyped()
+                            if (typed.isNotEmpty()) {
+                                statisticsQuery += typed.filter { it.isLetterOrDigit() || it == ' ' }
+                                statisticsScroll = 0
+                            }
+                            if (input.backspaceRequested && statisticsQuery.isNotEmpty()) {
+                                statisticsQuery = statisticsQuery.dropLast(1)
+                                statisticsScroll = 0
+                            }
                             if (input.chatScrollUpRequested) statisticsScroll += 5
                             if (input.chatScrollDownRequested) statisticsScroll = maxOf(0, statisticsScroll - 5)
                             // Колесо мыши листает список построчно.
@@ -3838,11 +3851,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     type = StatisticsScreen.TYPES[statisticsType],
                                 )
                             }
+                            val visibleRows = StatisticsScreen.filter(rows, statisticsQuery)
                             hud.drawStatisticsScreen(
                                 StatisticsScreen.titleOf(
                                     StatisticsScreen.TYPES[statisticsType], statsTable,
                                 ),
-                                rows,
+                                visibleRows,
                                 statisticsScroll,
                                 selectedType = StatisticsScreen.TYPES[statisticsType],
                                 // Иконки предметов только у «предметных» видов счётчиков:
@@ -3854,6 +3868,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 } else {
                                     null
                                 },
+                                query = statisticsQuery,
                             )
                         } else if (recipeBookOpen) {
                             // Книга рецептов: вкладки категорий и сетка результатов.

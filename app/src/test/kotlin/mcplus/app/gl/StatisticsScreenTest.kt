@@ -42,6 +42,32 @@ class StatisticsScreenTest {
     )
 
     @Test
+    fun `search filters counters by name`() {
+        val rows = listOf(
+            StatisticsScreen.Row("Глубинный сланец", 7),
+            StatisticsScreen.Row("Розовая керамика", 8),
+            StatisticsScreen.Row("Глубинный сланец", 9, icon = null),
+        )
+        // Пустой запрос возвращает всё.
+        assertEquals(3, StatisticsScreen.filter(rows, "").size)
+        // Поиск без регистра.
+        assertEquals(2, StatisticsScreen.filter(rows, "сланец").size)
+        assertEquals(2, StatisticsScreen.filter(rows, "ГЛУБИННЫЙ").size)
+        // Чего нет — пусто, а не весь список.
+        assertEquals(0, StatisticsScreen.filter(rows, "алмаз").size)
+    }
+
+    @Test
+    fun `search treats yo and ye as the same letter`() {
+        val rows = listOf(
+            StatisticsScreen.Row("Ещё один счётчик", 1),
+            StatisticsScreen.Row("Печь", 2),
+        )
+        assertEquals(1, StatisticsScreen.filter(rows, "еще").size)
+        assertEquals(1, StatisticsScreen.filter(rows, "печ").size)
+    }
+
+    @Test
     fun `mined blocks are named like items and sorted by count`() {
         val rows = rows(0, stats(0 to listOf(0 to 12L, 1 to 300L)))
         assertEquals(listOf("oak_log" to 300L, "stone" to 12L), rows.map { it.name to it.value })

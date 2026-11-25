@@ -118,6 +118,21 @@ object StatisticsScreen {
     /** Сколько строк помещается на экране при данном размере окна. */
     fun visibleRows(height: Int): Int = ((height - 200) / 14).coerceIn(4, 18)
 
+    /**
+     * Строки, подходящие под поиск.
+     *
+     * Счётчиков у игрока сотни, и найти «сколько раз сломал глубинный сланец» без поиска нельзя.
+     * Сравнение без регистра и с «ё» вместо «е»: в переводе встречается и то, и другое.
+     */
+    fun filter(rows: List<Row>, query: String): List<Row> {
+        val needle = normalize(query)
+        if (needle.isEmpty()) return rows
+        return rows.filter { normalize(it.name).contains(needle) }
+    }
+
+    private fun normalize(text: String): String =
+        text.lowercase().replace('ё', 'е').trim()
+
     /** Короткие подписи для колонки видов слева: по ним переключаются мышью. */
     fun shortTitleOf(type: Int): String = when (type) {
         0 -> "Добыто"

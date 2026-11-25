@@ -327,6 +327,8 @@ class Hud(
         selectedType: Int = 0,
         /** Слой иконки по имени предмета (null — рисовать без иконок). */
         iconLayer: ((String) -> Int)? = null,
+        /** Строка поиска: ей фильтруются счётчики. */
+        query: String = "",
     ) {
         val text = this.text ?: return
         val s = HudLayout.scale(height).toFloat()
@@ -343,6 +345,13 @@ class Hud(
         labels += TextRenderer.ScreenLabel(left, top, "Статистика", s * 1.6f)
         // Сколько счётчиков в выбранном виде: иначе непонятно, список кончился или нет.
         labels += TextRenderer.ScreenLabel(left, top + 26f * s, "$category — ${rows.size}", s * 1.1f)
+        // Поиск: подсказка и то, что уже набрано.
+        labels += TextRenderer.ScreenLabel(
+            left, top + 40f * s,
+            if (query.isEmpty()) "Поиск: начните печатать" else "Поиск: " + query,
+            s * 0.9f,
+            if (query.isEmpty()) 0x9099A8 else 0xFFE7A0,
+        )
 
         // Колонка видов счётчиков слева: по ней переключаются мышью, как в игре.
         val listX = width * 0.02f
