@@ -3823,6 +3823,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             hud.drawInventoryScreen(
                                 inventory, input.mouseX, input.mouseY,
                                 colors = selfUuid?.let { skinLibrary.colorsFor(it) } ?: SkinColors.DEFAULT,
+                                figure = selfUuid?.let { skinLibrary.figureFor(it) },
                             )
                         }
                         // Книга занимает экран целиком: поверх неё ничего не рисуем.

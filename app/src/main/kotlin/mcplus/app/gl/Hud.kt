@@ -990,6 +990,8 @@ class Hud(
         mouseY: Double,
         /** Цвета фигурки игрока из его скина; без скина — нейтральные. */
         colors: SkinColors = SkinColors.DEFAULT,
+        /** Фигурка из скина: если есть, рисуется она, а не цветные прямоугольники. */
+        figure: SkinFaces.Figure? = null,
     ) {
         val s = InventoryScreen.scale(height)
         val ox = InventoryScreen.originX(width, s)
@@ -1004,12 +1006,31 @@ class Hud(
             renderer.rect(ox + x * s, oy + y * s, w * s, h * s, color, 1f)
         }
         preview(26f, 8f, 50f, 62f, 0x2A2A2A)     // подложка под фигурку
-        preview(34f, 10f, 8f, 8f, colors.head)   // голова — цвет из скина
-        preview(34f, 22f, 8f, 12f, colors.body)  // рубашка
-        preview(30f, 22f, 4f, 12f, colors.arm)   // руки
-        preview(42f, 22f, 4f, 12f, colors.arm)
-        preview(34f, 36f, 4f, 12f, colors.leg)   // штаны
-        preview(42f, 36f, 4f, 12f, colors.leg)
+        if (figure != null) {
+            // Фигурка из настоящего скина: передние грани частей попиксельно.
+            fun part(pixels: List<SkinFaces.Pixel>, x: Float, y: Float, pixel: Float) {
+                for (dot in pixels) {
+                    preview(
+                        x + dot.u * pixel, y + dot.v * pixel,
+                        pixel, pixel, dot.color,
+                    )
+                }
+            }
+            val px = 1f
+            part(figure.head, 34f, 10f, px)
+            part(figure.body, 34f, 22f, px)
+            part(figure.armRight, 30f, 22f, px)
+            part(figure.armLeft, 42f, 22f, px)
+            part(figure.legRight, 34f, 36f, px)
+            part(figure.legLeft, 42f, 36f, px)
+        } else {
+            preview(34f, 10f, 8f, 8f, colors.head)   // голова — цвет из скина
+            preview(34f, 22f, 8f, 12f, colors.body)  // рубашка
+            preview(30f, 22f, 4f, 12f, colors.arm)   // руки
+            preview(42f, 22f, 4f, 12f, colors.arm)
+            preview(34f, 36f, 4f, 12f, colors.leg)   // штаны
+            preview(42f, 36f, 4f, 12f, colors.leg)
+        }
         for (cell in InventoryScreen.cells) {
             val stack = inventory.menuSlot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue

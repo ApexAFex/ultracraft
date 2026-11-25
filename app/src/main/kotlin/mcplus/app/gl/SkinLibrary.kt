@@ -68,6 +68,19 @@ class SkinLibrary : Closeable {
         return texture
     }
 
+    /** Уже посчитанные фигурки: части скина для инвентаря. */
+    private val figures = ConcurrentHashMap<UUID, SkinFaces.Figure>()
+
+    /** Фигурка из скина игрока; null — скина нет. */
+    fun figureFor(uuid: UUID): SkinFaces.Figure? {
+        figures[uuid]?.let { return it }
+        val image = images[uuid] ?: return null
+        val figure = SkinFaces.of(image)
+        if (figure.isEmpty) return null
+        figures[uuid] = figure
+        return figure
+    }
+
     /** Цвета фигурки игрока из его скина; без скина — нейтральные. */
     fun colorsFor(uuid: UUID): SkinColors {
         colors[uuid]?.let { return it }
