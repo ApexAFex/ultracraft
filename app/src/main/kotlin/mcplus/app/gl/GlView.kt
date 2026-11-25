@@ -667,6 +667,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val deathLogged = HashSet<Int>()
                     /** Мобы, про которых уже напечатана отладочная строка. */
                     val mobLogged = HashSet<Int>()
+                    /** Существа, про чей первый шаг уже напечатано. */
+                    val stepLogged = HashSet<Int>()
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -2648,6 +2650,15 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             "block.stone.step",
                                         )
                                         otherSteps++
+                                        // Звук этого шага просили у движка: под `--debug` видно,
+                                        // что путь работает и без слышимого устройства.
+                                        if (debug && stepLogged.add(entity.id)) {
+                                            println(
+                                                "Шаг существа: " +
+                                                    entityTypes.nameOf(entity.type) +
+                                                    " id=${entity.id} по блоку $ground",
+                                            )
+                                        }
                                         if (isPlayer) {
                                             playerSteps++
                                             if (playerSteps == 1) {
