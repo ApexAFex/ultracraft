@@ -73,6 +73,7 @@ class VehicleLoadsTest {
         assertEquals(3, boxes.size, "днище, крышка и замок")
         assertEquals(1, boxes.count { it.name == "base" })
         assertEquals(1, boxes.count { it.name == "lid" })
+        assertEquals(1, boxes.count { it.name == "knob" })
         // Крышка выше днища и начинается там, где днище кончается.
         val base = boxes.first { it.name == "base" }
         val lid = boxes.first { it.name == "lid" }

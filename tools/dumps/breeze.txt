@@ -1,0 +1,20 @@
+SIZE	32	32
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/body	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/body/head	0.000	4.000	0.000	0.000	0.000	0.000
+CUBE	root/body/head	-5.000	-5.000	-4.200	5.000	-2.000	-0.200	4.0	24.0
+CUBE	root/body/head	-4.000	-8.000	-4.000	4.000	0.000	4.000	0.0	0.0
+PART	root/body/head/eyes	0.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/body/head/eyes	-5.000	-5.000	-4.200	5.000	-2.000	-0.200	4.0	24.0
+CUBE	root/body/head/eyes	-4.000	-8.000	-4.000	4.000	0.000	4.000	0.0	0.0
+PART	root/body/rods	0.000	8.000	0.000	0.000	0.000	0.000
+PART	root/body/rods/rod_2	-2.598	-3.000	1.500	-2.749	1.047	3.142
+CUBE	root/body/rods/rod_2	-1.000	0.000	-3.000	1.000	8.000	-1.000	0.0	17.0
+PART	root/body/rods/rod_3	0.000	-3.000	-3.000	0.393	0.000	0.000
+CUBE	root/body/rods/rod_3	-1.000	0.000	-3.000	1.000	8.000	-1.000	0.0	17.0
+PART	root/body/rods/rod_1	2.598	-3.000	1.500	-2.749	-1.047	3.142
+CUBE	root/body/rods/rod_1	-1.000	0.000	-3.000	1.000	8.000	-1.000	0.0	17.0
+PART	root/wind_body	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/wind_body/wind_bottom	0.000	24.000	0.000	0.000	0.000	0.000
+PART	root/wind_body/wind_bottom/wind_mid	0.000	-7.000	0.000	0.000	0.000	0.000
+PART	root/wind_body/wind_bottom/wind_mid/wind_top	0.000	-6.000	0.000	0.000	0.000	0.000

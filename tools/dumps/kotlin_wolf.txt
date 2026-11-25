@@ -1,4 +1,4 @@
-﻿// Текстура 64×64, низ модели на 24 px
+// Текстура 64×64, низ модели на 24 px
         MobBox("real_head", -0.125f, -0.1875f, -0.125f, 0.25f, 0.1875f, 0.125f, u = 0, v = 0, offsetX = -0.0625f, offsetY = 0.6563f, offsetZ = -0.4375f),
         MobBox("real_head", -0.125f, 0.1875f, 0f, 0f, 0.3125f, 0.0625f, u = 16, v = 14, offsetX = -0.0625f, offsetY = 0.6563f, offsetZ = -0.4375f),
         MobBox("real_head", 0.125f, 0.1875f, 0f, 0.25f, 0.3125f, 0.0625f, u = 16, v = 14, offsetX = -0.0625f, offsetY = 0.6563f, offsetZ = -0.4375f),

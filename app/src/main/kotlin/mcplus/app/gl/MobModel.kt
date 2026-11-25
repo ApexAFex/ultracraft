@@ -598,21 +598,17 @@ object MobModels {
      * на 18 пикселей; тело висит над ними, как в игре. Все щупальца берут развёртку
      * с одного места текстуры (48, 0).
      */
-    private val SQUID = run {
-        fun tentacle(x: Float, z: Float) = MobBox(
-            "tentacle",
-            x - 1f / 16f, 0f, z - 1f / 16f,
-            x + 1f / 16f, 1.125f, z + 1f / 16f,
-            u = 48, v = 0,
-        )
-        val r = 5f / 16f
-        val d = 3.536f / 16f
-        listOf(
-            MobBox("body", -0.375f, 1.0625f, -0.375f, 0.375f, 2.0625f, 0.375f, u = 0, v = 0),
-            tentacle(r, 0f), tentacle(d, d), tentacle(0f, r), tentacle(-d, d),
-            tentacle(-r, 0f), tentacle(-d, -d), tentacle(0f, -r), tentacle(d, -d),
-        )
-    }
+    private val SQUID = listOf(
+        MobBox("tentacle0", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, matrix = floatArrayOf(-0.0002f, 0f, -1f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, -0.0002f, 0f, 0.3125f, 1.125f, 0f, 1f)),
+        MobBox("tentacle1", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, 0f, 1f, 0f, 0f, 0.7068f, 0f, 0.7074f, 0f, 0.221f, 1.125f, 0.221f, 1f)),
+        MobBox("tentacle6", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, matrix = floatArrayOf(-1f, 0f, -0.0004f, 0f, 0f, 1f, 0f, 0f, 0.0004f, 0f, -1f, 0f, 0f, 1.125f, -0.3125f, 1f)),
+        MobBox("tentacle7", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, matrix = floatArrayOf(-0.7071f, 0f, -0.7071f, 0f, 0f, 1f, 0f, 0f, 0.7071f, 0f, -0.7071f, 0f, 0.221f, 1.125f, -0.221f, 1f)),
+        MobBox("body", -0.375f, -0.5f, -0.375f, 0.375f, 0.5f, 0.375f, u = 0, v = 0, offsetY = 1.5625f),
+        MobBox("tentacle4", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, matrix = floatArrayOf(-0.0002f, 0f, 1f, 0f, 0f, 1f, 0f, 0f, -1f, 0f, -0.0002f, 0f, -0.3125f, 1.125f, 0f, 1f)),
+        MobBox("tentacle5", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, matrix = floatArrayOf(-0.707f, 0f, 0.7072f, 0f, 0f, 1f, 0f, 0f, -0.7072f, 0f, -0.707f, 0f, -0.221f, 1.125f, -0.221f, 1f)),
+        MobBox("tentacle2", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, offsetY = 1.125f, offsetZ = 0.3125f),
+        MobBox("tentacle3", -0.0625f, -1.125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 48, v = 0, matrix = floatArrayOf(0.7074f, 0f, 0.7068f, 0f, 0f, 1f, 0f, 0f, -0.7068f, 0f, 0.7074f, 0f, -0.221f, 1.125f, 0.221f, 1f)),
+    )
 
     /**
      * Летучая мышь (`BatModel`): тельце, морда с ушами и два плоских крыла с кончиками.
@@ -654,19 +650,17 @@ object MobModels {
      * получается «текучая» полосатая корка. Внутренний куб спрятан внутри и нужен только
      * для полноты модели.
      */
-    private val MAGMA_CUBE = buildList {
-        for (layer in 0 until 8) {
-            add(
-                MobBox(
-                    "layer$layer",
-                    -0.25f, layer / 16f, -0.25f, 0.25f, (layer + 1) / 16f, 0.25f,
-                    u = if (layer < 4) 0 else 32,
-                    v = 9 * (layer % 4),
-                ),
-            )
-        }
-        add(MobBox("inside", -0.125f, 0.125f, -0.125f, 0.125f, 0.375f, 0.125f, u = 24, v = 40))
-    }
+    private val MAGMA_CUBE = listOf(
+        MobBox("cube0", -0.25f, -1.0625f, -0.25f, 0.25f, -1f, 0.25f, u = 0, v = 0, offsetY = 1.5f),
+        MobBox("cube2", -0.25f, -1.1875f, -0.25f, 0.25f, -1.125f, 0.25f, u = 0, v = 18, offsetY = 1.5f),
+        MobBox("cube1", -0.25f, -1.125f, -0.25f, 0.25f, -1.0625f, 0.25f, u = 0, v = 9, offsetY = 1.5f),
+        MobBox("cube4", -0.25f, -1.3125f, -0.25f, 0.25f, -1.25f, 0.25f, u = 32, v = 0, offsetY = 1.5f),
+        MobBox("cube3", -0.25f, -1.25f, -0.25f, 0.25f, -1.1875f, 0.25f, u = 0, v = 27, offsetY = 1.5f),
+        MobBox("cube6", -0.25f, -1.4375f, -0.25f, 0.25f, -1.375f, 0.25f, u = 32, v = 18, offsetY = 1.5f),
+        MobBox("cube5", -0.25f, -1.375f, -0.25f, 0.25f, -1.3125f, 0.25f, u = 32, v = 9, offsetY = 1.5f),
+        MobBox("cube7", -0.25f, -1.5f, -0.25f, 0.25f, -1.4375f, 0.25f, u = 32, v = 27, offsetY = 1.5f),
+        MobBox("inside_cube", -0.125f, -1.375f, -0.125f, 0.125f, -1.125f, 0.125f, u = 24, v = 40, offsetY = 1.5f),
+    )
 
     /**
      * Гаст (`GhastModel`): куб в блок и девять щупалец разной длины.
@@ -674,25 +668,18 @@ object MobModels {
      * Модель в игре растянута вчетверо, поэтому куб занимает 4×4 блока, а щупальца свисают
      * до земли. Нижняя точка модели здесь — кончик самого длинного щупальца (13 пикселей).
      */
-    private val GHAST = buildList {
-        add(MobBox("body", -0.5f, 0.75f, -0.5f, 0.5f, 1.75f, 0.5f, u = 0, v = 0))
-        // Координаты и длины щупалец сняты с ванили: (x, z) центра и длина в пикселях.
-        val tentacles = listOf(
-            Triple(-3.75f, -5f, 8), Triple(1.25f, -5f, 13), Triple(6.25f, -5f, 9),
-            Triple(-6.25f, 0f, 11), Triple(-1.25f, 0f, 11), Triple(3.75f, 0f, 10),
-            Triple(-3.75f, 5f, 12), Triple(1.25f, 5f, 9), Triple(6.25f, 5f, 12),
-        )
-        for ((x, z, length) in tentacles) {
-            add(
-                MobBox(
-                    "tentacle",
-                    (x - 1f) / 16f, (13 - length) / 16f, (z - 1f) / 16f,
-                    (x + 1f) / 16f, 13f / 16f, (z + 1f) / 16f,
-                    u = 0, v = 0,
-                ),
-            )
-        }
-    }
+    private val GHAST = listOf(
+        MobBox("tentacle0", -0.0625f, -0.5f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 0.8125f, offsetZ = -0.3125f),
+        MobBox("tentacle1", -0.0625f, -0.8125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 0.8125f, offsetZ = -0.3125f),
+        MobBox("tentacle8", -0.0625f, -0.75f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 0.8125f, offsetZ = 0.3125f),
+        MobBox("tentacle6", -0.0625f, -0.75f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 0.8125f, offsetZ = 0.3125f),
+        MobBox("tentacle7", -0.0625f, -0.5625f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 0.8125f, offsetZ = 0.3125f),
+        MobBox("body", -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, u = 0, v = 0, offsetY = 1.25f),
+        MobBox("tentacle4", -0.0625f, -0.6875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.0781f, offsetY = 0.8125f),
+        MobBox("tentacle5", -0.0625f, -0.625f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.2344f, offsetY = 0.8125f),
+        MobBox("tentacle2", -0.0625f, -0.5625f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 0.8125f, offsetZ = -0.3125f),
+        MobBox("tentacle3", -0.0625f, -0.6875f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.3906f, offsetY = 0.8125f),
+    )
 
     /**
      * Волк (AdultWolfModel): голова с ушами и мордой, тело, хвост и четыре лапы.
@@ -991,38 +978,38 @@ object MobModels {
      * Лист 64×64.
      */
     private val AXOLOTL = listOf(
-        MobBox("body", -0.25f, -0.125f, -0.5625f, 0.25f, 0.125f, 0.0625f, u = 0, v = 11, offsetY = 1.3438f, offsetZ = 0.3125f),
-        MobBox("body", 0f, -0.125f, -0.5f, 0f, 0.1875f, 0.0625f, u = 2, v = 17, offsetY = 1.3438f, offsetZ = 0.3125f),
-        MobBox("head", -0.25f, -0.125f, -0.3125f, 0.25f, 0.1875f, 0f, u = 0, v = 1, offsetY = 1.3438f, offsetZ = -0.25f),
-        MobBox("top_gills", -0.25f, 0f, 0f, 0.25f, 0.1875f, 0f, u = 3, v = 37, offsetY = 0.3125f),
-        MobBox("left_gills", -0.1875f, -0.125f, 0f, 0f, 0.3125f, 0f, u = 0, v = 40, offsetX = -0.25f, offsetY = 0.125f),
-        MobBox("right_gills", 0f, -0.125f, 0f, 0.1875f, 0.3125f, 0f, u = 11, v = 40, offsetX = 0.25f, offsetY = 0.125f),
-        MobBox("right_front_leg", -0.125f, -0.3125f, 0f, 0.0625f, 0f, 0f, u = 2, v = 13, offsetX = -0.2187f, offsetY = 1.2813f, offsetZ = -0.1875f),
-        MobBox("right_hind_leg", -0.125f, -0.3125f, 0f, 0.0625f, 0f, 0f, u = 2, v = 13, offsetX = -0.2187f, offsetY = 1.2813f, offsetZ = 0.25f),
-        MobBox("tail", 0f, -0.125f, 0f, 0f, 0.1875f, 0.75f, u = 2, v = 19, offsetY = 1.3438f, offsetZ = 0.375f),
-        MobBox("left_hind_leg", -0.0625f, -0.3125f, 0f, 0.125f, 0f, 0f, u = 2, v = 13, offsetX = 0.2188f, offsetY = 1.2813f, offsetZ = 0.25f),
-        MobBox("left_front_leg", -0.0625f, -0.3125f, 0f, 0.125f, 0f, 0f, u = 2, v = 13, offsetX = 0.2188f, offsetY = 1.2813f, offsetZ = -0.1875f),
+        MobBox("body", -0.25f, -0.125f, -0.5625f, 0.25f, 0.125f, 0.0625f, u = 0, v = 11, offsetY = 0.375f, offsetZ = 0.3125f),
+        MobBox("body", 0f, -0.125f, -0.5f, 0f, 0.1875f, 0.0625f, u = 2, v = 17, offsetY = 0.375f, offsetZ = 0.3125f),
+        MobBox("head", -0.25f, -0.125f, -0.3125f, 0.25f, 0.1875f, 0f, u = 0, v = 1, offsetY = 0.375f, offsetZ = -0.25f),
+        MobBox("top_gills", -0.25f, 0f, 0f, 0.25f, 0.1875f, 0f, u = 3, v = 37, offsetY = 0.5625f, offsetZ = -0.3125f),
+        MobBox("left_gills", -0.1875f, -0.125f, 0f, 0f, 0.3125f, 0f, u = 0, v = 40, offsetX = -0.25f, offsetY = 0.375f, offsetZ = -0.3125f),
+        MobBox("right_gills", 0f, -0.125f, 0f, 0.1875f, 0.3125f, 0f, u = 11, v = 40, offsetX = 0.25f, offsetY = 0.375f, offsetZ = -0.3125f),
+        MobBox("right_front_leg", -0.125f, -0.3125f, 0f, 0.0625f, 0f, 0f, u = 2, v = 13, offsetX = -0.2187f, offsetY = 0.3125f, offsetZ = -0.1875f),
+        MobBox("right_hind_leg", -0.125f, -0.3125f, 0f, 0.0625f, 0f, 0f, u = 2, v = 13, offsetX = -0.2187f, offsetY = 0.3125f, offsetZ = 0.25f),
+        MobBox("tail", 0f, -0.125f, 0f, 0f, 0.1875f, 0.75f, u = 2, v = 19, offsetY = 0.375f, offsetZ = 0.375f),
+        MobBox("left_hind_leg", -0.0625f, -0.3125f, 0f, 0.125f, 0f, 0f, u = 2, v = 13, offsetX = 0.2188f, offsetY = 0.3125f, offsetZ = 0.25f),
+        MobBox("left_front_leg", -0.0625f, -0.3125f, 0f, 0.125f, 0f, 0f, u = 2, v = 13, offsetX = 0.2188f, offsetY = 0.3125f, offsetZ = -0.1875f),
     )
     /**
      * Нюхач (SnifferModel): тяжёлое тело, голова с хоботком, четыре ноги и уши.
      * Лист 192×192 — самый большой лист среди моделей мобов.
      */
     private val SNIFFER = listOf(
-        MobBox("right_front_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 87, offsetX = -0.4687f, offsetY = 1.4375f, offsetZ = -0.9375f),
-        MobBox("right_hind_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 123, offsetX = -0.4687f, offsetY = 1.4375f, offsetZ = 0.9375f),
-        MobBox("right_mid_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 105, offsetX = -0.4687f, offsetY = 1.4375f),
-        MobBox("left_hind_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 123, offsetX = 0.4688f, offsetY = 1.4375f, offsetZ = 0.9375f),
-        MobBox("body", -0.7812f, -0.9375f, -1.25f, 0.7813f, 0.875f, 1.25f, u = 62, v = 68, offsetY = 2.0625f),
-        MobBox("body", -0.7812f, -0.625f, -1.25f, 0.7813f, 0.875f, 1.25f, u = 62, v = 0, offsetY = 2.0625f),
-        MobBox("body", -0.7812f, -0.75f, -1.25f, 0.7813f, -0.75f, 1.25f, u = 87, v = 68, offsetY = 2.0625f),
-        MobBox("head", -0.4062f, -0.6562f, -0.7187f, 0.4063f, 0.4688f, -0.0312f, u = 8, v = 15, offsetY = 1.3438f, offsetZ = -1.2175f),
-        MobBox("head", -0.4062f, -0.4687f, -0.7187f, 0.4063f, -0.4687f, -0.0312f, u = 8, v = 4, offsetY = 1.3438f, offsetZ = -1.2175f),
-        MobBox("nose", -0.4062f, 0f, -0.5625f, 0.4063f, 0.125f, 0f, u = 10, v = 45, offsetY = 1f, offsetZ = -1.9362f),
-        MobBox("lower_beak", -0.4062f, -0.3125f, -0.5f, 0.4063f, 0.4375f, 0.0625f, u = 10, v = 57, offsetY = 0.5625f, offsetZ = -1.9987f),
-        MobBox("right_ear", -0.0625f, -1.1875f, -0.1875f, 0f, 0f, 0.25f, u = 48, v = 0, offsetX = -0.4069f, offsetY = 1.1875f, offsetZ = -1.4994f),
-        MobBox("left_ear", 0f, -1.1875f, -0.1875f, 0.0625f, 0f, 0.25f, u = 2, v = 0, offsetX = 0.4069f, offsetY = 1.1875f, offsetZ = -1.4994f),
-        MobBox("left_mid_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 105, offsetX = 0.4688f, offsetY = 1.4375f),
-        MobBox("left_front_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 87, offsetX = 0.4688f, offsetY = 1.4375f, offsetZ = -0.9375f),
+        MobBox("right_front_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 87, offsetX = -0.4687f, offsetY = 0.5625f, offsetZ = -0.9375f),
+        MobBox("right_hind_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 123, offsetX = -0.4687f, offsetY = 0.5625f, offsetZ = 0.9375f),
+        MobBox("right_mid_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 32, v = 105, offsetX = -0.4687f, offsetY = 0.5625f),
+        MobBox("left_hind_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 123, offsetX = 0.4688f, offsetY = 0.5625f, offsetZ = 0.9375f),
+        MobBox("body", -0.7812f, -0.9375f, -1.25f, 0.7813f, 0.875f, 1.25f, u = 62, v = 68, offsetY = 1.1875f),
+        MobBox("body", -0.7812f, -0.625f, -1.25f, 0.7813f, 0.875f, 1.25f, u = 62, v = 0, offsetY = 1.1875f),
+        MobBox("body", -0.7812f, -0.75f, -1.25f, 0.7813f, -0.75f, 1.25f, u = 87, v = 68, offsetY = 1.1875f),
+        MobBox("head", -0.4062f, -0.6562f, -0.7187f, 0.4063f, 0.4688f, -0.0312f, u = 8, v = 15, offsetY = 0.7813f, offsetZ = -1.2175f),
+        MobBox("head", -0.4062f, -0.4687f, -0.7187f, 0.4063f, -0.4687f, -0.0312f, u = 8, v = 4, offsetY = 0.7813f, offsetZ = -1.2175f),
+        MobBox("nose", -0.4062f, 0f, -0.5625f, 0.4063f, 0.125f, 0f, u = 10, v = 45, offsetY = 1.0625f, offsetZ = -1.9362f),
+        MobBox("lower_beak", -0.4062f, -0.3125f, -0.5f, 0.4063f, 0.4375f, 0.0625f, u = 10, v = 57, offsetY = 0.625f, offsetZ = -1.9987f),
+        MobBox("right_ear", -0.0625f, -1.1875f, -0.1875f, 0f, 0f, 0.25f, u = 48, v = 0, offsetX = -0.4069f, offsetY = 1.25f, offsetZ = -1.4994f),
+        MobBox("left_ear", 0f, -1.1875f, -0.1875f, 0.0625f, 0f, 0.25f, u = 2, v = 0, offsetX = 0.4069f, offsetY = 1.25f, offsetZ = -1.4994f),
+        MobBox("left_mid_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 105, offsetX = 0.4688f, offsetY = 0.5625f),
+        MobBox("left_front_leg", -0.2187f, -0.5625f, -0.25f, 0.2188f, 0.0625f, 0.25f, u = 0, v = 87, offsetX = 0.4688f, offsetY = 0.5625f, offsetZ = -0.9375f),
     )
     /**
      * Лама (LlamaModel): тело, длинная шея с головой и ушами, четыре ноги.
@@ -1053,12 +1040,12 @@ object MobModels {
         MobBox("left_leg", -0.125f, -1f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 55, offsetX = 0.25f, offsetY = 1f),
         MobBox("right_leg", -0.125f, -1f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 32, offsetX = -0.25f, offsetY = 1f),
         MobBox("body", -0.5f, -0.5f, -0.5f, 0.5f, 0.375f, 0.5f, u = 0, v = 0, offsetY = 1.4375f),
-        MobBox("right_top_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 33, offsetX = -0.5f, offsetY = 1.8125f, offsetZ = -0.5f, rotZ = 0.873f),
-        MobBox("right_bottom_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 65, offsetX = -0.5f, offsetY = 1.25f, offsetZ = -0.5f, rotZ = 1.222f),
-        MobBox("left_top_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 33, offsetX = 0.5f, offsetY = 1.875f, offsetZ = -0.5f, rotZ = -0.873f),
-        MobBox("left_bottom_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 65, offsetX = 0.5f, offsetY = 1.3125f, offsetZ = -0.5f, rotZ = -1.222f),
-        MobBox("right_middle_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 49, offsetX = -0.5f, offsetY = 1.5625f, offsetZ = -0.5f, rotZ = 1.134f),
-        MobBox("left_middle_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 49, offsetX = 0.5f, offsetY = 1.625f, offsetZ = -0.5f, rotZ = -1.134f),
+        MobBox("right_top_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 33, matrix = floatArrayOf(0.6425f, 0.7663f, 0f, 0f, -0.7663f, 0.6425f, 0f, 0f, 0f, 0f, 1f, 0f, -0.5f, 1.75f, -0.5f, 1f)),
+        MobBox("right_bottom_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 65, matrix = floatArrayOf(0.3418f, 0.9398f, 0f, 0f, -0.9398f, 0.3418f, 0f, 0f, 0f, 0f, 1f, 0f, -0.5f, 1.1875f, -0.5f, 1f)),
+        MobBox("left_top_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 33, matrix = floatArrayOf(0.6425f, -0.7663f, 0f, 0f, 0.7663f, 0.6425f, 0f, 0f, 0f, 0f, 1f, 0f, 0.5f, 1.8125f, -0.5f, 1f)),
+        MobBox("left_bottom_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 65, matrix = floatArrayOf(0.3418f, -0.9398f, 0f, 0f, 0.9398f, 0.3418f, 0f, 0f, 0f, 0f, 1f, 0f, 0.5f, 1.25f, -0.5f, 1f)),
+        MobBox("right_middle_bristle", -0.75f, 0f, 0f, 0f, 0f, 1f, u = 16, v = 49, matrix = floatArrayOf(0.423f, 0.9061f, 0f, 0f, -0.9061f, 0.423f, 0f, 0f, 0f, 0f, 1f, 0f, -0.5f, 1.5f, -0.5f, 1f)),
+        MobBox("left_middle_bristle", 0f, 0f, 0f, 0.75f, 0f, 1f, u = 16, v = 49, matrix = floatArrayOf(0.423f, -0.9061f, 0f, 0f, 0.9061f, 0.423f, 0f, 0f, 0f, 0f, 1f, 0f, 0.5f, 1.5625f, -0.5f, 1f)),
     )
 
     /**
@@ -1067,16 +1054,16 @@ object MobModels {
      * Уши повёрнуты вокруг Z, голова наклонена вокруг X; низ модели — копыта.
      */
     private val HOGLIN = listOf(
-        MobBox("head", -0.4375f, -0.1875f, -1.1875f, 0.4375f, 0.1875f, 0f, u = 61, v = 1, offsetY = 1.375f, offsetZ = -0.75f, rotX = -0.873f),
-        MobBox("right_horn", -0.0625f, 0f, -0.0625f, 0.0625f, 0.6875f, 0.0625f, u = 10, v = 13, offsetX = -0.4375f, offsetY = 1.375f, offsetZ = -0.75f),
-        MobBox("left_horn", -0.0625f, 0f, -0.0625f, 0.0625f, 0.6875f, 0.0625f, u = 1, v = 13, offsetX = 0.4375f, offsetY = 1.375f, offsetZ = -0.75f),
-        MobBox("right_ear", -0.375f, 0f, -0.125f, 0f, 0.0625f, 0.125f, u = 1, v = 1, offsetX = -0.375f, offsetY = 1.625f, offsetZ = -0.1875f, rotZ = 0.698f),
-        MobBox("left_ear", 0f, 0f, -0.125f, 0.375f, 0.0625f, 0.125f, u = 1, v = 6, offsetX = 0.375f, offsetY = 1.625f, offsetZ = -0.1875f, rotZ = -0.698f),
+        MobBox("head", -0.4375f, -0.1875f, -1.1875f, 0.4375f, 0.1875f, 0f, u = 61, v = 1, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6425f, -0.7663f, 0f, 0f, 0.7663f, 0.6425f, 0f, 0f, 1.375f, -0.75f, 1f)),
+        MobBox("right_horn", -0.0625f, 0f, -0.0625f, 0.0625f, 0.6875f, 0.0625f, u = 10, v = 13, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6425f, -0.7663f, 0f, 0f, 0.7663f, 0.6425f, 0f, -0.4375f, 0.72f, -1.1361f, 1f)),
+        MobBox("left_horn", -0.0625f, 0f, -0.0625f, 0.0625f, 0.6875f, 0.0625f, u = 1, v = 13, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6425f, -0.7663f, 0f, 0f, 0.7663f, 0.6425f, 0f, 0.4375f, 0.72f, -1.1361f, 1f)),
+        MobBox("right_ear", -0.375f, 0f, -0.125f, 0f, 0.0625f, 0.125f, u = 1, v = 1, matrix = floatArrayOf(0.7661f, 0.4129f, -0.4925f, 0f, -0.6427f, 0.4923f, -0.5871f, 0f, 0f, 0.7663f, 0.6425f, 0f, -0.375f, 1.3116f, -0.9663f, 1f)),
+        MobBox("left_ear", 0f, 0f, -0.125f, 0.375f, 0.0625f, 0.125f, u = 1, v = 6, matrix = floatArrayOf(0.7661f, -0.4129f, 0.4925f, 0f, 0.6427f, 0.4923f, -0.5871f, 0f, 0f, 0.7663f, 0.6425f, 0f, 0.375f, 1.3116f, -0.9663f, 1f)),
         MobBox("right_front_leg", -0.1875f, -0.875f, -0.1875f, 0.1875f, 0f, 0.1875f, u = 66, v = 42, offsetX = -0.25f, offsetY = 0.875f, offsetZ = -0.5312f),
         MobBox("right_hind_leg", -0.1562f, -0.6875f, -0.1562f, 0.1563f, 0f, 0.1563f, u = 21, v = 45, offsetX = -0.3125f, offsetY = 0.6875f, offsetZ = 0.625f),
         MobBox("left_hind_leg", -0.1562f, -0.6875f, -0.1562f, 0.1563f, 0f, 0.1563f, u = 0, v = 45, offsetX = 0.3125f, offsetY = 0.6875f, offsetZ = 0.625f),
         MobBox("body", -0.5f, -0.4375f, -0.8125f, 0.5f, 0.4375f, 0.8125f, u = 1, v = 1, offsetY = 1.0625f),
-        MobBox("mane", 0f, -0.625f, -0.5625f, 0f, 0f, 0.625f, u = 90, v = 33, offsetY = 2.375f, offsetZ = -0.4375f),
+        MobBox("mane", 0f, -0.625f, -0.5625f, 0f, 0f, 0.625f, u = 90, v = 33, offsetY = 1.9375f, offsetZ = -0.4375f),
         MobBox("left_front_leg", -0.1875f, -0.875f, -0.1875f, 0.1875f, 0f, 0.1875f, u = 41, v = 42, offsetX = 0.25f, offsetY = 0.875f, offsetZ = -0.5312f),
     )
 
@@ -1146,50 +1133,15 @@ object MobModels {
      * Низ модели — днище — поставлен на y = 0.
      */
     private val BOAT = listOf(
-        MobBox(
-            "bottom", -0.875f, -0.4375f, -0.1875f, 0.875f, 0.5625f, 0f,
-            u = 0, v = 0, offsetY = 0.1875f, offsetZ = 0.0625f, rotX = -1.5708f,
-        ),
-        MobBox(
-            "side", -0.875f, 0.0625f, -0.0625f, 0.875f, 0.4375f, 0.0625f,
-            u = 0, v = 43, offsetY = 0.125f, offsetZ = 0.5625f,
-        ),
-        MobBox(
-            "side", -0.875f, 0.0625f, -0.0625f, 0.875f, 0.4375f, 0.0625f,
-            u = 0, v = 35, offsetY = 0.125f, offsetZ = -0.5625f, rotY = 3.1416f,
-        ),
-        MobBox(
-            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.4375f, 0.0625f,
-            u = 0, v = 27, offsetX = 0.9375f, offsetY = 0.125f, rotY = 1.5708f,
-        ),
-        MobBox(
-            "side", -0.8125f, 0.0625f, -0.0625f, 0.3125f, 0.4375f, 0.0625f,
-            u = 0, v = 19, offsetX = -0.9375f, offsetY = 0.125f, offsetZ = 0.25f, rotY = 4.712f,
-        ),
-        // Вёсла: черенок и лопасть. В ванили они чуть повёрнуты вокруг Z, а качаются
-        // вокруг точки крепления к борту — поэтому у них свой `pivotY`.
-        MobBox(
-            "paddle_right", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
-            pivotY = 0.6875f,
-            u = 62, v = 0, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = 0.5625f, rotZ = -0.196f,
-        ),
-        MobBox(
-            "paddle_right", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
-            pivotY = 0.6875f,
-            u = 62, v = 0, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = 0.5625f, rotZ = -0.196f,
-        ),
-        MobBox(
-            "paddle_left", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f,
-            pivotY = 0.6875f,
-            u = 62, v = 20, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = -0.5625f,
-            rotY = 3.1416f, rotZ = -0.196f,
-        ),
-        MobBox(
-            "paddle_left", 0f, -0.1875f, 0.5f, 0.0625f, 0.1875f, 0.9375f,
-            pivotY = 0.6875f,
-            u = 62, v = 20, offsetX = 0.1875f, offsetY = 0.6875f, offsetZ = -0.5625f,
-            rotY = 3.1416f, rotZ = -0.196f,
-        ),
+        MobBox("right_paddle", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f, u = 62, v = 20, matrix = floatArrayOf(-0.9809f, 0.1947f, 0.0004f, 0f, 0.1947f, 0.9809f, 0f, 0f, -0.0004f, 0.0001f, -1f, 0f, 0.1875f, 0.6876f, -0.5625f, 1f)),
+        MobBox("right_paddle", 0.0001f, -0.1875f, 0.5f, 0.0626f, 0.1875f, 0.9375f, u = 62, v = 20, matrix = floatArrayOf(-0.9809f, 0.1947f, 0.0004f, 0f, 0.1947f, 0.9809f, 0f, 0f, -0.0004f, 0.0001f, -1f, 0f, 0.1875f, 0.6876f, -0.5625f, 1f)),
+        MobBox("left_paddle", -0.0625f, -0.125f, -0.3125f, 0.0625f, 0f, 0.8125f, u = 62, v = 0, matrix = floatArrayOf(0.9809f, -0.1947f, 0f, 0f, 0.1947f, 0.9809f, 0f, 0f, 0f, 0f, 1f, 0f, 0.1875f, 0.6876f, 0.5625f, 1f)),
+        MobBox("left_paddle", -0.0626f, -0.1875f, 0.5f, -0.0001f, 0.1875f, 0.9375f, u = 62, v = 0, matrix = floatArrayOf(0.9809f, -0.1947f, 0f, 0f, 0.1947f, 0.9809f, 0f, 0f, 0f, 0f, 1f, 0f, 0.1875f, 0.6876f, 0.5625f, 1f)),
+        MobBox("left", -0.875f, 0.0625f, -0.0625f, 0.875f, 0.4375f, 0.0625f, u = 0, v = 43, offsetY = 0.1251f, offsetZ = 0.5625f),
+        MobBox("bottom", -0.875f, -0.4375f, -0.1875f, 0.875f, 0.5625f, 0f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 0.1876f, 0.0625f, 1f)),
+        MobBox("back", -0.8125f, 0.0625f, -0.0625f, 0.3125f, 0.4375f, 0.0625f, u = 0, v = 19, matrix = floatArrayOf(-0.0004f, 0f, 1f, 0f, 0f, 1f, 0f, 0f, -1f, 0f, -0.0004f, 0f, -0.9375f, 0.1251f, 0.25f, 1f)),
+        MobBox("front", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.4375f, 0.0625f, u = 0, v = 27, matrix = floatArrayOf(-0.0002f, 0f, -1f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, -0.0002f, 0f, 0.9375f, 0.1251f, 0f, 1f)),
+        MobBox("right", -0.875f, 0.0625f, -0.0625f, 0.875f, 0.4375f, 0.0625f, u = 0, v = 35, matrix = floatArrayOf(-1f, 0f, 0.0004f, 0f, 0f, 1f, 0f, 0f, -0.0004f, 0f, -1f, 0f, 0f, 0.1251f, -0.5625f, 1f)),
     )
 
     /**
@@ -1201,26 +1153,11 @@ object MobModels {
      * а сам кузов один.
      */
     private val MINECART = listOf(
-        MobBox(
-            "bottom", -0.625f, -0.5f, -0.0625f, 0.625f, 0.5f, 0.0625f,
-            u = 0, v = 10, offsetY = 0.0625f, rotX = -1.5708f,
-        ),
-        MobBox(
-            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
-            u = 0, v = 0, offsetY = 0.0625f, offsetZ = -0.4375f, rotY = 3.1416f,
-        ),
-        MobBox(
-            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
-            u = 0, v = 0, offsetY = 0.0625f, offsetZ = 0.4375f,
-        ),
-        MobBox(
-            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
-            u = 0, v = 0, offsetX = -0.5625f, offsetY = 0.0625f, rotY = 4.712f,
-        ),
-        MobBox(
-            "side", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f,
-            u = 0, v = 0, offsetX = 0.5625f, offsetY = 0.0625f, rotY = 1.5708f,
-        ),
+        MobBox("left", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(-1f, 0f, 0.0004f, 0f, 0f, 1f, 0f, 0f, -0.0004f, 0f, -1f, 0f, 0f, 0.0626f, -0.4375f, 1f)),
+        MobBox("bottom", -0.625f, -0.5f, -0.0625f, 0.625f, 0.5f, 0.0625f, u = 0, v = 10, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 0.0626f, 0f, 1f)),
+        MobBox("back", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(-0.0002f, 0f, -1f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, -0.0002f, 0f, 0.5625f, 0.0626f, 0f, 1f)),
+        MobBox("front", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(-0.0004f, 0f, 1f, 0f, 0f, 1f, 0f, 0f, -1f, 0f, -0.0004f, 0f, -0.5625f, 0.0626f, 0f, 1f)),
+        MobBox("right", -0.5f, 0.0625f, -0.0625f, 0.5f, 0.5625f, 0.0625f, u = 0, v = 0, offsetY = 0.0626f, offsetZ = 0.4375f),
     )
 
     /**
@@ -1252,13 +1189,13 @@ object MobModels {
      * Боковые плавники повёрнуты на 45°, поэтому у них матрица, а не три угла.
      */
     private val COD = listOf(
-        MobBox("head", -0.0625f, -0.125f, -0.1875f, 0.0625f, 0.125f, 0f, u = 11, v = 0, offsetY = 0.125f),
-        MobBox("nose", -0.0625f, -0.0625f, -0.0625f, 0.0625f, 0.125f, 0f, u = 0, v = 0, offsetY = 0.125f, offsetZ = -0.1875f),
-        MobBox("left_fin", 0f, 0f, -0.0625f, 0.125f, 0f, 0.0625f, u = 22, v = 4, matrix = floatArrayOf(0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, 0.0625f, 0.0625f, 0f, 1f)),
-        MobBox("top_fin", 0f, 0f, -0.0625f, 0f, 0.0625f, 0.3125f, u = 20, v = -6, offsetY = 0.25f),
-        MobBox("right_fin", -0.125f, 0f, -0.0625f, 0f, 0f, 0.0625f, u = 22, v = 1, matrix = floatArrayOf(0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, -0.0625f, 0.0625f, 0f, 1f)),
-        MobBox("body", -0.0625f, -0.125f, 0f, 0.0625f, 0.125f, 0.4375f, u = 0, v = 0, offsetY = 0.125f),
-        MobBox("tail_fin", 0f, -0.125f, 0f, 0f, 0.125f, 0.25f, u = 22, v = 3, offsetY = 0.125f, offsetZ = 0.4375f),
+        MobBox("head", -0.0625f, -0.125f, -0.1875f, 0.0625f, 0.125f, 0f, u = 11, v = 0, offsetY = 0.1509f),
+        MobBox("nose", -0.0625f, -0.0625f, -0.0625f, 0.0625f, 0.125f, 0f, u = 0, v = 0, offsetY = 0.1509f, offsetZ = -0.1875f),
+        MobBox("left_fin", 0f, 0f, -0.0625f, 0.125f, 0f, 0.0625f, u = 22, v = 4, matrix = floatArrayOf(0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, 0.0625f, 0.0884f, 0f, 1f)),
+        MobBox("top_fin", 0f, 0f, -0.0625f, 0f, 0.0625f, 0.3125f, u = 20, v = -6, offsetY = 0.2759f),
+        MobBox("right_fin", -0.125f, 0f, -0.0625f, 0f, 0f, 0.0625f, u = 22, v = 1, matrix = floatArrayOf(0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, -0.0625f, 0.0884f, 0f, 1f)),
+        MobBox("body", -0.0625f, -0.125f, 0f, 0.0625f, 0.125f, 0.4375f, u = 0, v = 0, offsetY = 0.1509f),
+        MobBox("tail_fin", 0f, -0.125f, 0f, 0f, 0.125f, 0.25f, u = 22, v = 3, offsetY = 0.1509f, offsetZ = 0.4375f),
     )
 
     /**
@@ -1267,14 +1204,14 @@ object MobModels {
      * Модель крупнее трески, но той же раскладки; спинные плавники в дампе плоские.
      */
     private val SALMON = listOf(
-        MobBox("head", -0.0625f, -0.125f, -0.1875f, 0.0625f, 0.125f, 0f, u = 22, v = 0, offsetY = 0.1563f, offsetZ = -0.45f),
-        MobBox("left_fin", 0f, 0f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 0, matrix = floatArrayOf(0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, 0.0938f, 0.0625f, -0.45f, 1f)),
-        MobBox("body_back", -0.0937f, -0.1562f, 0f, 0.0938f, 0.1563f, 0.5f, u = 0, v = 13, offsetY = 0.1563f, offsetZ = 0.05f),
-        MobBox("top_back_fin", 0f, -0.125f, 0f, 0f, 0f, 0.25f, u = 0, v = 2, offsetY = 0.4375f, offsetZ = -0.0125f),
-        MobBox("back_fin", 0f, -0.1562f, 0f, 0f, 0.1563f, 0.375f, u = 20, v = 10, offsetY = 0.1563f, offsetZ = 0.55f),
-        MobBox("right_fin", -0.125f, 0f, 0f, 0f, 0f, 0.125f, u = -4, v = 0, matrix = floatArrayOf(0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, -0.0937f, 0.0625f, -0.45f, 1f)),
-        MobBox("body_front", -0.0937f, -0.1562f, 0f, 0.0938f, 0.1563f, 0.5f, u = 0, v = 0, offsetY = 0.1563f, offsetZ = -0.45f),
-        MobBox("top_front_fin", 0f, -0.125f, 0f, 0f, 0f, 0.1875f, u = 2, v = 1, offsetY = 0.4375f, offsetZ = -0.1375f),
+        MobBox("head", -0.0625f, -0.125f, -0.1875f, 0.0625f, 0.125f, 0f, u = 22, v = 0, offsetY = 0.1821f, offsetZ = -0.45f),
+        MobBox("left_fin", 0f, 0f, 0f, 0.125f, 0f, 0.125f, u = 0, v = 0, matrix = floatArrayOf(0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, 0.0938f, 0.0884f, -0.45f, 1f)),
+        MobBox("body_back", -0.0937f, -0.1562f, 0f, 0.0938f, 0.1563f, 0.5f, u = 0, v = 13, offsetY = 0.1821f, offsetZ = 0.05f),
+        MobBox("top_back_fin", 0f, -0.125f, 0f, 0f, 0f, 0.25f, u = 0, v = 2, offsetY = 0.4634f, offsetZ = -0.0125f),
+        MobBox("back_fin", 0f, -0.1562f, 0f, 0f, 0.1563f, 0.375f, u = 20, v = 10, offsetY = 0.1821f, offsetZ = 0.55f),
+        MobBox("right_fin", -0.125f, 0f, 0f, 0f, 0f, 0.125f, u = -4, v = 0, matrix = floatArrayOf(0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0f, 0f, 1f, 0f, -0.0937f, 0.0884f, -0.45f, 1f)),
+        MobBox("body_front", -0.0937f, -0.1562f, 0f, 0.0938f, 0.1563f, 0.5f, u = 0, v = 0, offsetY = 0.1821f, offsetZ = -0.45f),
+        MobBox("top_front_fin", 0f, -0.125f, 0f, 0f, 0f, 0.1875f, u = 2, v = 1, offsetY = 0.4634f, offsetZ = -0.1375f),
     )
 
     /**
@@ -1428,12 +1365,19 @@ object MobModels {
      * метаданные состояния мы пока не читаем, поэтому берём обычную — маленькую.
      */
     private val PUFFERFISH = listOf(
-        MobBox("right_eye", -0.0937f, -0.0625f, -0.0937f, -0.0312f, 0f, -0.0312f, u = 24, v = 6, offsetY = 0.1875f),
-        MobBox("left_fin", 0f, 0f, 0f, 0.0625f, 0f, 0.125f, u = 25, v = 0, offsetX = 0.0938f, offsetY = 0.0625f, offsetZ = -0.0937f),
-        MobBox("right_fin", -0.0625f, 0f, 0f, 0f, 0f, 0.125f, u = 25, v = 0, offsetX = -0.0937f, offsetY = 0.0625f, offsetZ = -0.0937f),
-        MobBox("left_eye", 0.0313f, -0.0625f, -0.0937f, 0.0938f, 0f, -0.0312f, u = 28, v = 6, offsetY = 0.1875f),
-        MobBox("body", -0.0937f, 0f, -0.0937f, 0.0938f, 0.125f, 0.0938f, u = 0, v = 27),
-        MobBox("back_fin", -0.0937f, 0f, 0f, 0.0938f, 0f, 0.1875f, u = -3, v = 0, offsetY = 0.0625f, offsetZ = 0.0938f),
+        MobBox("left_blue_fin", 0f, -0.0625f, -0.0625f, 0.125f, 0f, 0.0625f, u = 24, v = 3, offsetX = 0.25f, offsetY = 0.5f, offsetZ = -0.125f),
+        MobBox("top_back_fin", -0.25f, 0f, 0f, 0.25f, 0.0625f, 0f, u = 23, v = 18, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0.5625f, 0.25f, 1f)),
+        MobBox("top_middle_fin", -0.25f, 0f, 0f, 0.25f, 0.0625f, 0.0625f, u = 14, v = 16, offsetY = 0.5625f),
+        MobBox("bottom_front_fin", -0.25f, -0.0625f, 0f, 0.25f, 0f, 0f, u = 15, v = 20, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7074f, 0.7068f, 0f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0.0625f, -0.25f, 1f)),
+        MobBox("right_front_fin", -0.0625f, 0f, 0f, 0f, 0.5f, 0f, u = 5, v = 17, matrix = floatArrayOf(0.7074f, 0f, 0.7068f, 0f, 0f, 1f, 0f, 0f, -0.7068f, 0f, 0.7074f, 0f, -0.25f, 0.0625f, -0.25f, 1f)),
+        MobBox("body", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 0, v = 0, offsetY = 0.0625f),
+        MobBox("bottom_back_fin", -0.25f, -0.0625f, 0f, 0.25f, 0f, 0f, u = 15, v = 20, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0.0625f, 0.25f, 1f)),
+        MobBox("right_blue_fin", -0.125f, -0.0625f, -0.0625f, 0f, 0f, 0.0625f, u = 24, v = 0, offsetX = -0.25f, offsetY = 0.5f, offsetZ = -0.125f),
+        MobBox("left_front_fin", 0f, 0f, 0f, 0.0625f, 0.5f, 0f, u = 1, v = 17, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, 0f, 1f, 0f, 0f, 0.7068f, 0f, 0.7074f, 0f, 0.25f, 0.0625f, -0.25f, 1f)),
+        MobBox("bottom_middle_fin", -0.25f, -0.0625f, 0f, 0.25f, 0f, 0f, u = 15, v = 20, offsetY = 0.0625f),
+        MobBox("left_back_fin", 0f, 0f, 0f, 0.0625f, 0.5f, 0f, u = 9, v = 17, matrix = floatArrayOf(0.7074f, 0f, 0.7068f, 0f, 0f, 1f, 0f, 0f, -0.7068f, 0f, 0.7074f, 0f, 0.25f, 0.0625f, 0.25f, 1f)),
+        MobBox("right_back_fin", -0.0625f, 0f, 0f, 0f, 0.5f, 0f, u = 9, v = 17, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, 0f, 1f, 0f, 0f, 0.7068f, 0f, 0.7074f, 0f, -0.25f, 0.0625f, 0.25f, 1f)),
+        MobBox("top_front_fin", -0.25f, 0f, 0f, 0.25f, 0.0625f, 0f, u = 15, v = 17, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.7074f, -0.7068f, 0f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0.5625f, -0.25f, 1f)),
     )
 
     /**
@@ -1443,11 +1387,12 @@ object MobModels {
      * `tropical_a`: без метаданных варианта другого не выбрать.
      */
     private val TROPICAL_FISH = listOf(
-        MobBox("left_fin", 0f, -0.0625f, 0f, 0.125f, 0.0625f, 0f, u = 2, v = 12, matrix = floatArrayOf(0.7074f, 0f, 0.7068f, 0f, 0f, 1f, 0f, 0f, -0.7068f, 0f, 0.7074f, 0f, 0.0625f, 0.0625f, 0f, 1f)),
-        MobBox("top_fin", 0f, 0f, 0f, 0f, 0.1875f, 0.375f, u = 10, v = -5, offsetY = 0.1875f, offsetZ = -0.1875f),
-        MobBox("tail", 0f, -0.0937f, 0f, 0f, 0.0938f, 0.375f, u = 22, v = -6, offsetY = 0.0938f, offsetZ = 0.1875f),
-        MobBox("right_fin", -0.125f, -0.0625f, 0f, 0f, 0.0625f, 0f, u = 2, v = 16, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, 0f, 1f, 0f, 0f, 0.7068f, 0f, 0.7074f, 0f, -0.0625f, 0.0625f, 0f, 1f)),
-        MobBox("body", -0.0625f, -0.0937f, -0.1875f, 0.0625f, 0.0938f, 0.1875f, u = 0, v = 0, offsetY = 0.0938f),
+        MobBox("left_fin", 0f, -0.125f, 0f, 0.125f, 0f, 0f, u = 2, v = 12, matrix = floatArrayOf(0.7074f, 0f, 0.7068f, 0f, 0f, 1f, 0f, 0f, -0.7068f, 0f, 0.7074f, 0f, 0.0625f, 0.375f, 0f, 1f)),
+        MobBox("top_fin", 0f, 0f, 0f, 0f, 0.25f, 0.375f, u = 20, v = 11, offsetY = 0.625f, offsetZ = -0.1875f),
+        MobBox("tail", 0f, -0.1875f, 0f, 0f, 0.1875f, 0.3125f, u = 21, v = 16, offsetY = 0.4375f, offsetZ = 0.1875f),
+        MobBox("right_fin", -0.125f, -0.125f, 0f, 0f, 0f, 0f, u = 2, v = 16, matrix = floatArrayOf(0.7074f, 0f, -0.7068f, 0f, 0f, 1f, 0f, 0f, 0.7068f, 0f, 0.7074f, 0f, -0.0625f, 0.375f, 0f, 1f)),
+        MobBox("body", -0.0625f, -0.1875f, -0.1875f, 0.0625f, 0.1875f, 0.1875f, u = 0, v = 20, offsetY = 0.4375f),
+        MobBox("bottom_fin", 0f, -0.25f, 0f, 0f, 0f, 0.375f, u = 20, v = 21, offsetY = 0.25f, offsetZ = -0.1875f),
     )
 
     /**
@@ -1477,11 +1422,13 @@ object MobModels {
      * три угла. Глаза — отдельный слой текстуры `breeze_eyes`, его пока не рисуем.
      */
     private val BREEZE = listOf(
-        MobBox("head", -0.3125f, 0.125f, -0.2625f, 0.3125f, 0.3125f, -0.0125f, u = 4, v = 24, offsetY = 0.5625f),
-        MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 0, v = 0, offsetY = 0.5625f),
-        MobBox("rod_2", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(-0.5002f, 0.0002f, -0.8659f, 0f, -0.3309f, 0.9241f, 0.1914f, 0f, 0.8002f, 0.3823f, -0.4621f, 0f, -0.1624f, 0.5f, 0.0938f, 1f)),
-        MobBox("rod_3", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9238f, -0.383f, 0f, 0f, 0.383f, 0.9238f, 0f, 0f, 0.5f, -0.1875f, 1f)),
-        MobBox("rod_1", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(-0.5002f, 0.0002f, 0.8659f, 0f, 0.3317f, 0.9238f, 0.1914f, 0f, -0.7999f, 0.3829f, -0.4621f, 0f, 0.1624f, 0.5f, 0.0938f, 1f)),
+        MobBox("head", -0.3125f, 0.125f, -0.2625f, 0.3125f, 0.3125f, -0.0125f, u = 4, v = 24, offsetY = 0.5962f),
+        MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 0, v = 0, offsetY = 0.5962f),
+        MobBox("eyes", -0.3125f, 0.125f, -0.2625f, 0.3125f, 0.3125f, -0.0125f, u = 4, v = 24, offsetY = 0.5962f),
+        MobBox("eyes", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 0, v = 0, offsetY = 0.5962f),
+        MobBox("rod_2", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(-0.5002f, 0.0002f, -0.8659f, 0f, -0.3309f, 0.9241f, 0.1914f, 0f, 0.8002f, 0.3823f, -0.4621f, 0f, -0.1624f, 0.5337f, 0.0938f, 1f)),
+        MobBox("rod_3", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9238f, -0.383f, 0f, 0f, 0.383f, 0.9238f, 0f, 0f, 0.5337f, -0.1875f, 1f)),
+        MobBox("rod_1", -0.0625f, -0.5f, -0.1875f, 0.0625f, 0f, -0.0625f, u = 0, v = 17, matrix = floatArrayOf(-0.5002f, 0.0002f, 0.8659f, 0f, 0.3317f, 0.9238f, 0.1914f, 0f, -0.7999f, 0.3829f, -0.4621f, 0f, 0.1624f, 0.5337f, 0.0938f, 1f)),
     )
 
     /**
@@ -1510,110 +1457,111 @@ object MobModels {
      * Зомби-наутилус — та же модель с другой текстурой.
      */
     private val NAUTILUS = listOf(
-        MobBox("shell", -0.4375f, 0f, -0.4375f, 0.4375f, 0.625f, 0.5625f, u = 0, v = 0, offsetY = 0.5f, offsetZ = -0.0625f),
-        MobBox("shell", -0.4375f, -0.5f, -0.4375f, 0.4375f, 0f, 0.8125f, u = 0, v = 26, offsetY = 0.5f, offsetZ = -0.0625f),
-        MobBox("shell", -0.4375f, -0.5f, 0.375f, 0.4375f, 0f, 0.375f, u = 48, v = 26, offsetY = 0.5f, offsetZ = -0.0625f),
-        MobBox("body", -0.3125f, -0.2181f, -0.1875f, 0.3125f, 0.2819f, 0.6875f, u = 0, v = 54, offsetY = 0.2188f, offsetZ = 0.3938f),
-        MobBox("body", -0.3125f, -0.2181f, 0.4375f, 0.3125f, 0.2819f, 0.4375f, u = 0, v = 76, offsetY = 0.2188f, offsetZ = 0.3938f),
-        MobBox("lower_mouth", -0.3125f, -0.1262f, 0f, 0.3125f, 0.1238f, 0.25f, u = 54, v = 62, offsetY = 0.1256f, offsetZ = 0.4563f),
-        MobBox("upper_mouth", -0.3125f, -0.125f, 0f, 0.3125f, 0.125f, 0.25f, u = 54, v = 54, offsetY = 0.3756f, offsetZ = 0.4563f),
-        MobBox("inner_mouth", -0.1875f, -0.125f, -0.0312f, 0.1875f, 0.125f, 0.2188f, u = 54, v = 70, offsetY = 0.2513f, offsetZ = 0.4875f),
+        MobBox("shell", -0.4375f, 0f, -0.4375f, 0.4375f, 0.625f, 0.5625f, u = 0, v = 0, offsetY = 0.5006f, offsetZ = -0.0625f),
+        MobBox("shell", -0.4375f, -0.5f, -0.4375f, 0.4375f, 0f, 0.8125f, u = 0, v = 26, offsetY = 0.5006f, offsetZ = -0.0625f),
+        MobBox("shell", -0.4375f, -0.5f, 0.375f, 0.4375f, 0f, 0.375f, u = 48, v = 26, offsetY = 0.5006f, offsetZ = -0.0625f),
+        MobBox("body", -0.3125f, -0.2181f, -0.1875f, 0.3125f, 0.2819f, 0.6875f, u = 0, v = 54, offsetY = 0.2194f, offsetZ = 0.3938f),
+        MobBox("body", -0.3125f, -0.2181f, 0.4375f, 0.3125f, 0.2819f, 0.4375f, u = 0, v = 76, offsetY = 0.2194f, offsetZ = 0.3938f),
+        MobBox("lower_mouth", -0.3125f, -0.1262f, 0f, 0.3125f, 0.1238f, 0.25f, u = 54, v = 62, offsetY = 0.1262f, offsetZ = 0.8313f),
+        MobBox("upper_mouth", -0.3125f, -0.125f, 0f, 0.3125f, 0.125f, 0.25f, u = 54, v = 54, offsetY = 0.3762f, offsetZ = 0.8313f),
+        MobBox("inner_mouth", -0.1875f, -0.125f, -0.0312f, 0.1875f, 0.125f, 0.2188f, u = 54, v = 70, offsetY = 0.2512f, offsetZ = 0.8625f),
     )
 
     /**
      * Дракон Края (EnderDragonModel): туловище, шея, хвост, четыре лапы и два крыла. Модель огромная (размах крыльев — 14 блоков), поэтому у неё своя нижняя точка: Y0 = 63 пикселя, иначе конвейер поднимал её на восемь блоков. Рёбра, лапы и крылья в ванильной модели повёрнуты, поэтому у них матрица.
      */
     private val DRAGON = listOf(
-        MobBox("neck4", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.6875f, offsetZ = -3.25f),
-        MobBox("neck3", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.6875f, offsetZ = -2.625f),
-        MobBox("neck3", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.6875f, offsetZ = -2.625f),
-        MobBox("tail11", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 10.625f),
-        MobBox("tail11", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 10.625f),
-        MobBox("neck0", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.6875f, offsetZ = -0.75f),
-        MobBox("neck0", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.6875f, offsetZ = -0.75f),
-        MobBox("body", -0.75f, -0.5f, -1f, 0.75f, 1f, 3f, u = 0, v = 0, offsetY = 2.6875f, offsetZ = 0.5f),
-        MobBox("body", -0.0625f, 1f, -0.625f, 0.0625f, 1.375f, 0.125f, u = 220, v = 53, offsetY = 2.6875f, offsetZ = 0.5f),
-        MobBox("body", -0.0625f, 1f, 0.625f, 0.0625f, 1.375f, 1.375f, u = 220, v = 53, offsetY = 2.6875f, offsetZ = 0.5f),
-        MobBox("body", -0.0625f, 1f, 1.875f, 0.0625f, 1.375f, 2.625f, u = 220, v = 53, offsetY = 2.6875f, offsetZ = 0.5f),
-        MobBox("right_front_leg", -0.25f, -1.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 112, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.2675f, -0.9636f, 0f, 0f, 0.9636f, 0.2675f, 0f, -0.75f, 2.6875f, 0.125f, 1f)),
-        MobBox("right_front_leg_tip", -0.1875f, -1.4375f, -0.1875f, 0.1875f, 0.0625f, 0.1875f, u = 226, v = 138, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6967f, -0.7174f, 0f, 0f, 0.7174f, 0.6967f, 0f, -0.75f, 2.2929f, 1.3127f, 1f)),
-        MobBox("right_front_foot", -0.25f, -0.25f, -0.75f, 0.25f, 0f, 0.25f, u = 144, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0208f, -0.9998f, 0f, 0f, 0.9998f, 0.0208f, 0f, -0.75f, 1.2914f, 2.3439f, 1f)),
-        MobBox("right_hind_leg", -0.5f, -1.75f, -0.5f, 0.5f, 0.25f, 0.5f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.5403f, -0.8415f, 0f, 0f, 0.8415f, 0.5403f, 0f, -1f, 2.9375f, 2.625f, 1f)),
-        MobBox("right_hind_leg_tip", -0.375f, -1.875f, 0f, 0.375f, 0.125f, 0.75f, u = 196, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0707f, -0.9975f, 0f, 0f, 0.9975f, 0.0707f, 0f, -1f, 1.6465f, 4.1729f, 1f)),
-        MobBox("right_hind_foot", -0.5625f, -0.375f, -1.25f, 0.5625f, 0f, 0.25f, u = 112, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.6282f, -0.7781f, 0f, 0f, 0.7781f, -0.6282f, 0f, -1f, 1.7588f, 6.1232f, 1f)),
-        MobBox("right_wing", -3.5f, -0.25f, -0.25f, 0f, 0.25f, 0.25f, u = 112, v = 88, offsetX = -0.75f, offsetY = 3.625f, offsetZ = 0.125f),
-        MobBox("right_wing", -3.5f, 0f, 0.125f, 0f, 0f, 3.625f, u = -56, v = 88, offsetX = -0.75f, offsetY = 3.625f, offsetZ = 0.125f),
-        MobBox("right_wing_tip", -3.5f, -0.125f, -0.125f, 0f, 0.125f, 0.125f, u = 112, v = 136, offsetX = -4.25f, offsetY = 2.375f, offsetZ = 0.625f),
-        MobBox("right_wing_tip", -3.5f, 0f, 0.125f, 0f, 0f, 3.625f, u = -56, v = 144, offsetX = -4.25f, offsetY = 2.375f, offsetZ = 0.625f),
-        MobBox("left_wing", 0f, -0.25f, -0.25f, 3.5f, 0.25f, 0.25f, u = 112, v = 88, offsetX = 0.75f, offsetY = 3.625f, offsetZ = 0.125f),
-        MobBox("left_wing", 0f, 0f, 0.125f, 3.5f, 0f, 3.625f, u = -56, v = 88, offsetX = 0.75f, offsetY = 3.625f, offsetZ = 0.125f),
-        MobBox("left_wing_tip", 0f, -0.125f, -0.125f, 3.5f, 0.125f, 0.125f, u = 112, v = 136, offsetX = 4.25f, offsetY = 2.375f, offsetZ = 0.625f),
-        MobBox("left_wing_tip", 0f, 0f, 0.125f, 3.5f, 0f, 3.625f, u = -56, v = 144, offsetX = 4.25f, offsetY = 2.375f, offsetZ = 0.625f),
-        MobBox("left_hind_leg", -0.5f, -1.75f, -0.5f, 0.5f, 0.25f, 0.5f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.5403f, -0.8415f, 0f, 0f, 0.8415f, 0.5403f, 0f, 1f, 2.9375f, 2.625f, 1f)),
-        MobBox("left_hind_leg_tip", -0.375f, -1.875f, 0f, 0.375f, 0.125f, 0.75f, u = 196, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0707f, -0.9975f, 0f, 0f, 0.9975f, 0.0707f, 0f, 1f, 1.6465f, 4.1729f, 1f)),
-        MobBox("left_hind_foot", -0.5625f, -0.375f, -1.25f, 0.5625f, 0f, 0.25f, u = 112, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.6282f, -0.7781f, 0f, 0f, 0.7781f, -0.6282f, 0f, 1f, 1.7588f, 6.1232f, 1f)),
-        MobBox("left_front_leg", -0.25f, -1.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 112, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.2675f, -0.9636f, 0f, 0f, 0.9636f, 0.2675f, 0f, 0.75f, 2.6875f, 0.125f, 1f)),
-        MobBox("left_front_leg_tip", -0.1875f, -1.4375f, -0.1875f, 0.1875f, 0.0625f, 0.1875f, u = 226, v = 138, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6967f, -0.7174f, 0f, 0f, 0.7174f, 0.6967f, 0f, 0.75f, 2.2929f, 1.3127f, 1f)),
-        MobBox("left_front_foot", -0.25f, -0.25f, -0.75f, 0.25f, 0f, 0.25f, u = 144, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0208f, -0.9998f, 0f, 0f, 0.9998f, 0.0208f, 0f, 0.75f, 1.2914f, 2.3439f, 1f)),
-        MobBox("neck2", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.6875f, offsetZ = -2f),
-        MobBox("neck2", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.6875f, offsetZ = -2f),
-        MobBox("neck1", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.6875f, offsetZ = -1.375f),
-        MobBox("neck1", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.6875f, offsetZ = -1.375f),
-        MobBox("head", -0.375f, -0.25f, -1.5f, 0.375f, 0.0625f, -0.5f, u = 176, v = 44, offsetY = 2.6875f, offsetZ = -3.875f),
-        MobBox("head", -0.5f, -0.5f, -0.625f, 0.5f, 0.5f, 0.375f, u = 112, v = 30, offsetY = 2.6875f, offsetZ = -3.875f),
-        MobBox("head", -0.3125f, 0.5f, -0.25f, -0.1875f, 0.75f, 0.125f, u = 0, v = 0, offsetY = 2.6875f, offsetZ = -3.875f),
-        MobBox("head", -0.3125f, 0.0625f, -1.375f, -0.1875f, 0.1875f, -1.125f, u = 112, v = 0, offsetY = 2.6875f, offsetZ = -3.875f),
-        MobBox("head", 0.1875f, 0.5f, -0.25f, 0.3125f, 0.75f, 0.125f, u = 0, v = 0, offsetY = 2.6875f, offsetZ = -3.875f),
-        MobBox("head", 0.1875f, 0.0625f, -1.375f, 0.3125f, 0.1875f, -1.125f, u = 112, v = 0, offsetY = 2.6875f, offsetZ = -3.875f),
-        MobBox("jaw", -0.375f, -0.25f, -1f, 0.375f, 0f, 0f, u = 176, v = 65, offsetY = 2.4375f, offsetZ = -4.375f),
-        MobBox("tail0", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 3.75f),
-        MobBox("tail0", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 3.75f),
-        MobBox("tail1", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 4.375f),
-        MobBox("tail1", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 4.375f),
-        MobBox("tail2", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 5f),
-        MobBox("tail2", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 5f),
-        MobBox("tail3", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 5.625f),
-        MobBox("tail3", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 5.625f),
-        MobBox("tail4", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 6.25f),
-        MobBox("tail4", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 6.25f),
-        MobBox("tail5", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 6.875f),
-        MobBox("tail5", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 6.875f),
-        MobBox("tail10", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 10f),
-        MobBox("tail10", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 10f),
-        MobBox("tail6", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 7.5f),
-        MobBox("tail6", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 7.5f),
-        MobBox("tail7", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 8.125f),
-        MobBox("tail7", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 8.125f),
-        MobBox("tail8", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 8.75f),
-        MobBox("tail8", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 8.75f),
-        MobBox("tail9", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 3.3125f, offsetZ = 9.375f),
-        MobBox("tail9", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 3.3125f, offsetZ = 9.375f),
+        MobBox("neck4", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.1511f, offsetZ = -3.25f),
+        MobBox("neck4", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.1511f, offsetZ = -3.25f),
+        MobBox("neck3", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.1511f, offsetZ = -2.625f),
+        MobBox("neck3", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.1511f, offsetZ = -2.625f),
+        MobBox("tail11", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 10.625f),
+        MobBox("tail11", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 10.625f),
+        MobBox("neck0", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.1511f, offsetZ = -0.75f),
+        MobBox("neck0", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.1511f, offsetZ = -0.75f),
+        MobBox("body", -0.75f, -0.5f, -1f, 0.75f, 1f, 3f, u = 0, v = 0, offsetY = 2.1511f, offsetZ = 0.5f),
+        MobBox("body", -0.0625f, 1f, -0.625f, 0.0625f, 1.375f, 0.125f, u = 220, v = 53, offsetY = 2.1511f, offsetZ = 0.5f),
+        MobBox("body", -0.0625f, 1f, 0.625f, 0.0625f, 1.375f, 1.375f, u = 220, v = 53, offsetY = 2.1511f, offsetZ = 0.5f),
+        MobBox("body", -0.0625f, 1f, 1.875f, 0.0625f, 1.375f, 2.625f, u = 220, v = 53, offsetY = 2.1511f, offsetZ = 0.5f),
+        MobBox("right_front_leg", -0.25f, -1.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 112, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.2675f, -0.9636f, 0f, 0f, 0.9636f, 0.2675f, 0f, -0.75f, 2.1511f, 0.125f, 1f)),
+        MobBox("right_front_leg_tip", -0.1875f, -1.4375f, -0.1875f, 0.1875f, 0.0625f, 0.1875f, u = 226, v = 138, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6967f, -0.7174f, 0f, 0f, 0.7174f, 0.6967f, 0f, -0.75f, 1.7566f, 1.3127f, 1f)),
+        MobBox("right_front_foot", -0.25f, -0.25f, -0.75f, 0.25f, 0f, 0.25f, u = 144, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0208f, -0.9998f, 0f, 0f, 0.9998f, 0.0208f, 0f, -0.75f, 0.755f, 2.3439f, 1f)),
+        MobBox("right_hind_leg", -0.5f, -1.75f, -0.5f, 0.5f, 0.25f, 0.5f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.5403f, -0.8415f, 0f, 0f, 0.8415f, 0.5403f, 0f, -1f, 2.4011f, 2.625f, 1f)),
+        MobBox("right_hind_leg_tip", -0.375f, -1.875f, 0f, 0.375f, 0.125f, 0.75f, u = 196, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0707f, -0.9975f, 0f, 0f, 0.9975f, 0.0707f, 0f, -1f, 1.1102f, 4.1729f, 1f)),
+        MobBox("right_hind_foot", -0.5625f, -0.375f, -1.25f, 0.5625f, 0f, 0.25f, u = 112, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.6282f, -0.7781f, 0f, 0f, 0.7781f, -0.6282f, 0f, -1f, 1.2225f, 6.1232f, 1f)),
+        MobBox("right_wing", -3.5f, -0.25f, -0.25f, 0f, 0.25f, 0.25f, u = 112, v = 88, offsetX = -0.75f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("right_wing", -3.5f, 0f, 0.125f, 0f, 0f, 3.625f, u = -56, v = 88, offsetX = -0.75f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("right_wing_tip", -3.5f, -0.125f, -0.125f, 0f, 0.125f, 0.125f, u = 112, v = 136, offsetX = -4.25f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("right_wing_tip", -3.5f, 0f, 0.125f, 0f, 0f, 3.625f, u = -56, v = 144, offsetX = -4.25f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("left_wing", 0f, -0.25f, -0.25f, 3.5f, 0.25f, 0.25f, u = 112, v = 88, offsetX = 0.75f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("left_wing", 0f, 0f, 0.125f, 3.5f, 0f, 3.625f, u = -56, v = 88, offsetX = 0.75f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("left_wing_tip", 0f, -0.125f, -0.125f, 3.5f, 0.125f, 0.125f, u = 112, v = 136, offsetX = 4.25f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("left_wing_tip", 0f, 0f, 0.125f, 3.5f, 0f, 3.625f, u = -56, v = 144, offsetX = 4.25f, offsetY = 3.0886f, offsetZ = 0.125f),
+        MobBox("left_hind_leg", -0.5f, -1.75f, -0.5f, 0.5f, 0.25f, 0.5f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.5403f, -0.8415f, 0f, 0f, 0.8415f, 0.5403f, 0f, 1f, 2.4011f, 2.625f, 1f)),
+        MobBox("left_hind_leg_tip", -0.375f, -1.875f, 0f, 0.375f, 0.125f, 0.75f, u = 196, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0707f, -0.9975f, 0f, 0f, 0.9975f, 0.0707f, 0f, 1f, 1.1102f, 4.1729f, 1f)),
+        MobBox("left_hind_foot", -0.5625f, -0.375f, -1.25f, 0.5625f, 0f, 0.25f, u = 112, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.6282f, -0.7781f, 0f, 0f, 0.7781f, -0.6282f, 0f, 1f, 1.2225f, 6.1232f, 1f)),
+        MobBox("left_front_leg", -0.25f, -1.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 112, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.2675f, -0.9636f, 0f, 0f, 0.9636f, 0.2675f, 0f, 0.75f, 2.1511f, 0.125f, 1f)),
+        MobBox("left_front_leg_tip", -0.1875f, -1.4375f, -0.1875f, 0.1875f, 0.0625f, 0.1875f, u = 226, v = 138, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6967f, -0.7174f, 0f, 0f, 0.7174f, 0.6967f, 0f, 0.75f, 1.7566f, 1.3127f, 1f)),
+        MobBox("left_front_foot", -0.25f, -0.25f, -0.75f, 0.25f, 0f, 0.25f, u = 144, v = 104, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.0208f, -0.9998f, 0f, 0f, 0.9998f, 0.0208f, 0f, 0.75f, 0.755f, 2.3439f, 1f)),
+        MobBox("neck2", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.1511f, offsetZ = -2f),
+        MobBox("neck2", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.1511f, offsetZ = -2f),
+        MobBox("neck1", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.1511f, offsetZ = -1.375f),
+        MobBox("neck1", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.1511f, offsetZ = -1.375f),
+        MobBox("head", -0.375f, -0.25f, -1.5f, 0.375f, 0.0625f, -0.5f, u = 176, v = 44, offsetY = 2.1511f, offsetZ = -3.875f),
+        MobBox("head", -0.5f, -0.5f, -0.625f, 0.5f, 0.5f, 0.375f, u = 112, v = 30, offsetY = 2.1511f, offsetZ = -3.875f),
+        MobBox("head", -0.3125f, 0.5f, -0.25f, -0.1875f, 0.75f, 0.125f, u = 0, v = 0, offsetY = 2.1511f, offsetZ = -3.875f),
+        MobBox("head", -0.3125f, 0.0625f, -1.375f, -0.1875f, 0.1875f, -1.125f, u = 112, v = 0, offsetY = 2.1511f, offsetZ = -3.875f),
+        MobBox("head", 0.1875f, 0.5f, -0.25f, 0.3125f, 0.75f, 0.125f, u = 0, v = 0, offsetY = 2.1511f, offsetZ = -3.875f),
+        MobBox("head", 0.1875f, 0.0625f, -1.375f, 0.3125f, 0.1875f, -1.125f, u = 112, v = 0, offsetY = 2.1511f, offsetZ = -3.875f),
+        MobBox("jaw", -0.375f, -0.25f, -1f, 0.375f, 0f, 0f, u = 176, v = 65, offsetY = 1.9011f, offsetZ = -4.375f),
+        MobBox("tail0", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 3.75f),
+        MobBox("tail0", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 3.75f),
+        MobBox("tail1", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 4.375f),
+        MobBox("tail1", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 4.375f),
+        MobBox("tail2", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 5f),
+        MobBox("tail2", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 5f),
+        MobBox("tail3", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 5.625f),
+        MobBox("tail3", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 5.625f),
+        MobBox("tail4", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 6.25f),
+        MobBox("tail4", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 6.25f),
+        MobBox("tail5", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 6.875f),
+        MobBox("tail5", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 6.875f),
+        MobBox("tail10", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 10f),
+        MobBox("tail10", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 10f),
+        MobBox("tail6", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 7.5f),
+        MobBox("tail6", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 7.5f),
+        MobBox("tail7", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 8.125f),
+        MobBox("tail7", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 8.125f),
+        MobBox("tail8", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 8.75f),
+        MobBox("tail8", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 8.75f),
+        MobBox("tail9", -0.3125f, -0.3125f, -0.3125f, 0.3125f, 0.3125f, 0.3125f, u = 192, v = 104, offsetY = 2.7761f, offsetZ = 9.375f),
+        MobBox("tail9", -0.0625f, 0.3125f, -0.1875f, 0.0625f, 0.5625f, 0.1875f, u = 48, v = 0, offsetY = 2.7761f, offsetZ = 9.375f),
     )
 
     /**
      * Кристалл Края (EndCrystalModel): подставка-плита и куб со «стеклом» и гранью внутри. Коробки заданы руками: в дампе модель висит на оси сущности (подставка на y = 0, а куб на 24 пикселя ниже), и конвейер ставил её вверх ногами.
      */
     private val CRYSTAL = listOf(
-        MobBox("base", -0.375f, 0f, -0.375f, 0.375f, 0.25f, 0.375f, u = 0, v = 16),
-        MobBox("outer_glass", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 0, v = 0),
-        MobBox("inner_glass", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 0, v = 0),
-        MobBox("cube", -0.25f, 0.25f, -0.25f, 0.25f, 0.75f, 0.25f, u = 32, v = 0),
+        MobBox("outer_glass", -0.25f, -0.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 0, v = 0, offsetY = 0.25f),
+        MobBox("inner_glass", -0.25f, -0.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 0, v = 0, offsetY = 0.25f),
+        MobBox("cube", -0.25f, -0.25f, -0.25f, 0.25f, 0.25f, 0.25f, u = 32, v = 0, offsetY = 0.25f),
+        MobBox("base", -0.375f, -0.25f, -0.375f, 0.375f, 0f, 0.375f, u = 0, v = 16, offsetY = 1.75f),
     )
 
     /**
      * Счастливый гаст (HappyGhastModel): куб-тело и девять щупалец, лист 64×64. Модель висит высоко: у сущности ноги на нуле, а тело — на трёх с половиной блоках, поэтому смещения подняты на 41 пиксель (в дампе корень модели стоит на -72).
      */
     private val HAPPY_GHAST = listOf(
-        MobBox("body", -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, u = 0, v = 0, offsetY = 3.5f),
-        MobBox("tentacle0", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 3.0625f, offsetZ = -0.3125f),
-        MobBox("tentacle1", -0.0625f, -0.4375f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 3.0625f, offsetZ = -0.3125f),
-        MobBox("tentacle8", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 3.0625f, offsetZ = 0.3125f),
-        MobBox("tentacle6", -0.0625f, -0.5f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 3.0625f, offsetZ = 0.3125f),
-        MobBox("tentacle7", -0.0625f, -0.5f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 3.0625f, offsetZ = 0.3125f),
-        MobBox("tentacle4", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.0781f, offsetY = 3.0625f),
-        MobBox("tentacle5", -0.0625f, -0.4375f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.2344f, offsetY = 3.0625f),
-        MobBox("tentacle2", -0.0625f, -0.25f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 3.0625f, offsetZ = -0.3125f),
-        MobBox("tentacle3", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.3906f, offsetY = 3.0625f),
+        MobBox("body", -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, u = 0, v = 0, offsetY = 0.9375f),
+        MobBox("tentacle0", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 0.5f, offsetZ = -0.3125f),
+        MobBox("tentacle1", -0.0625f, -0.4375f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 0.5f, offsetZ = -0.3125f),
+        MobBox("tentacle8", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 0.5f, offsetZ = 0.3125f),
+        MobBox("tentacle6", -0.0625f, -0.5f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.2344f, offsetY = 0.5f, offsetZ = 0.3125f),
+        MobBox("tentacle7", -0.0625f, -0.5f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.0781f, offsetY = 0.5f, offsetZ = 0.3125f),
+        MobBox("tentacle4", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.0781f, offsetY = 0.5f),
+        MobBox("tentacle5", -0.0625f, -0.4375f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.2344f, offsetY = 0.5f),
+        MobBox("tentacle2", -0.0625f, -0.25f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = 0.3906f, offsetY = 0.5f, offsetZ = -0.3125f),
+        MobBox("tentacle3", -0.0625f, -0.3125f, -0.0625f, 0.0625f, 0f, 0.0625f, u = 0, v = 0, offsetX = -0.3906f, offsetY = 0.5f),
     )
 
     /**
@@ -1627,6 +1575,7 @@ object MobModels {
      * Скрипун (CreakingModel): тонкое тело, длинные руки и ноги, голова с ветками вместо глаз, лист 64×64. Части вложены на три уровня, поэтому смещения считаются по всей цепочке родителей — после починки конвейера (он складывал позы дважды) модель встала на землю.
      */
     private val CREAKING = listOf(
+        MobBox("head", -0.1875f, 0f, -0.1875f, 0.1875f, 0.625f, 0.1875f, u = 0, v = 0, offsetX = -0.25f, offsetY = 1.875f),
         MobBox("head", -0.1875f, 0.625f, -0.1875f, 0.1875f, 0.8125f, 0.1875f, u = 28, v = 31, offsetX = -0.25f, offsetY = 1.875f),
         MobBox("head", 0.1875f, -0.0625f, 0f, 0.75f, 0.8125f, 0f, u = 12, v = 40, offsetX = -0.25f, offsetY = 1.875f),
         MobBox("head", -0.75f, 0f, 0f, -0.1875f, 0.875f, 0f, u = 34, v = 12, offsetX = -0.25f, offsetY = 1.875f),

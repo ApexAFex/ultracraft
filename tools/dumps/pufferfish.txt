@@ -1,0 +1,28 @@
+SIZE	32	32
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/left_blue_fin	4.000	15.000	-2.000	0.000	0.000	0.000
+CUBE	root/left_blue_fin	0.000	0.000	-1.000	2.000	1.000	1.000	24.0	3.0
+PART	root/top_back_fin	0.000	14.000	4.000	-0.785	0.000	0.000
+CUBE	root/top_back_fin	-4.000	-1.000	0.000	4.000	0.000	0.000	23.0	18.0
+PART	root/top_middle_fin	0.000	14.000	0.000	0.000	0.000	0.000
+CUBE	root/top_middle_fin	-4.000	-1.000	0.000	4.000	0.000	1.000	14.0	16.0
+PART	root/bottom_front_fin	0.000	22.000	-4.000	-0.785	0.000	0.000
+CUBE	root/bottom_front_fin	-4.000	0.000	0.000	4.000	1.000	0.000	15.0	20.0
+PART	root/right_front_fin	-4.000	22.000	-4.000	0.000	-0.785	0.000
+CUBE	root/right_front_fin	-1.000	-8.000	0.000	0.000	0.000	0.000	5.0	17.0
+PART	root/body	0.000	22.000	0.000	0.000	0.000	0.000
+CUBE	root/body	-4.000	-8.000	-4.000	4.000	0.000	4.000	0.0	0.0
+PART	root/bottom_back_fin	0.000	22.000	4.000	0.785	0.000	0.000
+CUBE	root/bottom_back_fin	-4.000	0.000	0.000	4.000	1.000	0.000	15.0	20.0
+PART	root/right_blue_fin	-4.000	15.000	-2.000	0.000	0.000	0.000
+CUBE	root/right_blue_fin	-2.000	0.000	-1.000	0.000	1.000	1.000	24.0	0.0
+PART	root/left_front_fin	4.000	22.000	-4.000	0.000	0.785	0.000
+CUBE	root/left_front_fin	0.000	-8.000	0.000	1.000	0.000	0.000	1.0	17.0
+PART	root/bottom_middle_fin	0.000	22.000	0.000	0.000	0.000	0.000
+CUBE	root/bottom_middle_fin	-4.000	0.000	0.000	4.000	1.000	0.000	15.0	20.0
+PART	root/left_back_fin	4.000	22.000	4.000	0.000	-0.785	0.000
+CUBE	root/left_back_fin	0.000	-8.000	0.000	1.000	0.000	0.000	9.0	17.0
+PART	root/right_back_fin	-4.000	22.000	4.000	0.000	0.785	0.000
+CUBE	root/right_back_fin	-1.000	-8.000	0.000	0.000	0.000	0.000	9.0	17.0
+PART	root/top_front_fin	0.000	14.000	-4.000	0.785	0.000	0.000
+CUBE	root/top_front_fin	-4.000	-1.000	0.000	4.000	0.000	0.000	15.0	17.0

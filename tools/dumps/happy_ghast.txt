@@ -1,0 +1,22 @@
+SIZE	64	64
+PART	root	0.000	-72.048	0.000	0.000	0.000	0.000
+PART	root/body	0.000	16.000	0.000	0.000	0.000	0.000
+CUBE	root/body	-8.000	-8.000	-8.000	8.000	8.000	8.000	0.0	0.0
+PART	root/body/tentacle0	-3.750	7.000	-5.000	0.000	0.000	0.000
+CUBE	root/body/tentacle0	-1.000	0.000	-1.000	1.000	5.000	1.000	0.0	0.0
+PART	root/body/tentacle1	1.250	7.000	-5.000	0.000	0.000	0.000
+CUBE	root/body/tentacle1	-1.000	0.000	-1.000	1.000	7.000	1.000	0.0	0.0
+PART	root/body/tentacle8	6.250	7.000	5.000	0.000	0.000	0.000
+CUBE	root/body/tentacle8	-1.000	0.000	-1.000	1.000	5.000	1.000	0.0	0.0
+PART	root/body/tentacle6	-3.750	7.000	5.000	0.000	0.000	0.000
+CUBE	root/body/tentacle6	-1.000	0.000	-1.000	1.000	8.000	1.000	0.0	0.0
+PART	root/body/tentacle7	1.250	7.000	5.000	0.000	0.000	0.000
+CUBE	root/body/tentacle7	-1.000	0.000	-1.000	1.000	8.000	1.000	0.0	0.0
+PART	root/body/tentacle4	-1.250	7.000	0.000	0.000	0.000	0.000
+CUBE	root/body/tentacle4	-1.000	0.000	-1.000	1.000	5.000	1.000	0.0	0.0
+PART	root/body/tentacle5	3.750	7.000	0.000	0.000	0.000	0.000
+CUBE	root/body/tentacle5	-1.000	0.000	-1.000	1.000	7.000	1.000	0.0	0.0
+PART	root/body/tentacle2	6.250	7.000	-5.000	0.000	0.000	0.000
+CUBE	root/body/tentacle2	-1.000	0.000	-1.000	1.000	4.000	1.000	0.0	0.0
+PART	root/body/tentacle3	-6.250	7.000	0.000	0.000	0.000	0.000
+CUBE	root/body/tentacle3	-1.000	0.000	-1.000	1.000	5.000	1.000	0.0	0.0

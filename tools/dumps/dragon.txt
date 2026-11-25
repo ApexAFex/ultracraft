@@ -1,0 +1,103 @@
+SIZE	256	256
+PART	root	0.000	0.000	0.000	0.000	0.000	0.000
+PART	root/neck4	0.000	20.000	-52.000	0.000	0.000	0.000
+CUBE	root/neck4	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/neck4	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/neck3	0.000	20.000	-42.000	0.000	0.000	0.000
+CUBE	root/neck3	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/neck3	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail11	0.000	10.000	170.000	0.000	0.000	0.000
+CUBE	root/tail11	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail11	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/neck0	0.000	20.000	-12.000	0.000	0.000	0.000
+CUBE	root/neck0	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/neck0	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/body	0.000	20.000	8.000	0.000	0.000	0.000
+CUBE	root/body	-12.000	-16.000	-16.000	12.000	8.000	48.000	0.0	0.0
+CUBE	root/body	-1.000	-22.000	-10.000	1.000	-16.000	2.000	220.0	53.0
+CUBE	root/body	-1.000	-22.000	10.000	1.000	-16.000	22.000	220.0	53.0
+CUBE	root/body	-1.000	-22.000	30.000	1.000	-16.000	42.000	220.0	53.0
+PART	root/body/right_front_leg	-12.000	0.000	-6.000	1.300	0.000	0.000
+CUBE	root/body/right_front_leg	-4.000	-4.000	-4.000	4.000	20.000	4.000	112.0	104.0
+PART	root/body/right_front_leg/right_front_leg_tip	0.000	20.000	-1.000	-0.500	0.000	0.000
+CUBE	root/body/right_front_leg/right_front_leg_tip	-3.000	-1.000	-3.000	3.000	23.000	3.000	226.0	138.0
+PART	root/body/right_front_leg/right_front_leg_tip/right_front_foot	0.000	23.000	0.000	0.750	0.000	0.000
+CUBE	root/body/right_front_leg/right_front_leg_tip/right_front_foot	-4.000	0.000	-12.000	4.000	4.000	4.000	144.0	104.0
+PART	root/body/right_hind_leg	-16.000	-4.000	34.000	1.000	0.000	0.000
+CUBE	root/body/right_hind_leg	-8.000	-4.000	-8.000	8.000	28.000	8.000	0.0	0.0
+PART	root/body/right_hind_leg/right_hind_leg_tip	0.000	32.000	-4.000	0.500	0.000	0.000
+CUBE	root/body/right_hind_leg/right_hind_leg_tip	-6.000	-2.000	0.000	6.000	30.000	12.000	196.0	0.0
+PART	root/body/right_hind_leg/right_hind_leg_tip/right_hind_foot	0.000	31.000	4.000	0.750	0.000	0.000
+CUBE	root/body/right_hind_leg/right_hind_leg_tip/right_hind_foot	-9.000	0.000	-20.000	9.000	6.000	4.000	112.0	0.0
+PART	root/body/right_wing	-12.000	-15.000	-6.000	0.000	0.000	0.000
+CUBE	root/body/right_wing	-56.000	-4.000	-4.000	0.000	4.000	4.000	112.0	88.0
+CUBE	root/body/right_wing	-56.000	0.000	2.000	0.000	0.000	58.000	-56.0	88.0
+PART	root/body/right_wing/right_wing_tip	-56.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/body/right_wing/right_wing_tip	-56.000	-2.000	-2.000	0.000	2.000	2.000	112.0	136.0
+CUBE	root/body/right_wing/right_wing_tip	-56.000	0.000	2.000	0.000	0.000	58.000	-56.0	144.0
+PART	root/body/left_wing	12.000	-15.000	-6.000	0.000	0.000	0.000
+CUBE	root/body/left_wing	0.000	-4.000	-4.000	56.000	4.000	4.000	112.0	88.0
+CUBE	root/body/left_wing	0.000	0.000	2.000	56.000	0.000	58.000	-56.0	88.0
+PART	root/body/left_wing/left_wing_tip	56.000	0.000	0.000	0.000	0.000	0.000
+CUBE	root/body/left_wing/left_wing_tip	0.000	-2.000	-2.000	56.000	2.000	2.000	112.0	136.0
+CUBE	root/body/left_wing/left_wing_tip	0.000	0.000	2.000	56.000	0.000	58.000	-56.0	144.0
+PART	root/body/left_hind_leg	16.000	-4.000	34.000	1.000	0.000	0.000
+CUBE	root/body/left_hind_leg	-8.000	-4.000	-8.000	8.000	28.000	8.000	0.0	0.0
+PART	root/body/left_hind_leg/left_hind_leg_tip	0.000	32.000	-4.000	0.500	0.000	0.000
+CUBE	root/body/left_hind_leg/left_hind_leg_tip	-6.000	-2.000	0.000	6.000	30.000	12.000	196.0	0.0
+PART	root/body/left_hind_leg/left_hind_leg_tip/left_hind_foot	0.000	31.000	4.000	0.750	0.000	0.000
+CUBE	root/body/left_hind_leg/left_hind_leg_tip/left_hind_foot	-9.000	0.000	-20.000	9.000	6.000	4.000	112.0	0.0
+PART	root/body/left_front_leg	12.000	0.000	-6.000	1.300	0.000	0.000
+CUBE	root/body/left_front_leg	-4.000	-4.000	-4.000	4.000	20.000	4.000	112.0	104.0
+PART	root/body/left_front_leg/left_front_leg_tip	0.000	20.000	-1.000	-0.500	0.000	0.000
+CUBE	root/body/left_front_leg/left_front_leg_tip	-3.000	-1.000	-3.000	3.000	23.000	3.000	226.0	138.0
+PART	root/body/left_front_leg/left_front_leg_tip/left_front_foot	0.000	23.000	0.000	0.750	0.000	0.000
+CUBE	root/body/left_front_leg/left_front_leg_tip/left_front_foot	-4.000	0.000	-12.000	4.000	4.000	4.000	144.0	104.0
+PART	root/neck2	0.000	20.000	-32.000	0.000	0.000	0.000
+CUBE	root/neck2	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/neck2	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/neck1	0.000	20.000	-22.000	0.000	0.000	0.000
+CUBE	root/neck1	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/neck1	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/head	0.000	20.000	-62.000	0.000	0.000	0.000
+CUBE	root/head	-6.000	-1.000	-24.000	6.000	4.000	-8.000	176.0	44.0
+CUBE	root/head	-8.000	-8.000	-10.000	8.000	8.000	6.000	112.0	30.0
+CUBE	root/head	-5.000	-12.000	-4.000	-3.000	-8.000	2.000	0.0	0.0
+CUBE	root/head	-5.000	-3.000	-22.000	-3.000	-1.000	-18.000	112.0	0.0
+CUBE	root/head	3.000	-12.000	-4.000	5.000	-8.000	2.000	0.0	0.0
+CUBE	root/head	3.000	-3.000	-22.000	5.000	-1.000	-18.000	112.0	0.0
+PART	root/head/jaw	0.000	4.000	-8.000	0.000	0.000	0.000
+CUBE	root/head/jaw	-6.000	0.000	-16.000	6.000	4.000	0.000	176.0	65.0
+PART	root/tail0	0.000	10.000	60.000	0.000	0.000	0.000
+CUBE	root/tail0	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail0	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail1	0.000	10.000	70.000	0.000	0.000	0.000
+CUBE	root/tail1	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail1	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail2	0.000	10.000	80.000	0.000	0.000	0.000
+CUBE	root/tail2	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail2	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail3	0.000	10.000	90.000	0.000	0.000	0.000
+CUBE	root/tail3	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail3	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail4	0.000	10.000	100.000	0.000	0.000	0.000
+CUBE	root/tail4	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail4	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail5	0.000	10.000	110.000	0.000	0.000	0.000
+CUBE	root/tail5	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail5	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail10	0.000	10.000	160.000	0.000	0.000	0.000
+CUBE	root/tail10	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail10	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail6	0.000	10.000	120.000	0.000	0.000	0.000
+CUBE	root/tail6	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail6	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail7	0.000	10.000	130.000	0.000	0.000	0.000
+CUBE	root/tail7	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail7	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail8	0.000	10.000	140.000	0.000	0.000	0.000
+CUBE	root/tail8	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail8	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
+PART	root/tail9	0.000	10.000	150.000	0.000	0.000	0.000
+CUBE	root/tail9	-5.000	-5.000	-5.000	5.000	5.000	5.000	192.0	104.0
+CUBE	root/tail9	-1.000	-9.000	-3.000	1.000	-5.000	3.000	48.0	0.0
