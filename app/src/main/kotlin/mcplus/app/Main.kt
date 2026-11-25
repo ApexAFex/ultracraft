@@ -939,6 +939,8 @@ private fun windowCommand(args: List<String>) {
     var debug = false
     var showTab = false
     var startAdvancements = false
+    /** Взять первое невыполненное достижение под отслеживание (`--track`). */
+    var trackAtStart = false
     var useItemAtFrame = -1
     /** Кадр, на котором открыть торговлю у ближайшего жителя. */
     var tradeAtFrame = -1
@@ -991,6 +993,7 @@ private fun windowCommand(args: List<String>) {
             "--sound-log" -> soundLog = true
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
+            "--track" -> trackAtStart = true
             "--statistics" -> startStatistics = true
             "--recipes" -> startRecipeBook = true
             "--craft" -> startCraft = args.getOrNull(++index) ?: fail("--craft ждёт имя результата")
@@ -1141,6 +1144,7 @@ private fun windowCommand(args: List<String>) {
             debug = debug,
             showTab = showTab,
             startAdvancements = startAdvancements,
+            trackAtStart = trackAtStart,
             startStatistics = startStatistics,
             startRecipeBook = startRecipeBook,
             startCraft = startCraft,
@@ -1663,6 +1667,7 @@ private fun printUsage() {
           --debug        отладочные строки F3 (FPS, координаты, чанки)
           --tab          список игроков по Tab
           --advancements открыть экран достижений (клавиша L в игре)
+          --track        отслеживать первое невыполненное достижение (клавиша J)
           --recipes      открыть книгу рецептов (клавиша B в игре)
           --craft NAME   скрафтить из книги рецепт с таким результатом (проверка без мыши)
           --book [N]     открыть книгу из руки (страница N) — экран чтения без мыши

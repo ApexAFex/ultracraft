@@ -230,6 +230,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         showTab: Boolean = false,
         /** Открыть экран достижений сразу (проверка без клавиатуры). */
         startAdvancements: Boolean = false,
+        /** Отслеживать первое невыполненное достижение сразу (`--track`). */
+        trackAtStart: Boolean = false,
         /** Открыть экран статистики сразу (проверка без клавиатуры). */
         startStatistics: Boolean = false,
         startRecipeBook: Boolean = false,
@@ -978,6 +980,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     var statisticsLeftWasDown = false
     var statisticsRightWasDown = false
                     var advancementTab = 0
+    /** Отслеживаемое достижение: его название висит в углу экрана. */
+    var trackedAdvancement: String? = null
+                    var trackPicked = false
                     var advancementTabRects: List<HudRect> = emptyList()
                     /** Книга рецептов (B): вкладки категорий, страница и прямоугольники вкладок. */
                     var recipeBookOpen = startRecipeBook
@@ -3908,6 +3913,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         } else if (advancementsOpen) {
                             // Экран достижений: вкладки и дерево; клик по вкладке — выше.
                             val nodes = session?.advancements?.nodes() ?: emptyList()
+                            if (input.trackToggleRequested) {
+                                val node = AdvancementsScreen.tabs(nodes)
+                                    .getOrNull(advancementTab)?.nodes?.firstOrNull { !it.done }
+                                trackedAdvancement = if (node != null) node.title.text else null
+                            }
                             advancementTabRects = hud.drawAdvancementsScreen(
                                 AdvancementsScreen.tabs(nodes),
                                 advancementTab,
@@ -3916,6 +3926,23 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 mouseY = input.mouseY,
                             )
                         } else if (!inventoryOpen && openContainer == null) {
+                            // Отслеживаемое достижение: название и прогресс в углу.
+                            if (trackAtStart && !trackPicked) {
+                                val node = session?.advancements?.nodes()
+                                    ?.firstOrNull { !it.done }
+                                if (node != null) {
+                                    trackedAdvancement = node.title.text
+                                    trackPicked = true
+                                }
+                            }
+                            val tracked = trackedAdvancement?.let { name ->
+                                session?.advancements?.nodes()?.firstOrNull { it.title.text == name }
+                            }
+                            if (tracked != null) {
+                                hud.drawTrackedAdvancement(
+                                    TrackedAdvancement.lines(tracked, 0, 0),
+                                )
+                            }
                             val chatLines = session?.chat?.snapshot() ?: emptyList()
                             if (chat.open) {
                                 // Пока печатаешь, хотбар и сердца уступают место строке ввода.

@@ -625,6 +625,30 @@ class Hud(
      *
      * @return прямоугольники вкладок — по ним кликает вызывающий.
      */
+    /**
+     * Отслеживаемое достижение в правом верхнем углу, как в ванили.
+     *
+     * Показывается, пока достижение не выполнено, и не мешает чату: рисуется под ним.
+     */
+    fun drawTrackedAdvancement(lines: List<String>) {
+        if (lines.isEmpty()) return
+        val text = this.text ?: return
+        val s = HudLayout.scale(height).toFloat()
+        val widest = lines.maxOf { text.textWidth(it, s * 0.85f) }
+        val left = width - widest - 8f * s
+        var y = 6f * s
+        renderer.begin()
+        renderer.rect(left - 4f * s, y - 2f * s, widest + 8f * s, lines.size * 10f * s + 4f * s, 0x000000, 0.45f)
+        renderer.draw()
+        val labels = lines.mapIndexed { index, line ->
+            TextRenderer.ScreenLabel(
+                left, y + index * 10f * s, line, s * 0.85f,
+                if (index == 0) 0xFFE7A0 else 0xC0C0C0,
+            )
+        }
+        text.drawScreen(labels)
+    }
+
     fun drawAdvancementsScreen(
         tabs: List<AdvancementsScreen.Tab>,
         selected: Int,

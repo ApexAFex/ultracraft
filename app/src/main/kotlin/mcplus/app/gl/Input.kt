@@ -47,6 +47,7 @@ class Input(private val window: Long, private val camera: Camera) {
     private var commandPressed = false
     private var enterPressed = false
     private var backspacePressed = false
+    private var trackPressed = false
     private var upPressed = false
     private var downPressed = false
     private var pageUpPressed = false
@@ -116,6 +117,9 @@ class Input(private val window: Long, private val camera: Camera) {
         private set
 
     var backspaceRequested: Boolean = false
+
+    /** Нажата J: поставить или снять отслеживание достижения. */
+    var trackToggleRequested: Boolean = false
         private set
 
     var historyUpRequested: Boolean = false
@@ -299,6 +303,11 @@ class Input(private val window: Long, private val camera: Camera) {
         val respawn = pressed(GLFW.GLFW_KEY_R) || pressed(GLFW.GLFW_KEY_ENTER)
         respawnRequested = respawn && !respawnPressed
         respawnPressed = respawn
+
+        // J — отслеживать достижение (в ванили это отдельная кнопка в экране достижений).
+        val track = pressed(GLFW.GLFW_KEY_J)
+        trackToggleRequested = track && !trackPressed
+        trackPressed = track
 
         val chat = pressed(GLFW.GLFW_KEY_T)
         chatOpenRequested = chat && !chatPressed
