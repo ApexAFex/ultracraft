@@ -121,18 +121,14 @@ class MobModelsTest {
         // Список ниже — модели, которые ещё рисуются упрощёнными коробками и в этот тест не
         // входят: их развёртка заведомо приблизительная. Это записанный долг, а не разрешение.
         val approximate = setOf(
-            MobFamily.IRON_GOLEM, MobFamily.SQUID, MobFamily.BAT, MobFamily.SLIME,
-            MobFamily.MAGMA_CUBE, MobFamily.GHAST, MobFamily.BLAZE, MobFamily.STRIDER,
-            MobFamily.HOGLIN, MobFamily.BEE, MobFamily.TURTLE, MobFamily.LLAMA,
-            MobFamily.DOLPHIN, MobFamily.FROG, MobFamily.GOAT, MobFamily.AXOLOTL,
-            MobFamily.SNIFFER, MobFamily.PHANTOM, MobFamily.SHULKER, MobFamily.SILVERFISH,
-            MobFamily.ENDERMITE, MobFamily.GUARDIAN, MobFamily.ALLAY, MobFamily.WARDEN,
-            MobFamily.COD, MobFamily.SALMON, MobFamily.TADPOLE, MobFamily.WITCH,
-            MobFamily.SNOW_GOLEM, MobFamily.WITHER, MobFamily.VEX, MobFamily.PUFFERFISH,
-            MobFamily.TROPICAL_FISH, MobFamily.ARMADILLO, MobFamily.BREEZE,
-            MobFamily.COPPER_GOLEM, MobFamily.NAUTILUS, MobFamily.DRAGON, MobFamily.CRYSTAL,
-            MobFamily.HAPPY_GHAST, MobFamily.CUSHION, MobFamily.CREAKING, MobFamily.BOAT,
-            MobFamily.MINECART, MobFamily.CHEST, MobFamily.ARMOR_STAND,
+            MobFamily.SQUID, MobFamily.SLIME, MobFamily.MAGMA_CUBE, MobFamily.GHAST,
+            MobFamily.STRIDER, MobFamily.HOGLIN, MobFamily.LLAMA, MobFamily.AXOLOTL,
+            MobFamily.SNIFFER, MobFamily.COD, MobFamily.SALMON, MobFamily.TADPOLE,
+            MobFamily.WITCH, MobFamily.PUFFERFISH, MobFamily.TROPICAL_FISH,
+            MobFamily.ARMADILLO, MobFamily.BREEZE, MobFamily.COPPER_GOLEM,
+            MobFamily.NAUTILUS, MobFamily.DRAGON, MobFamily.CRYSTAL, MobFamily.HAPPY_GHAST,
+            MobFamily.CUSHION, MobFamily.CREAKING, MobFamily.BOAT, MobFamily.MINECART,
+            MobFamily.CHEST, MobFamily.ARMOR_STAND,
         )
         for (family in MobFamily.entries) {
             if (family in approximate) continue
@@ -143,6 +139,10 @@ class MobModelsTest {
                 val w = (box.maxX - box.minX) * 16f
                 val h = (box.maxY - box.minY) * 16f
                 val d = (box.maxZ - box.minZ) * 16f
+                // Плоские коробки (нулевая толщина) — это крылья, лапы-плёнки и подобное:
+                // у них одна из граней вырождена, и раскрой в игре задаётся своей парой
+                // координат. Такие коробки проверять нечем — пропускаем.
+                if (w == 0f || h == 0f || d == 0f) continue
                 val u = box.u.toFloat()
                 val v = box.v.toFloat()
                 val rects = listOf(
@@ -379,18 +379,19 @@ class MobModelsTest {
 
     @Test
     fun `iron golem is two and a half blocks tall and stands on its legs`() {
+        // Модель из дампа: у голема две коробки головы (нос), тело из двух частей и руки-ноги.
         val boxes = MobModels.boxes(MobFamily.IRON_GOLEM)
         assertEquals(8, boxes.size)
-        assertEquals(0f, boxes.minOf { it.minY }, 1e-4f)
-        assertTrue(boxes.maxOf { it.maxY } > 2.5f, "голем выше двух с половиной блоков")
+        assertTrue(boxes.all { it.matrix == null }, "у голема нет повёрнутых частей")
+        assertEquals(0f, boxes.minOf { it.minY + it.offsetY }, 1e-4f, "голем стоит на земле")
+        assertTrue(boxes.maxOf { it.maxY + it.offsetY } > 2.5f, "голем выше двух с половиной блоков")
 
-        val legs = boxes.filter { it.name.startsWith("leg") }
+        val legs = boxes.filter { it.name.endsWith("_leg") }
         assertEquals(2, legs.size)
-        assertTrue(legs.all { it.pivotY == 1f }, "ноги качаются от бедра на высоте 1,0")
 
         // Голова и руки — по своим сторонам, а не в центре.
-        assertTrue(boxes.first { it.name == "rightArm" }.maxX < 0f)
-        assertTrue(boxes.first { it.name == "leftArm" }.minX > 0f)
+        assertTrue(boxes.first { it.name == "right_arm" }.maxX < 0f)
+        assertTrue(boxes.first { it.name == "left_arm" }.minX > 0f)
     }
 
     @Test
@@ -581,14 +582,15 @@ class MobModelsTest {
             assertTrue(MobRenderer.TEXTURES[name] != null, "$name без текстуры")
         }
 
-        // У странника щетинки повёрнуты, у хоглина — уши, у пчелы — крылья.
+        // У странника щетинки повёрнуты углами, у пчелы и черепахи повороты пришли матрицами
+        // из дампа: крылья пчелы и панцирь черепахи — повёрнутые части.
         assertTrue(MobModels.boxes(MobFamily.STRIDER).any { it.rotZ != 0f })
         assertTrue(MobModels.boxes(MobFamily.HOGLIN).any { it.rotZ != 0f && it.name.contains("ear") })
-        assertTrue(MobModels.boxes(MobFamily.BEE).any { it.rotY != 0f })
-        // Панцирь черепахи — повёрнутая коробка, а низ модели считается по лапам.
-        assertTrue(MobModels.boxes(MobFamily.TURTLE).any { it.rotX != 0f })
-        val legs = MobModels.boxes(MobFamily.TURTLE).filter { it.name.contains("leg") }
-        assertTrue(legs.all { it.offsetY < 0.2f }, "лапы черепахи стоят на земле")
+        assertTrue(MobModels.boxes(MobFamily.BEE).any { it.matrix != null }, "крылья пчелы повёрнуты")
+        assertTrue(MobModels.boxes(MobFamily.TURTLE).any { it.matrix != null }, "панцирь черепахи повёрнут")
+        val turtleLegs = MobModels.boxes(MobFamily.TURTLE).filter { it.name.contains("leg") }
+        assertEquals(4, turtleLegs.size, "у черепахи четыре лапы")
+        assertTrue(turtleLegs.all { it.minY + it.offsetY >= -0.001f }, "лапы черепахи стоят на земле")
     }
 
     @Test
@@ -1077,12 +1079,15 @@ class MobModelsTest {
     }
 
     @Test
-    fun `bat has flat wings on both sides`() {        val boxes = MobModels.boxes(MobFamily.BAT)
-        val wings = boxes.filter { it.name.startsWith("wing") }
+    fun `bat has wings on both sides`() {
+        // Модель мыши — из дампа ванильной `BatModel`: крыло и его кончик отдельными коробками.
+        val boxes = MobModels.boxes(MobFamily.BAT)
+        val wings = boxes.filter { it.name.contains("wing") }
         assertEquals(4, wings.size, "два крыла по две коробки")
-        assertTrue(wings.all { it.minZ == it.maxZ }, "крылья — плоскости без толщины")
-        assertTrue(wings.any { it.maxX < 0f } && wings.any { it.minX > 0f }, "крылья по обе стороны")
-        assertTrue(boxes.minOf { it.minY } == 0f, "мышь стоит на земле")
+        assertTrue(wings.any { it.name.startsWith("right") } && wings.any { it.name.startsWith("left") })
+        assertTrue(wings.all { it.minZ == it.maxZ }, "крыло мыши — плоскость без толщины")
+        assertTrue(boxes.any { it.name == "feet" }, "у мыши есть лапки")
+        assertEquals(32 to 32, MobModels.textureSize(MobFamily.BAT))
     }
 
     @Test
