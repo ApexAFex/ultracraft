@@ -1182,6 +1182,7 @@ private fun windowCommand(args: List<String>) {
             world.rawChunks(),
         )
         println("Кэш мира: $savedChunks чанков ($dimension)")
+    println("Карт получено: ${session?.maps?.size ?: 0}")
 
         val closedByServer = it.closedByServer
         val reason = it.closeReason

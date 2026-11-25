@@ -704,6 +704,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     var playerLoadedSent = false
                     var pistonDemoAdded = false
                     var mapDemoAdded = false
+                    /** Рамки, в которых нарисованы плитки карты: для отчёта в конце. */
+                    val mapFrameDrawn = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
 
                     // Название предмета в руке показывается пару секунд после смены слота.
                     var lastSelected = session?.inventory?.selected ?: 0
@@ -3078,6 +3080,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             val tiles = MapFrame.tilesOf(mapImage) { packed ->
                                                 mcplus.net.MapColors.active.colorOf(packed)
                                             }
+                                            if (tiles.isNotEmpty()) mapFrameDrawn.add(entity.id)
                                             // Рамка у нас рисуется билбордом (повёрнутым к
                                             // камере), поэтому и карта в ней — билборд: плитки
                                             // ставятся в плоскости камеры и видны с любой
@@ -4559,6 +4562,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                     println("Шагов чужих существ: $otherSteps (игроков: $playerSteps)")
                     println("Едущих поршней замечено: ${mcplus.net.Pistons.seen}")
+            println("Карт в рамках нарисовано: ${mapFrameDrawn.size}")
                 }
             }
         } finally {
