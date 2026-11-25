@@ -2946,6 +2946,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         val mobs = ArrayList<MobRenderer.Mob>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
+                    val saddleLayer = atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
                         val worldIcons = ArrayList<Renderer.WorldIcon>()
                         val paintings = ArrayList<PaintingRenderer.Painting>()
                         val nowNanos = System.nanoTime()
@@ -3237,6 +3238,24 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
                                         )
+                                        // Седло: в 26.3 это слот экипировки, а не флаг в
+                                        // метаданных. Раньше мы его не рисовали вовсе.
+                                        val saddleItem = entity.equipmentItem(SaddleLook.SLOT)
+                                        if (SaddleLook.visible(family, saddleItem)) {
+                                            val saddleSize = SaddleLook.size(family)
+                                            cubes += Renderer.BlockCube(
+                                                entity.x,
+                                                entity.y + SaddleLook.height(family),
+                                                entity.z,
+                                                saddleSize,
+                                                saddleLayer, saddleLayer, saddleLayer,
+                                                yaw = entity.yaw,
+                                                red = 0.45f, green = 0.28f, blue = 0.14f,
+                                                sizeX = saddleSize,
+                                                sizeY = 0.12f,
+                                                sizeZ = saddleSize,
+                                            )
+                                        }
                                         // Груз вагонетки: настоящий блок кубом сверху —
                                         // динамит, печь, командный блок или спавнер.
                                         VehicleLoads.blockFor(name)?.let { load ->
