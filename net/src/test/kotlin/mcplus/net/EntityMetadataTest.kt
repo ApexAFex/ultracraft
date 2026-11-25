@@ -26,6 +26,37 @@ class EntityMetadataTest {
         ByteWriter().writeByte(index).writeVarInt(type).writeBytes(payload).toByteArray()
 
     @Test
+    fun `a vector and a quaternion do not stop the following fields`() {
+        // 39 (вектор) и 40 (кватернион) — числа с плавающей точкой. Если их длину перепутать,
+        // следующий за ними флаг прочитается из середины числа и разбор поля сломается.
+        val payload = ByteWriter()
+            .writeFloat(1.5f).writeFloat(-2f).writeFloat(3f)     // вектор
+            .writeFloat(0f).writeFloat(0f).writeFloat(0f).writeFloat(1f) // кватернион
+            .writeBoolean(true)                                   // флаг живого существа
+            .toByteArray()
+        val meta = readEntityMetadata(
+            body(1, field(4, 39, payload.copyOfRange(0, 12))),
+        ).second
+        assertEquals(1.5f.toDouble(), meta.getValue(4).number)
+
+        val quaternion = readEntityMetadata(
+            body(1, field(5, 40, payload.copyOfRange(12, 28))),
+        ).second
+        assertEquals(0.0, quaternion.getValue(5).number)
+    }
+
+    @Test
+    fun `an optional global position is read with its flag`() {
+        // 33 — флаг присутствия и упакованная позиция: без флага остаётся ноль.
+        val present = ByteWriter().writeBoolean(true).writeLong(1234L).toByteArray()
+        val absent = ByteWriter().writeBoolean(false).toByteArray()
+        val bodyPresent = readEntityMetadata(body(1, field(2, 33, present))).second
+        val bodyAbsent = readEntityMetadata(body(1, field(2, 33, absent))).second
+        assertEquals(1234.0, bodyPresent.getValue(2).number)
+        assertEquals(0.0, bodyAbsent.getValue(2).number)
+    }
+
+    @Test
     fun `a frame with a map keeps the map number`() {
         // Таблица компонентов нужна разбору стеков: по ней 48 — это map_id.
         val table = java.io.File.createTempFile("components", ".tsv").apply {

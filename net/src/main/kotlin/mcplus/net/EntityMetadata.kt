@@ -122,10 +122,45 @@ private fun readMetaValue(reader: ByteReader, type: Int): MetaEntry? = when (typ
     30 -> MetaEntry(type, reader.readVarInt().toDouble())
     31 -> MetaEntry(type, reader.readVarInt().toDouble())
     32 -> MetaEntry(type, reader.readVarInt().toDouble())
-    // 33…38 — состояния и варианты (в том числе 34 — вариант картины): тоже номера реестров.
-    in 33..38 -> MetaEntry(type, reader.readVarInt().toDouble())
-    // 42 — цвет красителя.
+    // 33 — необязательная позиция в мире: флаг и, если есть, упакованная позиция.
+    33 -> {
+        val present = reader.readBoolean()
+        MetaEntry(type, if (present) reader.readLong().toDouble() else 0.0)
+    }
+    // 34…38 — состояния и варианты (вариант картины, состояния сниффера и броненосца):
+    // номера реестров.
+    in 34..38 -> MetaEntry(type, reader.readVarInt().toDouble())
+    // 39 — вектор из трёх чисел, 40 — кватернион из четырёх.
+    39 -> {
+        val x = reader.readFloat()
+        reader.readFloat()
+        reader.readFloat()
+        MetaEntry(type, x.toDouble())
+    }
+    40 -> {
+        val x = reader.readFloat()
+        repeat(3) { reader.readFloat() }
+        MetaEntry(type, x.toDouble())
+    }
+    // 41 — профиль игрока (имя, UUID, свойства). Читаем целиком, иначе разбор встанет.
+    41 -> {
+        if (reader.readBoolean()) {
+            if (reader.readBoolean()) reader.readString()
+            if (reader.readBoolean()) {
+                reader.readLong()
+                reader.readLong()
+            }
+            repeat(reader.readVarInt().coerceIn(0, 64)) {
+                reader.readString()
+                reader.readString()
+                if (reader.readBoolean()) reader.readString()
+            }
+        }
+        MetaEntry(type)
+    }
+    // 42 и 43 — номер руки и цвет красителя: номера реестров.
     42 -> MetaEntry(type, reader.readVarInt().toDouble())
+    43 -> MetaEntry(type, reader.readVarInt().toDouble())
     // 7 — стек предмета: count, id, патч компонентов. Патч разбирается общим кодом инвентаря:
     // так у рамки с картой появляется номер карты, а не «неизвестный предмет». Если компонент
     // незнаком по длине (таблицы нет), стек по-прежнему помечается неизвестным, но пакет не
