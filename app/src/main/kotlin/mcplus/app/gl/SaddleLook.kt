@@ -13,7 +13,10 @@ object SaddleLook {
 
     /** На кого седло вообще надевается. */
     fun fits(family: MobFamily): Boolean = when (family) {
-        MobFamily.HORSE, MobFamily.QUADRUPED, MobFamily.CAMEL, MobFamily.STRIDER, MobFamily.RAVAGER -> true
+        MobFamily.HORSE, MobFamily.PIG, MobFamily.SHEEP, MobFamily.COW, MobFamily.CAMEL,
+        MobFamily.STRIDER, MobFamily.RAVAGER,
+        -> true
+
         else -> false
     }
 

@@ -597,6 +597,23 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             .drop(1)
                             .map { mobRenderer.textureForPath(it) }
                     }
+
+                    /**
+                     * Слои поверх базовой шкуры моба.
+                     *
+                     * У овцы шерсть в игре — отдельная модель и отдельная текстура
+                     * (`sheep_wool.png`). Своего меша для неё нет, поэтому слой рисуется тем же
+                     * мешем с полигональным сдвигом: овца получается белой, а не «стриженой».
+                     * Честно: флаг «острижена» из метаданных не читается — шерсть рисуется всегда.
+                     */
+                    fun mobOverlays(entity: mcplus.net.TrackedEntity, name: String): List<Int> {
+                        val layers = villagerLayers(entity, name).toMutableList()
+                        if (name == "sheep") {
+                            val wool = mobRenderer.textureForPath("entity/sheep/sheep_wool.png")
+                            if (wool != 0) layers += wool
+                        }
+                        return layers
+                    }
                     // Частицы: спрайты из textures/particle, собранные в один атлас.
                     val particleRenderer = ParticleRenderer(width, height, directory)
                     // Гуманоидные мобы: одна модель человека, у каждого свой скин. Раскладка
@@ -3268,7 +3285,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                     " масштаб=" + MobModels.scaleFor(name, entity.metadata) +
                                                     " коробок=" + MobModels.boxes(family).size +
                                                     " седло=" + entity.equipmentItem(SaddleLook.SLOT) +
-                                                    " поводок=" + entity.leashHolder,
+                                                    " поводок=" + entity.leashHolder +
+                                                    " смерть=" + deathProgress +
+                                                    " здоровье=" + entity.health +
+                                                    " скорость=" + entity.speed,
                                             )
                                         }
                                         mobs += MobRenderer.Mob(
@@ -3285,7 +3305,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             family = family,
                                             scale = MobModels.scaleFor(name, entity.metadata),
                                             texture = mobRenderer.textureFor(name),
-                                            overlays = villagerLayers(entity, name),
+                                            overlays = mobOverlays(entity, name),
                                             hurt = entity.hurtProgress(System.nanoTime()),
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,

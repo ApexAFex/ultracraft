@@ -195,6 +195,21 @@ class MobRenderer(
         GL30.glBindVertexArray(vao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, vbo)
         val vertices = data.toArray()
+        // Диагностика: без неё не видно, плоская модель в данных или в отрисовке.
+        // Печатается один раз на семейство за запуск.
+        var minVertexY = Float.MAX_VALUE
+        var maxVertexY = -Float.MAX_VALUE
+        var index = 0
+        while (index + 2 < vertices.size) {
+            val y = vertices[index + 1]
+            if (y < minVertexY) minVertexY = y
+            if (y > maxVertexY) maxVertexY = y
+            index += VERTEX_FLOATS
+        }
+        println(
+            "Меш $family: коробок ${boxes.size}, вершин ${vertices.size / VERTEX_FLOATS}, " +
+                "y %.3f..%.3f".format(minVertexY, maxVertexY),
+        )
         val buffer = MemoryUtil.memAllocFloat(vertices.size)
         buffer.put(vertices).flip()
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, buffer, GL30.GL_STATIC_DRAW)

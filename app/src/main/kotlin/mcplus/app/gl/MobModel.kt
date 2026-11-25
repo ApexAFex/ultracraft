@@ -4,7 +4,7 @@ import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
-    QUADRUPED, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
+    SHEEP, RABBIT, PIG, COW, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
     GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, CREAKING, BOAT, MINECART, CHEST, NONE,
@@ -94,7 +94,12 @@ object MobModels {
     }
 
     fun familyOf(entityName: String): MobFamily = when (entityName) {
-        "cow", "mooshroom", "pig", "sheep", "rabbit" -> MobFamily.QUADRUPED
+        // Копытные — из дампов ванильных моделей (`tools/mob-dump.ps1`): у каждого своя
+        // геометрия и свой раскрой текстуры, общей «четвероногой» коробкой их не нарисовать.
+        "cow", "mooshroom" -> MobFamily.COW
+        "pig" -> MobFamily.PIG
+        "sheep" -> MobFamily.SHEEP
+        "rabbit" -> MobFamily.RABBIT
 
         "chicken", "parrot" -> MobFamily.CHICKEN
         "creeper" -> MobFamily.CREEPER
@@ -260,6 +265,8 @@ object MobModels {
         MobFamily.WITHER -> 64 to 64
         MobFamily.VEX -> 32 to 32
         MobFamily.RAVAGER -> 128 to 128
+        MobFamily.PIG, MobFamily.COW -> 64 to 64
+        MobFamily.RABBIT -> 64 to 64
         MobFamily.ARMOR_STAND -> 64 to 64
         MobFamily.PUFFERFISH -> 32 to 32
         MobFamily.TROPICAL_FISH -> 32 to 32
@@ -278,7 +285,10 @@ object MobModels {
     }
 
     fun boxes(family: MobFamily): List<MobBox> = when (family) {
-        MobFamily.QUADRUPED -> QUADRUPED
+        MobFamily.SHEEP -> SHEEP
+        MobFamily.RABBIT -> RABBIT
+        MobFamily.PIG -> PIG
+        MobFamily.COW -> COW
         MobFamily.CHICKEN -> CHICKEN
         MobFamily.CREEPER -> CREEPER
         MobFamily.SPIDER -> SPIDER
@@ -429,41 +439,115 @@ object MobModels {
     private const val MAX_SWING = 0.7f
 
     // Коробки в блоках: 16 «пикселей» модели = 1 блок, ноги стоят на y = 0.
-    // u, v — начало развёртки в текстуре 64×32 (корова/свинья/овца).
-    private val QUADRUPED = listOf(
-        MobBox("body", -0.3125f, 0.5f, -0.5f, 0.3125f, 1.125f, 0.5f, u = 18, v = 4),
-        MobBox("head", -0.25f, 0.75f, 0.5f, 0.25f, 1.25f, 0.875f, u = 0, v = 0),
-        MobBox("legFL", -0.3125f, 0f, -0.4375f, -0.0625f, 0.5f, -0.1875f, pivotY = 0.5f, u = 0, v = 16),
-        MobBox("legFR", 0.0625f, 0f, -0.4375f, 0.3125f, 0.5f, -0.1875f, pivotY = 0.5f, u = 0, v = 16),
-        MobBox("legBL", -0.3125f, 0f, 0.1875f, -0.0625f, 0.5f, 0.4375f, pivotY = 0.5f, u = 0, v = 16),
-        MobBox("legBR", 0.0625f, 0f, 0.1875f, 0.3125f, 0.5f, 0.4375f, pivotY = 0.5f, u = 0, v = 16),
+    // u, v — начало развёртки в текстуре 64×32 (овца).
+
+    /**
+     * Овца из ванильной `SheepModel`.
+     *
+     * Шерсть в игре — отдельный слой (`SheepFurModel`, текстура `sheep_wool.png`), он
+     * рисуется поверх этой модели тем же мешем: так овца выглядит стриженой только без
+     * шерсти, а с ней — белой и пушистой.
+     */
+    private val SHEEP = listOf(
+        MobBox("head", -0.1875f, -0.125f, -0.375f, 0.1875f, 0.25f, 0.125f, u = 0, v = 0, offsetY = 1.125f, offsetZ = -0.5f),
+        MobBox("right_front_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.75f, offsetZ = -0.3125f),
+        MobBox("right_hind_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.75f, offsetZ = 0.4375f),
+        MobBox("left_hind_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.75f, offsetZ = 0.4375f),
+        MobBox("body", -0.25f, -0.375f, -0.4375f, 0.25f, 0.625f, -0.0625f, u = 28, v = 8, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.1875f, 0.125f, 1f)),
+        MobBox("left_front_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.75f, offsetZ = -0.3125f),
     )
 
+    /**
+     * Кролик из ванильной `AdultRabbitModel`: задние лапы-«пятки», тело, голова, уши, хвост
+     * и передние лапы. Почти все части повёрнуты, поэтому у них матрицы.
+     *
+     * Лист текстуры 64×64 — он больше, чем у овцы, и раскрой другой.
+     */
+    private val RABBIT = listOf(
+        MobBox("right_haunch", -0.0625f, -0.0625f, -0.3125f, 0.0625f, 0f, 0.0625f, u = 20, v = 24, matrix = floatArrayOf(0.9238f, 0f, -0.383f, 0f, 0f, 1f, 0f, 0f, 0.383f, 0f, 0.9238f, 0f, -0.1875f, 0.2118f, 0.25f, 1f)),
+        MobBox("left_haunch", -0.0625f, -0.0625f, -0.3125f, 0.0625f, 0f, 0.0625f, u = 36, v = 24, matrix = floatArrayOf(0.9238f, 0f, 0.383f, 0f, 0f, 1f, 0f, 0f, -0.383f, 0f, 0.9238f, 0f, 0.1875f, 0.2118f, 0.25f, 1f)),
+        MobBox("body", -0.25f, 0f, -0.5625f, 0.25f, 0.375f, 0.0625f, u = 0, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9238f, 0.383f, 0f, 0f, -0.383f, 0.9238f, 0f, 0f, 0.2118f, 0.25f, 1f)),
+        MobBox("head", -0.1562f, -0.125f, -0.25f, 0.1563f, 0.1875f, 0.0625f, u = 0, v = 16, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0.7118f, -0.0922f, 1f)),
+        MobBox("right_ear", -0.0625f, -0.0442f, -0.0076f, 0.0625f, 0.2683f, 0.0549f, u = 26, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, -0.0937f, 0.9435f, -0.1471f, 1f)),
+        MobBox("left_ear", -0.0625f, -0.0442f, -0.0076f, 0.0625f, 0.2683f, 0.0549f, u = 32, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0.0938f, 0.9435f, -0.1471f, 1f)),
+        MobBox("tail", -0.125f, -0.062f, -0.0633f, 0.125f, 0.188f, 0.1867f, u = 20, v = 16, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.9238f, 0.383f, 0f, 0f, -0.383f, 0.9238f, 0f, 0f, 0.4997f, 0.3702f, 1f)),
+        MobBox("right_front_leg", -0.0562f, -0.1875f, -0.0562f, 0.0688f, 0.0625f, 0.0688f, u = 36, v = 18, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, -0.125f, 0.3312f, -0.1016f, 1f)),
+        MobBox("left_front_leg", -0.0625f, -0.1875f, -0.0625f, 0.0625f, 0.0625f, 0.0625f, u = 44, v = 18, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0.125f, 0.3288f, -0.0958f, 1f)),
+    )
+
+    /**
+     * Свинья, снятая с ванильной `PigModel` (`tools/mob-dump.ps1` → `tools/build-mob-model.js`).
+     *
+     * Тело в модели повёрнуто на 90° вокруг X, поэтому у него матрица, а не три угла. Раскрой
+     * текстуры — ванильный: 64×64, тело начинается с пикселя (28, 8), морда — с (16, 16).
+     * Раньше свинья рисовалась общей «четвероногой» коробкой: её размеры не совпадали с
+     * раскроем, боковые грани попадали в прозрачные пиксели и отбрасывались — свинья
+     * выглядела стопкой плоских панелей.
+     */
+    private val PIG = listOf(
+        MobBox("head", -0.25f, -0.25f, -0.5f, 0.25f, 0.25f, 0f, u = 0, v = 0, offsetY = 0.75f, offsetZ = -0.375f),
+        MobBox("head", -0.125f, -0.1875f, -0.5625f, 0.125f, 0f, -0.5f, u = 16, v = 16, offsetY = 0.75f, offsetZ = -0.375f),
+        MobBox("right_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.375f, offsetZ = -0.3125f),
+        MobBox("right_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.375f, offsetZ = 0.4375f),
+        MobBox("left_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.375f, offsetZ = 0.4375f),
+        MobBox("body", -0.3125f, -0.375f, -0.4375f, 0.3125f, 0.625f, 0.0625f, u = 28, v = 8, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 0.8125f, 0.125f, 1f)),
+        MobBox("left_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.375f, offsetZ = -0.3125f),
+    )
+
+    /** Корова из ванильной `CowModel`: голова с рогами, тело и четыре ноги, лист 64×64. */
+    private val COW = listOf(
+        MobBox("head", -0.25f, -0.25f, -0.375f, 0.25f, 0.25f, 0f, u = 0, v = 0, offsetY = 1.25f, offsetZ = -0.5f),
+        MobBox("head", -0.1875f, -0.25f, -0.4375f, 0.1875f, -0.0625f, -0.375f, u = 1, v = 33, offsetY = 1.25f, offsetZ = -0.5f),
+        MobBox("head", -0.3125f, 0.125f, -0.3125f, -0.25f, 0.3125f, -0.25f, u = 22, v = 0, offsetY = 1.25f, offsetZ = -0.5f),
+        MobBox("head", 0.25f, 0.125f, -0.3125f, 0.3125f, 0.3125f, -0.25f, u = 22, v = 0, offsetY = 1.25f, offsetZ = -0.5f),
+        MobBox("right_front_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.25f, offsetY = 0.75f, offsetZ = -0.3125f),
+        MobBox("right_hind_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.25f, offsetY = 0.75f, offsetZ = 0.4375f),
+        MobBox("left_hind_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.25f, offsetY = 0.75f, offsetZ = 0.4375f),
+        MobBox("body", -0.375f, -0.5f, -0.4375f, 0.375f, 0.625f, 0.1875f, u = 18, v = 4, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.1875f, 0.125f, 1f)),
+        MobBox("body", -0.125f, -0.5f, -0.5f, 0.125f, -0.125f, -0.4375f, u = 52, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.1875f, 0.125f, 1f)),
+        MobBox("left_front_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.25f, offsetY = 0.75f, offsetZ = -0.3125f),
+    )
+
+    /** Курица из ванильной `AdultChickenModel`: голова, клюв, гребень, крылья, лапы. */
     private val CHICKEN = listOf(
-        MobBox("body", -0.1875f, 0.375f, -0.25f, 0.1875f, 0.875f, 0.25f, u = 0, v = 9),
-        MobBox("head", -0.125f, 0.875f, 0.25f, 0.125f, 1.25f, 0.4375f, u = 0, v = 0),
-        MobBox("wingL", -0.25f, 0.5f, -0.1875f, -0.1875f, 0.8125f, 0.1875f, pivotY = 0.75f, u = 24, v = 13),
-        MobBox("wingR", 0.1875f, 0.5f, -0.1875f, 0.25f, 0.8125f, 0.1875f, pivotY = 0.75f, u = 24, v = 13),
-        MobBox("legFL", -0.0625f, 0f, -0.0625f, 0f, 0.375f, 0.0625f, pivotY = 0.375f, u = 26, v = 0),
-        MobBox("legFR", 0f, 0f, -0.0625f, 0.0625f, 0.375f, 0.0625f, pivotY = 0.375f, u = 26, v = 0),
+        MobBox("head", -0.125f, 0f, -0.125f, 0.125f, 0.375f, 0.0625f, u = 0, v = 0, offsetY = 0.5625f, offsetZ = -0.25f),
+        MobBox("beak", -0.125f, 0.125f, -0.25f, 0.125f, 0.25f, -0.125f, u = 14, v = 0, offsetY = 0.5625f, offsetZ = -0.25f),
+        MobBox("red_thing", -0.0625f, 0f, -0.1875f, 0.0625f, 0.125f, -0.0625f, u = 14, v = 4, offsetY = 0.5625f, offsetZ = -0.25f),
+        MobBox("left_leg", -0.0625f, -0.3125f, -0.1875f, 0.125f, 0f, 0f, u = 26, v = 0, offsetX = 0.0625f, offsetY = 0.3125f, offsetZ = 0.0625f),
+        MobBox("right_leg", -0.0625f, -0.3125f, -0.1875f, 0.125f, 0f, 0f, u = 26, v = 0, offsetX = -0.125f, offsetY = 0.3125f, offsetZ = 0.0625f),
+        MobBox("right_wing", 0f, -0.25f, -0.1875f, 0.0625f, 0f, 0.1875f, u = 24, v = 13, offsetX = -0.25f, offsetY = 0.6875f),
+        MobBox("left_wing", -0.0625f, -0.25f, -0.1875f, 0f, 0f, 0.1875f, u = 24, v = 13, offsetX = 0.25f, offsetY = 0.6875f),
+        MobBox("body", -0.1875f, -0.25f, -0.1875f, 0.1875f, 0.25f, 0.1875f, u = 0, v = 9, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 0.5f, 0f, 1f)),
     )
 
+    /** Крипер из ванильной `CreeperModel`. */
     private val CREEPER = listOf(
-        MobBox("body", -0.25f, 0.375f, -0.125f, 0.25f, 1.125f, 0.125f, u = 16, v = 16),
-        MobBox("head", -0.25f, 1.125f, -0.25f, 0.25f, 1.625f, 0.25f, u = 0, v = 0),
-        MobBox("legFL", -0.25f, 0f, -0.25f, -0.0625f, 0.375f, -0.0625f, pivotY = 0.375f, u = 0, v = 16),
-        MobBox("legFR", 0.0625f, 0f, -0.25f, 0.25f, 0.375f, -0.0625f, pivotY = 0.375f, u = 0, v = 16),
-        MobBox("legBL", -0.25f, 0f, 0.0625f, -0.0625f, 0.375f, 0.25f, pivotY = 0.375f, u = 0, v = 16),
-        MobBox("legBR", 0.0625f, 0f, 0.0625f, 0.25f, 0.375f, 0.25f, pivotY = 0.375f, u = 0, v = 16),
+        MobBox("head", -0.25f, 0f, -0.25f, 0.25f, 0.5f, 0.25f, u = 0, v = 0, offsetY = 1.125f),
+        MobBox("right_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.125f, offsetY = 0.375f, offsetZ = -0.25f),
+        MobBox("right_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.125f, offsetY = 0.375f, offsetZ = 0.25f),
+        MobBox("left_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.125f, offsetY = 0.375f, offsetZ = 0.25f),
+        MobBox("body", -0.25f, -0.75f, -0.125f, 0.25f, 0f, 0.125f, u = 16, v = 16, offsetY = 1.125f),
+        MobBox("left_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.125f, offsetY = 0.375f, offsetZ = -0.25f),
     )
 
+    /**
+     * Паук из ванильной `SpiderModel`.
+     *
+     * Все восемь ног в модели повёрнуты вокруг своих осей, поэтому у каждой матрица: без неё
+     * ноги торчали бы вперёд, а не в стороны.
+     */
     private val SPIDER = listOf(
-        MobBox("body", -0.3125f, 0.5f, -0.375f, 0.3125f, 1f, 0.375f, u = 0, v = 12),
-        MobBox("head", -0.25f, 0.5f, 0.375f, 0.25f, 1f, 0.75f, u = 32, v = 4),
-        MobBox("legFL", -0.5625f, 0.5f, -0.25f, -0.3125f, 0.625f, -0.125f, u = 18, v = 0),
-        MobBox("legFR", 0.3125f, 0.5f, -0.25f, 0.5625f, 0.625f, -0.125f, u = 18, v = 0),
-        MobBox("legBL", -0.5625f, 0.5f, 0.125f, -0.3125f, 0.625f, 0.25f, u = 18, v = 0),
-        MobBox("legBR", 0.3125f, 0.5f, 0.125f, 0.5625f, 0.625f, 0.25f, u = 18, v = 0),
+        MobBox("head", -0.25f, -0.25f, -0.5f, 0.25f, 0.25f, 0f, u = 32, v = 4, offsetY = 0.25f, offsetZ = -0.1875f),
+        MobBox("right_front_leg", -0.9375f, -0.0625f, -0.0625f, 0.0625f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.5004f, 0.5f, 0.7068f, 0f, -0.7068f, 0.7074f, 0f, 0f, -0.5f, -0.4996f, 0.7074f, 0f, -0.25f, 0.25f, -0.0625f, 1f)),
+        MobBox("right_hind_leg", -0.9375f, -0.0625f, -0.0625f, 0.0625f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.5004f, 0.5f, -0.7068f, 0f, -0.7068f, 0.7074f, 0f, 0f, 0.5f, 0.4996f, 0.7074f, 0f, -0.25f, 0.25f, 0.125f, 1f)),
+        MobBox("left_middle_front_leg", -0.0625f, -0.0625f, -0.0625f, 0.9375f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.7722f, -0.507f, -0.383f, 0f, 0.5489f, 0.8359f, 0f, 0f, 0.3201f, -0.2102f, 0.9238f, 0f, 0.25f, 0.25f, 0f, 1f)),
+        MobBox("body0", -0.1875f, -0.1875f, -0.1875f, 0.1875f, 0.1875f, 0.1875f, u = 0, v = 0, offsetY = 0.25f),
+        MobBox("body1", -0.3125f, -0.25f, -0.375f, 0.3125f, 0.25f, 0.375f, u = 0, v = 12, offsetY = 0.25f, offsetZ = 0.5625f),
+        MobBox("left_hind_leg", -0.0625f, -0.0625f, -0.0625f, 0.9375f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.5004f, -0.5f, 0.7068f, 0f, 0.7068f, 0.7074f, 0f, 0f, -0.5f, 0.4996f, 0.7074f, 0f, 0.25f, 0.25f, 0.125f, 1f)),
+        MobBox("right_middle_hind_leg", -0.9375f, -0.0625f, -0.0625f, 0.0625f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.7722f, 0.507f, -0.383f, 0f, -0.5489f, 0.8359f, 0f, 0f, 0.3201f, 0.2102f, 0.9238f, 0f, -0.25f, 0.25f, 0.0625f, 1f)),
+        MobBox("right_middle_front_leg", -0.9375f, -0.0625f, -0.0625f, 0.0625f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.7722f, 0.507f, 0.383f, 0f, -0.5489f, 0.8359f, 0f, 0f, -0.3201f, -0.2102f, 0.9238f, 0f, -0.25f, 0.25f, 0f, 1f)),
+        MobBox("left_middle_hind_leg", -0.0625f, -0.0625f, -0.0625f, 0.9375f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.7722f, -0.507f, 0.383f, 0f, 0.5489f, 0.8359f, 0f, 0f, -0.3201f, 0.2102f, 0.9238f, 0f, 0.25f, 0.25f, 0.0625f, 1f)),
+        MobBox("left_front_leg", -0.0625f, -0.0625f, -0.0625f, 0.9375f, 0.0625f, 0.0625f, u = 18, v = 0, matrix = floatArrayOf(0.5004f, -0.5f, -0.7068f, 0f, 0.7068f, 0.7074f, 0f, 0f, 0.5f, -0.4996f, 0.7074f, 0f, 0.25f, 0.25f, -0.0625f, 1f)),
     )
 
     /**

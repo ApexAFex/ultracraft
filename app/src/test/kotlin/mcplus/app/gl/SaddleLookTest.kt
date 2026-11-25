@@ -15,7 +15,7 @@ class SaddleLookTest {
     @Test
     fun `only saddle-capable mobs show a saddle`() {
         assertTrue(SaddleLook.fits(MobFamily.HORSE))
-        assertTrue(SaddleLook.fits(MobFamily.QUADRUPED), "свинья — тоже")
+        assertTrue(SaddleLook.fits(MobFamily.PIG), "свинья — тоже")
         assertTrue(SaddleLook.fits(MobFamily.CAMEL))
         assertFalse(SaddleLook.fits(MobFamily.CHICKEN))
         assertFalse(SaddleLook.fits(MobFamily.VILLAGER))
@@ -32,10 +32,10 @@ class SaddleLookTest {
     @Test
     fun `the saddle sits on the back and grows with the mob`() {
         // У верблюда спина выше, чем у свиньи, и седло крупнее.
-        assertTrue(SaddleLook.height(MobFamily.CAMEL) > SaddleLook.height(MobFamily.QUADRUPED))
-        assertTrue(SaddleLook.size(MobFamily.CAMEL) > SaddleLook.size(MobFamily.QUADRUPED))
+        assertTrue(SaddleLook.height(MobFamily.CAMEL) > SaddleLook.height(MobFamily.PIG))
+        assertTrue(SaddleLook.size(MobFamily.CAMEL) > SaddleLook.size(MobFamily.PIG))
         // Все высоты в разумных пределах: седло не должно висеть в воздухе или тонуть в мобе.
-        for (family in listOf(MobFamily.HORSE, MobFamily.CAMEL, MobFamily.QUADRUPED)) {
+        for (family in listOf(MobFamily.HORSE, MobFamily.CAMEL, MobFamily.PIG, MobFamily.SHEEP)) {
             assertTrue(SaddleLook.height(family) in 0.5f..2f, "высота $family")
             assertTrue(SaddleLook.size(family) in 0.2f..1f, "размер $family")
         }

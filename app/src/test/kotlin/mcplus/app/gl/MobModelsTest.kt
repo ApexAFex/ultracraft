@@ -25,14 +25,17 @@ class MobModelsTest {
         assertTrue(kotlin.math.abs(first) <= 0.2f, "покачивание маленькое: $first")
         // Счастливый гаст тоже висит, а наземные мобы стоят на месте.
         assertTrue(MobModels.hoverOffset(MobFamily.HAPPY_GHAST, 1f) != 0f)
-        assertEquals(0f, MobModels.hoverOffset(MobFamily.QUADRUPED, 1f))
+        assertEquals(0f, MobModels.hoverOffset(MobFamily.SHEEP, 1f))
         assertEquals(0f, MobModels.hoverOffset(MobFamily.BOAT, 1f))
     }
 
     @Test
     fun `common animals map to their model families`() {
-        assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("cow"))
-        assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("pig"))
+        assertEquals(MobFamily.COW, MobModels.familyOf("cow"))
+        assertEquals(MobFamily.COW, MobModels.familyOf("mooshroom"))
+        assertEquals(MobFamily.PIG, MobModels.familyOf("pig"))
+        assertEquals(MobFamily.SHEEP, MobModels.familyOf("sheep"))
+        assertEquals(MobFamily.RABBIT, MobModels.familyOf("rabbit"))
         assertEquals(MobFamily.CHICKEN, MobModels.familyOf("chicken"))
         assertEquals(MobFamily.CREEPER, MobModels.familyOf("creeper"))
         assertEquals(MobFamily.SPIDER, MobModels.familyOf("cave_spider"))
@@ -40,12 +43,102 @@ class MobModelsTest {
     }
 
     @Test
-    fun `quadruped has a body head and four legs`() {
-        val boxes = MobModels.boxes(MobFamily.QUADRUPED)
+    fun `sheep has a body head and four legs`() {
+        val boxes = MobModels.boxes(MobFamily.SHEEP)
         assertEquals(6, boxes.size)
-        assertEquals(4, boxes.count { it.name.startsWith("leg") })
-        assertTrue(boxes.all { it.minY >= 0f }, "коробка ниже земли")
-        assertTrue(boxes.first { it.name == "legFL" }.maxY <= 0.51f, "нога длиннее половины блока")
+        assertEquals(4, boxes.count { it.name.endsWith("_leg") })
+        // У коробок с матрицей minY — локальная координата до поворота, поэтому проверяем
+        // только те, что ставятся смещением: их мировая высота — minY + offsetY.
+        assertTrue(
+            boxes.filter { it.matrix == null }.all { it.minY + it.offsetY >= 0f },
+            "коробка ниже земли",
+        )
+        // Ноги овцы — три четверти блока: под ними видно траву, как в игре.
+        val leg = boxes.first { it.name == "right_front_leg" }
+        assertTrue(leg.maxY - leg.minY in 0.7f..0.8f, "нога овцы: ${leg.maxY - leg.minY}")
+    }
+
+    @Test
+    fun `dumped models match the vanilla sheets`() {
+        // Свинья, корова, курица, крипер и паук сняты с моделей игры, а не нарисованы на глаз.
+        val pig = MobModels.boxes(MobFamily.PIG)
+        assertEquals(7, pig.size, "свинья: голова, морда, тело и четыре ноги")
+        assertEquals(4, pig.count { it.name.endsWith("_leg") })
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.PIG))
+        // Тело свиньи в модели повёрнуто: у него должна быть матрица.
+        assertTrue(pig.single { it.name == "body" }.matrix != null, "тело свиньи повёрнуто")
+
+        val cow = MobModels.boxes(MobFamily.COW)
+        assertEquals(10, cow.size, "корова: голова, морда, два рога, тело, вымя и четыре ноги")
+        assertEquals(4, cow.count { it.name.endsWith("_leg") })
+        assertEquals(64 to 64, MobModels.textureSize(MobFamily.COW))
+        assertTrue(cow.count { it.matrix != null } >= 2, "тело и вымя коровы повёрнуты")
+
+        val chicken = MobModels.boxes(MobFamily.CHICKEN)
+        assertEquals(8, chicken.size, "курица: голова, клюв, гребень, два крыла, тело и две лапы")
+        assertTrue(chicken.any { it.name == "beak" })
+
+        val creeper = MobModels.boxes(MobFamily.CREEPER)
+        assertEquals(6, creeper.size)
+
+        val spider = MobModels.boxes(MobFamily.SPIDER)
+        assertEquals(11, spider.size, "паук: голова, два тела и восемь ног")
+        assertEquals(8, spider.count { it.name.endsWith("_leg") })
+        assertEquals(8, spider.count { it.matrix != null }, "все ноги паука повёрнуты")
+    }
+
+    @Test
+    fun `every box unwraps inside its texture sheet`() {
+        // Раньше свинья рисовалась «на глаз»: коробка шириной 16 пикселей начиналась с u = 18
+        // и уезжала за край листа 64 в развёртке. Боковые грани попадали в прозрачные пиксели,
+        // шейдер их отбрасывал — моб выглядел стопкой плоских панелей. Теперь у моделей,
+        // снятых с игры, это проверяется для каждой коробки: все шесть граней должны лежать
+        // в листе.
+        //
+        // Список ниже — модели, которые ещё рисуются упрощёнными коробками и в этот тест не
+        // входят: их развёртка заведомо приблизительная. Это записанный долг, а не разрешение.
+        val approximate = setOf(
+            MobFamily.IRON_GOLEM, MobFamily.SQUID, MobFamily.BAT, MobFamily.SLIME,
+            MobFamily.MAGMA_CUBE, MobFamily.GHAST, MobFamily.BLAZE, MobFamily.STRIDER,
+            MobFamily.HOGLIN, MobFamily.BEE, MobFamily.TURTLE, MobFamily.WOLF, MobFamily.CAT,
+            MobFamily.FOX, MobFamily.LLAMA, MobFamily.PANDA, MobFamily.POLAR_BEAR,
+            MobFamily.DOLPHIN, MobFamily.FROG, MobFamily.GOAT, MobFamily.AXOLOTL,
+            MobFamily.SNIFFER, MobFamily.PHANTOM, MobFamily.SHULKER, MobFamily.SILVERFISH,
+            MobFamily.ENDERMITE, MobFamily.GUARDIAN, MobFamily.ALLAY, MobFamily.WARDEN,
+            MobFamily.COD, MobFamily.SALMON, MobFamily.TADPOLE, MobFamily.WITCH,
+            MobFamily.SNOW_GOLEM, MobFamily.WITHER, MobFamily.VEX, MobFamily.PUFFERFISH,
+            MobFamily.TROPICAL_FISH, MobFamily.ARMADILLO, MobFamily.BREEZE,
+            MobFamily.COPPER_GOLEM, MobFamily.NAUTILUS, MobFamily.DRAGON, MobFamily.CRYSTAL,
+            MobFamily.HAPPY_GHAST, MobFamily.CUSHION, MobFamily.CREAKING, MobFamily.BOAT,
+            MobFamily.MINECART, MobFamily.CHEST, MobFamily.ARMOR_STAND,
+        )
+        for (family in MobFamily.entries) {
+            if (family in approximate) continue
+            val boxes = MobModels.boxes(family)
+            if (boxes.isEmpty()) continue
+            val (sheetWidth, sheetHeight) = MobModels.textureSize(family)
+            for (box in boxes) {
+                val w = (box.maxX - box.minX) * 16f
+                val h = (box.maxY - box.minY) * 16f
+                val d = (box.maxZ - box.minZ) * 16f
+                val u = box.u.toFloat()
+                val v = box.v.toFloat()
+                val rects = listOf(
+                    "верх" to listOf(u + d, v, u + d + w, v + d),
+                    "низ" to listOf(u + d + w, v, u + d + w + w, v + d),
+                    "левый бок" to listOf(u, v + d, u + d, v + d + h),
+                    "правый бок" to listOf(u + d + w, v + d, u + d + w + d, v + d + h),
+                    "торец" to listOf(u + d + w + d, v + d, u + d + w + d + w, v + d + h),
+                    "лицо" to listOf(u + d, v + d, u + d + w, v + d + h),
+                )
+                for ((face, r) in rects) {
+                    assertTrue(
+                        r[0] >= -0.01f && r[1] >= -0.01f && r[2] <= sheetWidth + 0.01f && r[3] <= sheetHeight + 0.01f,
+                        "$family/${box.name}/$face выходит за лист ${sheetWidth}×$sheetHeight: $r",
+                    )
+                }
+            }
+        }
     }
 
     @Test
@@ -165,13 +258,13 @@ class MobModelsTest {
 
     @Test
     fun `every box has a texture origin inside the mob sheet`() {
-        for (family in listOf(MobFamily.QUADRUPED, MobFamily.CHICKEN, MobFamily.CREEPER, MobFamily.SPIDER)) {
+        for (family in listOf(MobFamily.SHEEP, MobFamily.CHICKEN, MobFamily.CREEPER, MobFamily.SPIDER)) {
             for (box in MobModels.boxes(family)) {
                 assertTrue(box.u in 0 until 64, "${box.name}: u=${box.u} вне листа")
                 assertTrue(box.v in 0 until 32, "${box.name}: v=${box.v} вне листа")
             }
         }
-        val body = MobModels.boxes(MobFamily.QUADRUPED).first { it.name == "body" }
+        val body = MobModels.boxes(MobFamily.SHEEP).first { it.name == "body" }
         assertTrue(body.u > 0 || body.v > 0, "у тела должна быть своя развёртка, а не угол листа")
     }
 
@@ -179,7 +272,7 @@ class MobModelsTest {
     fun `villager is a modelled mob with a 64 by 64 skin`() {
         assertEquals(MobFamily.VILLAGER, MobModels.familyOf("villager"))
         assertEquals(64 to 64, MobModels.textureSize(MobFamily.VILLAGER))
-        assertEquals(64 to 32, MobModels.textureSize(MobFamily.QUADRUPED))
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.SHEEP))
         assertTrue(MobModels.scaleOf("villager") < 1f, "житель мельче блока")
 
         for (box in MobModels.boxes(MobFamily.VILLAGER)) {
