@@ -3096,14 +3096,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                 mcplus.net.MapColors.active.colorOf(packed)
                                             }
                                             if (tiles.isNotEmpty()) mapFrameDrawn.add(entity.id)
-                                            // Рамка у нас рисуется билбордом (повёрнутым к
-                                            // камере), поэтому и карта в ней — билборд: плитки
-                                            // ставятся в плоскости камеры и видны с любой
-                                            // стороны, как иконка рамки.
-                                            val cameraYaw = 180f - CameraAngles.degrees(camera.yaw)
-                                            val yawRad = Math.toRadians(cameraYaw.toDouble())
+                                            // Направление рамки лежит в поле 8 (DIRECTION):
+                                            // 0 — вниз, 1 — вверх, 2 — север, 3 — юг, 4 — запад,
+                                            // 5 — восток. По нему карта кладётся плашмя на стену,
+                                            // как в ванили, а не поворачивается к камере.
+                                            val direction = entity.metadata[8]?.number?.toInt() ?: -1
+                                            val frameYaw = MapFrame.yawFor(direction)
+                                                ?: (180f - CameraAngles.degrees(camera.yaw))
+                                            val yawRad = Math.toRadians(frameYaw.toDouble())
                                             val rightX = kotlin.math.cos(yawRad).toFloat()
                                             val rightZ = -kotlin.math.sin(yawRad).toFloat()
+                                            // Нормаль рамки: карта выносится ею к зрителю на 3 см.
+                                            val normalX = kotlin.math.sin(yawRad).toFloat()
+                                            val normalZ = kotlin.math.cos(yawRad).toFloat()
                                             val white =
                                                 atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
                                             val tile = 1f / MapFrame.TILES
@@ -3112,12 +3117,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                 val localY = 0.5f - (part.y + 0.5f) * tile
                                                 val (red, green, blue) = MapFrame.channels(part.color)
                                                 cubes += Renderer.BlockCube(
-                                                    entity.x + localX * rightX,
+                                                    entity.x + localX * rightX + normalX * 0.03f,
                                                     entity.y + 0.5 + localY,
-                                                    entity.z + localX * rightZ,
+                                                    entity.z + localX * rightZ + normalZ * 0.03f,
                                                     1f,
                                                     white, white, white,
-                                                    yaw = cameraYaw,
+                                                    yaw = frameYaw,
                                                     red = red, green = green, blue = blue,
                                                     sizeX = tile, sizeY = tile, sizeZ = 0.01f,
                                                 )

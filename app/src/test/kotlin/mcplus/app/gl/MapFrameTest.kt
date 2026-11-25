@@ -3,6 +3,7 @@ package mcplus.app.gl
 import mcplus.net.MapData
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -21,6 +22,19 @@ class MapFrameTest {
             }
         }
         return image
+    }
+
+    @Test
+    fun `a wall frame turns the map to its own side`() {
+        // Направления рамки: 2 — север, 3 — юг, 4 — запад, 5 — восток.
+        assertEquals(180f, MapFrame.yawFor(2))
+        assertEquals(0f, MapFrame.yawFor(3))
+        assertEquals(270f, MapFrame.yawFor(4))
+        assertEquals(90f, MapFrame.yawFor(5))
+        // «Вверх» и «вниз» — карта не лежит на стене: пусть поворачивается к камере.
+        assertNull(MapFrame.yawFor(0))
+        assertNull(MapFrame.yawFor(1))
+        assertNull(MapFrame.yawFor(99))
     }
 
     @Test
