@@ -55,13 +55,26 @@ class SkinLibrary : Closeable {
         executor.submit { download(uuid, url) }
     }
 
+    /** Уже посчитанные цвета фигурки: из того же скина. */
+    private val colors = ConcurrentHashMap<UUID, SkinColors>()
+
     /** Текстура игрока; 0 — скина нет, рисовать запасной. */
     fun textureFor(uuid: UUID): Int {
         textures[uuid]?.let { return it }
-        val image = images.remove(uuid) ?: return 0
+        // Картинку не выбрасываем: из неё же берутся цвета фигурки в инвентаре.
+        val image = images[uuid] ?: return 0
         val texture = upload(image)
         textures[uuid] = texture
         return texture
+    }
+
+    /** Цвета фигурки игрока из его скина; без скина — нейтральные. */
+    fun colorsFor(uuid: UUID): SkinColors {
+        colors[uuid]?.let { return it }
+        val image = images[uuid] ?: return SkinColors.DEFAULT
+        val computed = SkinColors.of(image)
+        colors[uuid] = computed
+        return computed
     }
 
     private fun download(uuid: UUID, url: String) {

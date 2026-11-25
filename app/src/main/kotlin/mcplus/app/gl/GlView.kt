@@ -3788,7 +3788,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 itemName = { id -> itemTable.nameOf(id) },
                             )
                         } else if (inventory != null && inventoryOpen) {
-                            hud.drawInventoryScreen(inventory, input.mouseX, input.mouseY)
+                            hud.drawInventoryScreen(
+                                inventory, input.mouseX, input.mouseY,
+                                colors = selfUuid?.let { skinLibrary.colorsFor(it) } ?: SkinColors.DEFAULT,
+                            )
                         }
                         // Книга занимает экран целиком: поверх неё ничего не рисуем.
                         val openBook = bookScreens

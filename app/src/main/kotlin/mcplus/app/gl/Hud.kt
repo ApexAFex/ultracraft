@@ -928,7 +928,13 @@ class Hud(
      * Экран инвентаря в экранном слое: ванильный фон `container/inventory.png` и иконки
      * в пикселях этого фона. Слоты, подписи и подсказка живут в тех же координатах.
      */
-    fun drawInventoryScreen(inventory: Inventory, mouseX: Double, mouseY: Double) {
+    fun drawInventoryScreen(
+        inventory: Inventory,
+        mouseX: Double,
+        mouseY: Double,
+        /** Цвета фигурки игрока из его скина; без скина — нейтральные. */
+        colors: SkinColors = SkinColors.DEFAULT,
+    ) {
         val s = InventoryScreen.scale(height)
         val ox = InventoryScreen.originX(width, s)
         val oy = InventoryScreen.originY(height, s)
@@ -941,14 +947,13 @@ class Hud(
         fun preview(x: Float, y: Float, w: Float, h: Float, color: Int) {
             renderer.rect(ox + x * s, oy + y * s, w * s, h * s, color, 1f)
         }
-        preview(26f, 8f, 50f, 62f, 0x2A2A2A)  // подложка под модель
-        preview(34f, 10f, 8f, 8f, 0xC79B76)   // голова
-        preview(34f, 8f, 8f, 3f, 0x3B2A1A)    // волосы
-        preview(34f, 22f, 8f, 12f, 0x00AAAA)  // рубашка
-        preview(30f, 22f, 4f, 12f, 0xC79B76)  // руки
-        preview(42f, 22f, 4f, 12f, 0xC79B76)
-        preview(34f, 36f, 4f, 12f, 0x3B3BC7)  // штаны
-        preview(42f, 36f, 4f, 12f, 0x3B3BC7)
+        preview(26f, 8f, 50f, 62f, 0x2A2A2A)     // подложка под фигурку
+        preview(34f, 10f, 8f, 8f, colors.head)   // голова — цвет из скина
+        preview(34f, 22f, 8f, 12f, colors.body)  // рубашка
+        preview(30f, 22f, 4f, 12f, colors.arm)   // руки
+        preview(42f, 22f, 4f, 12f, colors.arm)
+        preview(34f, 36f, 4f, 12f, colors.leg)   // штаны
+        preview(42f, 36f, 4f, 12f, colors.leg)
         for (cell in InventoryScreen.cells) {
             val stack = inventory.menuSlot(cell.menuSlot) ?: continue
             val name = inventory.nameOf(stack) ?: continue
