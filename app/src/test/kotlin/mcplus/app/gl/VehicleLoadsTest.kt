@@ -69,15 +69,18 @@ class VehicleLoadsTest {
 
     @Test
     fun `the chest model has a base, a lid and a knob`() {
+        // Сундук снят с блок-модели `ChestModel`: днище `bottom`, крышка `lid`, замок `lock`.
         val boxes = MobModels.boxes(MobFamily.CHEST)
         assertEquals(3, boxes.size, "днище, крышка и замок")
-        assertEquals(1, boxes.count { it.name == "base" })
+        assertEquals(1, boxes.count { it.name == "bottom" })
         assertEquals(1, boxes.count { it.name == "lid" })
-        assertEquals(1, boxes.count { it.name == "knob" })
-        // Крышка выше днища и начинается там, где днище кончается.
-        val base = boxes.first { it.name == "base" }
+        assertEquals(1, boxes.count { it.name == "lock" })
+        val base = boxes.first { it.name == "bottom" }
         val lid = boxes.first { it.name == "lid" }
-        assertEquals(base.maxY, lid.minY, 0.0001f, "крышка стоит на днище")
+        // Крышка лежит на днище: низ крышки на уровне верха днища (в ванили они чуть
+        // перекрываются — это видно по числам дампа).
+        assertTrue(lid.minY + lid.offsetY >= base.maxY - 0.1f, "крышка стоит на днище")
+        assertTrue(lid.offsetY > 0f, "крышка поднята над нулём")
         // В основании 14 пикселей, как в ванильной модели сундука.
         assertEquals(0.875f, base.maxX - base.minX, 0.0001f)
     }

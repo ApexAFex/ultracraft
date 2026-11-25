@@ -601,10 +601,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     /**
                      * Слои поверх базовой шкуры моба.
                      *
-                     * У овцы шерсть в игре — отдельная модель и отдельная текстура
-                     * (`sheep_wool.png`). Своего меша для неё нет, поэтому слой рисуется тем же
-                     * мешем с полигональным сдвигом: овца получается белой, а не «стриженой».
-                     * Честно: флаг «острижена» из метаданных не читается — шерсть рисуется всегда.
+                     * У овцы шерсть в игре — отдельная модель `SheepFurModel` и отдельная
+                     * текстура (`sheep_wool.png`). Меш берётся из семейства `SHEEP_FUR`:
+                     * у шерсти свои коробки (ноги короче, шерсть заканчивается выше копыта).
+                     * Честно: флаг «острижена» из метаданных не читается — шерсть рисуется
+                     * всегда, поэтому остриженная овца выглядит так же, как обычная.
                      */
                     fun mobOverlays(entity: mcplus.net.TrackedEntity, name: String): List<Int> {
                         val layers = villagerLayers(entity, name).toMutableList()
@@ -614,6 +615,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
                         return layers
                     }
+
+                    /** Меш слоя: у овцы шерсть своя, у жителей — та же, что у тела. */
+                    fun overlayFamilyOf(name: String): MobFamily? =
+                        if (name == "sheep") MobFamily.SHEEP_FUR else null
                     // Частицы: спрайты из textures/particle, собранные в один атлас.
                     val particleRenderer = ParticleRenderer(width, height, directory)
                     // Гуманоидные мобы: одна модель человека, у каждого свой скин. Раскладка
@@ -3306,6 +3311,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             scale = MobModels.scaleFor(name, entity.metadata),
                                             texture = mobRenderer.textureFor(name),
                                             overlays = mobOverlays(entity, name),
+                                            overlayFamily = overlayFamilyOf(name),
                                             hurt = entity.hurtProgress(System.nanoTime()),
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,

@@ -13,6 +13,10 @@
 const fs = require('fs');
 
 const path = process.argv[2];
+// Блок-модели (`Model`, а не модель сущности): у них Y уже растёт вверх, а низ — это
+// y = 0 в координатах блока. Сущностные модели приходят с Y вниз и с «низом» где-то в
+// глубине, поэтому пересчёт у них другой. Включается флагом --block.
+const blockMode = process.argv.includes('--block');
 if (!path) {
   console.error('Укажи файл дампа: node tools/build-mob-model.js <dump.txt> [y0]');
   process.exit(1);
@@ -135,6 +139,14 @@ function poseMatrix(pose) {
 
 /** Ванильная матрица → наша: Y вверх, пиксели в блоки, низ модели на y0. */
 function toOurSpace(matrix, y0) {
+  if (blockMode) {
+    // Блок-модель: оси уже наши, делим только пиксели на 16.
+    const out = matrix.slice();
+    out[12] = matrix[12] / 16;
+    out[13] = matrix[13] / 16;
+    out[14] = matrix[14] / 16;
+    return out;
+  }
   // Линейная часть: F * M * F, где F переворачивает Y.
   const flip = [1, -1, 1];
   const out = new Array(16).fill(0);
@@ -181,7 +193,7 @@ for (const part of parts) {
     }
   }
 }
-const y0 = process.argv[3] !== undefined ? Number(process.argv[3]) : lowest;
+const y0 = blockMode ? 0 : (process.argv[3] !== undefined ? Number(process.argv[3]) : lowest);
 
 for (const part of parts) {
   let matrix = identity();
@@ -205,10 +217,10 @@ for (const part of parts) {
     const args = [
       '"' + part.name + '"',
       ff(blocks(cube.minX)),
-      ff(blocks(-cube.maxY)),
+      ff(blockMode ? blocks(cube.minY) : blocks(-cube.maxY)),
       ff(blocks(cube.minZ)),
       ff(blocks(cube.maxX)),
-      ff(blocks(-cube.minY)),
+      ff(blockMode ? blocks(cube.maxY) : blocks(-cube.minY)),
       ff(blocks(cube.maxZ)),
       'u = ' + cube.u,
       'v = ' + cube.v,
@@ -219,11 +231,14 @@ for (const part of parts) {
       args.push('matrix = floatArrayOf(' + values + ')');
     } else {
       if (part.x !== 0) args.push('offsetX = ' + ff(blocks(part.x)));
-      if (y0 - part.y !== 0) args.push('offsetY = ' + ff(blocks(y0 - part.y)));
+      // В блок-модели смещение части отсчитывается вверх от низа блока, в сущностной —
+      // от «низа модели», который мы только что вычислили.
+      const offsetPixels = blockMode ? part.y : y0 - part.y;
+      if (offsetPixels !== 0) args.push('offsetY = ' + ff(blocks(offsetPixels)));
       if (part.z !== 0) args.push('offsetZ = ' + ff(blocks(part.z)));
-      if (part.rx !== 0) args.push('rotX = ' + ff(-part.rx));
+      if (part.rx !== 0) args.push('rotX = ' + ff(blockMode ? part.rx : -part.rx));
       if (part.ry !== 0) args.push('rotY = ' + ff(part.ry));
-      if (part.rz !== 0) args.push('rotZ = ' + ff(-part.rz));
+      if (part.rz !== 0) args.push('rotZ = ' + ff(blockMode ? part.rz : -part.rz));
     }
     console.log('        MobBox(' + args.join(', ') + '),');
   }

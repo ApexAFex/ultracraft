@@ -4,7 +4,7 @@ import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
-    SHEEP, RABBIT, PIG, COW, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
+    SHEEP, SHEEP_FUR, RABBIT, PIG, COW, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
     GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, CREAKING, BOAT, MINECART, CHEST, NONE,
@@ -267,6 +267,7 @@ object MobModels {
         MobFamily.RAVAGER -> 128 to 128
         MobFamily.PIG, MobFamily.COW -> 64 to 64
         MobFamily.RABBIT -> 64 to 64
+        MobFamily.SHEEP_FUR -> 64 to 32
         MobFamily.ARMOR_STAND -> 64 to 64
         MobFamily.PUFFERFISH -> 32 to 32
         MobFamily.TROPICAL_FISH -> 32 to 32
@@ -286,6 +287,7 @@ object MobModels {
 
     fun boxes(family: MobFamily): List<MobBox> = when (family) {
         MobFamily.SHEEP -> SHEEP
+        MobFamily.SHEEP_FUR -> SHEEP_FUR
         MobFamily.RABBIT -> RABBIT
         MobFamily.PIG -> PIG
         MobFamily.COW -> COW
@@ -448,6 +450,22 @@ object MobModels {
      * рисуется поверх этой модели тем же мешем: так овца выглядит стриженой только без
      * шерсти, а с ней — белой и пушистой.
      */
+    /**
+     * Шерсть овцы — отдельная модель `SheepFurModel` (слой поверх овцы).
+     *
+     * Ноги здесь короче, чем у самой овцы: шерсть закрывает бедро и заканчивается выше
+     * копыта. Поэтому шерсть рисуется своим мешем поверх базовой модели, а не той же
+     * геометрией с другой текстурой — иначе войлок накрывал бы и копыта.
+     */
+    private val SHEEP_FUR = listOf(
+        MobBox("head", -0.1875f, -0.125f, -0.25f, 0.1875f, 0.25f, 0.125f, u = 0, v = 0, offsetY = 0.75f, offsetZ = -0.5f),
+        MobBox("right_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.375f, offsetZ = -0.3125f),
+        MobBox("right_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.375f, offsetZ = 0.4375f),
+        MobBox("left_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.375f, offsetZ = 0.4375f),
+        MobBox("body", -0.25f, -0.375f, -0.4375f, 0.25f, 0.625f, -0.0625f, u = 28, v = 8, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 0.8125f, 0.125f, 1f)),
+        MobBox("left_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.375f, offsetZ = -0.3125f),
+    )
+
     private val SHEEP = listOf(
         MobBox("head", -0.1875f, -0.125f, -0.375f, 0.1875f, 0.25f, 0.125f, u = 0, v = 0, offsetY = 1.125f, offsetZ = -0.5f),
         MobBox("right_front_leg", -0.125f, -0.75f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.75f, offsetZ = -0.3125f),
@@ -1167,19 +1185,14 @@ object MobModels {
      * высоту. Развёртка коробок стандартная, поэтому текстура `entity/chest/normal` ложится
      * как есть: у днища начало (0, 19), у крышки — (0, 0).
      */
+    /**
+     * Сундук, снятый с блок-модели `ChestModel` (флаг `--block`: у блок-моделей Y уже
+     * растёт вверх, поэтому пересчёт другой, чем у моделей сущностей).
+     */
     private val CHEST = listOf(
-        MobBox(
-            "base", -0.4375f, 0f, -0.4375f, 0.4375f, 0.625f, 0.4375f,
-            u = 0, v = 19,
-        ),
-        MobBox(
-            "lid", -0.4375f, 0.625f, -0.4375f, 0.4375f, 0.9375f, 0.4375f,
-            u = 0, v = 0,
-        ),
-        MobBox(
-            "knob", -0.0625f, 0.6875f, 0.4375f, 0.0625f, 0.8125f, 0.5f,
-            u = 0, v = 0,
-        ),
+        MobBox("bottom", 0.0625f, 0f, 0.0625f, 0.9375f, 0.625f, 0.9375f, u = 0, v = 19),
+        MobBox("lid", 0.0625f, 0f, 0f, 0.9375f, 0.3125f, 0.875f, u = 0, v = 0, offsetY = 0.5625f, offsetZ = 0.0625f),
+        MobBox("lock", 0.4375f, -0.125f, 0.875f, 0.5625f, 0.125f, 0.9375f, u = 0, v = 0, offsetY = 0.5625f, offsetZ = 0.0625f),
     )
 
     /**

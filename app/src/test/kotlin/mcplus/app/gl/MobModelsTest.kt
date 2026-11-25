@@ -56,6 +56,16 @@ class MobModelsTest {
         // Ноги овцы — три четверти блока: под ними видно траву, как в игре.
         val leg = boxes.first { it.name == "right_front_leg" }
         assertTrue(leg.maxY - leg.minY in 0.7f..0.8f, "нога овцы: ${leg.maxY - leg.minY}")
+
+        // Шерсть — отдельная модель: ноги короче, тело и голова на месте.
+        val fur = MobModels.boxes(MobFamily.SHEEP_FUR)
+        assertEquals(6, fur.size, "шерсть: голова, тело и четыре ноги")
+        val furLeg = fur.first { it.name == "right_front_leg" }
+        assertTrue(
+            furLeg.maxY - furLeg.minY < leg.maxY - leg.minY,
+            "шерсть короче ноги овцы — иначе закрывала бы копыто",
+        )
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.SHEEP_FUR))
     }
 
     @Test

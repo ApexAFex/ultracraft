@@ -39,6 +39,14 @@ class MobRenderer(
         val time: Float = 0f,
         /** 0 — стоит, 1 — уже упал набок (анимация смерти). */
         val deathProgress: Float = 0f,
+        /**
+         * Семейство меша для слоёв поверх шкуры.
+         *
+         * Обычно слой рисуется той же геометрией с другой текстурой (одежда жителя). Но
+         * у овцы шерсть — отдельная модель с другими коробками: ноги короче, потому что
+         * шерсть заканчивается выше копыта. Для неё меш берётся из этого поля.
+         */
+        val overlayFamily: MobFamily? = null,
     )
 
     private class FamilyMesh(
@@ -96,8 +104,10 @@ class MobRenderer(
                 GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
                 GL30.glEnable(GL30.GL_POLYGON_OFFSET_FILL)
                 GL30.glPolygonOffset(-1f, -1f)
+                // У слоя может быть своя геометрия (шерсть овцы): тогда берём её меш.
+                val overlayMesh = mob.overlayFamily?.let { meshFor(it) } ?: mesh
                 for (overlay in mob.overlays) {
-                    if (overlay != 0) drawMob(mesh, mob, overlay)
+                    if (overlay != 0) drawMob(overlayMesh, mob, overlay)
                 }
                 GL30.glDisable(GL30.GL_POLYGON_OFFSET_FILL)
                 GL30.glDisable(GL30.GL_BLEND)
