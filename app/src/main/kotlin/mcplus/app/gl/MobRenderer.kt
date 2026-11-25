@@ -130,8 +130,15 @@ class MobRenderer(
         } else {
             Mat4.identity()
         }
+        // Покачивание в воздухе: гаст и счастливый гаст висят и мерно покачиваются, а не
+        // стоят статуей. Смещение маленькое, поэтому на земле его не видно.
+        val hover = MobModels.hoverOffset(mob.family, mob.time)
         val base = Mat4.multiply(
-            Mat4.translate(mob.x.toFloat(), mob.y.toFloat(), mob.z.toFloat()),
+            Mat4.translate(
+                mob.x.toFloat(),
+                (mob.y + hover).toFloat(),
+                mob.z.toFloat(),
+            ),
             Mat4.multiply(Mat4.rotateY(yaw), Mat4.multiply(pose, scale(mob.scale))),
         )
 

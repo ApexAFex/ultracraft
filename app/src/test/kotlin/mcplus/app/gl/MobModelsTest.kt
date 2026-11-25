@@ -15,6 +15,20 @@ import kotlin.test.assertTrue
 class MobModelsTest {
 
     @Test
+    fun `a ghast hovers in the air and a cow does not`() {
+        // Гаст висит и покачивается: смещение ненулевое и меняет знак со временем.
+        val first = MobModels.hoverOffset(MobFamily.GHAST, 0.5f)
+        val later = MobModels.hoverOffset(MobFamily.GHAST, 3.5f)
+        assertTrue(first != 0f, "гаст должен покачиваться")
+        assertTrue(first != later, "покачивание меняется со временем")
+        assertTrue(kotlin.math.abs(first) <= 0.2f, "покачивание маленькое: $first")
+        // Счастливый гаст тоже висит, а наземные мобы стоят на месте.
+        assertTrue(MobModels.hoverOffset(MobFamily.HAPPY_GHAST, 1f) != 0f)
+        assertEquals(0f, MobModels.hoverOffset(MobFamily.QUADRUPED, 1f))
+        assertEquals(0f, MobModels.hoverOffset(MobFamily.BOAT, 1f))
+    }
+
+    @Test
     fun `common animals map to their model families`() {
         assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("cow"))
         assertEquals(MobFamily.QUADRUPED, MobModels.familyOf("pig"))

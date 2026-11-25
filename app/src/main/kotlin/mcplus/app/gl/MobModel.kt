@@ -66,6 +66,17 @@ object MobModels {
     fun deathAngle(progress: Float): Float =
         (Math.PI / 2.0 * progress.coerceIn(0f, 1f)).toFloat()
 
+    /**
+     * Покачивание модели в воздухе: у летающих мобов тело мерно ходит вверх-вниз.
+     *
+     * В ванили гаст висит и покачивается, а не стоит как статуя; на земле смещения нет.
+     */
+    fun hoverOffset(family: MobFamily, time: Float): Float = when (family) {
+        MobFamily.GHAST -> kotlin.math.sin(time * 1.1f) * 0.12f
+        MobFamily.HAPPY_GHAST -> kotlin.math.sin(time * 0.9f) * 0.10f
+        else -> 0f
+    }
+
     fun familyOf(entityName: String): MobFamily = when (entityName) {
         "cow", "mooshroom", "pig", "sheep", "rabbit" -> MobFamily.QUADRUPED
 
