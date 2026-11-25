@@ -630,19 +630,42 @@ class Hud(
      *
      * Показывается, пока достижение не выполнено, и не мешает чату: рисуется под ним.
      */
-    fun drawTrackedAdvancement(lines: List<String>) {
+    fun drawTrackedAdvancement(
+        lines: List<String>,
+        /** Слой иконки достижения (0 — без иконки). */
+        iconLayer: Int = 0,
+        /** Доля выполнения для полоски (null — полоски нет). */
+        fraction: Float? = null,
+    ) {
         if (lines.isEmpty()) return
         val text = this.text ?: return
         val s = HudLayout.scale(height).toFloat()
         val widest = lines.maxOf { text.textWidth(it, s * 0.85f) }
-        val left = width - widest - 8f * s
+        // Иконка слева от текста и полоска под ним — как в ванили.
+        val iconSize = 14f * s
+        val shift = if (iconLayer > 0) iconSize + 3f * s else 0f
+        val patternWidth = widest + shift
+        val left = width - patternWidth - 8f * s
         var y = 6f * s
+        val height = lines.size * 10f * s + (if (fraction != null) 4f * s else 0f) + 4f * s
         renderer.begin()
-        renderer.rect(left - 4f * s, y - 2f * s, widest + 8f * s, lines.size * 10f * s + 4f * s, 0x000000, 0.45f)
+        renderer.rect(left - 4f * s, y - 2f * s, patternWidth + 8f * s, height, 0x000000, 0.45f)
+        if (fraction != null) {
+            val barWidth = patternWidth
+            renderer.rect(left, y + height - 4f * s, barWidth, 2f * s, 0x202020, 0.9f)
+            renderer.rect(left, y + height - 4f * s, barWidth * fraction, 2f * s, 0x60D060, 1f)
+        }
         renderer.draw()
+        if (iconLayer > 0) {
+            renderer.begin()
+            renderer.icon(
+                HudRect(left, y - 1f * s, iconSize, iconSize), iconLayer, 1f,
+            )
+            renderer.draw()
+        }
         val labels = lines.mapIndexed { index, line ->
             TextRenderer.ScreenLabel(
-                left, y + index * 10f * s, line, s * 0.85f,
+                left + shift, y + index * 10f * s, line, s * 0.85f,
                 if (index == 0) 0xFFE7A0 else 0xC0C0C0,
             )
         }

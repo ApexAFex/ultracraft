@@ -3939,8 +3939,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 session?.advancements?.nodes()?.firstOrNull { it.title.text == name }
                             }
                             if (tracked != null) {
+                                // Иконка достижения — из атласа по номеру предмета,
+                                // полоска — по выполненным требованиям.
+                                val iconName = itemTable.nameOf(tracked.iconId)
                                 hud.drawTrackedAdvancement(
-                                    TrackedAdvancement.lines(tracked, 0, 0),
+                                    TrackedAdvancement.lines(tracked, tracked.progress, tracked.total),
+                                    iconLayer = atlas.layerForItemOrNull(iconName) ?: 0,
+                                    fraction = TrackedAdvancement.fraction(tracked),
                                 )
                             }
                             val chatLines = session?.chat?.snapshot() ?: emptyList()
