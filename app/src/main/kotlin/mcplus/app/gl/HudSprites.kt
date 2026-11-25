@@ -72,6 +72,13 @@ class HudSprites(val sheet: SpriteSheet) {
                 add("boss_${overlay}_background" to "boss_bar/${overlay}_background.png")
                 add("boss_${overlay}_progress" to "boss_bar/${overlay}_progress.png")
             }
+            // Значки меток на карте: у каждой свой файл 8×8, как в ванили.
+            for (icon in MapIcons.files) {
+                add(
+                    "map_$icon" to
+                        "assets/minecraft/textures/map/decorations/$icon.png",
+                )
+            }
         }
 
         /**

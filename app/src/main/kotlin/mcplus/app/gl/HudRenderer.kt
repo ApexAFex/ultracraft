@@ -213,6 +213,54 @@ class HudRenderer(
         GL30.glDeleteProgram(iconProgram)
     }
 
+    /**
+     * Спрайт, повёрнутый вокруг своего центра.
+     *
+     * Нужен меткам на карте: у значка игрока в игре поворот задаётся направлением взгляда
+     * (шаг 22,5°). Обычный [sprite] рисует только по осям, поэтому здесь считаются четыре
+     * угла повёрнутого квадрата.
+     *
+     * @return false, если спрайта нет — вызывающий рисует запасную точку.
+     */
+    fun spriteRotated(
+        name: String,
+        centerX: Float,
+        centerY: Float,
+        size: Float,
+        degrees: Float,
+        alpha: Float = 1f,
+    ): Boolean {
+        val sprite = sprites?.get(name) ?: return false
+        val uv = uvOf(sprite)
+        ensureGui()
+        var offset = guiCount
+        guiCount += GUI_FLOATS * 6
+        val radians = Math.toRadians(degrees.toDouble()).toFloat()
+        val c = kotlin.math.cos(radians)
+        val s = kotlin.math.sin(radians)
+        val half = size / 2f
+        fun put(cornerX: Float, cornerY: Float, u: Float, v: Float) {
+            // Поворот по часовой стрелке: экранные Y растут вниз.
+            val px = centerX + cornerX * c - cornerY * s
+            val py = centerY + cornerX * s + cornerY * c
+            gui[offset++] = px
+            gui[offset++] = py
+            gui[offset++] = u
+            gui[offset++] = v
+            gui[offset++] = 1f
+            gui[offset++] = 1f
+            gui[offset++] = 1f
+            gui[offset++] = alpha
+        }
+        put(-half, -half, uv[0], uv[1])
+        put(half, half, uv[2], uv[3])
+        put(half, -half, uv[2], uv[1])
+        put(-half, -half, uv[0], uv[1])
+        put(-half, half, uv[0], uv[3])
+        put(half, half, uv[2], uv[3])
+        return true
+    }
+
     private fun quad(x: Float, y: Float, w: Float, h: Float, uv: FloatArray, color: Int, alpha: Float) {
         ensureGui()
         val r = ((color shr 16) and 0xFF) / 255f

@@ -1778,17 +1778,26 @@ class Hud(
             markers += mcplus.net.MapData.Decoration(1, 70, 60, 0, "Дом")
         }
         for (marker in markers) {
-            val dot = 3f
             val cx = left + marker.x * cell
             val cy = top + marker.y * cell
-            // Носик стрелки: у метки игрока он показывает направление, у остальных не нужен.
-            if (marker.typeId == 0) {
-                val (dx, dy) = marker.noseOffset()
-                renderer.rect(cx + dx * cell - 1.5f, cy + dy * cell - 1.5f, 3f, 3f, 0x101010, 0.9f)
-                renderer.rect(cx + dx * cell - 1f, cy + dy * cell - 1f, 2f, 2f, marker.color(), 1f)
+            // Ванильный значок: у каждой метки своя картинка 8×8, у игрока она ещё и
+            // повёрнута по направлению взгляда (шаг 22,5°). Нет картинки — рисуем точку.
+            val iconSize = 8f
+            val sprite = MapIcons.spriteKey(marker.typeId)
+            val drawn = sprite != null && renderer.spriteRotated(
+                sprite, cx, cy, iconSize, marker.rotation * 22.5f,
+            )
+            if (!drawn) {
+                val dot = 3f
+                // Носик стрелки: у метки игрока он показывает направление, у остальных не нужен.
+                if (marker.typeId == 0) {
+                    val (dx, dy) = marker.noseOffset()
+                    renderer.rect(cx + dx * cell - 1.5f, cy + dy * cell - 1.5f, 3f, 3f, 0x101010, 0.9f)
+                    renderer.rect(cx + dx * cell - 1f, cy + dy * cell - 1f, 2f, 2f, marker.color(), 1f)
+                }
+                renderer.rect(cx - dot / 2f - 1f, cy - dot / 2f - 1f, dot + 2f, dot + 2f, 0x101010, 0.9f)
+                renderer.rect(cx - dot / 2f, cy - dot / 2f, dot, dot, marker.color(), 1f)
             }
-            renderer.rect(cx - dot / 2f - 1f, cy - dot / 2f - 1f, dot + 2f, dot + 2f, 0x101010, 0.9f)
-            renderer.rect(cx - dot / 2f, cy - dot / 2f, dot, dot, marker.color(), 1f)
         }
         renderer.draw()
         // Подпись под картой: масштаб и названия значков, как в ванили в подсказке карты.
