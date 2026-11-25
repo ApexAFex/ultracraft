@@ -941,6 +941,8 @@ private fun windowCommand(args: List<String>) {
     var startAdvancements = false
     /** Взять первое невыполненное достижение под отслеживание (`--track`). */
     var trackAtStart = false
+    /** На этом кадре правый клик по ближайшему мобу: проверка поводка (`--leash`). */
+    var leashAtFrame = -1
     var useItemAtFrame = -1
     /** Кадр, на котором открыть торговлю у ближайшего жителя. */
     var tradeAtFrame = -1
@@ -994,6 +996,7 @@ private fun windowCommand(args: List<String>) {
             "--tab" -> showTab = true
             "--advancements" -> startAdvancements = true
             "--track" -> trackAtStart = true
+            "--leash" -> leashAtFrame = args.getOrNull(++index)?.toIntOrNull() ?: 1200
             "--statistics" -> startStatistics = true
             "--recipes" -> startRecipeBook = true
             "--craft" -> startCraft = args.getOrNull(++index) ?: fail("--craft ждёт имя результата")
@@ -1145,6 +1148,7 @@ private fun windowCommand(args: List<String>) {
             showTab = showTab,
             startAdvancements = startAdvancements,
             trackAtStart = trackAtStart,
+            leashAtFrame = leashAtFrame,
             startStatistics = startStatistics,
             startRecipeBook = startRecipeBook,
             startCraft = startCraft,
@@ -1668,6 +1672,7 @@ private fun printUsage() {
           --tab          список игроков по Tab
           --advancements открыть экран достижений (клавиша L в игре)
           --track        отслеживать первое невыполненное достижение (клавиша J)
+          --leash N      на кадре N правый клик по ближайшему мобу (проверка поводка)
           --recipes      открыть книгу рецептов (клавиша B в игре)
           --craft NAME   скрафтить из книги рецепт с таким результатом (проверка без мыши)
           --book [N]     открыть книгу из руки (страница N) — экран чтения без мыши

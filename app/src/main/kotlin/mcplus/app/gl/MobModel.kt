@@ -77,6 +77,22 @@ object MobModels {
         else -> 0f
     }
 
+    /**
+     * Можно ли привязать это существо поводком.
+     *
+     * Ванильный `LeadItem.bindPlayerMobs` берёт только `Mob`: транспорт (лодки, вагонетки,
+     * сундучные варианты), стойка для брони и кристалл Края живые, но не мобы — поводок
+     * к ним не цепляется. Без этой проверки автоклик по «ближайшему существу» попадал в
+     * лодку, на которой стоял игрок, и поводок молча не привязывался.
+     */
+    fun leashable(family: MobFamily): Boolean = when (family) {
+        MobFamily.NONE, MobFamily.BOAT, MobFamily.MINECART, MobFamily.CHEST,
+        MobFamily.ARMOR_STAND, MobFamily.CRYSTAL,
+        -> false
+
+        else -> true
+    }
+
     fun familyOf(entityName: String): MobFamily = when (entityName) {
         "cow", "mooshroom", "pig", "sheep", "rabbit" -> MobFamily.QUADRUPED
 

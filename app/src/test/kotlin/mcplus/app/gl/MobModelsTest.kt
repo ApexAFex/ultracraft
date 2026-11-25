@@ -4,6 +4,7 @@ import mcplus.net.MetaEntry
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -961,12 +962,29 @@ class MobModelsTest {
     }
 
     @Test
-    fun `bat has flat wings on both sides`() {
-        val boxes = MobModels.boxes(MobFamily.BAT)
+    fun `bat has flat wings on both sides`() {        val boxes = MobModels.boxes(MobFamily.BAT)
         val wings = boxes.filter { it.name.startsWith("wing") }
         assertEquals(4, wings.size, "два крыла по две коробки")
         assertTrue(wings.all { it.minZ == it.maxZ }, "крылья — плоскости без толщины")
         assertTrue(wings.any { it.maxX < 0f } && wings.any { it.minX > 0f }, "крылья по обе стороны")
         assertTrue(boxes.minOf { it.minY } == 0f, "мышь стоит на земле")
+    }
+
+    @Test
+    fun `leash skips vehicles and non mobs`() {
+        // Живой моб — цель поводка.
+        assertTrue(MobModels.leashable(MobModels.familyOf("pig")))
+        assertTrue(MobModels.leashable(MobModels.familyOf("cow")))
+        assertTrue(MobModels.leashable(MobModels.familyOf("happy_ghast")))
+
+        // Транспорт и прочие сущности, которые не являются Mob: поводок к ним не цепляется.
+        assertFalse(MobModels.leashable(MobModels.familyOf("oak_boat")))
+        assertFalse(MobModels.leashable(MobModels.familyOf("bamboo_raft")))
+        assertFalse(MobModels.leashable(MobModels.familyOf("chest_boat")))
+        assertFalse(MobModels.leashable(MobModels.familyOf("minecart")))
+        assertFalse(MobModels.leashable(MobModels.familyOf("chest_minecart")))
+        assertFalse(MobModels.leashable(MobModels.familyOf("armor_stand")))
+        assertFalse(MobModels.leashable(MobModels.familyOf("end_crystal")))
+        assertFalse(MobModels.leashable(MobModels.familyOf("item")))
     }
 }

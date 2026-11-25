@@ -7,6 +7,7 @@ import mcplus.net.MoveSender
 import mcplus.net.PlayerMovement
 import mcplus.net.proto.Protocol777
 import mcplus.net.Session
+import mcplus.net.TrackedEntity
 import mcplus.net.World
 import mcplus.protocol.Packet
 import org.lwjgl.glfw.GLFW
@@ -84,6 +85,14 @@ fun blockXOf(key: Long): Int = (((key ushr 38) and 0x3FFFFFFL).toInt() shl 6) sh
 // Высота мира от -64 до 320: двенадцать бит со знаком, как в позиции протокола.
 fun blockYOf(key: Long): Int = (((key ushr 26) and 0xFFFL).toInt() shl 20) shr 20
 fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
+
+    /** Расстояние от игрока до существа в блоках — для проверки дальности клика. */
+    private fun distanceTo(player: Player, entity: TrackedEntity): Double {
+        val dx = entity.x - player.x
+        val dy = entity.y - player.y
+        val dz = entity.z - player.z
+        return kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+    }
 
     /** Цвет частицы по имени типа: дым серый, огонь оранжевый, искры жёлтые. */
     private fun particleColor(name: String): Int = when {
@@ -232,6 +241,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
         startAdvancements: Boolean = false,
         /** Отслеживать первое невыполненное достижение сразу (`--track`). */
         trackAtStart: Boolean = false,
+        /** На этом кадре правый клик по ближайшему мобу (проверка поводка). */
+        leashAtFrame: Int = -1,
         /** Открыть экран статистики сразу (проверка без клавиатуры). */
         startStatistics: Boolean = false,
         startRecipeBook: Boolean = false,
@@ -397,7 +408,20 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                 if (debug && seenIds.add(packet.id)) println("Пакет id=${packet.id}")
                 // The tab list is the only source of other players' names, so it goes first.
                 if (playerList.onPacket(packet.id, packet.body)) return
-                if (tracker.onPacket(packet)) return
+                val linksBefore = tracker.linkPackets
+                if (tracker.onPacket(packet)) {
+                    // Поводок пришёл: печатаем сразу, не дожидаясь итогов — так проверка
+                    // видна и в длинном прогоне, который потом снимают с сервера.
+                    if (tracker.linkPackets != linksBefore) {
+                        val leashed = tracker.snapshot().firstOrNull { it.leashHolder > 0 }
+                        println(
+                            "Поводок привязан: " + (leashed?.let {
+                                "сущность id=${it.id} держит id=${it.leashHolder}"
+                            } ?: "пакет связи без существа"),
+                        )
+                    }
+                    return
+                }
                 if (packet.id == Protocol777.Play.BLOCK_UPDATE) {
                     blockUpdates.incrementAndGet()
                     runCatching {
@@ -619,6 +643,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     /** Анимация смерти существ: свой отсчёт на каждого. */
                     val deathAnimator = DeathAnimator()
                     val deathLogged = HashSet<Int>()
+                    /** Мобы, про которых уже напечатана отладочная строка. */
+                    val mobLogged = HashSet<Int>()
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -684,6 +710,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     // The server already told us where we stand; guessing from the terrain puts
                     // the player half a block off and every move then gets corrected.
                     val serverSpawn = session?.playerPosition
+                    /** Номер своего существа: по нему видно, что держатель поводка — мы сами. */
+                    val selfEntityId = session?.joinResult?.joinGame?.entityId ?: -1
                     val spawnY = Player.spawnAbove(world, blocks, spawnX, spawnZ, world.minY + 383)
                     val player = if (serverSpawn != null) {
                         Player(serverSpawn.x, serverSpawn.y, serverSpawn.z, camera.yaw, camera.pitch)
@@ -846,6 +874,17 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     /** Set by the frame loop, consumed by the tick: one mining step per tick. */
                     var holdRequested = false
                     var aimTarget: Raycast.Hit? = null
+
+                    /**
+                     * Поводок ждёт подходящего моба, а не строгого кадра.
+                     *
+                     * Раньше клик был привязан к номеру кадра, и на быстрой машине кадр
+                     * проходил раньше, чем RCON успевал выдать поводок и поставить свинью:
+                     * клик уходил в рыбу за 44 блока и сервер его отбрасывал. Теперь клик
+                     * случается на первом кадре после [leashAtFrame], когда рядом (≤ 3,5 блока)
+                     * есть живой моб, и только один раз.
+                     */
+                    var leashPending = leashAtFrame >= 0
 
                     fun beginMining(hit: Raycast.Hit) {
                         val name = blocks.nameOf(world.blockAt(hit.x, hit.y, hit.z))
@@ -3220,6 +3259,18 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         if (debug && deathProgress > 0f && deathLogged.add(entity.id)) {
                                             println("Смерть: $name (id=${entity.id})")
                                         }
+                                        // Что именно нарисовано для моба: семейство, масштаб,
+                                        // число коробок, седло и поводок. Без этого не видно,
+                                        // почему модель выглядит не так, как в игре.
+                                        if (debug && mobLogged.add(entity.id)) {
+                                            println(
+                                                "Моб: $name семейство=$family" +
+                                                    " масштаб=" + MobModels.scaleFor(name, entity.metadata) +
+                                                    " коробок=" + MobModels.boxes(family).size +
+                                                    " седло=" + entity.equipmentItem(SaddleLook.SLOT) +
+                                                    " поводок=" + entity.leashHolder,
+                                            )
+                                        }
                                         mobs += MobRenderer.Mob(
                                             x = entity.x,
                                             y = entity.y,
@@ -3242,19 +3293,42 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         // Поводок: в 26.3 связь приходит пакетом `Set Entity
                                         // Link`. Верёвку рисуем цепочкой мелких кубиков от
                                         // головы моба к держателю — линий в рендерере нет.
+                                        // Держателем чаще всего бывает сам игрок, а он не
+                                        // лежит в списке сущностей: раньше из-за этого верёвка
+                                        // не рисовалась вовсе.
                                         val leashHolderId = entity.leashHolder
                                         if (leashHolderId > 0) {
                                             val holder = tracker.byId(leashHolderId)
+                                            val holderX: Double
+                                            val holderY: Double
+                                            val holderZ: Double
                                             if (holder != null) {
-                                                val steps = 8
-                                                for (step in 1 until steps) {
-                                                    val t = step / steps.toFloat()
-                                                    val ropeX = entity.x + (holder.x - entity.x) * t
-                                                    val ropeY = entity.y + 1.0 +
-                                                        (holder.y + 1.2 - (entity.y + 1.0)) * t
-                                                    val ropeZ = entity.z + (holder.z - entity.z) * t
+                                                holderX = holder.x
+                                                holderY = holder.y + 1.2
+                                                holderZ = holder.z
+                                            } else if (leashHolderId == selfEntityId) {
+                                                // Конец верёвки — не глаз камеры, а рука:
+                                                // иначе ближние кубики упираются в камеру и
+                                                // выглядят огромными коричневыми блоками.
+                                                val f = camera.forward()
+                                                val r = camera.right()
+                                                val u = camera.up()
+                                                holderX = player.x + r[0] * 0.32 + f[0] * 0.45 - u[0] * 0.30
+                                                holderY = player.eyeY + r[1] * 0.32 + f[1] * 0.45 - u[1] * 0.30
+                                                holderZ = player.z + r[2] * 0.32 + f[2] * 0.45 - u[2] * 0.30
+                                            } else {
+                                                holderX = Double.NaN
+                                                holderY = Double.NaN
+                                                holderZ = Double.NaN
+                                            }
+                                            if (!holderX.isNaN()) {
+                                                val rope = LeashRope.points(
+                                                    entity.x, entity.y + 1.0, entity.z,
+                                                    holderX, holderY, holderZ,
+                                                )
+                                                for (point in rope) {
                                                     cubes += Renderer.BlockCube(
-                                                        ropeX, ropeY, ropeZ, 0.06f,
+                                                        point.x, point.y, point.z, 0.06f,
                                                         ropeLayer, ropeLayer, ropeLayer,
                                                         red = 0.55f, green = 0.38f, blue = 0.20f,
                                                         sizeX = 0.06f, sizeY = 0.06f, sizeZ = 0.06f,
@@ -4395,6 +4469,29 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 holdRequested = false
                             }
                         }
+                        // Проверка поводка без мыши: ждём первого кадра после заданного, когда
+                        // рядом есть живой моб, и жмём ПКМ по нему — сервер сам привяжет его,
+                        // если в руке поводок. Клик ровно один.
+                        if (leashPending && frame >= leashAtFrame &&
+                            session?.inventory?.heldName() == "lead"
+                        ) {
+                            val candidates = entities.filter {
+                                MobModels.leashable(MobModels.familyOf(entityTypes.nameOf(it.type))) &&
+                                    distanceTo(player, it) <= 3.5
+                            }
+                            val targetEntity = candidates.minByOrNull { distanceTo(player, it) }
+                            if (targetEntity != null) {
+                                val targetName = entityTypes.nameOf(targetEntity.type)
+                                val targetHeight = EntityRay.boxOf(targetName).second
+                                session?.interact(targetEntity.id, 0.0, targetHeight * 0.5, 0.0)
+                                println(
+                                    "Поводок: ПКМ по " + targetName +
+                                        " id=" + targetEntity.id +
+                                        " (%.2f блока)".format(distanceTo(player, targetEntity)),
+                                )
+                                leashPending = false
+                            }
+                        }
                         aimTarget = if (inventoryOpen || advancementsOpen || openContainer != null || dead || chat.open) null else miningTarget
 
                         if (!inventoryOpen && !advancementsOpen && openContainer == null && bookScreens == null && !dead && !chat.open &&
@@ -4692,6 +4789,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     println("Звуков сыграно: ${sound.played} из ${sound.requested} запросов (доступен: ${sound.available}), из пакетов сервера: ${serverSounds.get()}")
                     println("Шагов чужих существ: $otherSteps (игроков: $playerSteps)")
                     println("Едущих поршней замечено: ${mcplus.net.Pistons.seen}")
+            println("Поводков получено: ${tracker.linkPackets}")
             println("Карт в рамках нарисовано: ${mapFrameDrawn.size}")
                 }
             }

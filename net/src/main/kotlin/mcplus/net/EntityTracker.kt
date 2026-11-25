@@ -216,6 +216,11 @@ class EntityTracker {
     var movementPackets: Int = 0
         private set
 
+    /** Сколько пакетов связи (поводков) пришло: по нему видно, работает ли путь. */
+    @Volatile
+    var linkPackets: Int = 0
+        private set
+
     val count: Int get() = entities.size
 
     fun snapshot(): List<TrackedEntity> = entities.values.toList()
@@ -296,6 +301,7 @@ class EntityTracker {
                     val reader = ByteReader(packet.body)
                     val leashed = reader.readInt()
                     val holder = reader.readInt()
+                    linkPackets++
                     entities[leashed]?.applyLeash(holder)
                 }
                 return true
