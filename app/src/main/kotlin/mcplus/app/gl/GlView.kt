@@ -3048,10 +3048,17 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         } else {
                                             "item_frame"
                                         }
-                                        worldIcons += Renderer.WorldIcon(
-                                            entity.x, entity.y + 0.5, entity.z, 0.62f,
-                                            atlas.layerFor(frameName, TextureAtlas.Kind.SIDE),
-                                        )
+                                        // Рамку рисуем, только если внутри не карта: у карты
+                                        // своя картинка плитками, и подложка рамки её закрывала.
+                                        val frameMapIdEarly = entity.frameItem?.mapId ?: -1
+                                        val frameShowsMap = frameMapIdEarly >= 0 &&
+                                            session?.maps?.has(frameMapIdEarly) == true
+                                        if (!frameShowsMap) {
+                                            worldIcons += Renderer.WorldIcon(
+                                                entity.x, entity.y + 0.5, entity.z, 0.62f,
+                                                atlas.layerFor(frameName, TextureAtlas.Kind.SIDE),
+                                            )
+                                        }
                                         // У рамки предмет лежит в своём поле (9), а не в поле
                                         // выпавшего предмета (8).
                                         val stack = entity.frameItem
@@ -3060,7 +3067,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         // Карта в рамке: в ванили видно сам рисунок карты, а
                                         // не иконку предмета. Рисуем её плитками на стене.
                                         val frameMapId = stack?.mapId ?: -1
-                                        val mapImage = if (frameMapId >= 0) {
+                                        val mapImage = if (frameMapId >= 0 &&
+                                            session?.maps?.has(frameMapId) == true
+                                        ) {
                                             session?.maps?.imageOf(frameMapId)
                                         } else {
                                             null
@@ -3069,11 +3078,14 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             val tiles = MapFrame.tilesOf(mapImage) { packed ->
                                                 mcplus.net.MapColors.active.colorOf(packed)
                                             }
-                                            val yawRad = Math.toRadians(entity.yaw.toDouble())
+                                            // Рамка у нас рисуется билбордом (повёрнутым к
+                                            // камере), поэтому и карта в ней — билборд: плитки
+                                            // ставятся в плоскости камеры и видны с любой
+                                            // стороны, как иконка рамки.
+                                            val cameraYaw = 180f - CameraAngles.degrees(camera.yaw)
+                                            val yawRad = Math.toRadians(cameraYaw.toDouble())
                                             val rightX = kotlin.math.cos(yawRad).toFloat()
                                             val rightZ = -kotlin.math.sin(yawRad).toFloat()
-                                            val faceX = kotlin.math.sin(yawRad).toFloat()
-                                            val faceZ = kotlin.math.cos(yawRad).toFloat()
                                             val white =
                                                 atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
                                             val tile = 1f / MapFrame.TILES
@@ -3082,12 +3094,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                 val localY = 0.5f - (part.y + 0.5f) * tile
                                                 val (red, green, blue) = MapFrame.channels(part.color)
                                                 cubes += Renderer.BlockCube(
-                                                    entity.x + localX * rightX + faceX * 0.06,
+                                                    entity.x + localX * rightX,
                                                     entity.y + 0.5 + localY,
-                                                    entity.z + localX * rightZ + faceZ * 0.06,
+                                                    entity.z + localX * rightZ,
                                                     1f,
                                                     white, white, white,
-                                                    yaw = entity.yaw,
+                                                    yaw = cameraYaw,
                                                     red = red, green = green, blue = blue,
                                                     sizeX = tile, sizeY = tile, sizeZ = 0.01f,
                                                 )
