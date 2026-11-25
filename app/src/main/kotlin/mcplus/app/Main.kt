@@ -1166,7 +1166,7 @@ private fun windowCommand(args: List<String>) {
             captureAfterSeconds = captureAfterSeconds,
             entityTypes = findEntityTable(),
             itemTable = findItemTable(),
-            particleTable = findParticleTable(),
+            particleTable = findParticleTable().also { mcplus.net.ParticleTable.active = it },
             soundEvents = findSoundEventTable(),
             consumables = findConsumables(),
             villagerTable = findVillagerTable(),

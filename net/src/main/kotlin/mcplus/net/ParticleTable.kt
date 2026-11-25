@@ -16,6 +16,10 @@ class ParticleTable(private val names: List<String>) {
     companion object {
         val EMPTY = ParticleTable(emptyList())
 
+        /** Таблица, которой пользуется разбор метаданных и частиц: заполняется при запуске. */
+        @Volatile
+        var active: ParticleTable = EMPTY
+
         fun load(file: File): ParticleTable {
             val names = ArrayList<String>()
             file.forEachLine { line ->

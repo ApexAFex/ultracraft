@@ -26,6 +26,58 @@ class EntityMetadataTest {
         ByteWriter().writeByte(index).writeVarInt(type).writeBytes(payload).toByteArray()
 
     @Test
+    fun `a block particle keeps the field after it`() {
+        // Частица блока несёт номер состояния блока: без него следующее поле прочитается
+        // из середины числа и разбор сломается.
+        val table = java.io.File.createTempFile("particles", ".tsv").apply {
+            deleteOnExit()
+            writeText("1\tblock\n")
+        }
+        val previous = ParticleTable.active
+        ParticleTable.active = ParticleTable.load(table)
+        try {
+            val particle = ByteWriter()
+                .writeVarInt(1)      // тип частицы: block
+                .writeVarInt(77)     // состояние блока
+                .toByteArray()
+            // Следующее поле идёт сразу за частицей: если её длина прочитана неверно,
+            // это поле не разберётся.
+            val meta = readEntityMetadata(
+                body(
+                    1,
+                    field(6, 16, particle),
+                    field(7, 3, ByteWriter().writeFloat(2.5f).toByteArray()),
+                ),
+            ).second
+            assertEquals(77.0, meta.getValue(6).number)
+            assertEquals(2.5f.toDouble(), meta.getValue(7).number)
+        } finally {
+            ParticleTable.active = previous
+        }
+    }
+
+    @Test
+    fun `a dust particle reads colour and size`() {
+        val table = java.io.File.createTempFile("particles", ".tsv").apply {
+            deleteOnExit()
+            writeText("2\tdust\n")
+        }
+        val previous = ParticleTable.active
+        ParticleTable.active = ParticleTable.load(table)
+        try {
+            val payload = ByteWriter()
+                .writeVarInt(2)          // тип частицы: dust
+                .writeInt(0x11223344)    // цвет
+                .writeFloat(1.5f)        // размер
+                .toByteArray()
+            val meta = readEntityMetadata(body(1, field(7, 16, payload))).second
+            assertEquals(0x11223344.toDouble(), meta.getValue(7).number)
+        } finally {
+            ParticleTable.active = previous
+        }
+    }
+
+    @Test
     fun `a vector and a quaternion do not stop the following fields`() {
         // 39 (вектор) и 40 (кватернион) — числа с плавающей точкой. Если их длину перепутать,
         // следующий за ними флаг прочитается из середины числа и разбор поля сломается.
@@ -149,7 +201,7 @@ class EntityMetadataTest {
     fun `an unknown field type stops the parse but keeps earlier fields`() {        val packet = body(
             7,
             field(9, 3, ByteWriter().writeFloat(20f).toByteArray()),
-            field(10, 16, ByteWriter().writeVarInt(1).toByteArray()), // частица: неизвестно
+            field(10, 200, ByteWriter().writeVarInt(1).toByteArray()), // тип 200 не существует
             field(11, 3, ByteWriter().writeFloat(1f).toByteArray()),
         )
         val (_, meta) = readEntityMetadata(packet)

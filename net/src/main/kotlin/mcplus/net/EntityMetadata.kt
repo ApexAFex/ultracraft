@@ -174,7 +174,45 @@ private fun readMetaValue(reader: ByteReader, type: Int): MetaEntry? = when (typ
         }
     }
 
-    // 16 (частица), 17 (список частиц) и всё незнакомое — стоп: длину их данных мы не знаем.
+    // 16 — частица: номер типа и данные, зависящие от типа. У частиц блоков это номер
+    // состояния блока, у пыли — цвет и размер, у предмета — стек. Остальные частицы данных не
+    // несут. Незнакомый тип по-прежнему останавливает разбор: его длину не угадать.
+    16 -> {
+        val particleId = reader.readVarInt()
+        when (ParticleTable.active.nameOf(particleId)) {
+            "block", "block_marker", "falling_dust", "dust_pillar" ->
+                MetaEntry(type, reader.readVarInt().toDouble())
+            "dust" -> {
+                val color = reader.readInt()
+                reader.readFloat()
+                MetaEntry(type, color.toDouble())
+            }
+            "dust_color_transition" -> {
+                val from = reader.readInt()
+                reader.readInt()
+                reader.readFloat()
+                MetaEntry(type, from.toDouble())
+            }
+            "item" -> {
+                runCatching { mcplus.net.readMenuStack(reader) }
+                MetaEntry(type, particleId.toDouble())
+            }
+            "sculk_charge" -> MetaEntry(type, reader.readFloat().toDouble())
+            "shriek" -> MetaEntry(type, reader.readVarInt().toDouble())
+            // Без данных: цвет пыли, искры, дым и прочее.
+            else -> MetaEntry(type, particleId.toDouble())
+        }
+    }
+    // 17 — список частиц: столько же записей, каждая как одиночная частица.
+    17 -> {
+        val count = reader.readVarInt().coerceIn(0, 32)
+        repeat(count) {
+            readMetaValue(reader, 16)
+        }
+        MetaEntry(type)
+    }
+
+    // Всё незнакомое — стоп: длину данных мы не знаем.
     else -> null
 }
 
