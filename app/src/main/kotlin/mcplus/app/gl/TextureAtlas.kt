@@ -84,6 +84,25 @@ class TextureAtlas(
         return layerFor(itemName, kind)
     }
 
+    /**
+     * Слой для иконки предмета, если текстура есть; null — иконки нет.
+     *
+     * `layerForItem` возвращает пурпурную заглушку, и вызывающий код не может отличить её от
+     * настоящей иконки — в статистике из-за этого висели пурпурные квадраты.
+     */
+    fun layerForItemOrNull(itemName: String, kind: Kind = Kind.SIDE): Int? {
+        appearances[itemName]?.let { faces ->
+            return when (kind) {
+                Kind.TOP -> faces.top
+                Kind.BOTTOM -> faces.bottom
+                Kind.SIDE -> faces.side
+            }
+        }
+        layers["item:$itemName"]?.let { return it }
+        val layer = layerFor(itemName, kind)
+        return if (layer == missingLayer) null else layer
+    }
+
     fun tintOf(layer: Int): Int? {
         val name = namesByLayer.getOrNull(layer) ?: return null
         return when {

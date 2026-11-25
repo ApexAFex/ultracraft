@@ -334,7 +334,10 @@ class Hud(
         renderer.rect(0f, 0f, width.toFloat(), height.toFloat(), 0x06090F, 0.9f)
         renderer.draw()
 
-        val left = width * 0.12f
+        // Колонка видов счётчиков слева шире, чем отступ для текста:содержимое начинается
+        // правее неё, иначе названия строк наезжают на названия видов.
+        val listXForLayout = width * 0.02f
+        val left = maxOf(width * 0.12f, listXForLayout + 100f * s)
         val top = height * 0.10f
         val labels = ArrayList<TextRenderer.ScreenLabel>()
         labels += TextRenderer.ScreenLabel(left, top, "Статистика", s * 1.6f)
