@@ -25,6 +25,16 @@ class MapFrameTest {
     }
 
     @Test
+    fun `the caption shows the scale number and the legend`() {
+        // Раньше номер масштаба терялся и под картой висело «Масштаб:» без числа.
+        assertEquals(listOf("Масштаб: 2", "Дом"), MapFrame.caption(2, listOf("Дом")))
+        assertEquals(listOf("Дом"), MapFrame.caption(null, listOf("Дом")))
+        assertEquals(emptyList(), MapFrame.caption(null, emptyList()))
+        // Пустые подписи не попадают в подпись, а пробелы обрезаются.
+        assertEquals(listOf("Дом"), MapFrame.caption(null, listOf("  ", " Дом ")))
+    }
+
+    @Test
     fun `a wall frame turns the map to its own side`() {
         // Направления рамки: 2 — север, 3 — юг, 4 — запад, 5 — восток.
         assertEquals(180f, MapFrame.yawFor(2))

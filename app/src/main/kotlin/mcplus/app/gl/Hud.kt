@@ -1710,10 +1710,9 @@ class Hud(
         }
         renderer.draw()
         // Подпись под картой: масштаб и названия значков, как в ванили в подсказке карты.
-        val labels = ArrayList<String>()
-        mapScale(mapId)?.let { labels += "Масштаб: " }
         // Легенда — из тех значков, что реально нарисованы (включая пробные).
-        labels += markers.mapNotNull { it.label?.takeIf { text -> text.isNotBlank() } }.distinct()
+        val legend = markers.mapNotNull { it.label?.takeIf { text -> text.isNotBlank() } }.distinct()
+        val labels = MapFrame.caption(mapScale(mapId), legend)
         if (labels.isNotEmpty() && text != null) {
             val lines = labels.mapIndexed { index, line ->
                 TextRenderer.ScreenLabel(

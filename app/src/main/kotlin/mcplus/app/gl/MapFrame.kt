@@ -55,6 +55,21 @@ object MapFrame {
     }
 
     /**
+     * Подпись под картой: масштаб и названия значков.
+     *
+     * Раньше номер масштаба терялся при правке строки, и под картой висело «Масштаб:» без числа.
+     */
+    fun caption(scale: Int?, labels: List<String>): List<String> {
+        val lines = ArrayList<String>(labels.size + 1)
+        if (scale != null) lines += "Масштаб: " + scale
+        for (label in labels) {
+            val text = label.trim()
+            if (text.isNotEmpty()) lines += text
+        }
+        return lines
+    }
+
+    /**
      * Поворот карты по направлению рамки.
      *
      * Направление лежит в поле 8 (`DIRECTION`): 0 — вниз, 1 — вверх, 2 — север, 3 — юг,
