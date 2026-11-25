@@ -2768,10 +2768,25 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             val iterator = particles.iterator()
                             while (iterator.hasNext()) {
                                 val piece = iterator.next()
-                                piece.vy -= 3.0 * debrisDelta
-                                piece.x += piece.vx * debrisDelta
-                                piece.y += piece.vy * debrisDelta
-                                piece.z += piece.vz * debrisDelta
+                                // Физика вынесена в ParticlePhysics: гравитация, торможение и
+                                // отскок от пола — раньше частицы проваливались сквозь блоки.
+                                val stepped = ParticlePhysics.step(
+                                    ParticlePhysics.State(
+                                        piece.x, piece.y, piece.z,
+                                        piece.vx, piece.vy, piece.vz,
+                                    ),
+                                    debrisDelta.toDouble(),
+                                ) { bx, by, bz ->
+                                    val state = world.blockAt(bx, by, bz)
+                                    state != 0 && state != mcplus.net.World.UNKNOWN &&
+                                        !blocks.isAir(state)
+                                }
+                                piece.x = stepped.x
+                                piece.y = stepped.y
+                                piece.z = stepped.z
+                                piece.vx = stepped.vx
+                                piece.vy = stepped.vy
+                                piece.vz = stepped.vz
                                 piece.life -= debrisDelta
                                 if (piece.life <= 0f) iterator.remove()
                             }
