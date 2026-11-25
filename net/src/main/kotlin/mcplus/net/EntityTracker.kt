@@ -124,6 +124,21 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     val sneaking: Boolean
         get() = meta[POSE_FIELD]?.number?.toInt() == POSE_SNEAKING
 
+    /**
+     * Поводок: к кому привязана сущность (0 — не привязана).
+     *
+     * В 26.3 связь приходит отдельным пакетом `Set Entity Link` с двумя Int, а не полем
+     * метаданных, как в старых версиях.
+     */
+    @Volatile
+    var leashHolder: Int = 0
+        private set
+
+    /** Поставить или снять поводок: 0 в [holder] — отвязали. */
+    fun applyLeash(holder: Int) {
+        leashHolder = if (holder > 0) holder else 0
+    }
+
     /** Экипировка из `Set Equipment`: номер слота → id предмета (0 — пусто). */
     private val equipment = ConcurrentHashMap<Int, Int>()
 
@@ -272,6 +287,16 @@ class EntityTracker {
                 runCatching {
                     val (id, values) = readEntityMetadata(packet.body)
                     entities[id]?.applyMetadata(values)
+                }
+                return true
+            }
+
+            Protocol777.Play.SET_ENTITY_LINK -> {
+                runCatching {
+                    val reader = ByteReader(packet.body)
+                    val leashed = reader.readInt()
+                    val holder = reader.readInt()
+                    entities[leashed]?.applyLeash(holder)
                 }
                 return true
             }

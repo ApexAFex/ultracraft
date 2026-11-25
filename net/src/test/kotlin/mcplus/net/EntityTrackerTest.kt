@@ -32,6 +32,28 @@ class EntityTrackerTest {
         )
 
     @Test
+    fun `a leash link comes as its own packet`() {
+        // 26.3: `Set Entity Link` — два Int (кого привязали, к кому). 0 — отвязали.
+        val tracker = EntityTracker()
+        val spawnPacket = spawn(7, 74, 1.0, 2.0, 3.0)
+        tracker.onPacket(spawnPacket)
+        val leash = Packet(
+            Protocol777.Play.SET_ENTITY_LINK,
+            ByteWriter().writeInt(7).writeInt(99).toByteArray(),
+        )
+        tracker.onPacket(leash)
+        assertEquals(99, tracker.snapshot().single { it.id == 7 }.leashHolder)
+
+        val release = Packet(
+            Protocol777.Play.SET_ENTITY_LINK,
+            ByteWriter().writeInt(7).writeInt(0).toByteArray(),
+        )
+        tracker.onPacket(release)
+        assertEquals(0, tracker.snapshot().single { it.id == 7 }.leashHolder)
+        // Пакет про неизвестную сущность не должен ронять разбор.
+    }
+
+    @Test
     fun `an item frame keeps its item in field nine`() {
         // У рамки предмет лежит в своём поле (9), а не в поле выпавшего предмета (8):
         // HangingEntity занимает восьмое поле направлением.

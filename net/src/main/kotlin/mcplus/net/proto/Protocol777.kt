@@ -88,6 +88,9 @@ object Protocol777 {
          */
         const val SET_PASSENGERS: Int = 0x6D
 
+    /** Поводок: два Int — кого привязали и к кому (0 — отвязали). */
+    const val SET_ENTITY_LINK: Int = 0x66
+
         /** Книга рецептов: список описаний того, что можно скрафтить. */
         const val RECIPE_BOOK_ADD: Int = 0x4B
         const val REMOVE_ENTITIES: Int = 0x4E

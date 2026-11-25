@@ -2947,6 +2947,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
                     val saddleLayer = atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
+                    val ropeLayer = atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
                         val worldIcons = ArrayList<Renderer.WorldIcon>()
                         val paintings = ArrayList<PaintingRenderer.Painting>()
                         val nowNanos = System.nanoTime()
@@ -3238,6 +3239,29 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
                                         )
+                                        // Поводок: в 26.3 связь приходит пакетом `Set Entity
+                                        // Link`. Верёвку рисуем цепочкой мелких кубиков от
+                                        // головы моба к держателю — линий в рендерере нет.
+                                        val leashHolderId = entity.leashHolder
+                                        if (leashHolderId > 0) {
+                                            val holder = tracker.byId(leashHolderId)
+                                            if (holder != null) {
+                                                val steps = 8
+                                                for (step in 1 until steps) {
+                                                    val t = step / steps.toFloat()
+                                                    val ropeX = entity.x + (holder.x - entity.x) * t
+                                                    val ropeY = entity.y + 1.0 +
+                                                        (holder.y + 1.2 - (entity.y + 1.0)) * t
+                                                    val ropeZ = entity.z + (holder.z - entity.z) * t
+                                                    cubes += Renderer.BlockCube(
+                                                        ropeX, ropeY, ropeZ, 0.06f,
+                                                        ropeLayer, ropeLayer, ropeLayer,
+                                                        red = 0.55f, green = 0.38f, blue = 0.20f,
+                                                        sizeX = 0.06f, sizeY = 0.06f, sizeZ = 0.06f,
+                                                    )
+                                                }
+                                            }
+                                        }
                                         // Седло: в 26.3 это слот экипировки, а не флаг в
                                         // метаданных. Раньше мы его не рисовали вовсе.
                                         val saddleItem = entity.equipmentItem(SaddleLook.SLOT)
