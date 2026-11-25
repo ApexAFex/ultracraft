@@ -151,11 +151,36 @@ function toOurSpace(matrix, y0) {
   return out;
 }
 
-// Самый низ модели: без учёта поворотов, но этого достаточно, чтобы поставить её на ноль.
-const lowest = parts.reduce(
-  (max, part) => part.cubes.reduce((inner, cube) => Math.max(inner, part.y + cube.maxY), max),
-  -Infinity,
-);
+// Самый низ модели: считаем честно — углы всех коробок через полную цепочку поз.
+//
+// Раньше здесь складывались `part.y + cube.maxY`, то есть повороты не учитывались. Для
+// кролика (лапы-«пятки» повёрнуты, а части вложены) это дало низ 26,389 px вместо целого
+// числа, и модель вставала на землю криво. Теперь каждая коробка прогоняется через матрицу
+// своей части целиком, а в игре Y растёт вниз, поэтому «низ» — это максимум Y.
+function fullMatrix(part) {
+  let matrix = identity();
+  const chain = part.path.split('/');
+  for (let depth = 2; depth <= chain.length; depth++) {
+    const pose = originalPoses.get(chain.slice(0, depth).join('/'));
+    if (pose) matrix = multiply(matrix, poseMatrix(pose));
+  }
+  return matrix;
+}
+
+let lowest = -Infinity;
+for (const part of parts) {
+  const matrix = fullMatrix(part);
+  for (const cube of part.cubes) {
+    for (const x of [cube.minX, cube.maxX]) {
+      for (const y of [cube.minY, cube.maxY]) {
+        for (const z of [cube.minZ, cube.maxZ]) {
+          const worldY = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+          if (worldY > lowest) lowest = worldY;
+        }
+      }
+    }
+  }
+}
 const y0 = process.argv[3] !== undefined ? Number(process.argv[3]) : lowest;
 
 for (const part of parts) {

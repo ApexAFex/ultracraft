@@ -56,21 +56,26 @@ final class mob_dump {
 
     /** Фабрика слоя: без аргументов или с одной деформацией куба. */
     private static Object callFactory(Class<?> type, String name) throws Exception {
-        for (Method method : type.getDeclaredMethods()) {
-            if (!method.getName().equals(name)) continue;
-            method.setAccessible(true);
-            if (method.getParameterCount() == 0) {
-                return method.invoke(null);
-            }
-            if (method.getParameterCount() == 1
-                && method.getParameterTypes()[0] == CubeDeformation.class) {
-                return method.invoke(null, new CubeDeformation(0.0F));
-            }
-            // Счастливый гаст: фабрика принимает «детёныш ли» и деформацию куба.
-            if (method.getParameterCount() == 2
-                && method.getParameterTypes()[0] == boolean.class
-                && method.getParameterTypes()[1] == CubeDeformation.class) {
-                return method.invoke(null, false, new CubeDeformation(0.0F));
+        // Фабрика бывает объявлена не в самой модели, а в родителе: у кошки `createBodyLayer`
+        // живёт в `AdultFelineModel`, у волка принимает деформацию куба. Раньше поиск шёл
+        // только по объявленным методам класса и падал с NoSuchMethodException.
+        for (Class<?> current = type; current != null; current = current.getSuperclass()) {
+            for (Method method : current.getDeclaredMethods()) {
+                if (!method.getName().equals(name)) continue;
+                method.setAccessible(true);
+                if (method.getParameterCount() == 0) {
+                    return method.invoke(null);
+                }
+                if (method.getParameterCount() == 1
+                    && method.getParameterTypes()[0] == CubeDeformation.class) {
+                    return method.invoke(null, new CubeDeformation(0.0F));
+                }
+                // Счастливый гаст: фабрика принимает «детёныш ли» и деформацию куба.
+                if (method.getParameterCount() == 2
+                    && method.getParameterTypes()[0] == boolean.class
+                    && method.getParameterTypes()[1] == CubeDeformation.class) {
+                    return method.invoke(null, false, new CubeDeformation(0.0F));
+                }
             }
         }
         throw new NoSuchMethodException(type.getName() + "." + name);

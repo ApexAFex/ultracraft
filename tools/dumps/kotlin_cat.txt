@@ -1,0 +1,12 @@
+﻿// Текстура 64×64, низ модели на 28 px
+        MobBox("head", -0.1562f, -0.125f, -0.1875f, 0.1563f, 0.125f, 0.125f, u = 0, v = 0, offsetY = 0.8125f, offsetZ = -0.5625f),
+        MobBox("head", -0.0937f, -0.1249f, -0.25f, 0.0938f, 0.0001f, -0.125f, u = 0, v = 24, offsetY = 0.8125f, offsetZ = -0.5625f),
+        MobBox("head", -0.125f, 0.125f, 0f, -0.0625f, 0.1875f, 0.125f, u = 0, v = 10, offsetY = 0.8125f, offsetZ = -0.5625f),
+        MobBox("head", 0.0625f, 0.125f, 0f, 0.125f, 0.1875f, 0.125f, u = 6, v = 10, offsetY = 0.8125f, offsetZ = -0.5625f),
+        MobBox("tail1", -0.0312f, -0.5f, 0f, 0.0313f, 0f, 0.0625f, u = 0, v = 15, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0.6216f, -0.7833f, 0f, 0f, 0.7833f, 0.6216f, 0f, 0f, 0.8125f, 0.5f, 1f)),
+        MobBox("right_front_leg", -0.0625f, -0.625f, 0f, 0.0625f, 0f, 0.125f, u = 40, v = 0, offsetX = -0.075f, offsetY = 0.8688f, offsetZ = -0.3125f),
+        MobBox("tail2", -0.0312f, -0.5f, 0f, 0.0313f, 0f, 0.0625f, u = 4, v = 15, offsetY = 0.5f, offsetZ = 0.875f),
+        MobBox("right_hind_leg", -0.0625f, -0.375f, 0.0625f, 0.0625f, 0f, 0.1875f, u = 8, v = 13, offsetX = -0.0687f, offsetY = 0.625f, offsetZ = 0.3125f),
+        MobBox("left_hind_leg", -0.0625f, -0.375f, 0.0625f, 0.0625f, 0f, 0.1875f, u = 8, v = 13, offsetX = 0.0688f, offsetY = 0.625f, offsetZ = 0.3125f),
+        MobBox("body", -0.125f, -1.1875f, -0.5f, 0.125f, -0.1875f, -0.125f, u = 20, v = 0, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1f, -0.625f, 1f)),
+        MobBox("left_front_leg", -0.0625f, -0.625f, 0f, 0.0625f, 0f, 0.125f, u = 40, v = 0, offsetX = 0.075f, offsetY = 0.8688f, offsetZ = -0.3125f),

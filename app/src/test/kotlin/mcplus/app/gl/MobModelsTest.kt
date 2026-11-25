@@ -88,6 +88,29 @@ class MobModelsTest {
     }
 
     @Test
+    fun `wolf cat fox panda and bear are dumped from the game`() {
+        // Пять моделей переведены на дампы: у каждой свои пропорции и свой лист текстуры.
+        val expected = mapOf(
+            MobFamily.WOLF to (64 to 64),
+            MobFamily.CAT to (64 to 64),
+            MobFamily.FOX to (48 to 32),
+            MobFamily.PANDA to (64 to 64),
+            MobFamily.POLAR_BEAR to (128 to 64),
+        )
+        for ((family, sheet) in expected) {
+            val boxes = MobModels.boxes(family)
+            assertTrue(boxes.size >= 8, "$family: всего ${boxes.size} коробок")
+            assertEquals(sheet, MobModels.textureSize(family), "$family: лист текстуры")
+            // В дампе всегда есть голова и хотя бы по одной ноге на сторону.
+            assertTrue(boxes.any { it.name.contains("head") }, "$family: нет головы")
+            assertTrue(boxes.count { it.name.contains("leg") } >= 4, "$family: меньше четырёх ног")
+        }
+        // Кошка и волк — с листом 64×64, значит у них есть место под хвост и морду.
+        assertTrue(MobModels.boxes(MobFamily.CAT).any { it.name.contains("tail") })
+        assertTrue(MobModels.boxes(MobFamily.FOX).any { it.name.contains("tail") })
+    }
+
+    @Test
     fun `every box unwraps inside its texture sheet`() {
         // Раньше свинья рисовалась «на глаз»: коробка шириной 16 пикселей начиналась с u = 18
         // и уезжала за край листа 64 в развёртке. Боковые грани попадали в прозрачные пиксели,
@@ -100,8 +123,7 @@ class MobModelsTest {
         val approximate = setOf(
             MobFamily.IRON_GOLEM, MobFamily.SQUID, MobFamily.BAT, MobFamily.SLIME,
             MobFamily.MAGMA_CUBE, MobFamily.GHAST, MobFamily.BLAZE, MobFamily.STRIDER,
-            MobFamily.HOGLIN, MobFamily.BEE, MobFamily.TURTLE, MobFamily.WOLF, MobFamily.CAT,
-            MobFamily.FOX, MobFamily.LLAMA, MobFamily.PANDA, MobFamily.POLAR_BEAR,
+            MobFamily.HOGLIN, MobFamily.BEE, MobFamily.TURTLE, MobFamily.LLAMA,
             MobFamily.DOLPHIN, MobFamily.FROG, MobFamily.GOAT, MobFamily.AXOLOTL,
             MobFamily.SNIFFER, MobFamily.PHANTOM, MobFamily.SHULKER, MobFamily.SILVERFISH,
             MobFamily.ENDERMITE, MobFamily.GUARDIAN, MobFamily.ALLAY, MobFamily.WARDEN,
@@ -572,7 +594,7 @@ class MobModelsTest {
     @Test
     fun `wolf, cat and fox are separate families`() {
         val cases = listOf(
-            Triple("wolf", MobFamily.WOLF, 64 to 32),
+            Triple("wolf", MobFamily.WOLF, 64 to 64),
             Triple("cat", MobFamily.CAT, 64 to 64),
             Triple("ocelot", MobFamily.CAT, 64 to 64),
             Triple("fox", MobFamily.FOX, 48 to 32),
