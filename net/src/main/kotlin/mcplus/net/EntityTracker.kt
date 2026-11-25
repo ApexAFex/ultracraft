@@ -104,6 +104,12 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     val droppedItem: MetaEntry? get() = meta[DROPPED_ITEM_FIELD]?.takeIf { it.type == 7 }
 
     /**
+     * Предмет в рамке: у `ItemFrame` своё поле, следующее за полем направления у
+     * `HangingEntity`, поэтому номер 9, а не 8.
+     */
+    val frameItem: MetaEntry? get() = meta[FRAME_ITEM_FIELD]?.takeIf { it.type == 7 }
+
+    /**
      * Данные жителя (тип 18: климат, профессия, уровень) или null.
      *
      * Номер поля у каждого класса свой и назначается при регистрации, поэтому ищем по типу
@@ -445,6 +451,7 @@ private const val HEALTH_FIELD = 9
 
 /** Поле 8 — предмет для `item` и количество опыта для `experience_orb`. */
 private const val DROPPED_ITEM_FIELD = 8
+private const val FRAME_ITEM_FIELD = 9
 private const val ORB_VALUE_FIELD = 8
 private const val POSE_FIELD = 6
 private const val POSE_SNEAKING = 5

@@ -32,6 +32,27 @@ class EntityTrackerTest {
         )
 
     @Test
+    fun `an item frame keeps its item in field nine`() {
+        // У рамки предмет лежит в своём поле (9), а не в поле выпавшего предмета (8):
+        // HangingEntity занимает восьмое поле направлением.
+        val tracker = EntityTracker()
+        val entity = TrackedEntity(7, UUID.randomUUID(), 74)
+        entity.applyMetadata(
+            mapOf(
+                9 to MetaEntry(type = 7, itemId = 1238, itemCount = 1, mapId = 0),
+            ),
+        )
+        assertNull(entity.droppedItem, "у рамки нет предмета в поле 8")
+        assertEquals(1238, entity.frameItem?.itemId)
+        assertEquals(0, entity.frameItem?.mapId)
+        // У выпавшего предмета всё наоборот: поле 8, а не 9.
+        val dropped = TrackedEntity(8, UUID.randomUUID(), 1)
+        dropped.applyMetadata(mapOf(8 to MetaEntry(type = 7, itemId = 5, itemCount = 1)))
+        assertEquals(5, dropped.droppedItem?.itemId)
+        assertNull(dropped.frameItem)
+    }
+
+    @Test
     fun `a spawned entity appears in the snapshot with its type`() {
         val tracker = EntityTracker()
         assertTrue(tracker.onPacket(spawn(7, 159, 1.0, 2.0, 3.0)))

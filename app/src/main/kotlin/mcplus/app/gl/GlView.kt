@@ -2972,7 +2972,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         )
 
                                     name == "item" -> {                                        // Выпавший предмет: мини-куб блока, если это блок.
-                                        val stack = entity.droppedItem
+                                        val stack = entity.frameItem ?: entity.droppedItem
                                         val itemName = stack?.takeIf { it.itemId >= 0 }
                                             ?.let { itemTable.nameOf(it.itemId) }
                                         val state = itemName?.let { blocks.firstStateOf(it) } ?: 0
@@ -3052,10 +3052,47 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             entity.x, entity.y + 0.5, entity.z, 0.62f,
                                             atlas.layerFor(frameName, TextureAtlas.Kind.SIDE),
                                         )
-                                        val stack = entity.droppedItem
+                                        // У рамки предмет лежит в своём поле (9), а не в поле
+                                        // выпавшего предмета (8).
+                                        val stack = entity.frameItem
                                         val itemName = stack?.takeIf { it.itemId >= 0 }
                                             ?.let { itemTable.nameOf(it.itemId) }
-                                        if (itemName != null) {
+                                        // Карта в рамке: в ванили видно сам рисунок карты, а
+                                        // не иконку предмета. Рисуем её плитками на стене.
+                                        val frameMapId = stack?.mapId ?: -1
+                                        val mapImage = if (frameMapId >= 0) {
+                                            session?.maps?.imageOf(frameMapId)
+                                        } else {
+                                            null
+                                        }
+                                        if (mapImage != null) {
+                                            val tiles = MapFrame.tilesOf(mapImage) { packed ->
+                                                mcplus.net.MapColors.active.colorOf(packed)
+                                            }
+                                            val yawRad = Math.toRadians(entity.yaw.toDouble())
+                                            val rightX = kotlin.math.cos(yawRad).toFloat()
+                                            val rightZ = -kotlin.math.sin(yawRad).toFloat()
+                                            val faceX = kotlin.math.sin(yawRad).toFloat()
+                                            val faceZ = kotlin.math.cos(yawRad).toFloat()
+                                            val white =
+                                                atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
+                                            val tile = 1f / MapFrame.TILES
+                                            for (part in tiles) {
+                                                val localX = (part.x + 0.5f) * tile - 0.5f
+                                                val localY = 0.5f - (part.y + 0.5f) * tile
+                                                val (red, green, blue) = MapFrame.channels(part.color)
+                                                cubes += Renderer.BlockCube(
+                                                    entity.x + localX * rightX + faceX * 0.06,
+                                                    entity.y + 0.5 + localY,
+                                                    entity.z + localX * rightZ + faceZ * 0.06,
+                                                    1f,
+                                                    white, white, white,
+                                                    yaw = entity.yaw,
+                                                    red = red, green = green, blue = blue,
+                                                    sizeX = tile, sizeY = tile, sizeZ = 0.01f,
+                                                )
+                                            }
+                                        } else if (itemName != null) {
                                             worldIcons += Renderer.WorldIcon(
                                                 entity.x, entity.y + 0.5, entity.z, 0.34f,
                                                 atlas.layerForItem(itemName),

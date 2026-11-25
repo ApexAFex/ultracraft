@@ -26,6 +26,33 @@ class EntityMetadataTest {
         ByteWriter().writeByte(index).writeVarInt(type).writeBytes(payload).toByteArray()
 
     @Test
+    fun `a frame with a map keeps the map number`() {
+        // Таблица компонентов нужна разбору стеков: по ней 48 — это map_id.
+        val table = java.io.File.createTempFile("components", ".tsv").apply {
+            deleteOnExit()
+            writeText("48\tmap_id\n")
+        }
+        val previous = ComponentTable.active
+        ComponentTable.active = ComponentTable.load(table)
+        try {
+            val payload = ByteWriter()
+                .writeVarInt(1)      // количество
+                .writeVarInt(42)     // номер предмета
+                .writeVarInt(1)      // один добавленный компонент
+                .writeVarInt(0)      // ни одного удалённого
+                .writeVarInt(48)     // map_id
+                .writeVarInt(7)      // карта №7
+                .toByteArray()
+            val entry = readEntityMetadata(body(1, field(8, 7, payload))).second.getValue(8)
+            assertEquals(42, entry.itemId)
+            assertEquals(1, entry.itemCount)
+            assertEquals(7, entry.mapId)
+        } finally {
+            ComponentTable.active = previous
+        }
+    }
+
+    @Test
     fun `health is a float field`() {
         val packet = body(
             42,

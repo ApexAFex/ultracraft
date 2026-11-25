@@ -18,6 +18,8 @@ data class MetaEntry(
     /** Для типа 7 (стек предмета): id и количество; -1 — предмет с нечитаемыми компонентами. */
     val itemId: Int = 0,
     val itemCount: Int = 0,
+    /** Для типа 7: номер карты, если в рамке карта (-1 — не карта). */
+    val mapId: Int = -1,
     /** Для типа 17 (`Villager Data`): климат, профессия и уровень жителя — номера реестров. */
     val villagerType: Int = 0,
     val villagerProfession: Int = 0,
@@ -124,22 +126,16 @@ private fun readMetaValue(reader: ByteReader, type: Int): MetaEntry? = when (typ
     in 33..38 -> MetaEntry(type, reader.readVarInt().toDouble())
     // 42 — цвет красителя.
     42 -> MetaEntry(type, reader.readVarInt().toDouble())
-    // 7 — стек предмета: count, id, патч компонентов. Патч с добавленными компонентами
-    // прочитать нельзя (у каждого свой кодек), поэтому такой предмет помечается неизвестным.
+    // 7 — стек предмета: count, id, патч компонентов. Патч разбирается общим кодом инвентаря:
+    // так у рамки с картой появляется номер карты, а не «неизвестный предмет». Если компонент
+    // незнаком по длине (таблицы нет), стек по-прежнему помечается неизвестным, но пакет не
+    // рвётся.
     7 -> {
-        val count = reader.readVarInt()
-        if (count <= 0) {
-            MetaEntry(type)
+        val stack = runCatching { mcplus.net.readMenuStack(reader) }.getOrNull()
+        if (stack == null) {
+            MetaEntry(type, itemId = -1)
         } else {
-            val itemId = reader.readVarInt()
-            val added = reader.readVarInt()
-            val removed = reader.readVarInt()
-            if (added != 0) {
-                MetaEntry(type, itemId = -1, itemCount = count)
-            } else {
-                repeat(removed) { reader.readVarInt() }
-                MetaEntry(type, itemId = itemId, itemCount = count)
-            }
+            MetaEntry(type, itemId = stack.itemId, itemCount = stack.count, mapId = stack.mapId)
         }
     }
 
