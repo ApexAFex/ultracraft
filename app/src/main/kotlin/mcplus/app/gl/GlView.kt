@@ -687,6 +687,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     }
                     // Частицы: спрайты из textures/particle, собранные в один атлас.
                     val particleRenderer = ParticleRenderer(width, height, directory)
+                    // Дождь: тонкие штрихи вокруг игрока, когда сервер сказал «дождь».
+                    val weatherRenderer = WeatherRenderer(width, height)
                     // Гуманоидные мобы: одна модель человека, у каждого свой скин. Раскладка
                     // у мобов классическая — левые рука и нога зеркалят правые; отдельные
                     // пиксели для них есть только у скинов игроков.
@@ -741,6 +743,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val burningLogged = HashSet<Int>()
                     /** Мобы, про чью невидимость уже напечатано (отладка). */
                     val invisibleLogged = HashSet<Int>()
+                    /** Сколько капель дождя было в прошлом кадре (отладка). */
+                    var rainDropsLogged = 0
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -3946,6 +3950,26 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             particleRenderer.draw(camera, flames)
                             GL30.glEnable(GL30.GL_DEPTH_TEST)
                         }
+                        // Дождь: тонкие штрихи вокруг игрока. Сила приходит в `Set Weather`
+                        // (0 — ясно, 1 — ливень), поэтому при 0 капель не считаем вовсе.
+                        val rainLevel = session?.sky?.rain ?: 0f
+                        if (rainLevel > 0.01f) {
+                            val seconds = (nowNanos / 1_000_000_000.0).toFloat()
+                            val drops = Weather.drops(
+                                rainLevel, seconds, camera.x, camera.z, camera.y,
+                            )
+                            weatherRenderer.draw(
+                                camera, drops,
+                                red = 0.62f, green = 0.70f, blue = 0.85f, alpha = 0.42f,
+                            )
+                            if (debug && rainDropsLogged != drops.size) {
+                                rainDropsLogged = drops.size
+                                println("Дождь: сила $rainLevel, капель ${drops.size}")
+                            }
+                        } else if (debug && rainDropsLogged != 0) {
+                            rainDropsLogged = 0
+                            println("Дождь: ясно")
+                        }
                         if (particleDemo) {
                             // Образцы всех загруженных спрайтов перед камерой: видно, что атлас
                             // собран и шейдер рисует, даже если сервер частиц не присылал.
@@ -5116,6 +5140,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     entityRenderer.close()
                     mobRenderer.close()
                     particleRenderer.close()
+                    weatherRenderer.close()
                     humanoidRenderer.close()
                     slimHumanoidRenderer.close()
                     slimPlayerRenderer.close()
