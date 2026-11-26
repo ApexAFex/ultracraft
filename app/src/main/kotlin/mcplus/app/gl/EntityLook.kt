@@ -77,6 +77,19 @@ object EntityLook {
     }
 
     /**
+     * Разница «голова минус тело» в градусах, приведённая к ±180.
+     *
+     * В протоколе угол головы абсолютный (`rotate_head`, 0x55), а модель поворачивает голову
+     * относительно корпуса. Без приведения 350° и −10° дали бы полный оборот вместо десяти.
+     */
+    fun headTurn(headYaw: Float, bodyYaw: Float): Float {
+        var delta = headYaw - bodyYaw
+        while (delta > 180f) delta -= 360f
+        while (delta < -180f) delta += 360f
+        return delta
+    }
+
+    /**
      * Белая вспышка подожжённого крипера — `CreeperRenderer.getWhiteOverlayProgress`.
      *
      * Вспышка мигает: берётся десятая доля раздувания, и на чётных десятых её нет, а на

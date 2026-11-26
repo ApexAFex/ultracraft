@@ -62,6 +62,15 @@ class MobRenderer(
          */
         val flash: Float = 0f,
         /**
+         * Поворот головы отдельно от тела, градусы протокола; `null` — голова смотрит вперёд.
+         *
+         * Приходит пакетом `rotate_head` (0x55): так моб смотрит на игрока, не разворачиваясь
+         * корпусом. Угол уже приведён к разнице «голова минус тело».
+         */
+        val headYaw: Float? = null,
+        /** Взгляд головы вниз-вверх, градусы: ванильный `xRot` головы живой сущности. */
+        val headPitch: Float = 0f,
+        /**
          * Семейство меша для слоёв поверх шкуры.
          *
          * Обычно слой рисуется той же геометрией с другой текстурой (одежда жителя). Но
@@ -180,11 +189,12 @@ class MobRenderer(
             Mat4.multiply(Mat4.rotateY(yaw), Mat4.multiply(pose, modelScale(mob))),
         )
 
+        val headPivot = headPivotOf(mob.family)
         for ((index, box) in mesh.boxes.withIndex()) {
             // Вершины коробок уже лежат в координатах модели, поэтому качание — это
             // поворот вокруг оси бедра, без масштабирования коробки.
             val angle = MobModels.limbAngle(box.name, mob.walkPhase, mob.walkAmount, mob.time)
-            val matrix = if (angle == 0f) {
+            var matrix = if (angle == 0f) {
                 base
             } else {
                 val pivotX = (box.minX + box.maxX) / 2f
@@ -202,6 +212,32 @@ class MobRenderer(
                 )
                 Mat4.multiply(base, rotate)
             }
+            // Голова поворачивается отдельно от тела: вокруг шеи на разницу углов
+            // (`rotate_head`) и вниз-вверх на взгляд (`xRot` в ванили).
+            if (headPivot != null && MobModels.isHeadPart(box)) {
+                val yawTurn = mob.headYaw
+                val pitchTurn = mob.headPitch
+                if ((yawTurn != null && yawTurn != 0f) || pitchTurn != 0f) {
+                    val (px, py, pz) = headPivot
+                    val turn = Mat4.translate(px, py, pz)
+                    var rotation = Mat4.identity()
+                    if (yawTurn != null && yawTurn != 0f) {
+                        rotation = Mat4.rotateY(
+                            -Math.toRadians(yawTurn.toDouble()).toFloat(),
+                        )
+                    }
+                    if (pitchTurn != 0f) {
+                        rotation = Mat4.multiply(
+                            rotation,
+                            Mat4.rotateX(
+                                -Math.toRadians(pitchTurn.toDouble()).toFloat(),
+                            ),
+                        )
+                    }
+                    val back = Mat4.translate(-px, -py, -pz)
+                    matrix = Mat4.multiply(matrix, Mat4.multiply(turn, Mat4.multiply(rotation, back)))
+                }
+            }
             GL30.glUniformMatrix4fv(modelLocation, false, matrix)
             GL30.glDrawArrays(
                 GL30.GL_TRIANGLES,
@@ -211,6 +247,12 @@ class MobRenderer(
             )
         }
     }
+
+    /** Точка поворота головы по семейству (шея); считается один раз на семейство. */
+    private fun headPivotOf(family: MobFamily): Triple<Float, Float, Float>? =
+        headPivots.getOrPut(family) { MobModels.headPivot(family) }
+
+    private val headPivots = HashMap<MobFamily, Triple<Float, Float, Float>?>()
 
     private fun meshFor(family: MobFamily): FamilyMesh? {
         meshes[family]?.let { return it }

@@ -54,6 +54,52 @@ class EntityTrackerTest {
     }
 
     @Test
+    fun `a rotate head packet turns the head but not the body`() {
+        // `rotate_head` (0x55): id сущности и один байт поворота в 1/256 оборота.
+        // Тело при этом остаётся на месте — именно так моб смотрит на игрока боком.
+        val tracker = EntityTracker()
+        tracker.onPacket(spawn(9, 32, 0.0, 0.0, 0.0))
+        val body = Packet(
+            Protocol777.Play.UPDATE_ENTITY_ROTATION,
+            ByteWriter().writeVarInt(9).writeByte(0).writeByte(0).toByteArray(),
+        )
+        tracker.onPacket(body)
+        val before = tracker.snapshot().single { it.id == 9 }
+        assertEquals(0f, before.headYaw)
+
+        // 64 из 256 — это четверть оборота, 90°.
+        val head = Packet(
+            Protocol777.Play.ROTATE_HEAD,
+            ByteWriter().writeVarInt(9).writeByte(64).toByteArray(),
+        )
+        tracker.onPacket(head)
+        val after = tracker.snapshot().single { it.id == 9 }
+        assertEquals(90f, after.headYaw, 0.01f)
+        assertEquals(before.yaw, after.yaw, 0.01f, "тело не повернулось")
+        assertTrue(after.headTracked)
+
+        // Поворот тела снова тянет голову за собой: голова не должна «отстать» навсегда.
+        tracker.onPacket(
+            Packet(
+                Protocol777.Play.UPDATE_ENTITY_ROTATION,
+                ByteWriter().writeVarInt(9).writeByte(128).writeByte(0).toByteArray(),
+            ),
+        )
+        val turned = tracker.snapshot().single { it.id == 9 }
+        // Байт поворота читается как знаковый: 128 — это −128, то есть −180°.
+        assertEquals(-180f, turned.yaw, 0.01f)
+        assertEquals(-180f, turned.headYaw, 0.01f, "голова едет вместе с телом")
+
+        // Пакет про неизвестную сущность не должен ронять разбор.
+        tracker.onPacket(
+            Packet(
+                Protocol777.Play.ROTATE_HEAD,
+                ByteWriter().writeVarInt(999).writeByte(32).toByteArray(),
+            ),
+        )
+    }
+
+    @Test
     fun `an item frame keeps its item in field nine`() {
         // У рамки предмет лежит в своём поле (9), а не в поле выпавшего предмета (8):
         // HangingEntity занимает восьмое поле направлением.

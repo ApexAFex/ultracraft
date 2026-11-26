@@ -58,6 +58,28 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     var pitch: Float = 0f
         private set
 
+    /**
+     * Поворот головы отдельно от тела, в градусах протокола.
+     *
+     * Приходит пакетом `rotate_head` (0x55), когда моб поворачивает голову, не разворачиваясь
+     * корпусом: так моб смотрит на игрока, стоя к нему боком. Пока пакета не было, голова
+     * смотрит туда же, куда тело.
+     */
+    @Volatile
+    var headYaw: Float = 0f
+        private set
+
+    /** Голова поворачивается отдельно: пришёл `rotate_head`. */
+    @Volatile
+    var headTracked: Boolean = false
+        private set
+
+    fun lookHead(yaw: Float) {
+        if (yaw.isNaN()) return
+        headYaw = yaw
+        headTracked = true
+    }
+
     /** Когда сущность в последний раз взмахнула рукой — для анимации. */
     @Volatile
     var swingStartNanos: Long = 0L
@@ -158,6 +180,9 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
         if (newYaw.isNaN() || newPitch.isNaN()) return
         yaw = newYaw
         pitch = newPitch
+        // Повернулось тело — голова едет вместе с ним; отдельный поворот головы придёт
+        // пакетом `rotate_head` уже после.
+        headYaw = newYaw
     }
 
     fun place(nx: Double, ny: Double, nz: Double) {
@@ -275,6 +300,23 @@ class EntityTracker {
 
             Protocol777.Play.UPDATE_ENTITY_ROTATION -> {
                 runCatching { readRotation(packet.body) }
+                return true
+            }
+
+            /**
+             * `rotate_head` (0x55): поворот только головы.
+             *
+             * Тело и голова в протоколе расходятся: `update_entity_rotation` крутит всё тело,
+             * а этим пакетом сервер отдельно поворачивает голову — так моб смотрит на игрока,
+             * стоя к нему боком. Без него все головы у нас смотрели строго вперёд.
+             */
+            Protocol777.Play.ROTATE_HEAD -> {
+                runCatching {
+                    val reader = ByteReader(packet.body)
+                    val id = reader.readVarInt()
+                    val yaw = reader.readByte().toInt() * TURN / 256f
+                    entities[id]?.lookHead(yaw)
+                }
                 return true
             }
 

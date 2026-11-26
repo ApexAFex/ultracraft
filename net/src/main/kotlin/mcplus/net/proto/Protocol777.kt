@@ -97,6 +97,14 @@ object Protocol777 {
         const val UPDATE_ENTITY_POSITION: Int = 0x36
         const val UPDATE_ENTITY_POSITION_ROTATION: Int = 0x37
         const val UPDATE_ENTITY_ROTATION: Int = 0x39
+
+        /**
+         * `rotate_head` (0x55): поворот только головы, байтом в 1/256 оборота.
+         *
+         * Номер взят у сервера: `tools/protocol-ids.java` печатает
+         * `85  0x55  minecraft:rotate_head`.
+         */
+        const val ROTATE_HEAD: Int = 0x55
         const val TELEPORT_ENTITY: Int = 0x23
         const val CHUNK_DATA: Int = 0x2E
         const val BLOCK_UPDATE: Int = 0x08

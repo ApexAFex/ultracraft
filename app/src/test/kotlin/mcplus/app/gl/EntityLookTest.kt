@@ -76,6 +76,43 @@ class EntityLookTest {
     }
 
     @Test
+    fun `head turn is the difference between head and body, wrapped to half a turn`() {
+        assertEquals(0f, EntityLook.headTurn(90f, 90f), 1e-4f)
+        assertEquals(45f, EntityLook.headTurn(135f, 90f), 1e-4f)
+        assertEquals(-45f, EntityLook.headTurn(45f, 90f), 1e-4f)
+        // Через ноль: тело смотрит на 350°, голова на 10° — это +20°, а не −340°.
+        assertEquals(20f, EntityLook.headTurn(10f, 350f), 1e-4f)
+        assertEquals(-20f, EntityLook.headTurn(350f, 10f), 1e-4f)
+        // Ровно пол-оборота остаётся пол-оборотом.
+        assertEquals(180f, EntityLook.headTurn(180f, 0f), 1e-4f)
+    }
+
+    @Test
+    fun `every model with a head can turn it`() {
+        // Голова есть у всех моделей, кроме тех, что целиком из кубов (лодка, вагонетка,
+        // снаряд): у них нет коробки `head`, и поворот головы просто не применяется.
+        val families = MobFamily.entries
+        val withHead = families.filter { MobModels.headPivot(it) != null }
+        // 42 семейства называют голову `head`; у остальных голова называется иначе
+        // (у дракона — `real_head`) или её нет вовсе (лодка, вагонетка, сундук, кристалл).
+        assertTrue(withHead.size >= 40, "голова должна быть у большинства моделей: ${withHead.size}")
+        assertTrue(MobModels.headPivot(MobFamily.COW) != null)
+        assertTrue(MobModels.headPivot(MobFamily.BOAT) == null, "у лодки головы нет")
+
+        // Шея — низ и середина коробки головы (у коровы голова впереди и выше тела).
+        val cow = MobModels.boxes(MobFamily.COW).first { it.name == "head" }
+        val pivot = MobModels.headPivot(MobFamily.COW)!!
+        assertEquals((cow.minX + cow.maxX) / 2f + cow.offsetX, pivot.first, 1e-5f)
+        assertEquals(cow.minY + cow.offsetY, pivot.second, 1e-5f)
+
+        // Части головы: сама голова и её дети из дампов поворачиваются, тело — нет.
+        assertTrue(MobModels.isHeadPart(cow))
+        assertTrue(MobModels.boxes(MobFamily.CHICKEN).any { MobModels.isHeadPart(it) && it.name == "beak" })
+        assertFalse(MobModels.isHeadPart(MobModels.boxes(MobFamily.COW).first { it.name == "body" }))
+        assertFalse(MobModels.isHeadPart(MobModels.boxes(MobFamily.COW).first { it.name.endsWith("_leg") }))
+    }
+
+    @Test
     fun `creeper flashes white on alternating tenths of swelling`() {
         // `CreeperRenderer.getWhiteOverlayProgress`: десятая доля раздувания; чётная — вспышки
         // нет, нечётная — вспышка равна раздуванию, но не меньше 0,5.

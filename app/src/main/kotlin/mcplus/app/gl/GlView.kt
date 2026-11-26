@@ -735,6 +735,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val mobLogged = HashSet<Int>()
                     /** Существа, про чей первый шаг уже напечатано. */
                     val stepLogged = HashSet<Int>()
+                    /** Мобы, про чей поворот головы уже напечатано (отладка). */
+                    val headLogged = HashSet<Int>()
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -3397,6 +3399,24 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             flash = EntityLook.creeperWhiteOverlay(
                                                 creeperSwell(entity, name, nowNanos),
                                             ),
+                                            // Голова отдельно от тела: приходит пакетом
+                                            // `rotate_head` (0x55).
+                                            headYaw = if (entity.headTracked) {
+                                                val turn = EntityLook.headTurn(
+                                                    entity.headYaw, entity.yaw,
+                                                )
+                                                if (debug && headLogged.add(entity.id)) {
+                                                    println(
+                                                        "Голова: id=${entity.id} $name, " +
+                                                            "тело ${entity.yaw.toInt()}, " +
+                                                            "голова ${entity.headYaw.toInt()}",
+                                                    )
+                                                }
+                                                turn
+                                            } else {
+                                                null
+                                            },
+                                            headPitch = entity.pitch,
                                         )
                                         // Поводок: в 26.3 связь приходит пакетом `Set Entity
                                         // Link`. Верёвку рисуем цепочкой мелких кубиков от
@@ -3756,6 +3776,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     time = demoTime,
                                     swell = swell,
                                     flash = EntityLook.creeperWhiteOverlay(swell),
+                                    // Голова первой коровы повёрнута вбок: видно, что голова
+                                    // поворачивается отдельно от тела.
+                                    headYaw = if (index == 0) 40f else null,
                                 )
                             }
                             mobRenderer.draw(camera, demoClose)

@@ -383,6 +383,36 @@ object MobModels {
     /** Номер поля размера в `Set Entity Data` для слизня и магмового куба. */
     const val CUBE_SIZE_FIELD = 18
 
+    /**
+     * Части, которые в ванили висят на голове и поворачиваются вместе с ней.
+     *
+     * Имена собраны из дампов: у моделей это `root/head/…` — клюв, шапка, глаза, уши, рога,
+     * челюсть, нос. Отдельной иерархии в плоском списке коробок нет, поэтому набор имён
+     * записан здесь; у кого голова — одна коробка (`head`), тот попадает по имени.
+     */
+    val HEAD_PARTS: Set<String> = setOf(
+        "head", "hat", "beak", "eye", "jaw", "nose", "real_head", "red_thing",
+        "left_ear", "right_ear", "left_horn", "right_horn",
+    )
+
+    /** Коробка принадлежит голове: её надо поворачивать вместе с головой. */
+    fun isHeadPart(box: MobBox): Boolean = box.name in HEAD_PARTS
+
+    /**
+     * Точка, вокруг которой поворачивается голова: низ и середина коробки `head`.
+     *
+     * В ванили это шея — `PartPose` головы. В плоском списке коробок её нет, но низ головы
+     * и её середина по X и Z как раз совпадают с шеей у всех моделей из дампов.
+     * Возвращает `null`, если головы в модели нет.
+     */
+    fun headPivot(family: MobFamily): Triple<Float, Float, Float>? {
+        val head = boxes(family).firstOrNull { it.name == "head" } ?: return null
+        val centerX = (head.minX + head.maxX) / 2f + head.offsetX
+        val bottomY = head.minY + head.offsetY
+        val centerZ = (head.minZ + head.maxZ) / 2f + head.offsetZ
+        return Triple(centerX, bottomY, centerZ)
+    }
+
     /** Угол качания коробки: ноги идут крест-накрест, крылья машут вверх-вниз. */
     /**
      * Угол качания части при ходьбе.
