@@ -75,4 +75,17 @@ object EntityLook {
         val vertical = (1f + squared * 0.1f) / h
         return horizontal to vertical
     }
+
+    /**
+     * Белая вспышка подожжённого крипера — `CreeperRenderer.getWhiteOverlayProgress`.
+     *
+     * Вспышка мигает: берётся десятая доля раздувания, и на чётных десятых её нет, а на
+     * нечётных она равна раздуванию, но не меньше 0,5. Поэтому крипер перед взрывом
+     * мигает белым, а не светится ровно.
+     */
+    fun creeperWhiteOverlay(swell: Float): Float {
+        val tenths = (swell * 10f).toInt()
+        if (tenths % 2 == 0) return 0f
+        return swell.coerceIn(0.5f, 1f)
+    }
 }

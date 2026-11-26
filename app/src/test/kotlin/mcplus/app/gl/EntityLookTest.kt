@@ -76,6 +76,20 @@ class EntityLookTest {
     }
 
     @Test
+    fun `creeper flashes white on alternating tenths of swelling`() {
+        // `CreeperRenderer.getWhiteOverlayProgress`: десятая доля раздувания; чётная — вспышки
+        // нет, нечётная — вспышка равна раздуванию, но не меньше 0,5.
+        assertEquals(0f, EntityLook.creeperWhiteOverlay(0f), 1e-6f)
+        assertEquals(0f, EntityLook.creeperWhiteOverlay(0.2f), 1e-6f, "вторая десятая — чётная")
+        assertEquals(0.5f, EntityLook.creeperWhiteOverlay(0.1f), 1e-6f, "первая десятая — вспышка")
+        assertEquals(0.5f, EntityLook.creeperWhiteOverlay(0.3f), 1e-6f, "не меньше половины")
+        assertEquals(0.7f, EntityLook.creeperWhiteOverlay(0.7f), 1e-6f)
+        assertEquals(0.95f, EntityLook.creeperWhiteOverlay(0.95f), 1e-6f)
+        // На самом пределе раздувания десятая доля десятая — чётная, вспышки нет.
+        assertEquals(0f, EntityLook.creeperWhiteOverlay(1f), 1e-6f)
+    }
+
+    @Test
     fun `creeper scale swells sideways more than upwards`() {
         val (h0, v0) = EntityLook.creeperScale(0f)
         assertEquals(1f, h0, 1e-4f)

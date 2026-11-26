@@ -3393,6 +3393,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
                                             swell = creeperSwell(entity, name, nowNanos),
+                                            // Мигание белым у подожжённого крипера.
+                                            flash = EntityLook.creeperWhiteOverlay(
+                                                creeperSwell(entity, name, nowNanos),
+                                            ),
                                         )
                                         // Поводок: в 26.3 связь приходит пакетом `Set Entity
                                         // Link`. Верёвку рисуем цепочкой мелких кубиков от
@@ -3717,7 +3721,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 Triple("cow", emptyMap<Int, mcplus.net.MetaEntry>(), 0f),
                                 Triple("cow", babyFlag, 0f),
                                 Triple("creeper", emptyMap(), 0f),
-                                Triple("creeper", emptyMap(), 1f),
+                                // 0,95 — на нечётной десятой доле, поэтому видна и вспышка.
+                                Triple("creeper", emptyMap(), 0.95f),
                                 Triple("sheep", wool(0.0), 0f),
                                 Triple("sheep", wool(14.0), 0f),
                                 Triple("sheep", wool(30.0), 0f),
@@ -3750,6 +3755,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     overlayFamily = if (isSheep) MobFamily.SHEEP_FUR else null,
                                     time = demoTime,
                                     swell = swell,
+                                    flash = EntityLook.creeperWhiteOverlay(swell),
                                 )
                             }
                             mobRenderer.draw(camera, demoClose)

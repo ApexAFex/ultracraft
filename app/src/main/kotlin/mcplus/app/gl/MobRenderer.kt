@@ -55,6 +55,13 @@ class MobRenderer(
          */
         val swell: Float = 0f,
         /**
+         * Белая вспышка 0…1: у подожжённого крипера она мигает.
+         *
+         * Ваниль рисует вспышку поверх модели (`getWhiteOverlayProgress`); у нас шейдер
+         * подмешивает белый к цвету текстуры на эту долю.
+         */
+        val flash: Float = 0f,
+        /**
          * Семейство меша для слоёв поверх шкуры.
          *
          * Обычно слой рисуется той же геометрией с другой текстурой (одежда жителя). Но
@@ -77,6 +84,7 @@ class MobRenderer(
     private val modelLocation = GL30.glGetUniformLocation(program, "uModel")
     private val textureLocation = GL30.glGetUniformLocation(program, "uSkin")
     private val tintLocation = GL30.glGetUniformLocation(program, "uTint")
+    private val flashLocation = GL30.glGetUniformLocation(program, "uFlash")
 
     private val meshes = HashMap<MobFamily, FamilyMesh>()
     private val textures = HashMap<String, Int>()
@@ -145,6 +153,8 @@ class MobRenderer(
             ((tint shr 8) and 0xFF) / 255f * hurt,
             (tint and 0xFF) / 255f * hurt,
         )
+        // Вспышка (подожжённый крипер): шейдер подмешивает белый к цвету текстуры.
+        GL30.glUniform1f(flashLocation, mob.flash.coerceIn(0f, 1f))
 
         // Лодка и вагонетка в модели длиной по X, а не по Z: им нужен поворот на 90°.
         val yaw = -Math.toRadians(mob.yaw.toDouble()).toFloat() +
@@ -593,13 +603,16 @@ class MobRenderer(
             in float vShade;
             uniform sampler2D uSkin;
             uniform vec3 uTint;
+            uniform float uFlash;
             out vec4 FragColor;
             void main() {
                 vec4 texel = texture(uSkin, vUv);
                 if (texel.a < 0.1) discard;
+                // Вспышка: белый поверх цвета модели (подожжённый крипер мигает).
+                vec3 rgb = mix(texel.rgb * vShade * uTint, vec3(1.0), clamp(uFlash, 0.0, 1.0));
                 // Альфа сохраняется: оболочка слизня полупрозрачная, и слой рисуется со
                 // смешиванием (см. `draw`).
-                FragColor = vec4(texel.rgb * vShade * uTint, texel.a);
+                FragColor = vec4(rgb, texel.a);
             }
         """
     }
