@@ -48,6 +48,13 @@ class MobRenderer(
         /** 0 — стоит, 1 — уже упал набок (анимация смерти). */
         val deathProgress: Float = 0f,
         /**
+         * Раздувание крипера 0…1: модель растёт и пульсирует перед взрывом.
+         *
+         * Ванильная формула — `CreeperRenderer.scale`; горизонталь и вертикаль считаются
+         * по-разному, поэтому масштаб здесь не один, а пара.
+         */
+        val swell: Float = 0f,
+        /**
          * Семейство меша для слоёв поверх шкуры.
          *
          * Обычно слой рисуется той же геометрией с другой текстурой (одежда жителя). Но
@@ -160,7 +167,7 @@ class MobRenderer(
                 (mob.y + hover).toFloat(),
                 mob.z.toFloat(),
             ),
-            Mat4.multiply(Mat4.rotateY(yaw), Mat4.multiply(pose, scale(mob.scale))),
+            Mat4.multiply(Mat4.rotateY(yaw), Mat4.multiply(pose, modelScale(mob))),
         )
 
         for ((index, box) in mesh.boxes.withIndex()) {
@@ -351,6 +358,22 @@ class MobRenderer(
         it[0] = value
         it[5] = value
         it[10] = value
+    }
+
+    /**
+     * Масштаб модели моба: обычный или «раздувающийся» у подожжённого крипера.
+     *
+     * Ваниль считает горизонталь и вертикаль по разным формулам (`CreeperRenderer.scale`),
+     * поэтому у крипера с фитилём модель не просто больше, а вздувается.
+     */
+    private fun modelScale(mob: Mob): FloatArray {
+        if (mob.swell <= 0f) return scale(mob.scale)
+        val (horizontal, vertical) = EntityLook.creeperScale(mob.swell)
+        return Mat4.identity().also {
+            it[0] = mob.scale * horizontal
+            it[5] = mob.scale * vertical
+            it[10] = mob.scale * horizontal
+        }
     }
 
     private fun upload(image: BufferedImage): Int {

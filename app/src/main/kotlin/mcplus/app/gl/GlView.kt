@@ -644,6 +644,47 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         "slime", "sulfur_cube" -> MobFamily.SLIME_OUTER
                         else -> null
                     }
+
+                    /**
+                     * Когда у крипера загорелся фитиль (наносекунды).
+                     *
+                     * В метаданных приходит только направление раздувания (1/0/−1), самого
+                     * времени фитиля там нет: ванильный клиент считает его сам, тикая счётчик.
+                     * Мы запоминаем момент, когда направление стало положительным, и считаем
+                     * прогресс от него — 30 тиков, как в игре.
+                     */
+                    val creeperIgnitedAt = HashMap<Int, Long>()
+
+                    /**
+                     * Раздувание крипера 0…1: от момента, когда фитиль загорелся.
+                     *
+                     * В метаданных есть только направление (`DATA_SWELL_DIR`) и флаг
+                     * `DATA_IS_IGNITED`, времени фитиля нет — ванильный клиент тикает счётчик
+                     * сам. Запоминаем момент включения и считаем 30 тиков от него.
+                     */
+                    fun creeperSwell(
+                        entity: mcplus.net.TrackedEntity,
+                        name: String,
+                        now: Long,
+                    ): Float {
+                        if (name != "creeper") return 0f
+                        val ignited = EntityLook.creeperSwellDir(entity.metadata) > 0 ||
+                            EntityLook.creeperIgnited(entity.metadata)
+                        if (!ignited) {
+                            creeperIgnitedAt.remove(entity.id)
+                            return 0f
+                        }
+                        val start = creeperIgnitedAt.getOrPut(entity.id) { now }
+                        if (debug && start == now) {
+                            // Проверка без глаз: видно, что метаданные крипера прочитаны.
+                            println(
+                                "Крипер раздувается: id=${entity.id}, " +
+                                    "направление=${EntityLook.creeperSwellDir(entity.metadata)}, " +
+                                    "подожжён=${EntityLook.creeperIgnited(entity.metadata)}",
+                            )
+                        }
+                        return EntityLook.creeperSwell((now - start) / 1_000_000_000.0)
+                    }
                     // Частицы: спрайты из textures/particle, собранные в один атлас.
                     val particleRenderer = ParticleRenderer(width, height, directory)
                     // Гуманоидные мобы: одна модель человека, у каждого свой скин. Раскладка
@@ -3351,6 +3392,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             hurt = entity.hurtProgress(System.nanoTime()),
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
+                                            swell = creeperSwell(entity, name, nowNanos),
                                         )
                                         // Поводок: в 26.3 связь приходит пакетом `Set Entity
                                         // Link`. Верёвку рисуем цепочкой мелких кубиков от
@@ -3656,29 +3698,46 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                             mobRenderer.draw(camera, demoGround)
 
-                            // Шерсть овцы: белая, красная и красная стриженая. Видно и цвет
-                            // красителя, и что у стриженой шерсти нет вовсе.
-                            val woolSamples = listOf(0x00, 0x0E, 0x1E)
+                            // Ближний ряд: детёныш, раздувание крипера и шерсть овцы.
+                            //
+                            // Взрослая и детская корова рядом: видно, что детёныш вдвое
+                            // меньше (`getAgeScale`). Два крипера — обычный и раздутый до
+                            // предела: видно ванильную формулу `CreeperRenderer.scale`
+                            // (вширь сильнее, чем ввысь). Три овцы — белая, красная и красная
+                            // стриженая: краситель и отсутствие шерсти у стриженой.
+                            val babyFlag = mapOf(
+                                EntityLook.SHARED_FIELD to mcplus.net.MetaEntry(
+                                    type = EntityLook.BOOLEAN_TYPE, number = 1.0,
+                                ),
+                            )
+                            fun wool(bits: Double) = mapOf(
+                                SheepLook.WOOL_FIELD to mcplus.net.MetaEntry(type = 0, number = bits),
+                            )
+                            val closeSamples = listOf(
+                                Triple("cow", emptyMap<Int, mcplus.net.MetaEntry>(), 0f),
+                                Triple("cow", babyFlag, 0f),
+                                Triple("creeper", emptyMap(), 0f),
+                                Triple("creeper", emptyMap(), 1f),
+                                Triple("sheep", wool(0.0), 0f),
+                                Triple("sheep", wool(14.0), 0f),
+                                Triple("sheep", wool(30.0), 0f),
+                            )
                             val woolTexture = mobRenderer.textureForPath("entity/sheep/sheep_wool.png")
-                            val demoWool = woolSamples.mapIndexed { index, bits ->
-                                val side = (index - (woolSamples.size - 1) / 2f) * 1.8f
-                                val metadata = mapOf(
-                                    SheepLook.WOOL_FIELD to mcplus.net.MetaEntry(
-                                        type = 0, number = bits.toDouble(),
-                                    ),
-                                )
+                            val demoClose = closeSamples.mapIndexed { index, (typeName, metadata, swell) ->
+                                val side = (index - (closeSamples.size - 1) / 2f) * 1.0f
+                                val isSheep = typeName == "sheep"
                                 MobRenderer.Mob(
-                                    x = camera.x + forward[0] * 4.0 + right[0] * side,
+                                    x = camera.x + forward[0] * 4.6 + right[0] * side,
                                     y = camera.y - 1.9,
-                                    z = camera.z + forward[2] * 4.0 + right[2] * side,
+                                    z = camera.z + forward[2] * 4.6 + right[2] * side,
                                     yaw = faceCamera,
                                     walkPhase = 0f,
                                     walkAmount = 0f,
-                                    family = MobFamily.SHEEP,
-                                    scale = MobModels.scaleOf("sheep"),
-                                    texture = mobRenderer.textureFor("sheep"),
+                                    family = MobModels.familyOf(typeName),
+                                    scale = MobModels.scaleFor(typeName, metadata),
+                                    texture = mobRenderer.textureFor(typeName),
                                     overlays = if (
-                                        !SheepLook.isSheared(metadata) && woolTexture != 0
+                                        isSheep && !SheepLook.isSheared(metadata) && woolTexture != 0
                                     ) {
                                         listOf(
                                             MobRenderer.Layer(
@@ -3688,11 +3747,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     } else {
                                         emptyList()
                                     },
-                                    overlayFamily = MobFamily.SHEEP_FUR,
+                                    overlayFamily = if (isSheep) MobFamily.SHEEP_FUR else null,
                                     time = demoTime,
+                                    swell = swell,
                                 )
                             }
-                            mobRenderer.draw(camera, demoWool)
+                            mobRenderer.draw(camera, demoClose)
 
                             // Гаст парит справа: он втрое крупнее остальных и в общий ряд
                             // не влезает — три блока в ширину.

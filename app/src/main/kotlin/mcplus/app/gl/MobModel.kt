@@ -363,12 +363,21 @@ object MobModels {
     fun cubeSize(metadata: Map<Int, MetaEntry>): Int =
         (metadata[CUBE_SIZE_FIELD]?.number?.toInt() ?: 2).coerceIn(1, 127)
 
-    /** Масштаб моба: у слизней он зависит от размера из метаданных, у остальных — от типа. */
-    fun scaleFor(entityName: String, metadata: Map<Int, MetaEntry>): Float = when (familyOf(entityName)) {
-        // Модель слизня — куб в полблока (8 пикселей), масштаб равен размеру из метаданных.
-        MobFamily.SLIME -> cubeSize(metadata).toFloat()
-        MobFamily.MAGMA_CUBE -> cubeSize(metadata).toFloat()
-        else -> scaleOf(entityName)
+    /** Масштаб моба: у слизней он зависит от размера из метаданных, у детёнышей — половинный. */
+    fun scaleFor(entityName: String, metadata: Map<Int, MetaEntry>): Float {
+        val base = when (familyOf(entityName)) {
+            // Модель слизня — куб в полблока (8 пикселей), масштаб равен размеру из метаданных.
+            MobFamily.SLIME -> cubeSize(metadata).toFloat()
+            MobFamily.MAGMA_CUBE -> cubeSize(metadata).toFloat()
+            else -> scaleOf(entityName)
+        }
+        // Детёныш вдвое меньше взрослого (`LivingEntity.getAgeScale`). У слизня размер уже
+        // задаёт масштаб, «детёнышей» у него нет.
+        return if (EntityLook.isBaby(metadata) && familyOf(entityName) != MobFamily.SLIME) {
+            base * EntityLook.BABY_SCALE
+        } else {
+            base
+        }
     }
 
     /** Номер поля размера в `Set Entity Data` для слизня и магмового куба. */
