@@ -112,6 +112,24 @@ app\build\install\app\bin\app.bat window 127.0.0.1:25565 --name mcplus `
   --hidden --no-menu --after 8 --frames 900 --out screenshots\check.png
 ```
 
+**Смоук-прогон десяти режимов** (2026-11-26: все десять чистые, ни одного исключения).
+Каждый режим — свой снимок `screenshots\sweep-*.png` и лог с тем же именем:
+
+```powershell
+$exe = '.\app\build\install\app\bin\app.bat'
+$base = @('window','127.0.0.1:25565','--name','mcplus','--hidden','--no-menu','--frames','2500')
+& $exe @base --inventory --hover 427,564 --out screenshots\sweep-inventory.png
+& $exe @base --recipes      --out screenshots\sweep-recipes.png
+& $exe @base --advancements --out screenshots\sweep-advancements.png
+& $exe @base --statistics   --out screenshots\sweep-statistics.png
+& $exe @base --mobs --pitch -55 --out screenshots\sweep-mobs.png
+& $exe @base --demo         --out screenshots\sweep-demo.png
+& $exe @base --piston       --out screenshots\sweep-piston.png
+& $exe @base --held 1 --map --out screenshots\sweep-map.png
+& $exe @base --sound-log    --out screenshots\sweep-sound.png
+& $exe @base --particles    --out screenshots\sweep-particles.png
+```
+
 Проверки, которые стоит запускать первыми: `tools/list-missing-mobs.py` (сколько типов
 без своего вида), `.\gradlew.bat build` (тесты), снимок `--statistics` и `--mobs`.
 

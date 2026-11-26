@@ -3445,6 +3445,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                 null
                                             },
                                             headPitch = entity.pitch,
+                                            // Эффект свечения (бит 0x40): ореол вокруг модели.
+                                            glow = EntityLook.isGlowing(entity.metadata),
                                         )
                                         // Поводок: в 26.3 связь приходит пакетом `Set Entity
                                         // Link`. Верёвку рисуем цепочкой мелких кубиков от

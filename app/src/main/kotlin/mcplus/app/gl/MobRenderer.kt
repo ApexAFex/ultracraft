@@ -71,6 +71,13 @@ class MobRenderer(
         /** Взгляд головы вниз-вверх, градусы: ванильный `xRot` головы живой сущности. */
         val headPitch: Float = 0f,
         /**
+         * Сущность светится (эффект свечения, бит 0x40 общих флагов).
+         *
+         * Ваниль обводит такую сущность контуром постобработкой; у нас модель рисуется
+         * второй раз чуть крупнее и почти белой — получается свечение вокруг силуэта.
+         */
+        val glow: Boolean = false,
+        /**
          * Семейство меша для слоёв поверх шкуры.
          *
          * Обычно слой рисуется той же геометрией с другой текстурой (одежда жителя). Но
@@ -190,6 +197,30 @@ class MobRenderer(
         )
 
         val headPivot = headPivotOf(mob.family)
+        // Свечение: модель рисуется второй раз чуть крупнее и почти белой, без записи
+        // глубины — получается ореол вокруг силуэта (ваниль обводит постобработкой).
+        if (mob.glow) {
+            val glowScale = Mat4.multiply(
+                base,
+                Mat4.multiply(Mat4.translate(0f, 0.02f, 0f), scale(1.06f)),
+            )
+            GL30.glUniform3f(tintLocation, 1f, 1f, 1f)
+            GL30.glUniform1f(flashLocation, 0.55f)
+            GL30.glDepthMask(false)
+            for ((index, _) in mesh.boxes.withIndex()) {
+                GL30.glUniformMatrix4fv(modelLocation, false, glowScale)
+                GL30.glDrawArrays(
+                    GL30.GL_TRIANGLES,
+                    mesh.offsets[index] / (VERTEX_FLOATS * Float.SIZE_BYTES),
+                    mesh.counts[index],
+                )
+            }
+            GL30.glDepthMask(true)
+            // Возвращаем обычный цвет: дальше рисуется сама модель.
+            val hurtBack = 1f - mob.hurt * 0.65f
+            GL30.glUniform3f(tintLocation, 1f, hurtBack, hurtBack)
+            GL30.glUniform1f(flashLocation, mob.flash.coerceIn(0f, 1f))
+        }
         for ((index, box) in mesh.boxes.withIndex()) {
             // Вершины коробок уже лежат в координатах модели, поэтому качание — это
             // поворот вокруг оси бедра, без масштабирования коробки.
