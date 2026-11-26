@@ -99,6 +99,14 @@ object Protocol777 {
         const val UPDATE_ENTITY_ROTATION: Int = 0x39
 
         /**
+         * `explode` (0x24): взрыв — центр, сила и число блоков.
+         *
+         * Номер взят у сервера: `tools/protocol-ids.java` печатает
+         * `36  0x24  minecraft:explode`.
+         */
+        const val EXPLODE: Int = 0x24
+
+        /**
          * `rotate_head` (0x55): поворот только головы, байтом в 1/256 оборота.
          *
          * Номер взят у сервера: `tools/protocol-ids.java` печатает

@@ -390,6 +390,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             val breakEvents = java.util.concurrent.ConcurrentLinkedQueue<PendingBreak>()
             val pendingParticles = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.ParticleSpawn>()
             val pendingSounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.SoundSpawn>()
+            /** Взрывы из пакета `explode`: рендер-поток превращает их в частицы и звук. */
+            val pendingExplosions = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.Explosion>()
+            val explodePackets = java.util.concurrent.atomic.AtomicInteger()
             val pendingEntitySounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.EntitySoundSpawn>()
             /** Чужие трещины: ключ — упакованная позиция блока. */
             val remoteCracks = java.util.concurrent.ConcurrentHashMap<Long, RemoteCrack>()
@@ -480,8 +483,20 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     }
                     return
                 }
-                if (packet.id == Protocol777.Play.LEVEL_PARTICLES) {
-                    val parsed = runCatching {
+                if (packet.id == Protocol777.Play.EXPLODE) {
+                    // Взрыв: центр, сила и число блоков. Частицы и звук рисует рендер-поток.
+                    runCatching { mcplus.net.readExplosion(packet.body) }.getOrNull()?.let {
+                        pendingExplosions.add(it)
+                        if (explodePackets.getAndIncrement() < 3) {
+                            println(
+                                "Взрыв: сила ${it.radius} в (${it.x}, ${it.y}, ${it.z}), " +
+                                    "блоков ${it.blockCount}",
+                            )
+                        }
+                    }
+                    return
+                }
+                if (packet.id == Protocol777.Play.LEVEL_PARTICLES) {                    val parsed = runCatching {
                         mcplus.net.readParticles(packet.body, particleTable)
                     }
                     if (particlePackets.getAndIncrement() < 3) {
@@ -2927,6 +2942,34 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     1.2f,
                                     spawn.name,
                                     0.18f,
+                                )
+                            }
+                        }
+                        // Взрывы: из пакета `explode` — частицы по силе взрыва и звук.
+                        while (true) {
+                            val blast = pendingExplosions.poll() ?: break
+                            val dx = blast.x - camera.x
+                            val dy = blast.y - camera.y
+                            val dz = blast.z - camera.z
+                            if (dx * dx + dy * dy + dz * dz > 4096.0) continue
+                            sound.play("entity.generic.explode", blast.x, blast.y, blast.z)
+                            val random = java.util.Random()
+                            // Чем сильнее взрыв, тем больше дыма: у крипера сила 3, у кровати 5.
+                            val count = (blast.radius * 6f).toInt().coerceIn(8, 60)
+                            repeat(count) {
+                                val angle = random.nextDouble() * Math.PI * 2
+                                val speed = 1.5 + random.nextDouble() * blast.radius
+                                val pieces = if (random.nextInt(3) == 0) "explosion" else "smoke"
+                                particles += ParticlePiece(
+                                    blast.x + (random.nextDouble() - 0.5) * blast.radius,
+                                    blast.y + (random.nextDouble() - 0.5) * blast.radius,
+                                    blast.z + (random.nextDouble() - 0.5) * blast.radius,
+                                    kotlin.math.cos(angle) * speed,
+                                    0.4 + random.nextDouble() * 0.9,
+                                    kotlin.math.sin(angle) * speed,
+                                    (1.0 + random.nextDouble() * blast.radius).toFloat(),
+                                    pieces,
+                                    0.5f + random.nextDouble().toFloat() * 0.6f,
                                 )
                             }
                         }

@@ -1,4 +1,4 @@
-﻿package mcplus.app.gl
+package mcplus.app.gl
 
 import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
@@ -61,9 +61,16 @@ class ParticleRenderer(
     /** Сколько кадров у типа; для неизвестного — один. */
     fun frameCount(name: String): Int = frames[name]?.size ?: 1
 
+    /**
+     * Номер кадра в атласе по индексу анимации.
+     *
+     * Индекс приводится к положительному остатку: у частицы с «возрастом» больше ожидаемого
+     * (например, после взрыва) выражение давало отрицательный номер и клиент падал с
+     * `IndexOutOfBoundsException: Index -1`.
+     */
     fun frameOf(name: String, index: Int): Int {
         val list = frames[name] ?: frames["generic"] ?: return 0
-        return list[index % list.size]
+        return list[ParticleFrames.index(index, list.size)]
     }
 
     fun draw(camera: Camera, sprites: List<Sprite>) {
@@ -255,5 +262,21 @@ class ParticleRenderer(
                 FragColor = vec4(texel.rgb, texel.a * vAlpha);
             }
         """
+    }
+}
+
+/**
+ * Приведение индекса анимации частицы к номеру кадра в атласе.
+ *
+ * Вынесено из [ParticleRenderer.frameOf], чтобы проверяться тестом без OpenGL: клиент падал
+ * с IndexOutOfBoundsException: Index -1, когда возраст частицы оказывался больше ожидаемого
+ * и остаток от деления получался отрицательным (так было при взрыве).
+ */
+internal object ParticleFrames {
+    /** Положительный остаток: -1 при восьми кадрах даёт 7, а не падение. */
+    fun index(value: Int, size: Int): Int {
+        if (size <= 0) return 0
+        val remainder = value % size
+        return if (remainder < 0) remainder + size else remainder
     }
 }
