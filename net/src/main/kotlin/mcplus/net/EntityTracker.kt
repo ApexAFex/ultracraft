@@ -170,8 +170,18 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
         if (itemId > 0) equipment[slot] = itemId else equipment.remove(slot)
     }
 
+    /**
+     * Поля метаданных приходят по частям: сервер присылает только изменившиеся.
+     *
+     * Раньше карта заменялась целиком, и после любого обновления (например, здоровья)
+     * пропадали редкие поля — общие флаги (огонь, невидимость), размер слизня, шерсть овцы.
+     * Поэтому поля сливаются: новое значение перекрывает старое, остальные остаются.
+     */
     fun applyMetadata(values: Map<Int, MetaEntry>) {
-        if (values.isNotEmpty()) meta = values
+        if (values.isEmpty()) return
+        val merged = HashMap(meta)
+        merged.putAll(values)
+        meta = merged
     }
 
     fun look(newYaw: Float, newPitch: Float) {

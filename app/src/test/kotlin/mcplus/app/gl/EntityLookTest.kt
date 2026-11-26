@@ -113,6 +113,58 @@ class EntityLookTest {
     }
 
     @Test
+    fun `burning comes from the shared flags byte`() {
+        fun flags(value: Int) = mapOf(
+            EntityLook.FLAGS_FIELD to MetaEntry(type = EntityLook.BYTE_TYPE, number = value.toDouble()),
+        )
+        assertTrue(EntityLook.isBurning(flags(0x01)), "горит")
+        assertTrue(EntityLook.isBurning(flags(0x41)), "горит и светится")
+        assertFalse(EntityLook.isBurning(flags(0x00)))
+        assertFalse(EntityLook.isBurning(flags(0x02)), "крадётся — это не огонь")
+        assertFalse(EntityLook.isBurning(flags(0x20)), "невидим — это не огонь")
+        assertFalse(EntityLook.isBurning(emptyMap()), "без метаданных не горит")
+        // Поле 0 логического типа — не общие флаги: не путаем с «детёнышом» из поля 16.
+        assertFalse(
+            EntityLook.isBurning(
+                mapOf(EntityLook.FLAGS_FIELD to MetaEntry(type = EntityLook.BOOLEAN_TYPE, number = 1.0)),
+            ),
+        )
+        assertEquals(0x41, EntityLook.sharedFlags(flags(0x41)))
+    }
+
+    @Test
+    fun `elders head spikes turn with the head, body spikes do not`() {
+        val guardian = MobModels.boxes(MobFamily.GUARDIAN)
+        val head = guardian.filter { MobModels.isHeadPart(it) }
+        assertTrue(head.any { it.name == "head" })
+        // Шипы головы — spike6…spike11; шипы тела (spike0…spike5) остаются на теле.
+        for (name in listOf("spike6", "spike11")) {
+            assertTrue(head.any { it.name == name }, "$name должен поворачиваться с головой")
+        }
+        for (name in listOf("spike0", "spike3", "spike5")) {
+            assertTrue(head.none { it.name == name }, "$name — шип тела, головой не крутится")
+        }
+    }
+
+    @Test
+    fun `flames surround the mob and move over time`() {
+        val first = EntityLook.flames(time = 0f, id = 1)
+        assertEquals(4, first.size, "по умолчанию четыре языка пламени")
+        // Языки стоят вокруг тела: есть смещения и в плюс, и в минус по X или Z.
+        assertTrue(first.any { it.first != 0f || it.third != 0f })
+        assertTrue(first.any { it.second > 0f }, "пламя поднимается над ногами")
+        // Со временем картинка меняется, но остаётся в тех же пределах.
+        val later = EntityLook.flames(time = 0.7f, id = 1)
+        assertTrue(first != later, "пламя должно покачиваться")
+        for ((dx, dy, dz) in later) {
+            assertTrue(abs(dx) < 0.5f && abs(dz) < 0.5f, "пламя не улетает от тела")
+            assertTrue(dy in 0.1f..1.2f, "высота пламени: $dy")
+        }
+        // У разных сущностей фазы разные — иначе все горели бы синхронно.
+        assertTrue(EntityLook.flames(0f, id = 1) != EntityLook.flames(0f, id = 2))
+    }
+
+    @Test
     fun `creeper flashes white on alternating tenths of swelling`() {
         // `CreeperRenderer.getWhiteOverlayProgress`: десятая доля раздувания; чётная — вспышки
         // нет, нечётная — вспышка равна раздуванию, но не меньше 0,5.

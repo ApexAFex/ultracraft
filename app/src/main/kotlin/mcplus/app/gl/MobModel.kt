@@ -395,8 +395,17 @@ object MobModels {
         "left_ear", "right_ear", "left_horn", "right_horn",
     )
 
+    /**
+     * Шипы на голове стража (`root/head/spike6…spike11`).
+     *
+     * У стража шипы есть и на теле (`spike0…spike5`), они лежат в той же области по высоте,
+     * поэтому по положению их не разделить — номера записаны из дампа.
+     */
+    private val HEAD_SPIKES: Set<String> =
+        setOf("spike6", "spike7", "spike8", "spike9", "spike10", "spike11")
+
     /** Коробка принадлежит голове: её надо поворачивать вместе с головой. */
-    fun isHeadPart(box: MobBox): Boolean = box.name in HEAD_PARTS
+    fun isHeadPart(box: MobBox): Boolean = box.name in HEAD_PARTS || box.name in HEAD_SPIKES
 
     /**
      * Точка, вокруг которой поворачивается голова: низ и середина коробки `head`.

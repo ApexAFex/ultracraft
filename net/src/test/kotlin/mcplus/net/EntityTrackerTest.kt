@@ -100,6 +100,29 @@ class EntityTrackerTest {
     }
 
     @Test
+    fun `metadata fields merge instead of replacing the whole map`() {
+        // Сервер присылает только изменившиеся поля. Если заменять карту целиком, то после
+        // обновления здоровья пропадут редкие поля: общие флаги (огонь), размер слизня,
+        // шерсть овцы. Проверяем, что старые поля остаются, а новые перекрываются.
+        val entity = TrackedEntity(5, UUID.randomUUID(), 32)
+        entity.applyMetadata(
+            mapOf(
+                0 to MetaEntry(type = 0, number = 0x01.toDouble()), // флаги: горит
+                9 to MetaEntry(type = 3, number = 20.0), // здоровье
+                16 to MetaEntry(type = 8, number = 0.0), // не детёныш
+            ),
+        )
+        entity.applyMetadata(mapOf(9 to MetaEntry(type = 3, number = 12.0)))
+        assertEquals(12.0, entity.metadata[9]?.number)
+        assertEquals(0x01, entity.metadata[0]?.number?.toInt(), "флаги не пропали")
+        assertEquals(0.0, entity.metadata[16]?.number)
+        assertEquals(3, entity.metadata.size)
+        // Пустой пакет ничего не стирает.
+        entity.applyMetadata(emptyMap())
+        assertEquals(3, entity.metadata.size)
+    }
+
+    @Test
     fun `an item frame keeps its item in field nine`() {
         // У рамки предмет лежит в своём поле (9), а не в поле выпавшего предмета (8):
         // HangingEntity занимает восьмое поле направлением.

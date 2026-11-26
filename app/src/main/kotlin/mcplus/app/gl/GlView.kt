@@ -737,6 +737,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val stepLogged = HashSet<Int>()
                     /** Мобы, про чей поворот головы уже напечатано (отладка). */
                     val headLogged = HashSet<Int>()
+                    /** Мобы, про чьё горение уже напечатано (отладка). */
+                    val burningLogged = HashSet<Int>()
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -3084,6 +3086,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         }
 
                         val mobs = ArrayList<MobRenderer.Mob>()
+                    /** Горящие мобы: вокруг них рисуются языки пламени. */
+                    val burning = ArrayList<mcplus.net.TrackedEntity>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
                     val saddleLayer = atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
@@ -3372,8 +3376,22 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                     " поводок=" + entity.leashHolder +
                                                     " смерть=" + deathProgress +
                                                     " здоровье=" + entity.health +
-                                                    " скорость=" + entity.speed,
+                                                    " скорость=" + entity.speed +
+                                                    " полей=" + entity.metadata.size +
+                                                    " флаги=" + EntityLook.sharedFlags(entity.metadata) +
+                                                    " поле0=" + entity.metadata[0],
                                             )
+                                        }
+                                        // Горящий моб: ваниль рисует поверх модели анимированный
+                                        // огонь. У нас вокруг тела рисуются языки пламени.
+                                        if (EntityLook.isBurning(entity.metadata)) {
+                                            burning += entity
+                                            if (debug && burningLogged.add(entity.id)) {
+                                                println(
+                                                    "Горит: $name (id=${entity.id}), флаги=" +
+                                                        EntityLook.sharedFlags(entity.metadata),
+                                                )
+                                            }
                                         }
                                         mobs += MobRenderer.Mob(
                                             x = entity.x,
@@ -3865,6 +3883,29 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 )
                             }
                             particleRenderer.draw(camera, sprites)
+                        }
+                        // Горящие мобы: языки пламени вокруг тела — замена ванильного огня
+                        // поверх модели (там это анимированная текстура, у нас спрайты).
+                        if (burning.isNotEmpty()) {
+                            val seconds = (nowNanos / 1_000_000_000.0).toFloat()
+                            val flameFrame = particleRenderer.frameOf(
+                                "flame", (seconds * 8f).toInt() % particleRenderer.frameCount("flame"),
+                            )
+                            val flames = ArrayList<ParticleRenderer.Sprite>(burning.size * 4)
+                            for (entity in burning) {
+                                val boost = if (entity.speed > 0.1) 1.0f else 1f
+                                for ((dx, dy, dz) in EntityLook.flames(seconds, entity.id)) {
+                                    flames += ParticleRenderer.Sprite(
+                                        entity.x + dx * boost,
+                                        entity.y + dy * boost,
+                                        entity.z + dz * boost,
+                                        0.42f,
+                                        flameFrame,
+                                        0.85f,
+                                    )
+                                }
+                            }
+                            particleRenderer.draw(camera, flames)
                         }
                         if (particleDemo) {
                             // Образцы всех загруженных спрайтов перед камерой: видно, что атлас

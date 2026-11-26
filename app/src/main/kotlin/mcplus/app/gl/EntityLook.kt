@@ -31,6 +31,27 @@ object EntityLook {
         return entry.type == BOOLEAN_TYPE && entry.number != 0.0
     }
 
+    /**
+     * Байт общих флагов сущности — `Entity.DATA_SHARED_FLAGS_ID` (поле 0, тип `BYTE`).
+     *
+     * В нём лежит «горит» (0x01), «крадётся» (0x02), «бежит» (0x08), «плывёт» (0x10),
+     * «невидим» (0x20), «светится» (0x40) и «в полёте на элитрах» (0x80).
+     */
+    fun sharedFlags(metadata: Map<Int, MetaEntry>): Int =
+        metadata[FLAGS_FIELD]?.takeIf { it.type == BYTE_TYPE }?.number?.toInt() ?: 0
+
+    /** Сущность горит: младший бит общих флагов (`Entity.getSharedFlag(0)`). */
+    fun isBurning(metadata: Map<Int, MetaEntry>): Boolean =
+        (sharedFlags(metadata) and BURNING_BIT) != 0
+
+    /** Поле 0 — общие флаги; тип `BYTE` (0 в таблице `data/metadata-types-777.tsv`). */
+    const val FLAGS_FIELD = 0
+
+    const val BYTE_TYPE = 0
+
+    /** Бит «горит» в общих флагах. */
+    const val BURNING_BIT = 0x01
+
     /** Масштаб детёныша: половинный, как `getAgeScale()`. */
     const val BABY_SCALE = 0.5f
 
@@ -87,6 +108,31 @@ object EntityLook {
         while (delta > 180f) delta -= 360f
         while (delta < -180f) delta += 360f
         return delta
+    }
+
+    /**
+     * Где рисовать языки пламени вокруг горящей сущности.
+     *
+     * Ваниль рисует поверх модели анимированную текстуру огня; у нас огонь — это несколько
+     * спрайтов пламени вокруг тела, которые покачиваются по времени. Позиции детерминированы
+     * от времени и номера сущности, чтобы пламя не дёргалось само по себе.
+     *
+     * @return тройки «смещение по X, высота, смещение по Z» относительно ног сущности.
+     */
+    fun flames(time: Float, id: Int, count: Int = 4): List<Triple<Float, Float, Float>> {
+        val result = ArrayList<Triple<Float, Float, Float>>(count)
+        for (index in 0 until count) {
+            // Каждый язык живёт со своей фазой, чтобы они не качались синхронно.
+            val phase = time * 2.3f + index * 1.7f + id * 0.37f
+            val wobble = kotlin.math.sin(phase)
+            val radius = 0.22f + 0.1f * kotlin.math.cos(phase * 0.8f)
+            result += Triple(
+                radius * kotlin.math.cos(index * 2.1f) + wobble * 0.05f,
+                0.25f + index * 0.22f + wobble * 0.06f,
+                radius * kotlin.math.sin(index * 2.1f),
+            )
+        }
+        return result
     }
 
     /**
