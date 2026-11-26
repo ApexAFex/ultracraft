@@ -3007,17 +3007,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     )
                                 }
                             } else {
-                                // Дождь: короткие быстрые струи вокруг игрока.
-                                repeat(6) {
-                                    particles += ParticlePiece(
-                                        player.x + (Math.random() - 0.5) * 14,
-                                        player.y + 6 + Math.random() * 6,
-                                        player.z + (Math.random() - 0.5) * 14,
-                                        0.4, -14.0, 0.4,
-                                        0.8f, "rain", 0.14f,
-                                    )
-                                }
-                                // Всплески на земле: ищем твёрдый блок под случайной точкой.
+                                // Дождь: сами струи рисует `WeatherRenderer` (линиями, их
+                                // много и они дешёвые), а здесь остаются только всплески
+                                // на земле — их видно, только когда капля попала в блок.
                                 repeat(3) {
                                     val splashX = kotlin.math.floor(player.x).toInt() + (Math.random() * 12 - 6).toInt()
                                     val splashZ = kotlin.math.floor(player.z).toInt() + (Math.random() * 12 - 6).toInt()
