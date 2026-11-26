@@ -3923,7 +3923,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                         entity.x + dx + toCameraX * push,
                                         entity.y + dy,
                                         entity.z + dz + toCameraZ * push,
-                                        0.42f,
+                                        // 0,8 видно и в темноте: на 0,42 языки терялись
+                                        // на фоне тёмной шкуры и ночи.
+                                        0.8f,
                                         flameFrame,
                                         0.85f,
                                     )
@@ -3931,13 +3933,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                             // Огонь рисуется без теста глубины: спрайты стоят у самой
                             // поверхности тела, и иначе их прячут грани модели.
-                            if (debug && flames.isNotEmpty()) {
-                                val first = flames.first()
+                            if (debug) {
                                 println(
-                                    "Пламя: ${flames.size} спрайтов у ${burning.size} мобов, " +
-                                        "первый ${first.x}, ${first.y}, ${first.z} " +
-                                        "камера ${camera.x}, ${camera.y}, ${camera.z} " +
-                                        "кадр ${first.frame}",
+                                    "Пламя: ${flames.size} спрайтов у ${burning.size} мобов",
                                 )
                             }
                             GL30.glDisable(GL30.GL_DEPTH_TEST)
