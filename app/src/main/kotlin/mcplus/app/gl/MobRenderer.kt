@@ -200,9 +200,10 @@ class MobRenderer(
         // Свечение: модель рисуется второй раз чуть крупнее и почти белой, без записи
         // глубины — получается ореол вокруг силуэта (ваниль обводит постобработкой).
         if (mob.glow) {
+            val glowScaleValue = GLOW_SCALE
             val glowScale = Mat4.multiply(
                 base,
-                Mat4.multiply(Mat4.translate(0f, 0.02f, 0f), scale(1.06f)),
+                Mat4.multiply(Mat4.translate(0f, 0.02f, 0f), scale(glowScaleValue)),
             )
             GL30.glUniform3f(tintLocation, 1f, 1f, 1f)
             GL30.glUniform1f(flashLocation, 0.55f)
@@ -673,6 +674,14 @@ class MobRenderer(
 
         /** Сколько чисел на вершину: x, y, z, u, v, shade. */
         private const val VERTEX_FLOATS = 6
+
+    /**
+     * Насколько ореол свечения крупнее модели.
+     *
+     * 6 % — это тонкая светлая кайма по силуэту, похожая на ванильную обводку. При 25 %
+     * виден уже белый «призрак» позади моба: так я и убедился, что проход вообще рисуется.
+     */
+    private const val GLOW_SCALE = 1.06f
 
         private const val VERTEX_SHADER = """
             #version 330 core

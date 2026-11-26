@@ -3771,18 +3771,30 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             fun wool(bits: Double) = mapOf(
                                 SheepLook.WOOL_FIELD to mcplus.net.MetaEntry(type = 0, number = bits),
                             )
+                            // Второй элемент — метаданные, третий — раздувание крипера,
+                            // четвёртый — свечение: у первой коровы оно включено, чтобы рядом
+                            // с обычной было видно ореол.
+                            data class CloseSample(
+                                val name: String,
+                                val metadata: Map<Int, mcplus.net.MetaEntry>,
+                                val swell: Float,
+                                val glow: Boolean,
+                            )
                             val closeSamples = listOf(
-                                Triple("cow", emptyMap<Int, mcplus.net.MetaEntry>(), 0f),
-                                Triple("cow", babyFlag, 0f),
-                                Triple("creeper", emptyMap(), 0f),
+                                CloseSample("cow", emptyMap(), 0f, true),
+                                CloseSample("cow", babyFlag, 0f, false),
+                                CloseSample("creeper", emptyMap(), 0f, false),
                                 // 0,95 — на нечётной десятой доле, поэтому видна и вспышка.
-                                Triple("creeper", emptyMap(), 0.95f),
-                                Triple("sheep", wool(0.0), 0f),
-                                Triple("sheep", wool(14.0), 0f),
-                                Triple("sheep", wool(30.0), 0f),
+                                CloseSample("creeper", emptyMap(), 0.95f, false),
+                                CloseSample("sheep", wool(0.0), 0f, false),
+                                CloseSample("sheep", wool(14.0), 0f, false),
+                                CloseSample("sheep", wool(30.0), 0f, false),
                             )
                             val woolTexture = mobRenderer.textureForPath("entity/sheep/sheep_wool.png")
-                            val demoClose = closeSamples.mapIndexed { index, (typeName, metadata, swell) ->
+                            val demoClose = closeSamples.mapIndexed { index, sample ->
+                                val typeName = sample.name
+                                val metadata = sample.metadata
+                                val swell = sample.swell
                                 val side = (index - (closeSamples.size - 1) / 2f) * 1.0f
                                 val isSheep = typeName == "sheep"
                                 MobRenderer.Mob(
@@ -3810,6 +3822,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     time = demoTime,
                                     swell = swell,
                                     flash = EntityLook.creeperWhiteOverlay(swell),
+                                    glow = sample.glow,
                                     // Голова первой коровы повёрнута вбок: видно, что голова
                                     // поворачивается отдельно от тела.
                                     headYaw = if (index == 0) 40f else null,
