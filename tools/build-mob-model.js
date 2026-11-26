@@ -63,6 +63,8 @@ for (const line of lines) {
       maxZ: Number(cells[7]),
       u: Number(cells[8]),
       v: Number(cells[9]),
+      // Раздувание коробки (`CubeDeformation`): у старых дампов столбца нет.
+      grow: cells.length > 10 ? Number(cells[10]) : 0,
     });
   }
 }
@@ -225,6 +227,8 @@ for (const part of parts) {
       'u = ' + cube.u,
       'v = ' + cube.v,
     ];
+    // Раздувание: развёртка остаётся по «чистым» размерам, геометрия расширяется.
+    if (cube.grow) args.push('grow = ' + ff(blocks(cube.grow)));
     if (part.matrix) {
       // Вложенный поворот: печатаем матрицу, смещения и углы уже внутри неё.
       const values = part.matrix.map((value) => ff(value)).join(', ');

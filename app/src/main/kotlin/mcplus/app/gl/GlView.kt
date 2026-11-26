@@ -608,21 +608,42 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                      * У овцы шерсть в игре — отдельная модель `SheepFurModel` и отдельная
                      * текстура (`sheep_wool.png`). Меш берётся из семейства `SHEEP_FUR`:
                      * у шерсти свои коробки (ноги короче, шерсть заканчивается выше копыта).
-                     * Честно: флаг «острижена» из метаданных не читается — шерсть рисуется
-                     * всегда, поэтому остриженная овца выглядит так же, как обычная.
+                     * Шерсть красится красителем овцы: цвет лежит в младших четырёх битах поля
+                     * `DATA_WOOL_ID` (номер 18 — проверено `tools/metadata-field.ps1`), а бит
+                     * `0x10` того же байта — «острижена» (`Sheep.isSheared`). Остриженная овца
+                     * шерсти не имеет вовсе.
+                     *
+                     * У слизня второй слой — прозрачная оболочка `SlimeModel.createOuterBodyLayer`
+                     * с той же текстурой (`slime.png`), но другим мешем.
                      */
-                    fun mobOverlays(entity: mcplus.net.TrackedEntity, name: String): List<Int> {
-                        val layers = villagerLayers(entity, name).toMutableList()
+                    fun mobOverlays(
+                        entity: mcplus.net.TrackedEntity,
+                        name: String,
+                    ): List<MobRenderer.Layer> {
+                        val layers = villagerLayers(entity, name)
+                            .map { MobRenderer.Layer(it) }
+                            .toMutableList()
                         if (name == "sheep") {
-                            val wool = mobRenderer.textureForPath("entity/sheep/sheep_wool.png")
-                            if (wool != 0) layers += wool
+                            val texture = mobRenderer.textureForPath("entity/sheep/sheep_wool.png")
+                            if (!SheepLook.isSheared(entity.metadata) && texture != 0) {
+                                layers += MobRenderer.Layer(texture, SheepLook.woolTint(entity.metadata))
+                            }
+                        }
+                        if (name == "slime" || name == "sulfur_cube") {
+                            // Оболочка полупрозрачная; цвет не меняем — он в самой текстуре.
+                            if (mobRenderer.textureFor(name) != 0) {
+                                layers += MobRenderer.Layer(mobRenderer.textureFor(name))
+                            }
                         }
                         return layers
                     }
 
-                    /** Меш слоя: у овцы шерсть своя, у жителей — та же, что у тела. */
-                    fun overlayFamilyOf(name: String): MobFamily? =
-                        if (name == "sheep") MobFamily.SHEEP_FUR else null
+                    /** Меш слоя: у овцы шерсть своя, у слизня оболочка, у жителей — та же. */
+                    fun overlayFamilyOf(name: String): MobFamily? = when (name) {
+                        "sheep" -> MobFamily.SHEEP_FUR
+                        "slime", "sulfur_cube" -> MobFamily.SLIME_OUTER
+                        else -> null
+                    }
                     // Частицы: спрайты из textures/particle, собранные в один атлас.
                     val particleRenderer = ParticleRenderer(width, height, directory)
                     // Гуманоидные мобы: одна модель человека, у каждого свой скин. Раскладка
@@ -3596,7 +3617,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     family = MobModels.familyOf(sample.name),
                                     scale = MobModels.scaleOf(sample.name),
                                     texture = mobRenderer.textureFor(sample.name),
-                                    overlays = layers.drop(1).map { mobRenderer.textureForPath(it) },
+                                    overlays = layers.drop(1).map { MobRenderer.Layer(mobRenderer.textureForPath(it)) },
                                     time = demoTime,
                                 )
                             }
@@ -3604,9 +3625,12 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
 
                             // Ближе и на полу — крупный голем, мелкая мышь и спрут: в общем ряду
                             // их модели было бы не разглядеть, а так видно и размер, и развёртку.
+                            // Слизень здесь же: у него два слоя (внутренний куб и оболочка),
+                            // и оболочка рисуется отдельным проходом.
                             val groundSamples = listOf("iron_golem", "bat", "squid", "slime", "magma_cube")
                             val demoGround = groundSamples.mapIndexed { index, typeName ->
                                 val side = (index - (groundSamples.size - 1) / 2f) * 2.2f
+                                val texture = mobRenderer.textureFor(typeName)
                                 MobRenderer.Mob(
                                     x = camera.x + forward[0] * 5f + right[0] * side,
                                     y = camera.y - 1.55,
@@ -3616,11 +3640,59 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     walkAmount = 0f,
                                     family = MobModels.familyOf(typeName),
                                     scale = MobModels.scaleFor(typeName, emptyMap()),
-                                    texture = mobRenderer.textureFor(typeName),
+                                    texture = texture,
+                                    overlays = if (typeName == "slime" && texture != 0) {
+                                        listOf(MobRenderer.Layer(texture))
+                                    } else {
+                                        emptyList()
+                                    },
+                                    overlayFamily = if (typeName == "slime") {
+                                        MobFamily.SLIME_OUTER
+                                    } else {
+                                        null
+                                    },
                                     time = demoTime,
                                 )
                             }
                             mobRenderer.draw(camera, demoGround)
+
+                            // Шерсть овцы: белая, красная и красная стриженая. Видно и цвет
+                            // красителя, и что у стриженой шерсти нет вовсе.
+                            val woolSamples = listOf(0x00, 0x0E, 0x1E)
+                            val woolTexture = mobRenderer.textureForPath("entity/sheep/sheep_wool.png")
+                            val demoWool = woolSamples.mapIndexed { index, bits ->
+                                val side = (index - (woolSamples.size - 1) / 2f) * 1.8f
+                                val metadata = mapOf(
+                                    SheepLook.WOOL_FIELD to mcplus.net.MetaEntry(
+                                        type = 0, number = bits.toDouble(),
+                                    ),
+                                )
+                                MobRenderer.Mob(
+                                    x = camera.x + forward[0] * 4.0 + right[0] * side,
+                                    y = camera.y - 1.9,
+                                    z = camera.z + forward[2] * 4.0 + right[2] * side,
+                                    yaw = faceCamera,
+                                    walkPhase = 0f,
+                                    walkAmount = 0f,
+                                    family = MobFamily.SHEEP,
+                                    scale = MobModels.scaleOf("sheep"),
+                                    texture = mobRenderer.textureFor("sheep"),
+                                    overlays = if (
+                                        !SheepLook.isSheared(metadata) && woolTexture != 0
+                                    ) {
+                                        listOf(
+                                            MobRenderer.Layer(
+                                                woolTexture, SheepLook.woolTint(metadata),
+                                            ),
+                                        )
+                                    } else {
+                                        emptyList()
+                                    },
+                                    overlayFamily = MobFamily.SHEEP_FUR,
+                                    time = demoTime,
+                                )
+                            }
+                            mobRenderer.draw(camera, demoWool)
 
                             // Гаст парит справа: он втрое крупнее остальных и в общий ряд
                             // не влезает — три блока в ширину.

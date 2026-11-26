@@ -66,6 +66,24 @@ class MobModelsTest {
             "шерсть короче ноги овцы — иначе закрывала бы копыто",
         )
         assertEquals(64 to 32, MobModels.textureSize(MobFamily.SHEEP_FUR))
+
+        // Шерсть — это те же коробки, раздутые на 1,75 пикселя (у головы на 0,6, у ног на 0,5).
+        // Раздувание живёт в отдельном поле `grow`: дамп раньше брал размеры из `cube.minX…`,
+        // где его нет, и шерсть совпадала с телом — её не было видно, а краситель ложился
+        // только на ноги.
+        val furBody = fur.first { it.name == "body" }
+        val body = boxes.first { it.name == "body" }
+        assertEquals(1.75f / 16f, furBody.grow, 1e-4f, "тело шерсти раздуто на 1,75 пикселя")
+        assertTrue(
+            furBody.maxX - furBody.minX + 2 * furBody.grow > body.maxX - body.minX + 0.2f,
+            "шерсть шире тела",
+        )
+        val furHead = fur.first { it.name == "head" }
+        val head = boxes.first { it.name == "head" }
+        assertEquals(0.6f / 16f, furHead.grow, 1e-4f, "голова шерсти раздута на 0,6 пикселя")
+        // Голова шерсти стоит там же, где голова овцы: слой не съезжает.
+        assertEquals(head.offsetY, furHead.offsetY, 1e-4f)
+        assertEquals(head.offsetZ, furHead.offsetZ, 1e-4f)
     }
 
     @Test
@@ -131,10 +149,10 @@ class MobModelsTest {
         // Список ниже — модели, которые ещё рисуются упрощёнными коробками и в этот тест не
         // входят: их развёртка заведомо приблизительная. Это записанный долг, а не разрешение.
         val approximate = setOf(
-            // Слизень рисуется кубом с масштабом от размера из метаданных, сундук — блок-моделью
-            // (`ChestModel` — это `Model`, а не модель сущности: у неё другая ось Y и другой
-            // конвейер). Их развёртка в этом тесте не проверяется — записанный долг.
-            MobFamily.SLIME, MobFamily.CHEST,
+            // Сундук — блок-модель (`ChestModel` — это `Model`, а не модель сущности: у неё
+            // другая ось Y и другой конвейер). Его развёртка в этом тесте не проверяется —
+            // записанный долг. Слизень больше в списке не нужен: он теперь из дампа.
+            MobFamily.CHEST,
         )
         for (family in MobFamily.entries) {
             if (family in approximate) continue
@@ -424,26 +442,55 @@ class MobModelsTest {
         // Слизень — внутренний куб и лицо; магмовый — восемь слоёв и внутренний куб.
         val slime = MobModels.boxes(MobFamily.SLIME)
         assertEquals(4, slime.size)
-        assertEquals(1, slime.count { it.name == "body" })
-        assertEquals(2, slime.count { it.name == "eye" })
+        assertEquals(1, slime.count { it.name == "cube" })
+        assertEquals(1, slime.count { it.name == "right_eye" })
+        assertEquals(1, slime.count { it.name == "left_eye" })
         assertEquals(1, slime.count { it.name == "mouth" })
         assertEquals(9, MobModels.boxes(MobFamily.MAGMA_CUBE).size)
 
-        // Лицо слизня должно смотреть вперёд (+Z), а не внутрь куба.
-        assertTrue(slime.filter { it.name == "eye" }.all { it.minZ > 0.05f })
+        // Лицо слизня смотрит вперёд, а в системе игры «вперёд» — отрицательный Z (там же
+        // клюв курицы): глаза стоят на передней грани куба, а не внутри и не сзади.
+        assertTrue(slime.filter { it.name.endsWith("eye") }.all { it.minZ < -0.05f })
+        val cube = slime.first { it.name == "cube" }
+        assertEquals(0.375f, cube.maxY - cube.minY, 1e-4f, "внутренний куб — 6 пикселей")
+        // Внутренний куб стоит на пиксель выше оболочки: в ванильной модели он 17..23,
+        // а оболочка — 16..24 пикселя.
+        assertEquals(0.0625f, cube.minY + cube.offsetY, 1e-4f)
+        assertTrue(slime.filter { it.name.endsWith("eye") }.all { it.minZ < cube.minZ }, "глаза выступают из куба")
+    }
+
+    @Test
+    fun `slime shell is a separate translucent layer around the inner cube`() {
+        // Оболочка — отдельная модель (`createOuterBodyLayer`): куб 8×8×8 на той же текстуре.
+        assertEquals(64 to 32, MobModels.textureSize(MobFamily.SLIME_OUTER))
+        val shell = MobModels.boxes(MobFamily.SLIME_OUTER)
+        assertEquals(1, shell.size, "оболочка — один куб")
+        val cube = shell.first()
+        assertEquals(0.5f, cube.maxX - cube.minX, 1e-4f)
+        assertEquals(0.5f, cube.maxY - cube.minY, 1e-4f)
+        assertEquals(0.5f, cube.maxZ - cube.minZ, 1e-4f)
+        assertEquals(0f, cube.minY + cube.offsetY, 1e-4f)
+
+        // Внутренний куб целиком внутри оболочки: слои не спорят за глубину.
+        val inner = MobModels.boxes(MobFamily.SLIME).first { it.name == "cube" }
+        assertTrue(inner.minX > cube.minX && inner.maxX < cube.maxX)
+        assertTrue(inner.minZ > cube.minZ && inner.maxZ < cube.maxZ)
+        // Оболочка не участвует в выборе модели по имени сущности: это только слой.
+        assertTrue(MobFamily.SLIME_OUTER !in listOf(MobModels.familyOf("slime")))
     }
 
     @Test
     fun `slime size comes from metadata and sets the scale`() {
-        // Поле 18 — размер; у слизня размера 4 он даёт масштаб 4*4/3.
+        // Поле 18 — размер (`AbstractCubeMob.ID_SIZE`); модель — куб в полблока,
+        // поэтому масштаб равен размеру: слизень размера 4 занимает два блока.
         val big = mapOf(MobModels.CUBE_SIZE_FIELD to MetaEntry(type = 1, number = 4.0))
         val small = mapOf(MobModels.CUBE_SIZE_FIELD to MetaEntry(type = 1, number = 1.0))
 
         assertEquals(4, MobModels.cubeSize(big))
         assertEquals(1, MobModels.cubeSize(small))
         assertEquals(2, MobModels.cubeSize(emptyMap()), "без поля размера считаем двойку")
-        assertEquals(4f * 4f / 3f, MobModels.scaleFor("slime", big), 0.001f)
-        assertEquals(1f * 4f / 3f, MobModels.scaleFor("slime", small), 0.001f)
+        assertEquals(4f, MobModels.scaleFor("slime", big), 0.001f)
+        assertEquals(1f, MobModels.scaleFor("slime", small), 0.001f)
         assertEquals(4f, MobModels.scaleFor("magma_cube", big), 0.001f)
         // Остальные мобы не зависят от поля размера.
         assertEquals(MobModels.scaleOf("cow"), MobModels.scaleFor("cow", big), 0.001f)

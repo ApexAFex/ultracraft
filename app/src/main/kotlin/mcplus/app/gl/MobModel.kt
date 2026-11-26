@@ -4,7 +4,7 @@ import mcplus.net.MetaEntry
 
 /** Семейства простых моделей: у каждого своя раскладка коробок. */
 enum class MobFamily {
-    SHEEP, SHEEP_FUR, RABBIT, PIG, COW, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, MAGMA_CUBE,
+    SHEEP, SHEEP_FUR, RABBIT, PIG, COW, CHICKEN, CREEPER, SPIDER, VILLAGER, IRON_GOLEM, SQUID, BAT, SLIME, SLIME_OUTER, MAGMA_CUBE,
     GHAST, BLAZE, STRIDER, HOGLIN, BEE, TURTLE, WOLF, CAT, FOX, LLAMA, HORSE, PANDA, POLAR_BEAR,
     DOLPHIN, FROG, GOAT, AXOLOTL, SNIFFER, PHANTOM, SHULKER, SILVERFISH, ENDERMITE,
     GUARDIAN, ALLAY, WARDEN, COD, SALMON, TADPOLE, WITCH, SNOW_GOLEM, CAMEL, WITHER, VEX, RAVAGER, ARMOR_STAND, PUFFERFISH, TROPICAL_FISH, ARMADILLO, BREEZE, COPPER_GOLEM, NAUTILUS, DRAGON, CRYSTAL, HAPPY_GHAST, CUSHION, CREAKING, BOAT, MINECART, CHEST, NONE,
@@ -230,6 +230,7 @@ object MobModels {
         MobFamily.SQUID -> 64 to 32
         MobFamily.BAT -> 32 to 32
         MobFamily.SLIME -> 64 to 32
+        MobFamily.SLIME_OUTER -> 64 to 32
         MobFamily.MAGMA_CUBE -> 64 to 64
         MobFamily.GHAST -> 64 to 32
         MobFamily.BLAZE -> 64 to 32
@@ -299,6 +300,7 @@ object MobModels {
         MobFamily.SQUID -> SQUID
         MobFamily.BAT -> BAT
         MobFamily.SLIME -> SLIME
+        MobFamily.SLIME_OUTER -> SLIME_OUTER
         MobFamily.MAGMA_CUBE -> MAGMA_CUBE
         MobFamily.GHAST -> GHAST
         MobFamily.BLAZE -> BLAZE
@@ -363,8 +365,8 @@ object MobModels {
 
     /** Масштаб моба: у слизней он зависит от размера из метаданных, у остальных — от типа. */
     fun scaleFor(entityName: String, metadata: Map<Int, MetaEntry>): Float = when (familyOf(entityName)) {
-        // Внутренний слой слизня — 6 пикселей вместо 8 у оболочки, поэтому 4/3.
-        MobFamily.SLIME -> cubeSize(metadata) * 4f / 3f
+        // Модель слизня — куб в полблока (8 пикселей), масштаб равен размеру из метаданных.
+        MobFamily.SLIME -> cubeSize(metadata).toFloat()
         MobFamily.MAGMA_CUBE -> cubeSize(metadata).toFloat()
         else -> scaleOf(entityName)
     }
@@ -458,12 +460,12 @@ object MobModels {
      * геометрией с другой текстурой — иначе войлок накрывал бы и копыта.
      */
     private val SHEEP_FUR = listOf(
-        MobBox("head", -0.1875f, -0.125f, -0.25f, 0.1875f, 0.25f, 0.125f, u = 0, v = 0, offsetY = 0.75f, offsetZ = -0.5f),
-        MobBox("right_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.375f, offsetZ = -0.3125f),
-        MobBox("right_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = -0.1875f, offsetY = 0.375f, offsetZ = 0.4375f),
-        MobBox("left_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.375f, offsetZ = 0.4375f),
-        MobBox("body", -0.25f, -0.375f, -0.4375f, 0.25f, 0.625f, -0.0625f, u = 28, v = 8, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 0.8125f, 0.125f, 1f)),
-        MobBox("left_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, offsetX = 0.1875f, offsetY = 0.375f, offsetZ = -0.3125f),
+        MobBox("head", -0.1875f, -0.125f, -0.25f, 0.1875f, 0.25f, 0.125f, u = 0, v = 0, grow = 0.0375f, offsetY = 1.125f, offsetZ = -0.5f),
+        MobBox("right_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, grow = 0.0313f, offsetX = -0.1875f, offsetY = 0.75f, offsetZ = -0.3125f),
+        MobBox("right_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, grow = 0.0313f, offsetX = -0.1875f, offsetY = 0.75f, offsetZ = 0.4375f),
+        MobBox("left_hind_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, grow = 0.0313f, offsetX = 0.1875f, offsetY = 0.75f, offsetZ = 0.4375f),
+        MobBox("body", -0.25f, -0.375f, -0.4375f, 0.25f, 0.625f, -0.0625f, u = 28, v = 8, grow = 0.1094f, matrix = floatArrayOf(1f, 0f, 0f, 0f, 0f, -0.0002f, -1f, 0f, 0f, 1f, -0.0002f, 0f, 0f, 1.1875f, 0.125f, 1f)),
+        MobBox("left_front_leg", -0.125f, -0.375f, -0.125f, 0.125f, 0f, 0.125f, u = 0, v = 16, grow = 0.0313f, offsetX = 0.1875f, offsetY = 0.75f, offsetZ = -0.3125f),
     )
 
     private val SHEEP = listOf(
@@ -649,16 +651,26 @@ object MobModels {
     /**
      * Слизень: ванильная модель — прозрачная оболочка и внутренний куб с лицом.
      *
-     * Прозрачной оболочки у нас нет (шейдер мобов не смешивает альфу), поэтому рисуется
-     * внутренний слой: куб 6×6×6 пикселя с глазами и ртом, а масштаб умножается на 4/3,
-     * чтобы слизень остался того же размера, что и оболочка в игре. Глаза и рот в ванильной
-     * модели стоят при отрицательном Z, поэтому их Z отражён: иначе лицо смотрит внутрь куба.
+     * Развернуто из дампа `SlimeModel` (`tools/dumps/slime_inner.txt`): куб 6×6×6 пикселя
+     * (u=0,v=16), глаза (32,0)/(32,4) и рот (32,8) на передней грани — в системе игры она
+     * при отрицательном Z. Оболочка — отдельное семейство [MobFamily.SLIME_OUTER], рисуется
+     * слоем поверх и со смешиванием: её текстура полупрозрачная.
      */
     private val SLIME = listOf(
-        MobBox("body", -0.1875f, 0.0625f, -0.1875f, 0.1875f, 0.4375f, 0.1875f, u = 0, v = 16),
-        MobBox("eye", -0.203125f, 0.25f, 0.09375f, -0.078125f, 0.375f, 0.21875f, u = 32, v = 0),
-        MobBox("eye", 0.078125f, 0.25f, 0.09375f, 0.203125f, 0.375f, 0.21875f, u = 32, v = 4),
-        MobBox("mouth", 0f, 0.125f, 0.15625f, 0.0625f, 0.1875f, 0.21875f, u = 32, v = 8),
+        MobBox("right_eye", -0.2031f, -1.25f, -0.2187f, -0.0781f, -1.125f, -0.0937f, u = 32, v = 0, offsetY = 1.5f),
+        MobBox("mouth", 0f, -1.375f, -0.2187f, 0.0625f, -1.3125f, -0.1562f, u = 32, v = 8, offsetY = 1.5f),
+        MobBox("left_eye", 0.0781f, -1.25f, -0.2187f, 0.2031f, -1.125f, -0.0937f, u = 32, v = 4, offsetY = 1.5f),
+        MobBox("cube", -0.1875f, -1.4375f, -0.1875f, 0.1875f, -1.0625f, 0.1875f, u = 0, v = 16, offsetY = 1.5f),
+    )
+
+    /**
+     * Оболочка слизня (`SlimeModel.createOuterBodyLayer`): куб 8×8×8 пикселя с развёрткой (0,0).
+     *
+     * Индекс размера из метаданных (`AbstractCubeMob.ID_SIZE` = 18) умножает обе части модели,
+     * поэтому слизень размера 4 занимает два блока, как в игре.
+     */
+    private val SLIME_OUTER = listOf(
+        MobBox("cube", -0.25f, -1.5f, -0.25f, 0.25f, -1f, 0.25f, u = 0, v = 0, offsetY = 1.5f),
     )
 
     /**

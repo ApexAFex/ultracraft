@@ -20,6 +20,14 @@ class MobRenderer(
     private val directory: java.io.File?,
 ) : Closeable {
 
+    /**
+     * Один слой поверх шкуры: текстура и её цвет.
+     *
+     * Цвет нужен там, где ваниль красит текстуру: шерсть овцы красится её красителем
+     * (`DyeColor.getTextureDiffuseColor`), а одежда жителя — нет (белый множитель).
+     */
+    data class Layer(val texture: Int, val tint: Int = 0xFFFFFF)
+
     /** Один моб в кадре: позиция, поворот, фаза шага и текстура. */
     data class Mob(
         val x: Double,
@@ -31,8 +39,8 @@ class MobRenderer(
         val family: MobFamily,
         val scale: Float,
         val texture: Int,
-        /** Слои поверх базовой шкуры (одежда, климат, значок уровня жителя). */
-        val overlays: List<Int> = emptyList(),
+        /** Слои поверх базовой шкуры (одежда, климат, значок уровня жителя, шерсть, слизень). */
+        val overlays: List<Layer> = emptyList(),
         /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
         val hurt: Float = 0f,
         /** Время в секундах: по нему качаются хвосты, уши и щупальца в покое. */
@@ -104,10 +112,11 @@ class MobRenderer(
                 GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
                 GL30.glEnable(GL30.GL_POLYGON_OFFSET_FILL)
                 GL30.glPolygonOffset(-1f, -1f)
-                // У слоя может быть своя геометрия (шерсть овцы): тогда берём её меш.
+                // У слоя может быть своя геометрия (шерсть овцы, оболочка слизня): тогда
+                // берём её меш.
                 val overlayMesh = mob.overlayFamily?.let { meshFor(it) } ?: mesh
                 for (overlay in mob.overlays) {
-                    if (overlay != 0) drawMob(overlayMesh, mob, overlay)
+                    if (overlay.texture != 0) drawMob(overlayMesh, mob, overlay.texture, overlay.tint)
                 }
                 GL30.glDisable(GL30.GL_POLYGON_OFFSET_FILL)
                 GL30.glDisable(GL30.GL_BLEND)
@@ -118,14 +127,16 @@ class MobRenderer(
         GL30.glUseProgram(0)
     }
 
-    /** Один проход по коробкам модели с указанной текстурой. */
-    private fun drawMob(mesh: FamilyMesh, mob: Mob, texture: Int) {
+    /** Один проход по коробкам модели с указанной текстурой и множителем цвета. */
+    private fun drawMob(mesh: FamilyMesh, mob: Mob, texture: Int, tint: Int = 0xFFFFFF) {
         GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
         GL30.glBindVertexArray(mesh.vao)
+        val hurt = 1f - mob.hurt * 0.65f
         GL30.glUniform3f(
-            tintLocation, 1f,
-            1f - mob.hurt * 0.65f,
-            1f - mob.hurt * 0.65f,
+            tintLocation,
+            ((tint shr 16) and 0xFF) / 255f,
+            ((tint shr 8) and 0xFF) / 255f * hurt,
+            (tint and 0xFF) / 255f * hurt,
         )
 
         // Лодка и вагонетка в модели длиной по X, а не по Z: им нужен поворот на 90°.
@@ -563,7 +574,9 @@ class MobRenderer(
             void main() {
                 vec4 texel = texture(uSkin, vUv);
                 if (texel.a < 0.1) discard;
-                FragColor = vec4(texel.rgb * vShade * uTint, 1.0);
+                // Альфа сохраняется: оболочка слизня полупрозрачная, и слой рисуется со
+                // смешиванием (см. `draw`).
+                FragColor = vec4(texel.rgb * vShade * uTint, texel.a);
             }
         """
     }

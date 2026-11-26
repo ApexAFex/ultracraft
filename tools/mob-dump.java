@@ -97,19 +97,41 @@ final class mob_dump {
             name, pose.x(), pose.y(), pose.z(), pose.xRot(), pose.yRot(), pose.zRot());
 
         for (ModelPart.Cube cube : cubes(part)) {
+            // Развёртка считается по «чистой» коробке (`cube.minX…`), а раздувание
+            // (`CubeDeformation`) уже вписано в вершины полигонов: у шерсти овцы это 1,75
+            // пикселя, у шапки игрока — 0,5. Поэтому печатаем и коробку без раздувания,
+            // и само раздувание отдельным столбцом: иначе шерсть совпадает с телом и её
+            // не видно, а текстура разъезжается.
             float minU = Float.MAX_VALUE;
             float minV = Float.MAX_VALUE;
+            float grownMinX = Float.MAX_VALUE;
+            float grownMinY = Float.MAX_VALUE;
+            float grownMinZ = Float.MAX_VALUE;
+            float grownMaxX = -Float.MAX_VALUE;
+            float grownMaxY = -Float.MAX_VALUE;
+            float grownMaxZ = -Float.MAX_VALUE;
             for (ModelPart.Polygon polygon : cube.polygons) {
                 for (ModelPart.Vertex vertex : (ModelPart.Vertex[]) field(polygon, "vertices")) {
+                    grownMinX = Math.min(grownMinX, vertex.x());
+                    grownMinY = Math.min(grownMinY, vertex.y());
+                    grownMinZ = Math.min(grownMinZ, vertex.z());
+                    grownMaxX = Math.max(grownMaxX, vertex.x());
+                    grownMaxY = Math.max(grownMaxY, vertex.y());
+                    grownMaxZ = Math.max(grownMaxZ, vertex.z());
                     minU = Math.min(minU, vertex.u() * texWidth);
                     minV = Math.min(minV, vertex.v() * texHeight);
                 }
             }
+            // Раздувание по каждой оси; в моделях игры оно одинаковое для всех трёх.
+            float growX = (grownMaxX - grownMinX - (cube.maxX - cube.minX)) / 2f;
+            float growY = (grownMaxY - grownMinY - (cube.maxY - cube.minY)) / 2f;
+            float growZ = (grownMaxZ - grownMinZ - (cube.maxZ - cube.minZ)) / 2f;
+            float grow = (growX + growY + growZ) / 3f;
             System.out.printf(
-                "CUBE\t%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.1f\t%.1f%n",
+                "CUBE\t%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.1f\t%.1f\t%.3f%n",
                 name,
                 cube.minX, cube.minY, cube.minZ, cube.maxX, cube.maxY, cube.maxZ,
-                minU, minV);
+                minU, minV, grow);
         }
 
         @SuppressWarnings("unchecked")
