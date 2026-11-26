@@ -480,6 +480,34 @@ object MobModels {
         return if (back) -swing * side else swing * side
     }
 
+    /**
+     * Качание лап паука — ванильный `SpiderModel.setupAnim`.
+     *
+     * У паука лапы лежат почти горизонтально, поэтому они не «шагают» вверх-вниз, как ноги
+     * четвероногих: ваниль крутит их вокруг **Y** (вперёд-назад) и **Z** (вверх-вниз), причём
+     * у каждой пары своя фаза (`0`, `π`, `π/2`, `3π/2`), а правая и левая лапы ходят в
+     * противофазе. Раньше мы крутили лапы вокруг X — они махали, как крылья.
+     *
+     * @return пара «поворот вокруг Y, поворот вокруг Z» в радианах.
+     */
+    fun spiderLegTurn(name: String, phase: Float, amount: Float): Pair<Float, Float> {
+        val key = name.lowercase()
+        if (!key.contains("leg")) return 0f to 0f
+        // `walkAnimationPos * 0.6662` в ванили, а фаза считается удвоенной.
+        val p = phase * 2f
+        val offset = when {
+            key.contains("middle") && key.contains("hind") -> Math.PI.toFloat()
+            key.contains("middle") -> (Math.PI / 2).toFloat()
+            key.contains("hind") -> 0f
+            else -> (Math.PI * 1.5).toFloat()
+        }
+        val speed = amount.coerceIn(0f, 1f)
+        val yaw = -kotlin.math.cos(p + offset) * 0.4f * speed
+        val roll = kotlin.math.abs(kotlin.math.sin(p + offset)) * 0.4f * speed
+        val side = sideOf(key) ?: 1f
+        return (yaw * side) to (roll * side)
+    }
+
     /** Сторона части: −1 слева, +1 справа, null если сторона не указана. */
     private fun sideOf(key: String): Float? = when {
         key.contains("left") || key.endsWith("l") && key.length <= 6 -> -1f

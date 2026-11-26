@@ -3686,6 +3686,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             val samples = listOf(
                                 DemoMob("creaking"),
                                 DemoMob("cushion"),
+                                // Паук идёт: видно, что лапы качаются вокруг Y и Z от тела.
+                                DemoMob("spider"),
                             )
                             val faceCamera = 180f - CameraAngles.degrees(camera.yaw)
                             // Время для позы покоя: хвосты, уши и щупальца должны шевелиться.
@@ -3710,8 +3712,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     // Рыба вытянута вдоль тела: чтобы на снимке был виден бок,
                                     // её поворачиваем на 90°, а не лицом к камере.
                                     yaw = if (sample.name in FISH_TYPES) faceCamera - 90f else faceCamera,
-                                    walkPhase = 0f,
-                                    walkAmount = 0f,
+                                    // Паук в ряду идёт: у него видно качание лап, у остальных
+                                    // поза покоя.
+                                    walkPhase = if (sample.name == "spider") 1.6f else 0f,
+                                    walkAmount = if (sample.name == "spider") 1f else 0f,
                                     family = MobModels.familyOf(sample.name),
                                     scale = MobModels.scaleOf(sample.name),
                                     texture = mobRenderer.textureFor(sample.name),

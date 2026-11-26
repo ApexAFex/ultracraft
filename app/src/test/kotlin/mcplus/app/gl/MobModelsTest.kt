@@ -43,6 +43,39 @@ class MobModelsTest {
     }
 
     @Test
+    fun `spider legs swing around y and z, not x`() {
+        // Ванильный `SpiderModel.setupAnim`: у каждой пары лап своя фаза, правая и левая
+        // в противофазе, амплитуда 0,4 на «скорости» 1.
+        val phase = (Math.PI / 2).toFloat()
+        // Задняя пара: cos(π + 0) = −1, значит поворот вокруг Y положительный.
+        val (hindYaw, hindRoll) = MobModels.spiderLegTurn("right_hind_leg", phase, 1f)
+        assertTrue(hindYaw in 0.35f..0.45f, "задняя правая: $hindYaw")
+        assertTrue(hindRoll in 0f..0.45f, "крен: $hindRoll")
+        // Левая лапа той же пары — зеркально.
+        val (leftHindYaw, leftHindRoll) = MobModels.spiderLegTurn("left_hind_leg", phase, 1f)
+        assertEquals(-hindYaw, leftHindYaw, 1e-4f)
+        assertEquals(-hindRoll, leftHindRoll, 1e-4f)
+
+        // Стоящий паук не машет лапами.
+        assertEquals(0f, MobModels.spiderLegTurn("right_front_leg", phase, 0f).first, 1e-6f)
+        assertEquals(0f, MobModels.spiderLegTurn("right_front_leg", phase, 0f).second, 1e-6f)
+        // Не лапа — не качается.
+        assertEquals(0f to 0f, MobModels.spiderLegTurn("body0", phase, 1f))
+        // Амплитуда не больше 0,4 (ванильная): скорость не может раскачать сильнее.
+        for (amount in listOf(1f, 2f, 5f)) {
+            for (leg in listOf("right_front_leg", "left_middle_front_leg", "right_middle_hind_leg")) {
+                val (yaw, roll) = MobModels.spiderLegTurn(leg, 0.3f, amount)
+                assertTrue(kotlin.math.abs(yaw) <= 0.41f, "$leg yaw: $yaw")
+                assertTrue(kotlin.math.abs(roll) <= 0.41f, "$leg roll: $roll")
+            }
+        }
+        // У пары «середина» фаза сдвинута: при нулевой фазе задняя и средняя не совпадают.
+        val rear = MobModels.spiderLegTurn("right_hind_leg", 0f, 1f).first
+        val middle = MobModels.spiderLegTurn("right_middle_hind_leg", 0f, 1f).first
+        assertTrue(kotlin.math.abs(rear - middle) > 0.1f, "у пар разные фазы: $rear против $middle")
+    }
+
+    @Test
     fun `sheep has a body head and four legs`() {
         val boxes = MobModels.boxes(MobFamily.SHEEP)
         assertEquals(6, boxes.size)

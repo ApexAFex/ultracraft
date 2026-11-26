@@ -212,6 +212,26 @@ class MobRenderer(
                 )
                 Mat4.multiply(base, rotate)
             }
+            // Паук: лапы качаются вокруг Y и Z от места крепления к телу, а не вокруг X
+            // (см. `MobModels.spiderLegTurn`).
+            if (mob.family == MobFamily.SPIDER && box.name.contains("leg")) {
+                val (yawTurn, rollTurn) = MobModels.spiderLegTurn(
+                    box.name, mob.walkPhase, mob.walkAmount,
+                )
+                if (yawTurn != 0f || rollTurn != 0f) {
+                    // Крепление лапы — внутренний конец коробки: у правых это maxX, у левых minX.
+                    val attachX = if (box.minX + box.maxX <= 0f) box.maxX else box.minX
+                    val pivotZ = (box.minZ + box.maxZ) / 2f
+                    val around = Mat4.multiply(
+                        Mat4.translate(attachX, box.pivotY, pivotZ),
+                        Mat4.multiply(
+                            Mat4.multiply(Mat4.rotateY(yawTurn), Mat4.rotateZ(rollTurn)),
+                            Mat4.translate(-attachX, -box.pivotY, -pivotZ),
+                        ),
+                    )
+                    matrix = Mat4.multiply(matrix, around)
+                }
+            }
             // Голова поворачивается отдельно от тела: вокруг шеи на разницу углов
             // (`rotate_head`) и вниз-вверх на взгляд (`xRot` в ванили).
             if (headPivot != null && MobModels.isHeadPart(box)) {
