@@ -325,4 +325,105 @@ class PlayerModelTest {
 
         assertTrue(shades.size >= 3, "лица должны быть затенены по-разному: $shades")
     }
+
+    /** Габариты части по осям в блоках. */
+    private fun boundsOf(part: PlayerModel.Part): Triple<ClosedFloatingPointRange<Float>, ClosedFloatingPointRange<Float>, ClosedFloatingPointRange<Float>> {
+        var minX = Float.MAX_VALUE
+        var maxX = -Float.MAX_VALUE
+        var minY = Float.MAX_VALUE
+        var maxY = -Float.MAX_VALUE
+        var minZ = Float.MAX_VALUE
+        var maxZ = -Float.MAX_VALUE
+        var index = 0
+        while (index < part.data.size) {
+            minX = minOf(minX, part.data[index])
+            maxX = maxOf(maxX, part.data[index])
+            minY = minOf(minY, part.data[index + 1])
+            maxY = maxOf(maxY, part.data[index + 1])
+            minZ = minOf(minZ, part.data[index + 2])
+            maxZ = maxOf(maxZ, part.data[index + 2])
+            index += PlayerModel.FLOATS_PER_VERTEX
+        }
+        return Triple(minX..maxX, minY..maxY, minZ..maxZ)
+    }
+
+    /** UV передней грани (эмитится последней, по шесть вершин). */
+    private fun frontUv(part: PlayerModel.Part): List<Pair<Float, Float>> {
+        val result = ArrayList<Pair<Float, Float>>()
+        var index = part.data.size - 6 * PlayerModel.FLOATS_PER_VERTEX
+        while (index < part.data.size) {
+            result += part.data[index + 3] to part.data[index + 4]
+            index += PlayerModel.FLOATS_PER_VERTEX
+        }
+        return result
+    }
+
+    @Test
+    fun `overlay layer repeats the body parts, marked as overlay`() {
+        val overlays = PlayerModel.overlayParts()
+        assertEquals(parts.map { it.name }, overlays.map { it.name }, "второй слой — те же части")
+        for (part in overlays) assertTrue(part.overlay, "${part.name}: должен быть вторым слоем")
+        for (part in parts) assertTrue(!part.overlay, "${part.name}: первый слой непрозрачный")
+        // Плечи и бёдра те же: слой ходит вместе с телом.
+        for (index in parts.indices) {
+            assertEquals(parts[index].pivotY, overlays[index].pivotY, "высота плеча/бедра")
+            assertEquals(parts[index].pivotX, overlays[index].pivotX, "смещение плеча/бедра")
+        }
+    }
+
+    @Test
+    fun `overlay grows by half a pixel on the head and a quarter elsewhere`() {
+        val overlays = PlayerModel.overlayParts().associateBy { it.name }
+        val base = parts.associateBy { it.name }
+
+        // Шапка: та же коробка головы, раздутая на 0,5 пикселя (= 1/32 блока).
+        val hat = boundsOf(overlays.getValue("head"))
+        val head = boundsOf(base.getValue("head"))
+        assertEquals(head.first.start - 0.03125f, hat.first.start, 1e-6f)
+        assertEquals(head.first.endInclusive + 0.03125f, hat.first.endInclusive, 1e-6f)
+        assertEquals(head.third.start - 0.03125f, hat.third.start, 1e-6f)
+        assertEquals(32.5f / 16f, hat.second.endInclusive, 1e-6f, "шапка выше головы на полпикселя")
+
+        // Куртка, рукава и штаны — раздувание 0,25 пикселя.
+        for (name in listOf("body", "rightArm", "leftArm", "rightLeg", "leftLeg")) {
+            val layer = boundsOf(overlays.getValue(name))
+            val inner = boundsOf(base.getValue(name))
+            assertEquals(inner.third.start - 0.015625f, layer.third.start, 1e-6f, name)
+            assertEquals(inner.third.endInclusive + 0.015625f, layer.third.endInclusive, 1e-6f, name)
+        }
+    }
+
+    @Test
+    fun `overlay takes the second layer of the skin`() {
+        val overlays = PlayerModel.overlayParts().associateBy { it.name }
+        // Развёртки ванильной PlayerModel: шапка (32,0), куртка (16,32), рукава (40,32)/(48,48),
+        // штаны (0,32)/(0,48). Передняя грань начинается со сдвига на глубину коробки.
+        fun frontStart(name: String): Pair<Float, Float> {
+            val uv = frontUv(overlays.getValue(name)).first()
+            return (uv.first * 64f) to (uv.second * 64f)
+        }
+
+        assertEquals(40f to 8f, frontStart("head"))      // (32+8, 0+8)
+        assertEquals(20f to 36f, frontStart("body"))     // (16+4, 32+4)
+        assertEquals(44f to 36f, frontStart("rightArm")) // (40+4, 32+4)
+        assertEquals(52f to 52f, frontStart("leftArm"))  // (48+4, 48+4)
+        assertEquals(4f to 36f, frontStart("rightLeg"))  // (0+4, 32+4)
+        assertEquals(4f to 52f, frontStart("leftLeg"))   // (0+4, 48+4)
+    }
+
+    @Test
+    fun `skeletons have no second skin layer and slim sleeves are three pixels`() {
+        assertTrue(PlayerModel.overlayParts(classic = true).isEmpty(), "у скина 64×32 второго слоя нет")
+        assertTrue(PlayerModel.overlayParts(slim = true).isEmpty(), "у скелета второго слоя нет")
+
+        val slim = PlayerModel.overlayParts(slimArms = true).associateBy { it.name }
+        assertEquals(PlayerModel.overlayParts().map { it.name }, slim.values.map { it.name })
+        // Рукав тонкой модели — три пикселя, вплотную к телу, и раздут на 0,25 пикселя:
+        // 4..7 пикселя превращаются в 3,75..7,25.
+        assertEquals(3.75f / 16f..7.25f / 16f, boundsOf(slim.getValue("leftArm")).first)
+        assertEquals((-7.25f / 16f)..(-3.75f / 16f), boundsOf(slim.getValue("rightArm")).first)
+        assertEquals(44f to 36f, frontUv(slim.getValue("rightArm")).first().let {
+            (it.first * 64f) to (it.second * 64f)
+        })
+    }
 }

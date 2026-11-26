@@ -56,6 +56,15 @@ class Camera(
     var fovDegrees: Float = 70f
 
     /**
+     * Полувысота ортографического кадра в блоках; `0` — обычная перспектива.
+     *
+     * Ваниль рисует модель игрока в инвентаре ортографической проекцией (`Projection.setupOrtho`
+     * в её picture-in-picture рендере). С перспективой ближние грани модели крупнее дальних,
+     * и фигурка выглядит раздутой — поэтому для предпросмотра включаем ортографию.
+     */
+    var orthoHalfHeight: Float = 0f
+
+    /**
      * Крен камеры в радианах: тошнота и урон наклоняют горизонт.
      *
      * Наклон считается вокруг направления взгляда, поэтому его достаточно передать в
@@ -83,8 +92,21 @@ class Camera(
             )
         }
         val view = Mat4.lookAt(eye, center, up)
-        val projection = Mat4.perspective(Math.toRadians(fovDegrees.toDouble()).toFloat(), aspect, 0.1f, 2000f)
+        val projection = if (orthoHalfHeight > 0f) {
+            val half = orthoHalfHeight
+            Mat4.orthographic(
+                -half * aspect, half * aspect, -half, half, ORTHO_NEAR, ORTHO_FAR,
+            )
+        } else {
+            Mat4.perspective(Math.toRadians(fovDegrees.toDouble()).toFloat(), aspect, 0.1f, 2000f)
+        }
         return Mat4.multiply(projection, view)
+    }
+
+    private companion object {
+        /** Границы глубины для ортографии: модели предпросмотра стоят в паре блоков от камеры. */
+        const val ORTHO_NEAR = -2000f
+        const val ORTHO_FAR = 2000f
     }
 }
 
@@ -136,6 +158,30 @@ object Mat4 {
         it[0] = x
         it[5] = y
         it[10] = z
+    }
+
+    /**
+     * Ортографическая проекция: без перспективного сокращения.
+     *
+     * Так ваниль рисует предпросмотр игрока в инвентаре, поэтому размер модели на экране
+     * считается простой пропорцией, а не делением на расстояние.
+     */
+    fun orthographic(
+        left: Float,
+        right: Float,
+        bottom: Float,
+        top: Float,
+        near: Float,
+        far: Float,
+    ): FloatArray {
+        val result = identity()
+        result[0] = 2f / (right - left)
+        result[5] = 2f / (top - bottom)
+        result[10] = -2f / (far - near)
+        result[12] = -(right + left) / (right - left)
+        result[13] = -(top + bottom) / (top - bottom)
+        result[14] = -(far + near) / (far - near)
+        return result
     }
 
     fun perspective(fovY: Float, aspect: Float, near: Float, far: Float): FloatArray {

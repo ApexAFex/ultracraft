@@ -34,8 +34,9 @@ final class mob_dump {
         String methodName = args.length > 1 ? args[1] : "createBodyLayer";
         int hintWidth = args.length > 2 ? Integer.parseInt(args[2]) : 0;
         int hintHeight = args.length > 3 ? Integer.parseInt(args[3]) : 0;
+        String variant = args.length > 4 ? args[4] : "";
 
-        Object result = callFactory(type, methodName);
+        Object result = callFactory(type, methodName, variant);
 
         MeshDefinition mesh;
         int textureWidth = hintWidth > 0 ? hintWidth : 64;
@@ -55,7 +56,7 @@ final class mob_dump {
     }
 
     /** Фабрика слоя: без аргументов или с одной деформацией куба. */
-    private static Object callFactory(Class<?> type, String name) throws Exception {
+    private static Object callFactory(Class<?> type, String name, String variant) throws Exception {
         // Фабрика бывает объявлена не в самой модели, а в родителе: у кошки `createBodyLayer`
         // живёт в `AdultFelineModel`, у волка принимает деформацию куба. Раньше поиск шёл
         // только по объявленным методам класса и падал с NoSuchMethodException.
@@ -75,6 +76,13 @@ final class mob_dump {
                     && method.getParameterTypes()[0] == boolean.class
                     && method.getParameterTypes()[1] == CubeDeformation.class) {
                     return method.invoke(null, false, new CubeDeformation(0.0F));
+                }
+                // Модель игрока: `createMesh(CubeDeformation, boolean slim)`.
+                if (method.getParameterCount() == 2
+                    && method.getParameterTypes()[0] == CubeDeformation.class
+                    && method.getParameterTypes()[1] == boolean.class) {
+                    return method.invoke(
+                        null, new CubeDeformation(0.0F), "slim".equals(variant));
                 }
             }
         }

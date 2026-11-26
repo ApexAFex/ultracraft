@@ -71,6 +71,13 @@ class SkinLibrary : Closeable {
     /** Уже посчитанные фигурки: части скина для инвентаря. */
     private val figures = ConcurrentHashMap<UUID, SkinFaces.Figure>()
 
+    /**
+     * Картинка скина игрока; null — скин ещё не скачан.
+     *
+     * Нужна предпросмотру в инвентаре: он строит отдельный рендерер модели по картинке.
+     */
+    fun imageFor(uuid: UUID): BufferedImage? = images[uuid]
+
     /** Фигурка из скина игрока; null — скина нет. */
     fun figureFor(uuid: UUID): SkinFaces.Figure? {
         figures[uuid]?.let { return it }

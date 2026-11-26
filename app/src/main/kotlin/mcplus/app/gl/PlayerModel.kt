@@ -20,6 +20,13 @@ object PlayerModel {
         val pivotY: Float,
         val pivotZ: Float,
         val data: FloatArray,
+        /**
+         * Второй слой скина (шапка, куртка, рукава, штаны): полупрозрачные пиксели.
+         *
+         * Ваниль рисует такие части отдельным проходом `entityTranslucent`, с включённым
+         * смешиванием; непрозрачные части идут через `entityCutoutNoCull`.
+         */
+        val overlay: Boolean = false,
     ) {
         val vertexCount: Int get() = data.size / FLOATS_PER_VERTEX
     }
@@ -37,6 +44,8 @@ object PlayerModel {
         val pivotY: Int,
         /** Зеркальная развёртка: у левых конечностей текстура правых, отражённая по U. */
         val mirror: Boolean = false,
+        /** Раздувание коробки в пикселях: у второго слоя скина 0,5 или 0,25. */
+        val grow: Float = 0f,
     )
 
     private val BOXES = listOf(
@@ -115,12 +124,68 @@ object PlayerModel {
     private val SLIM_PARTS: List<Part> by lazy { SLIM_BOXES.map { part(it) } }
     private val SLIM_PLAYER_PARTS: List<Part> by lazy { SLIM_PLAYER_BOXES.map { part(it) } }
 
+    /**
+     * Второй слой скина: шапка, куртка, рукава и штаны.
+     *
+     * Числа взяты из игры (`PlayerModel.createMesh` + `HumanoidModel.createMesh`): шапка — та же
+     * коробка головы, раздутая на 0,5 пикселя, остальное — на 0,25. У развёрток 64×32 второго
+     * слоя нет вовсе, поэтому скелеты получают пустой список.
+     */
+    fun overlayParts(
+        classic: Boolean = false,
+        slim: Boolean = false,
+        slimArms: Boolean = false,
+    ): List<Part> = when {
+        slimArms -> SLIM_OVERLAYS
+        slim || classic -> emptyList()
+        else -> MODERN_OVERLAYS
+    }
+
+    private val MODERN_OVERLAYS: List<Part> by lazy {
+        listOf(
+            overlayPart("head", -4, 24, -4, 8, 8, 8, 32, 0, 24, grow = 0.5f),
+            overlayPart("body", -4, 12, -2, 8, 12, 4, 16, 32, 12, grow = 0.25f),
+            overlayPart("rightArm", -8, 12, -2, 4, 12, 4, 40, 32, 24, grow = 0.25f),
+            overlayPart("leftArm", 4, 12, -2, 4, 12, 4, 48, 48, 24, grow = 0.25f),
+            overlayPart("rightLeg", -4, 0, -2, 4, 12, 4, 0, 32, 12, grow = 0.25f),
+            overlayPart("leftLeg", 0, 0, -2, 4, 12, 4, 0, 48, 12, grow = 0.25f),
+        )
+    }
+
+    private val SLIM_OVERLAYS: List<Part> by lazy {
+        listOf(
+            overlayPart("head", -4, 24, -4, 8, 8, 8, 32, 0, 24, grow = 0.5f),
+            overlayPart("body", -4, 12, -2, 8, 12, 4, 16, 32, 12, grow = 0.25f),
+            overlayPart("rightArm", -7, 12, -2, 3, 12, 4, 40, 32, 24, grow = 0.25f),
+            overlayPart("leftArm", 4, 12, -2, 3, 12, 4, 48, 48, 24, grow = 0.25f),
+            overlayPart("rightLeg", -4, 0, -2, 4, 12, 4, 0, 32, 12, grow = 0.25f),
+            overlayPart("leftLeg", 0, 0, -2, 4, 12, 4, 0, 48, 12, grow = 0.25f),
+        )
+    }
+
+    private fun overlayPart(
+        name: String,
+        x: Int,
+        y: Int,
+        z: Int,
+        width: Int,
+        height: Int,
+        depth: Int,
+        u: Int,
+        v: Int,
+        pivotY: Int,
+        grow: Float,
+    ): Part {
+        val base = part(Box(name, x, y, z, width, height, depth, u, v, pivotY, grow = grow))
+        return Part(base.name, base.pivotX, base.pivotY, base.pivotZ, base.data, overlay = true)
+    }
+
     private fun part(box: Box, growPx: Float = 0f): Part = Part(
         name = box.name,
         pivotX = (box.x + box.width / 2f) / 16f,
         pivotY = box.pivotY / 16f,
         pivotZ = 0f,
-        data = build(box, growPx),
+        data = build(box, box.grow + growPx),
     )
 
     val parts: List<Part> get() = MODERN_PARTS

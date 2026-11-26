@@ -82,11 +82,20 @@ class PlayerRenderer(
     private val offsets: IntArray
     private val model = FloatArray(16)
 
+    /**
+     * Части модели в порядке отрисовки: сначала тело, затем второй слой скина.
+     *
+     * Второй слой (`hat`, `jacket`, `*_sleeve`, `*_pants`) рисуется с включённым смешиванием,
+     * как ванильный `entityTranslucent`: иначе прозрачные пиксели скина становились бы чёрными.
+     */
+    private val parts: List<PlayerModel.Part> =
+        PlayerModel.parts(classic, slim, slimArms) +
+            PlayerModel.overlayParts(classic, slim, slimArms)
+
     init {
         GL30.glBindVertexArray(vao)
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, vbo)
 
-        val parts = PlayerModel.parts(classic, slim, slimArms)
         val total = parts.sumOf { it.data.size }
         var offset = 0
         offsets = IntArray(parts.size)
@@ -122,7 +131,9 @@ class PlayerRenderer(
         GL30.glActiveTexture(GL30.GL_TEXTURE0)
         GL30.glBindVertexArray(vao)
 
-        val parts = PlayerModel.parts(classic, slim, slimArms)
+        // Смешивание включаем только для второго слоя скина и возвращаем как было.
+        val blendWasOn = GL30.glIsEnabled(GL30.GL_BLEND)
+        var blendOn = blendWasOn
         for (player in players) {
             // У мобов свой скин, у игроков — общий из конструктора.
             val current = if (player.texture != 0) player.texture else texture
@@ -135,6 +146,17 @@ class PlayerRenderer(
             )
             fillModel(player)
             for ((index, part) in parts.withIndex()) {
+                if (part.overlay != blendOn) {
+                    blendOn = part.overlay
+                    if (blendOn) {
+                        GL30.glEnable(GL30.GL_BLEND)
+                        GL30.glBlendFunc(
+                            GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA,
+                        )
+                    } else {
+                        GL30.glDisable(GL30.GL_BLEND)
+                    }
+                }
                 val swingAngle = if (part.name == "rightArm" && player.swing > 0f) {
                     -kotlin.math.sin(player.swing * Math.PI).toFloat() * SWING_ANGLE
                 } else {
@@ -164,6 +186,7 @@ class PlayerRenderer(
             }
         }
 
+        if (!blendWasOn && blendOn) GL30.glDisable(GL30.GL_BLEND)
         GL30.glBindVertexArray(0)
         GL30.glUseProgram(0)
     }
@@ -278,7 +301,9 @@ class PlayerRenderer(
             void main() {
                 vec4 texel = texture(uSkin, vUv);
                 if (texel.a < 0.1) discard;
-                FragColor = vec4(texel.rgb * vShade * uTint, 1.0);
+                // Альфа сохраняется: второй слой скина (шапка, куртка, рукава) полупрозрачный,
+                // и ваниль смешивает его с тем, что под ним.
+                FragColor = vec4(texel.rgb * vShade * uTint, texel.a);
             }
         """
     }

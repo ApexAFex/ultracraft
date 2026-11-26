@@ -1001,11 +1001,12 @@ class Hud(
         if (!renderer.spriteSub("gui_inventory", panel, 0, 0, 176, 166)) {
             renderer.rect(panel, 0x101018, 0.85f)
         }
-        // В ванильном фоне на месте модели игрока чёрный прямоугольник — рисуем фигурку.
+        // В ванильном фоне на месте модели игрока чёрный прямоугольник 49×70 единиц от (26,8)
+        // до (75,78) — ровно та область, которую `InventoryScreen` отдаёт под модель.
         fun preview(x: Float, y: Float, w: Float, h: Float, color: Int) {
             renderer.rect(ox + x * s, oy + y * s, w * s, h * s, color, 1f)
         }
-        preview(26f, 8f, 50f, 62f, 0x2A2A2A)     // подложка под фигурку
+        preview(26f, 8f, 49f, 70f, 0x000000)     // подложка под фигурку
         if (figure != null) {
             // Фигурка из настоящего скина: передние грани частей попиксельно.
             fun part(pixels: List<SkinFaces.Pixel>, x: Float, y: Float, pixel: Float) {
@@ -1017,19 +1018,20 @@ class Hud(
                 }
             }
             val px = 1f
-            part(figure.head, 34f, 10f, px)
-            part(figure.body, 34f, 22f, px)
-            part(figure.armRight, 30f, 22f, px)
-            part(figure.armLeft, 42f, 22f, px)
-            part(figure.legRight, 34f, 36f, px)
-            part(figure.legLeft, 42f, 36f, px)
+            // Фигурка центрируется в области 49×70: её середина — (50,5; 43).
+            part(figure.head, 46f, 24f, px)
+            part(figure.body, 46f, 36f, px)
+            part(figure.armRight, 42f, 36f, px)
+            part(figure.armLeft, 54f, 36f, px)
+            part(figure.legRight, 46f, 50f, px)
+            part(figure.legLeft, 54f, 50f, px)
         } else {
-            preview(34f, 10f, 8f, 8f, colors.head)   // голова — цвет из скина
-            preview(34f, 22f, 8f, 12f, colors.body)  // рубашка
-            preview(30f, 22f, 4f, 12f, colors.arm)   // руки
-            preview(42f, 22f, 4f, 12f, colors.arm)
-            preview(34f, 36f, 4f, 12f, colors.leg)   // штаны
-            preview(42f, 36f, 4f, 12f, colors.leg)
+            preview(46f, 24f, 8f, 8f, colors.head)   // голова — цвет из скина
+            preview(46f, 36f, 8f, 12f, colors.body)  // рубашка
+            preview(42f, 36f, 4f, 12f, colors.arm)   // руки
+            preview(54f, 36f, 4f, 12f, colors.arm)
+            preview(46f, 50f, 4f, 12f, colors.leg)   // штаны
+            preview(54f, 50f, 4f, 12f, colors.leg)
         }
         for (cell in InventoryScreen.cells) {
             val stack = inventory.menuSlot(cell.menuSlot) ?: continue

@@ -1,4 +1,4 @@
-﻿# Печатает модель моба из клиентского jar (tools/mob-dump.java).
+# Печатает модель моба из клиентского jar (tools/mob-dump.java).
 #
 #   .\tools\mob-dump.ps1 net.minecraft.client.model.animal.squid.SquidModel
 #   .\tools\mob-dump.ps1 net.minecraft.client.model.animal.golem.IronGolemModel
@@ -10,7 +10,10 @@ param(
     [Parameter(Mandatory = $true, Position = 0)][string]$Model,
     [string]$Method = 'createBodyLayer',
     [int]$TexWidth = 0,
-    [int]$TexHeight = 0
+    [int]$TexHeight = 0,
+    # Пятый аргумент уходит в фабрику, если она принимает `(CubeDeformation, boolean)`:
+    # у модели игрока это «тонкие руки» (slim). Значения: slim / wide.
+    [string]$Variant = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,4 +42,4 @@ foreach ($root in @('C:\Program Files\Eclipse Adoptium', 'C:\Program Files\Java'
 if (-not $java) { throw 'Не найден JDK 25+ (java.exe)' }
 
 & $java '-Duser.language=en' '-Duser.country=US' -cp ($classpath -join ';') `
-    (Join-Path $PSScriptRoot 'mob-dump.java') $Model $Method $TexWidth $TexHeight
+    (Join-Path $PSScriptRoot 'mob-dump.java') $Model $Method $TexWidth $TexHeight $Variant

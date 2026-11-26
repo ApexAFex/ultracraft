@@ -560,6 +560,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val entityRenderer = EntityRenderer(width, height)
                     val skin = GameFiles.readPng(directory, "assets/minecraft/textures/entity/player/wide/steve.png")
                     val playerRenderer = PlayerRenderer(width, height, skin)
+                    // Предпросмотр игрока в инвентаре: свой рендерер, потому что у него может
+                    // быть скин и тонкая модель из профиля.
+                    var portraitRenderer: PlayerRenderer? = null
+                    var portraitLogged = false
                     // Скины игроков: ссылка из профиля, скачивание и текстура для модели.
                     val skinLibrary = SkinLibrary()
                     // `--skin` рисует свой скин из файла: так проверяется рисование без сети.
@@ -3974,11 +3978,81 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 itemName = { id -> itemTable.nameOf(id) },
                             )
                         } else if (inventory != null && inventoryOpen) {
+                            val skinImage = selfUuid?.let { skinLibrary.imageFor(it) } ?: skin
                             hud.drawInventoryScreen(
                                 inventory, input.mouseX, input.mouseY,
                                 colors = selfUuid?.let { skinLibrary.colorsFor(it) } ?: SkinColors.DEFAULT,
-                                figure = selfUuid?.let { skinLibrary.figureFor(it) },
+                                // Настоящая модель рисуется отдельным проходом ниже; плоскую
+                                // фигурку оставляем только как запасной вариант без скина.
+                                figure = if (skinImage == null) {
+                                    selfUuid?.let { skinLibrary.figureFor(it) }
+                                } else {
+                                    null
+                                },
                             )
+                            // Портрет игрока: модель рисуется прямо в кадр поверх панели.
+                            // Ваниль делает это отдельным проходом с ортографической
+                            // проекцией, поэтому и здесь включается ортография (см. Camera).
+                            if (skinImage != null) {
+                                val portrait = portraitRenderer ?: PlayerRenderer(
+                                    width, height, skinImage, slimArms = selfSlim,
+                                ).also { portraitRenderer = it }
+                                val s = InventoryScreen.scale(height)
+                                // Прямоугольник ванильного предпросмотра: (26,8)–(75,78).
+                                val rectX = InventoryScreen.originX(width, s) + 26f * s
+                                val rectY = InventoryScreen.originY(height, s) + 8f * s
+                                val rectW = 49f * s
+                                val rectH = 70f * s
+                                val ndcX = (rectX + rectW / 2f) / width * 2f - 1f
+                                val ndcY = 1f - (rectY + rectH / 2f) / height * 2f
+                                // Модель в ванили — 2 блока по 30 единиц, то есть 60*s
+                                // пикселей внутри области высотой 70*s: поля по 5 единиц.
+                                val target = 60f * s
+                                val half = PortraitCamera.orthoHalfHeight(
+                                    PortraitCamera.PLAYER_HEIGHT, target, height,
+                                )
+                                val (camX, camY) = PortraitCamera.orthoOffset(
+                                    ndcX, ndcY, half, width.toFloat() / height,
+                                    PortraitCamera.PLAYER_HEIGHT / 2.0,
+                                )
+                                val camera = Camera(camX, camY, -3.0, 0f, 0f)
+                                camera.fovDegrees = 90f
+                                camera.orthoHalfHeight = half.toFloat()
+                                // Тело поворачивается за мышью, как в ванили.
+                                val yaw = PortraitCamera.bodyYaw(
+                                    26f + 49f / 2f, (input.mouseX / s).toFloat(),
+                                )
+                                // Отсечение (scissor) выключено: с ним модель не рисовалась
+                                // вовсе, хотя без него тот же проход виден. Модель и так
+                                // попадает в область превью по расчёту камеры.
+                                GL30.glDisable(GL30.GL_DEPTH_TEST)
+                                portrait.draw(
+                                    camera,
+                                    listOf(
+                                        PlayerRenderer.Player(
+                                            0.0, 0.0, 0.0, yaw, scale = 1f,
+                                        ),
+                                    ),
+                                )
+                                GL30.glEnable(GL30.GL_DEPTH_TEST)
+                                if (debug && System.getenv("UC_PORTRAIT_MID") != null) {
+                                    // Проверка камеры: та же модель, но перед основной камерой.
+                                    camera.orthoHalfHeight = 0f
+                                    camera.fovDegrees = 90f
+                                    val f = camera.forward()
+                                    portrait.draw(
+                                        camera,
+                                        listOf(
+                                            PlayerRenderer.Player(
+                                                camera.x + f[0] * 3.0,
+                                                camera.y - 1.4,
+                                                camera.z + f[2] * 3.0,
+                                                180f,
+                                            ),
+                                        ),
+                                    )
+                                }
+                            }
                         }
                         // Книга занимает экран целиком: поверх неё ничего не рисуем.
                         val openBook = bookScreens
