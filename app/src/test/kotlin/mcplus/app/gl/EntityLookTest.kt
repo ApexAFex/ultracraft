@@ -113,6 +113,21 @@ class EntityLookTest {
     }
 
     @Test
+    fun `invisible and glowing come from their bits`() {
+        fun flags(value: Int) = mapOf(
+            EntityLook.FLAGS_FIELD to MetaEntry(type = EntityLook.BYTE_TYPE, number = value.toDouble()),
+        )
+        assertTrue(EntityLook.isInvisible(flags(0x20)))
+        assertFalse(EntityLook.isInvisible(flags(0x01)), "огонь — это не невидимость")
+        assertTrue(EntityLook.isInvisible(flags(0x60)), "невидим и светится")
+        assertTrue(EntityLook.isGlowing(flags(0x40)))
+        assertTrue(EntityLook.isGlowing(flags(0x60)))
+        assertFalse(EntityLook.isGlowing(flags(0x20)))
+        assertFalse(EntityLook.isInvisible(emptyMap()))
+        assertFalse(EntityLook.isGlowing(emptyMap()))
+    }
+
+    @Test
     fun `burning comes from the shared flags byte`() {
         fun flags(value: Int) = mapOf(
             EntityLook.FLAGS_FIELD to MetaEntry(type = EntityLook.BYTE_TYPE, number = value.toDouble()),

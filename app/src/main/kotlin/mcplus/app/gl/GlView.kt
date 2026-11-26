@@ -739,6 +739,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val headLogged = HashSet<Int>()
                     /** Мобы, про чьё горение уже напечатано (отладка). */
                     val burningLogged = HashSet<Int>()
+                    /** Мобы, про чью невидимость уже напечатано (отладка). */
+                    val invisibleLogged = HashSet<Int>()
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -3133,6 +3135,18 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 val family = MobModels.familyOf(name)
                                 val look = HumanoidLook.lookOf(name)
                                 val mannequinSkin = HumanoidLook.playerSkin(name)
+                                // Невидимого моба (зелье невидимости, бит 0x20 общих флагов)
+                                // не рисуем вовсе: в ванили остаются только броня и предмет
+                                // в руке, а у нас они одним мешем с телом.
+                                if (EntityLook.isInvisible(entity.metadata)) {
+                                    if (debug && invisibleLogged.add(entity.id)) {
+                                        println(
+                                            "Невидим: $name (id=${entity.id}), флаги=" +
+                                                EntityLook.sharedFlags(entity.metadata),
+                                        )
+                                    }
+                                    continue
+                                }
                                 when {
                                     // Манекен — модель игрока со стандартным скином.
                                     mannequinSkin != null ->
@@ -3888,24 +3902,47 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // поверх модели (там это анимированная текстура, у нас спрайты).
                         if (burning.isNotEmpty()) {
                             val seconds = (nowNanos / 1_000_000_000.0).toFloat()
-                            val flameFrame = particleRenderer.frameOf(
-                                "flame", (seconds * 8f).toInt() % particleRenderer.frameCount("flame"),
-                            )
+                            // Первый кадр спрайта пламени: он самый крупный, а анимацию
+                            // делают покачивание и разные фазы у мобов.
+                            val flameFrame = particleRenderer.frameOf("flame", 0)
                             val flames = ArrayList<ParticleRenderer.Sprite>(burning.size * 4)
                             for (entity in burning) {
-                                val boost = if (entity.speed > 0.1) 1.0f else 1f
+                                // Языки пламени сдвигаются от центра моба к камере: иначе
+                                // спрайт оказывается внутри коробки тела и тест глубины его
+                                // прячет, и горящий моб выглядит обычно.
+                                var toCameraX = camera.x - entity.x
+                                var toCameraZ = camera.z - entity.z
+                                val length = kotlin.math.hypot(toCameraX, toCameraZ)
+                                if (length > 1e-4) {
+                                    toCameraX /= length
+                                    toCameraZ /= length
+                                }
+                                val push = 0.36f
                                 for ((dx, dy, dz) in EntityLook.flames(seconds, entity.id)) {
                                     flames += ParticleRenderer.Sprite(
-                                        entity.x + dx * boost,
-                                        entity.y + dy * boost,
-                                        entity.z + dz * boost,
+                                        entity.x + dx + toCameraX * push,
+                                        entity.y + dy,
+                                        entity.z + dz + toCameraZ * push,
                                         0.42f,
                                         flameFrame,
                                         0.85f,
                                     )
                                 }
                             }
+                            // Огонь рисуется без теста глубины: спрайты стоят у самой
+                            // поверхности тела, и иначе их прячут грани модели.
+                            if (debug && flames.isNotEmpty()) {
+                                val first = flames.first()
+                                println(
+                                    "Пламя: ${flames.size} спрайтов у ${burning.size} мобов, " +
+                                        "первый ${first.x}, ${first.y}, ${first.z} " +
+                                        "камера ${camera.x}, ${camera.y}, ${camera.z} " +
+                                        "кадр ${first.frame}",
+                                )
+                            }
+                            GL30.glDisable(GL30.GL_DEPTH_TEST)
                             particleRenderer.draw(camera, flames)
+                            GL30.glEnable(GL30.GL_DEPTH_TEST)
                         }
                         if (particleDemo) {
                             // Образцы всех загруженных спрайтов перед камерой: видно, что атлас

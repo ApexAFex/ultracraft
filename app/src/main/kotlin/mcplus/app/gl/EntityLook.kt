@@ -44,6 +44,25 @@ object EntityLook {
     fun isBurning(metadata: Map<Int, MetaEntry>): Boolean =
         (sharedFlags(metadata) and BURNING_BIT) != 0
 
+    /**
+     * Сущность невидима (зелье невидимости): бит `0x20` общих флагов.
+     *
+     * Ваниль не рисует невидимую модель (броня и предмет в руке остаются видны, у нас
+     * они одним мешем с телом, поэтому просто не рисуем моба целиком).
+     */
+    fun isInvisible(metadata: Map<Int, MetaEntry>): Boolean =
+        (sharedFlags(metadata) and INVISIBLE_BIT) != 0
+
+    /** Сущность светится (эффект свечения): бит `0x40`. */
+    fun isGlowing(metadata: Map<Int, MetaEntry>): Boolean =
+        (sharedFlags(metadata) and GLOWING_BIT) != 0
+
+    /** Бит «невидим» в общих флагах. */
+    const val INVISIBLE_BIT = 0x20
+
+    /** Бит «светится» (эффект свечения). */
+    const val GLOWING_BIT = 0x40
+
     /** Поле 0 — общие флаги; тип `BYTE` (0 в таблице `data/metadata-types-777.tsv`). */
     const val FLAGS_FIELD = 0
 
