@@ -180,6 +180,23 @@ class EntityLookTest {
     }
 
     @Test
+    fun `wolf head is a real head and can turn`() {
+        // У волка головная коробка называется `real_head` (так в ванильной WolfModel),
+        // обычной `head` у него нет — раньше из-за этого шея не находилась и голова
+        // волка не поворачивалась вовсе.
+        val boxes = MobModels.boxes(MobFamily.WOLF)
+        assertTrue(boxes.any { it.name == "real_head" }, "у волка есть real_head")
+        assertTrue(boxes.none { it.name == "head" }, "обычной коробки head у него нет")
+        assertTrue(MobModels.headPivot(MobFamily.WOLF) != null, "шея волка находится")
+        assertTrue(boxes.filter { MobModels.isHeadPart(it) }.any { it.name == "real_head" })
+        // У дракона голова называется обычно и висит на шее — она тоже поворачивается.
+        val dragon = MobModels.boxes(MobFamily.DRAGON)
+        assertTrue(dragon.any { it.name == "head" })
+        assertTrue(dragon.any { it.name == "jaw" && MobModels.isHeadPart(it) })
+        assertTrue(MobModels.headPivot(MobFamily.DRAGON) != null)
+    }
+
+    @Test
     fun `creeper flashes white on alternating tenths of swelling`() {
         // `CreeperRenderer.getWhiteOverlayProgress`: десятая доля раздувания; чётная — вспышки
         // нет, нечётная — вспышка равна раздуванию, но не меньше 0,5.

@@ -396,6 +396,14 @@ object MobModels {
     )
 
     /**
+     * У волка головная коробка называется `real_head` — обычной `head` у него нет.
+     *
+     * Имя «real_head» пришло из ванильной `WolfModel`: там голова с ушами собрана в части
+     * `head` → `real_head`, и в плоском списке осталось только внутреннее имя.
+     */
+    private val REAL_HEAD = setOf("real_head")
+
+    /**
      * Шипы на голове стража (`root/head/spike6…spike11`).
      *
      * У стража шипы есть и на теле (`spike0…spike5`), они лежат в той же области по высоте,
@@ -415,7 +423,11 @@ object MobModels {
      * Возвращает `null`, если головы в модели нет.
      */
     fun headPivot(family: MobFamily): Triple<Float, Float, Float>? {
-        val head = boxes(family).firstOrNull { it.name == "head" } ?: return null
+        // У волка головной коробки `head` нет — её роль играет `real_head`.
+        val all = boxes(family)
+        val head = all.firstOrNull { it.name == "head" }
+            ?: all.firstOrNull { it.name in REAL_HEAD }
+            ?: return null
         val centerX = (head.minX + head.maxX) / 2f + head.offsetX
         val bottomY = head.minY + head.offsetY
         val centerZ = (head.minZ + head.maxZ) / 2f + head.offsetZ
