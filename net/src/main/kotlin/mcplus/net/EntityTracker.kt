@@ -254,6 +254,9 @@ class EntityTracker(
     /** Очередь смертей: мобы умерли, а частицы и звук надо нарисовать в рендер-потоке. */
     val deaths = java.util.concurrent.ConcurrentLinkedQueue<Death>()
 
+    /** Сколько событий уже напечатано с hex (отладка). */
+    private val eventDumps = java.util.concurrent.atomic.AtomicInteger()
+
     private val entities = ConcurrentHashMap<Int, TrackedEntity>()
 
     @Volatile
@@ -387,10 +390,23 @@ class EntityTracker(
             Protocol777.Play.ENTITY_EVENT -> {
                 runCatching {
                     val reader = ByteReader(packet.body)
-                    val id = reader.readVarInt()
+                    // В 26.3 идентификатор сущности здесь — **фиксированный int**, а не VarInt:
+                    // `ClientboundEntityEventPacket` пишет `writeInt`, затем `writeByte`.
+                    // Раньше читали VarInt, из-за чего каждый пакет давал `id=0 статус=0`
+                    // (тело 5 байт: 00 00 0d ac 18 = id 3500, статус 24) — поэтому не работали
+                    // ни вспышка урона, ни смерть моба.
+                    val id = reader.readInt()
                     val status = reader.readUnsignedByte()
                     if (logEvents) {
-                        println("Событие сущности: id=$id статус=$status известна=${entities[id] != null}")
+                        // Первые несколько событий печатаем вместе с сырыми байтами: если
+                        // разбор даёт нули, по hex видно, та ли это раскладка пакета.
+                        if (eventDumps.getAndIncrement() < 4) {
+                            println(
+                                "Событие сущности: id=$id статус=$status известна=${entities[id] != null}" +
+                                    ", байт ${packet.body.size}: " +
+                                    packet.body.joinToString("") { "%02x".format(it) },
+                            )
+                        }
                     }
                     // 2 — получен урон: короткая красная вспышка на модели.
                     // 3 — смерть: в ванили на месте моба всплывают частицы «пуф», и играет

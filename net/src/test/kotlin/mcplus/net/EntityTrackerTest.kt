@@ -35,11 +35,12 @@ class EntityTrackerTest {
     fun `mob death event queues a death for particles`() {
         // `entity_event` = 3 — смерть: в ванили на месте моба всплывают частицы «пуф».
         // Клиент должен узнать об этом из пакета, а не из исчезновения сущности.
+        // В 26.3 тело пакета — фиксированный int (id) + байт (событие), а не VarInt.
         val tracker = EntityTracker()
         tracker.onPacket(spawn(11, 74, -207.0, 121.0, -47.0))
         val event = Packet(
             Protocol777.Play.ENTITY_EVENT,
-            ByteWriter().writeVarInt(11).writeByte(3).toByteArray(),
+            ByteWriter().writeInt(11).writeByte(3).toByteArray(),
         )
         assertTrue(tracker.onPacket(event))
         val death = tracker.deaths.poll()
@@ -52,9 +53,26 @@ class EntityTrackerTest {
         // Урон (2) смертью не считается.
         tracker.onPacket(Packet(
             Protocol777.Play.ENTITY_EVENT,
-            ByteWriter().writeVarInt(11).writeByte(2).toByteArray(),
+            ByteWriter().writeInt(11).writeByte(2).toByteArray(),
         ))
         assertNull(tracker.deaths.poll(), "статус 2 — только вспышка урона")
+    }
+
+    @Test
+    fun `entity event reads the fixed-width entity id`() {
+        // Живой пакет из игры: тело 00 00 0d ac 18 — это id 3500 (int) и статус 24.
+        // Раньше здесь читался VarInt, и все события выглядели как «id=0 статус=0».
+        val tracker = EntityTracker()
+        tracker.onPacket(spawn(3500, 74, 1.0, 2.0, 3.0))
+        tracker.onPacket(
+            Packet(
+                Protocol777.Play.ENTITY_EVENT,
+                byteArrayOf(0x00, 0x00, 0x0d.toByte(), 0xac.toByte(), 0x18),
+            ),
+        )
+        // Статус 24 — не смерть, значит очередь пуста, но сущность найдена (не упало).
+        assertNull(tracker.deaths.poll())
+        assertEquals(1.0, tracker.byId(3500)?.x ?: 0.0, 1e-9)
     }
 
     @Test
