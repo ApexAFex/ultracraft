@@ -180,6 +180,16 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
     /** One full arm swing per this many blocks walked (vanilla is about the same). */
     private const val WALK_PHASE_PER_BLOCK = 3.5
 
+/** Поля метаданных манекена для брони: голова, корпус, две руки, две ноги. */
+private val POSE_FIELDS = listOf(
+    ArmorStandPose.HEAD_FIELD,
+    ArmorStandPose.BODY_FIELD,
+    ArmorStandPose.LEFT_ARM_FIELD,
+    ArmorStandPose.RIGHT_ARM_FIELD,
+    ArmorStandPose.LEFT_LEG_FIELD,
+    ArmorStandPose.RIGHT_LEG_FIELD,
+)
+
     /** Speed at which the limbs swing at full amplitude. */
     private const val WALK_SPEED = 4.3
 
@@ -3626,6 +3636,15 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             hurtYaw = entity.hurtYaw,
                                             // Горит: поверх модели рисуются кадры огня, как в игре.
                                             burning = EntityLook.isBurning(entity.metadata),
+                                            // Позы манекена для брони: шесть поворотов из
+                                            // метаданных (поля 16…21).
+                                            pose = if (family == MobFamily.ARMOR_STAND) {
+                                                POSE_FIELDS.associateWith { field ->
+                                                    ArmorStandPose.rotation(entity.metadata, field)
+                                                }
+                                            } else {
+                                                emptyMap()
+                                            },
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
                                             swell = creeperSwell(entity, name, nowNanos),

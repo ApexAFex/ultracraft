@@ -86,6 +86,12 @@ class MobRenderer(
      * на модель кадры `block/fire_0`/`fire_1` — их и рисуем вторым проходом.
      */
     val burning: Boolean = false,
+    /**
+     * Позы манекена для брони: шесть поворотов из метаданных (голова, корпус, руки, ноги).
+     *
+     * Пустая карта — обычный манекен. Ключи — номера полей [ArmorStandPose].
+     */
+    val pose: Map<Int, ArmorStandPose.Rotation> = emptyMap(),
         /**
          * Семейство меша для слоёв поверх шкуры.
          *
@@ -333,6 +339,29 @@ class MobRenderer(
                     }
                     val back = Mat4.translate(-px, -py, -pz)
                     matrix = Mat4.multiply(matrix, Mat4.multiply(turn, Mat4.multiply(rotation, back)))
+                }
+            }
+            // Манекен для брони: каждая часть поворачивается на свои углы из метаданных.
+            if (mob.family == MobFamily.ARMOR_STAND && mob.pose.isNotEmpty()) {
+                val field = ArmorStandPose.fieldOf(box.name)
+                val rotation = field?.let { mob.pose[it] }
+                if (rotation != null && !rotation.isZero) {
+                    val pivotX = (box.minX + box.maxX) / 2f
+                    val pivotZ = (box.minZ + box.maxZ) / 2f
+                    val around = Mat4.multiply(
+                        Mat4.translate(pivotX, box.pivotY, pivotZ),
+                        Mat4.multiply(
+                            Mat4.multiply(
+                                Mat4.rotateY(Math.toRadians(rotation.y.toDouble()).toFloat()),
+                                Mat4.multiply(
+                                    Mat4.rotateX(Math.toRadians(rotation.x.toDouble()).toFloat()),
+                                    Mat4.rotateZ(Math.toRadians(rotation.z.toDouble()).toFloat()),
+                                ),
+                            ),
+                            Mat4.translate(-pivotX, -box.pivotY, -pivotZ),
+                        ),
+                    )
+                    matrix = Mat4.multiply(matrix, around)
                 }
             }
             // Огонь рисуется чуть крупнее модели, чтобы кадры огня не спорили с ней за глубину.

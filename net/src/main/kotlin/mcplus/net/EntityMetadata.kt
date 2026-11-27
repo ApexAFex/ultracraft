@@ -15,6 +15,9 @@ data class MetaEntry(
     val type: Int,
     val number: Double = 0.0,
     val text: String? = null,
+    /** Для типа 9 (`Rotations`): повороты вокруг Y и Z; вокруг X лежит в [number]. */
+    val rotationY: Double = 0.0,
+    val rotationZ: Double = 0.0,
     /** Для типа 7 (стек предмета): id и количество; -1 — предмет с нечитаемыми компонентами. */
     val itemId: Int = 0,
     val itemCount: Int = 0,
@@ -73,10 +76,12 @@ private fun readMetaValue(reader: ByteReader, type: Int): MetaEntry? = when (typ
 
     8 -> MetaEntry(type, if (reader.readBoolean()) 1.0 else 0.0)
     9 -> {
+        // Повороты (`Rotations`): три float — вокруг X, Y и Z. Раньше сохранялся только X,
+        // из-за чего позы манекена для брони (поля 16…21) прочитать было нельзя.
         val x = reader.readFloat()
-        reader.readFloat()
-        reader.readFloat()
-        MetaEntry(type, x.toDouble())
+        val y = reader.readFloat()
+        val z = reader.readFloat()
+        MetaEntry(type, x.toDouble(), rotationY = y.toDouble(), rotationZ = z.toDouble())
     }
 
     10 -> MetaEntry(type, reader.readLong().toDouble())
