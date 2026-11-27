@@ -74,6 +74,27 @@ class EntityTrackerTest {
     }
 
     @Test
+    fun `hurt animation carries the direction of the hit`() {
+        // `hurt_animation` (0x2B): VarInt id + float yaw. Современные серверы шлют его вместо
+        // `entity_event` 2 — без него урон на модели не показывался вовсе.
+        val tracker = EntityTracker()
+        tracker.onPacket(spawn(21, 74, 0.0, 64.0, 0.0))
+        val packet = Packet(
+            Protocol777.Play.HURT_ANIMATION,
+            ByteWriter().writeVarInt(21).writeFloat(90f).toByteArray(),
+        )
+        assertTrue(tracker.onPacket(packet))
+        val entity = tracker.byId(21)!!
+        assertEquals(90f, entity.hurtYaw, 1e-3f)
+        // Сразу после удара вспышка полная, через полсекунды гаснет.
+        val now = 5_000_000_000L
+        entity.hurt(now, 45f)
+        assertEquals(1f, entity.hurtProgress(now), 1e-4f)
+        assertEquals(0f, entity.hurtProgress(now + 500_000_000L), 1e-4f)
+        assertEquals(45f, entity.hurtYaw, 1e-3f)
+    }
+
+    @Test
     fun `entity event reads the fixed-width entity id`() {
         // Живой пакет из игры: тело 00 00 0d ac 18 — это id 3500 (int) и статус 24.
         // Раньше здесь читался VarInt, и все события выглядели как «id=0 статус=0».

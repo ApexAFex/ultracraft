@@ -98,9 +98,15 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     @Volatile
     private var hurtAtNanos: Long = 0L
 
-    fun hurt(nowNanos: Long) {
+    fun hurt(nowNanos: Long, yaw: Float = Float.NaN) {
         hurtAtNanos = nowNanos
+        if (!yaw.isNaN()) hurtYaw = yaw
     }
+
+    /** С какой стороны пришёл удар, градусы: по нему ваниль наклоняет модель. */
+    @Volatile
+    var hurtYaw: Float = 0f
+        private set
 
     fun hurtProgress(nowNanos: Long): Float {
         if (hurtAtNanos == 0L) return 0f
@@ -377,6 +383,20 @@ class EntityTracker(
                     val holder = reader.readInt()
                     linkPackets++
                     entities[leashed]?.applyLeash(holder)
+                }
+                return true
+            }
+
+            Protocol777.Play.HURT_ANIMATION -> {
+                // `hurt_animation` (0x2B): VarInt id и float «откуда пришёл удар» в градусах.
+                // Современные серверы шлют именно его, а не `entity_event` 2, поэтому без
+                // разбора этого пакета урон на модели не показывался.
+                runCatching {
+                    val reader = ByteReader(packet.body)
+                    val id = reader.readVarInt()
+                    val yaw = reader.readFloat()
+                    entities[id]?.hurt(System.nanoTime(), yaw)
+                    if (logEvents) println("Анимация урона: id=$id угол=$yaw")
                 }
                 return true
             }

@@ -148,6 +148,14 @@ object Protocol777 {
         const val SET_TITLE_TEXT: Int = 0x74
         const val SET_SUBTITLE_TEXT: Int = 0x72
         /**
+         * `hurt_animation` (0x2B): VarInt id и float — с какой стороны пришёл удар.
+         *
+         * Номер у сервера: `tools/protocol-ids.java` печатает
+         * `43  0x2B  minecraft:hurt_animation`.
+         */
+        const val HURT_ANIMATION: Int = 0x2B
+
+        /**
          * `set_titles_animation` (0x75): три VarInt — проявление, показ и угасание, в тиках.
          *
          * Номер у сервера: `tools/protocol-ids.java` печатает
