@@ -795,6 +795,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val invisibleLogged = HashSet<Int>()
                     /** Сколько капель дождя было в прошлом кадре (отладка). */
                     var rainDropsLogged = 0
+                    /** Биом, про осадки в котором уже напечатано (отладка). */
+                    var precipitationLogged = -1
                     val font = Font.load(directory)
                     val textRenderer = font?.let { TextRenderer(it, width, height) }
                     if (textRenderer == null) println("Шрифт игры не найден: никнеймы не рисуются")
@@ -3087,7 +3089,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 kotlin.math.floor(player.z).toInt(),
                             )
                             val biomeName = biomeNames.getOrNull(biomeId) ?: ""
-                            if ("snow" in biomeName || "frozen" in biomeName || "ice" in biomeName) {
+                            // Снег или дождь — по температуре биома из данных игры
+                            // (ванильный порог 0,15); имя биома осталось запасным вариантом.
+                            val snow = Weather.isSnow(tints.temperatureOf(biomeId), biomeName)
+                            if (debug && precipitationLogged != biomeId) {
+                                precipitationLogged = biomeId
+                                val temperature = tints.temperatureOf(biomeId)
+                                println(
+                                    "Осадки: " + (if (snow) "снег" else "дождь") + " в биоме " +
+                                        (biomeName.ifEmpty { biomeId.toString() }) +
+                                        ", температура " + (temperature ?: "неизвестна"),
+                                )
+                            }
+                            if (snow) {
                                 repeat(2) {
                                     particles += ParticlePiece(
                                         player.x + (Math.random() - 0.5) * 12,

@@ -11,7 +11,14 @@ import java.awt.image.BufferedImage
  * Цвета одного биома: трава, листва, вода. Берутся из `effects` файла биома; если явного
  * цвета нет — из цветовой карты по температуре и влажности.
  */
-data class BiomeTint(val grass: Int, val foliage: Int, val water: Int, val fog: Int? = null)
+data class BiomeTint(
+    val grass: Int,
+    val foliage: Int,
+    val water: Int,
+    val fog: Int? = null,
+    /** Базовая температура биома: по ней ваниль решает, снег идёт или дождь. */
+    val temperature: Float = 0.8f,
+)
 
 /**
  * Оттенки биомов для травы, листвы и воды.
@@ -30,11 +37,16 @@ class BiomeTints private constructor(
     private val ratios: List<Array<FloatArray>?>,
     /** Цвет тумана биома или null, если его нет. */
     private val fogs: List<Int?> = emptyList(),
+    /** Базовая температура биома по id: ниже 0,15 ваниль сыплет снег. */
+    private val temperatures: List<Float?> = emptyList(),
 ) {
 
     /** Множитель цвета для [kind] в биоме [biomeId]; 1 — оставить как в атласе. */
     fun ratio(kind: Int, biomeId: Int): FloatArray =
         ratios.getOrNull(biomeId)?.getOrNull(kind) ?: NEUTRAL
+
+    /** Температура биома из данных игры или null, если биом не загрузился. */
+    fun temperatureOf(biomeId: Int): Float? = temperatures.getOrNull(biomeId)
 
     /** Цвет тумана биома, если он задан в данных игры. */
     fun fogOf(biomeId: Int): Int? = fogs.getOrNull(biomeId)
@@ -58,13 +70,15 @@ class BiomeTints private constructor(
 
             val ratios = ArrayList<Array<FloatArray>?>(biomeNames.size)
             val fogs = ArrayList<Int?>(biomeNames.size)
+            val temperatures = ArrayList<Float?>(biomeNames.size)
             for (name in biomeNames) {
                 val text = GameFiles.readText(directory, "data/minecraft/worldgen/biome/$name.json")
                 val tint = text?.let { parse(it, grassMap, foliageMap) }
                 ratios += tint?.let { arrayOf(ratio(it.grass, TextureAtlas.TINT_GRASS), ratio(it.foliage, TextureAtlas.TINT_FOLIAGE), ratio(it.water, TextureAtlas.TINT_WATER)) }
                 fogs += tint?.fog
+                temperatures += tint?.temperature
             }
-            return BiomeTints(ratios, fogs)
+            return BiomeTints(ratios, fogs, temperatures)
         }
 
         
@@ -85,7 +99,7 @@ class BiomeTints private constructor(
                 "swamp" -> grass = 0x6A7039
                 "dark_forest" -> grass = average(grass, 0x28340A)
             }
-            return BiomeTint(grass, foliage, water, effects.color("fog_color"))
+            return BiomeTint(grass, foliage, water, effects.color("fog_color"), temperature.toFloat())
         }
 
         private fun JsonObject.color(key: String): Int? = string(key)?.removePrefix("#")?.toIntOrNull(16)

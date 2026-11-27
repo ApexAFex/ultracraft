@@ -87,4 +87,18 @@ object Weather {
         val scaled = abs(kotlin.math.sin(value * 12.9898) * 43758.5453)
         return scaled - kotlin.math.floor(scaled)
     }
+
+    /** Ванильный порог: при температуре биома ниже 0,15 идёт снег, иначе дождь. */
+    const val SNOW_TEMPERATURE = 0.15f
+
+    /**
+     * Идёт снег или дождь: решает температура биома (`Biome.shouldSnow` в игре).
+     *
+     * Если температура неизвестна (биом не загрузился), остаётся прежняя проверка по имени
+     * биома — она и была до появления температур.
+     */
+    fun isSnow(temperature: Float?, biomeName: String): Boolean {
+        if (temperature != null) return temperature < SNOW_TEMPERATURE
+        return "snow" in biomeName || "frozen" in biomeName || "ice" in biomeName
+    }
 }

@@ -55,4 +55,24 @@ class WeatherTest {
         assertEquals(rain.size, snow.size, "капель столько же")
         assertTrue(snow.first().length < rain.first().length, "снежинка короче капли")
     }
+
+    @Test
+    fun `biome temperature decides snow`() {
+        // Ванильный порог: ниже 0,15 — снег. Пустыня (2,0) и пляж (0,8) — дождь.
+        assertTrue(Weather.isSnow(0.0f, "snowy_plains"))
+        assertTrue(Weather.isSnow(0.14f, "anything"))
+        assertTrue(Weather.isSnow(-0.5f, "frozen_ocean"))
+        assertTrue(!Weather.isSnow(0.15f, "plains"), "на самом пороге уже дождь")
+        assertTrue(!Weather.isSnow(0.8f, "beach"))
+        assertTrue(!Weather.isSnow(2.0f, "desert"))
+    }
+
+    @Test
+    fun `unknown temperature falls back to the biome name`() {
+        assertTrue(Weather.isSnow(null, "snowy_taiga"))
+        assertTrue(Weather.isSnow(null, "frozen_river"))
+        assertTrue(Weather.isSnow(null, "ice_spikes"))
+        assertTrue(!Weather.isSnow(null, "beach"))
+        assertTrue(!Weather.isSnow(null, "plains"))
+    }
 }
