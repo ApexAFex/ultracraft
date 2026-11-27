@@ -388,6 +388,10 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
             val breakEvents = java.util.concurrent.ConcurrentLinkedQueue<PendingBreak>()
+            /** Сколько строк «Блок исчез» уже напечатано (отладка). */
+            val breaksLogged = java.util.concurrent.atomic.AtomicInteger()
+            /** Сколько строк «Обновление блока» уже напечатано (отладка). */
+            val blockUpdatesLogged = java.util.concurrent.atomic.AtomicInteger()
             val pendingParticles = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.ParticleSpawn>()
             val pendingSounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.SoundSpawn>()
             /** Взрывы из пакета `explode`: рендер-поток превращает их в частицы и звук. */
@@ -433,8 +437,22 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         val before = world.blockAt(position.x, position.y, position.z)
                         world.applyBlockUpdate(packet.body)
                         val after = world.blockAt(position.x, position.y, position.z)
-                        if (before != 0 && after == 0) {
+                        if (BlockChange.isRemoval(before, after)) {
                             breakEvents += PendingBreak(position.x, position.y, position.z, before)
+                            // Чужое ломание (или взрыв, или команда) приходит тем же путём:
+                            // блок исчез — играем звук и сыплем осколки. Печатаем под --debug,
+                            // чтобы это было видно в логе без глаз.
+                            if (debug && breaksLogged.getAndIncrement() < 5) {
+                                println(
+                                    "Блок исчез: " + blocks.nameOf(before) +
+                                        " (${position.x}, ${position.y}, ${position.z})",
+                                )
+                            }
+                        } else if (debug && blockUpdatesLogged.getAndIncrement() < 6) {
+                            println(
+                                "Обновление блока: (${position.x}, ${position.y}, ${position.z}) " +
+                                    "$before → $after",
+                            )
                         }
                         remeshAround(position.x, position.y, position.z)
                     }
