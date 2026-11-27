@@ -3645,6 +3645,8 @@ private val POSE_FIELDS = listOf(
                                             } else {
                                                 emptyMap()
                                             },
+                                            // Детёныш: голова вдвое крупнее тела, как в игре.
+                                            baby = EntityLook.isBaby(entity.metadata),
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
                                             swell = creeperSwell(entity, name, nowNanos),

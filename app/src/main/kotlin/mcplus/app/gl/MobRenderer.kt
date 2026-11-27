@@ -92,6 +92,14 @@ class MobRenderer(
      * Пустая карта — обычный манекен. Ключи — номера полей [ArmorStandPose].
      */
     val pose: Map<Int, ArmorStandPose.Rotation> = emptyMap(),
+    /**
+     * Детёныш: голова вдвое крупнее относительно тела, как в ванили.
+     *
+     * В игре детское превращение (`BabyModelTransform`) масштабирует тело на 0,5, а голову —
+     * ещё вдвое, поэтому у детёнышей голова кажется большой. У нас раньше уменьшалась вся
+     * модель целиком, и детёныши выглядели просто мелкими копиями взрослых.
+     */
+    val baby: Boolean = false,
         /**
          * Семейство меша для слоёв поверх шкуры.
          *
@@ -279,8 +287,7 @@ class MobRenderer(
             val angle = MobModels.limbAngle(box.name, mob.walkPhase, mob.walkAmount, mob.time)
             var matrix = if (angle == 0f) {
                 base
-            } else {
-                val pivotX = (box.minX + box.maxX) / 2f
+            } else {                val pivotX = (box.minX + box.maxX) / 2f
                 val pivotZ = (box.minZ + box.maxZ) / 2f
                 // Крылья висят в плоскости XY: машут они вокруг Z, а не вокруг X, иначе
                 // вместо взмаха получается шаг вперёд-назад.
@@ -363,6 +370,13 @@ class MobRenderer(
                     )
                     matrix = Mat4.multiply(matrix, around)
                 }
+            }
+            // Детёныш: голова крупнее тела вдвое (`BabyModelTransform` в ванили).
+            if (mob.baby && MobModels.isHeadPart(box)) {
+                val (px, py, pz) = headPivot ?: Triple(
+                    (box.minX + box.maxX) / 2f, box.pivotY, (box.minZ + box.maxZ) / 2f,
+                )
+                matrix = Mat4.multiply(matrix, scaleAround(px, py, pz, BABY_HEAD_SCALE))
             }
             // Огонь рисуется чуть крупнее модели, чтобы кадры огня не спорили с ней за глубину.
             if (scaleMultiplier != 1f) {
@@ -541,6 +555,13 @@ class MobRenderer(
         it[5] = value
         it[10] = value
     }
+
+    /** Масштаб вокруг точки: 	ranslate(p) * scale(f) * translate(-p). */
+    private fun scaleAround(px: Float, py: Float, pz: Float, factor: Float): FloatArray =
+        Mat4.multiply(
+            Mat4.translate(px, py, pz),
+            Mat4.multiply(scale(factor), Mat4.translate(-px, -py, -pz)),
+        )
 
     /**
      * Наклон модели от удара вокруг осей X и Z.
@@ -783,6 +804,15 @@ class MobRenderer(
  * и пламя читается даже на тонких лапах.
  */
 private const val FIRE_SCALE = 1.12f
+
+/**
+ * Во сколько раз голова детёныша крупнее тела.
+ *
+ * Ваниль масштабирует тело детёныша на 0,5, а голову — ещё на 2 (BabyModelTransform),
+ * то есть голова остаётся «взрослого» размера. Без этого детёныши выглядели просто мелкими
+ * копиями взрослых.
+ */
+private const val BABY_HEAD_SCALE = 2f
 
         private const val VERTEX_SHADER = """
             #version 330 core
