@@ -3471,6 +3471,35 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                                     sizeX = tile, sizeY = tile, sizeZ = 0.01f,
                                                 )
                                             }
+                                            // Значки на карте (метки игроков, рамок, баннеров):
+                                            // в ванили это картинки, у нас — клетка цвета значка
+                                            // чуть впереди полотна, чтобы не сливалась с картой.
+                                            val decorations = session?.maps?.decorationsOf(frameMapId).orEmpty()
+                                            for (decoration in decorations) {
+                                                val (localX, localY) = MapFrame.markerOffset(
+                                                    decoration.x,
+                                                    decoration.y,
+                                                )
+                                                val (red, green, blue) = MapFrame.channels(decoration.color())
+                                                cubes += Renderer.BlockCube(
+                                                    entity.x + localX * rightX + normalX * 0.045f,
+                                                    entity.y + 0.5 + localY,
+                                                    entity.z + localX * rightZ + normalZ * 0.045f,
+                                                    1f,
+                                                    white, white, white,
+                                                    yaw = frameYaw,
+                                                    red = red, green = green, blue = blue,
+                                                    // Метка крупнее клетки карты: 8 пикселей из 128,
+                                                    // как значок в игре.
+                                                    sizeX = tile, sizeY = tile, sizeZ = 0.01f,
+                                                )
+                                            }
+                                            if (decorations.isNotEmpty() && debug) {
+                                                println(
+                                                    "Значков в рамке: ${decorations.size} " +
+                                                        "(карта $frameMapId)",
+                                                )
+                                            }
                                         } else if (itemName != null) {
                                             worldIcons += Renderer.WorldIcon(
                                                 entity.x, entity.y + 0.5, entity.z, 0.34f,

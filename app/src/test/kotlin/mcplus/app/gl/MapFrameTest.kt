@@ -85,4 +85,19 @@ class MapFrameTest {
             (color and 0xFF) / 255f,
         )
     }
+    @Test
+    fun `markers sit at their pixel and grow upwards`() {
+        // Центр карты — центр полотна.
+        assertEquals(0f, MapFrame.markerOffset(64, 64).first, 1e-6f)
+        assertEquals(0f, MapFrame.markerOffset(64, 64).second, 1e-6f)
+        // Левый верхний угол карты — левый верхний угол полотна: по X −0,5, по Y +0,5.
+        assertEquals(-0.5f, MapFrame.markerOffset(0, 0).first, 1e-6f)
+        assertEquals(0.5f, MapFrame.markerOffset(0, 0).second, 1e-6f)
+        // Правый нижний — наоборот.
+        assertEquals(0.5f, MapFrame.markerOffset(128, 128).first, 1e-6f)
+        assertEquals(-0.5f, MapFrame.markerOffset(128, 128).second, 1e-6f)
+        // Метка правее центра смещена вправо, ниже центра — вниз (ось Y перевёрнута).
+        assertTrue(MapFrame.markerOffset(96, 64).first > 0f)
+        assertTrue(MapFrame.markerOffset(64, 96).second < 0f)
+    }
 }
