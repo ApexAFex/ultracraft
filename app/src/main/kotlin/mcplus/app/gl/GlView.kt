@@ -3244,12 +3244,28 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val burning = ArrayList<mcplus.net.TrackedEntity>()
                         val boxes = ArrayList<mcplus.net.TrackedEntity>()
                         val cubes = ArrayList<Renderer.BlockCube>()
+                        /** Молнии в этом кадре: для них рисуется столб света. */
+                        val lightningBolts = ArrayList<mcplus.net.TrackedEntity>()
+                        val lightningLogged = java.util.concurrent.atomic.AtomicInteger()
                     val saddleLayer = atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
                     val ropeLayer = atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
                         val worldIcons = ArrayList<Renderer.WorldIcon>()
                         val paintings = ArrayList<PaintingRenderer.Painting>()
                         val nowNanos = System.nanoTime()
                         for (entity in entities) {
+                            // Молния: сервер присылает сущность `lightning_bolt`, ваниль рисует
+                            // столб света и белую вспышку экрана. Раньше её не было видно вовсе:
+                            // сущность попадала в «неизвестные».
+                            if (entityTypes.nameOf(entity.type) == "lightning_bolt") {
+                                lightningBolts += entity
+                                lightningUntilNanos = nowNanos + 150_000_000L
+                                if (debug && lightningLogged.getAndIncrement() < 3) {
+                                    println(
+                                        "Молния: (%.1f, %.1f, %.1f)".format(entity.x, entity.y, entity.z),
+                                    )
+                                }
+                                continue
+                            }
                             if (playerList.nameOf(entity.uuid) != null) {
                                 // Чужой игрок: свой скин из профиля, иначе скин по умолчанию.
                                 skinLibrary.request(entity.uuid, playerList.skinUrl(entity.uuid))
@@ -4235,6 +4251,17 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 sizeZ = sz,
                             )
                         }
+                        // Молния: белый столб от земли вверх, пока сущность жива (она живёт
+                        // пару тиков, но вспышка экрана уже включена выше).
+                        for (bolt in lightningBolts) {
+                            val boltLayer = atlas.layerFor("white_wool", TextureAtlas.Kind.SIDE)
+                            cubes += Renderer.BlockCube(
+                                bolt.x, bolt.y + 4.0, bolt.z, 1f,
+                                boltLayer, boltLayer, boltLayer,
+                                red = 1f, green = 1f, blue = 1f,
+                                sizeX = 0.35f, sizeY = 8f, sizeZ = 0.35f,
+                            )
+                        }
                         // Выпавшие предметы и сферы опыта — мини-кубами настоящих блоков.
                         if (cubes.isNotEmpty()) renderer.drawBlockCubes(camera, cubes)
                         // Подбор: иконка предмета летит от места подбора к игроку и тает.
@@ -4962,7 +4989,11 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             lightningUntilNanos = System.nanoTime() + 150_000_000L
                             sound.play("entity.lightning_bolt.thunder", player.x, player.y, player.z)
                         }
-                        if (System.nanoTime() < lightningUntilNanos) hud.drawLightning(0.8f)
+                        if (System.nanoTime() < lightningUntilNanos) {
+                            // Ванильная вспышка короткая и не слепит: 0,3 вместо 0,8 —
+                            // при 0,8 экран выбеливался целиком на четверть секунды.
+                            hud.drawLightning(0.3f)
+                        }
 
                         // Cracks on the block being mined: ten stages, like vanilla.
                         if (mining) {
