@@ -245,6 +245,12 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
 /** Keeps the set of entities the client knows about and feeds them movement packets. */
 class EntityTracker {
 
+    /** Смерть моба: где и какой тип (`entity_event` = 3). Событие забирает рендер-поток. */
+    class Death(val x: Double, val y: Double, val z: Double, val type: Int)
+
+    /** Очередь смертей: мобы умерли, а частицы и звук надо нарисовать в рендер-потоке. */
+    val deaths = java.util.concurrent.ConcurrentLinkedQueue<Death>()
+
     private val entities = ConcurrentHashMap<Int, TrackedEntity>()
 
     @Volatile
@@ -381,7 +387,12 @@ class EntityTracker {
                     val id = reader.readVarInt()
                     val status = reader.readUnsignedByte()
                     // 2 — получен урон: короткая красная вспышка на модели.
+                    // 3 — смерть: в ванили на месте моба всплывают частицы «пуф», и играет
+                    //     его звук смерти; рисует это рендер-поток, поэтому здесь только очередь.
                     if (status == 2) entities[id]?.hurt(System.nanoTime())
+                    if (status == 3) {
+                        entities[id]?.let { deaths += Death(it.x, it.y, it.z, it.type) }
+                    }
                 }
                 return true
             }

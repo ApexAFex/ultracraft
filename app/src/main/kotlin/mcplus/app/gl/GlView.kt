@@ -4162,6 +4162,30 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         while (true) {
                             val pickup = pendingPickups.poll() ?: break
                             pickups += pickup
+                        }                        // Смерть моба (`entity_event` = 3): на месте моба всплывают частицы
+                        // «пуф» и играет его звук смерти — как в ванили.
+                        while (true) {
+                            val death = tracker.deaths.poll() ?: break
+                            val deadName = entityTypes.nameOf(death.type)
+                            sound.play("entity.$deadName.death", death.x, death.y, death.z)
+                            val deathRandom = java.util.Random()
+                            repeat(12) {
+                                particles += ParticlePiece(
+                                    death.x + (deathRandom.nextDouble() - 0.5) * 0.6,
+                                    death.y + deathRandom.nextDouble() * 1.2,
+                                    death.z + (deathRandom.nextDouble() - 0.5) * 0.6,
+                                    (deathRandom.nextDouble() - 0.5) * 0.6,
+                                    0.3 + deathRandom.nextDouble() * 0.5,
+                                    (deathRandom.nextDouble() - 0.5) * 0.6,
+                                    0.9f, "poof", 0.6f,
+                                )
+                            }
+                            if (debug) {
+                                println(
+                                    "Смерть моба: $deadName в (%.1f, %.1f, %.1f)"
+                                        .format(death.x, death.y, death.z),
+                                )
+                            }
                         }
                         if (pickups.isNotEmpty()) {
                             val nowPickup = System.nanoTime()

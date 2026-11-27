@@ -32,6 +32,32 @@ class EntityTrackerTest {
         )
 
     @Test
+    fun `mob death event queues a death for particles`() {
+        // `entity_event` = 3 — смерть: в ванили на месте моба всплывают частицы «пуф».
+        // Клиент должен узнать об этом из пакета, а не из исчезновения сущности.
+        val tracker = EntityTracker()
+        tracker.onPacket(spawn(11, 74, -207.0, 121.0, -47.0))
+        val event = Packet(
+            Protocol777.Play.ENTITY_EVENT,
+            ByteWriter().writeVarInt(11).writeByte(3).toByteArray(),
+        )
+        assertTrue(tracker.onPacket(event))
+        val death = tracker.deaths.poll()
+        assertNotNull(death, "смерть попала в очередь")
+        assertEquals(-207.0, death.x, 1e-9)
+        assertEquals(121.0, death.y, 1e-9)
+        assertEquals(-47.0, death.z, 1e-9)
+        assertEquals(74, death.type)
+        assertNull(tracker.deaths.poll(), "одна смерть — одно событие")
+        // Урон (2) смертью не считается.
+        tracker.onPacket(Packet(
+            Protocol777.Play.ENTITY_EVENT,
+            ByteWriter().writeVarInt(11).writeByte(2).toByteArray(),
+        ))
+        assertNull(tracker.deaths.poll(), "статус 2 — только вспышка урона")
+    }
+
+    @Test
     fun `a leash link comes as its own packet`() {
         // 26.3: `Set Entity Link` — два Int (кого привязали, к кому). 0 — отвязали.
         val tracker = EntityTracker()
