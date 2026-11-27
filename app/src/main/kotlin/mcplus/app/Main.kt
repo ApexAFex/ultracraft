@@ -62,6 +62,8 @@ private fun dispatch(args: List<String>) {
         args[0] == "logout" -> logoutCommand(args.drop(1))
         args[0] == "ping" -> pingCommand(args.drop(1))
         args[0] == "--help" || args[0] == "-h" || args[0] == "help" -> printUsage()
+        // `--version` раньше попадал в ping и клиент пытался подключиться к «--version:25565».
+        args[0] == "--version" || args[0] == "-v" || args[0] == "version" -> printVersion()
         else -> pingCommand(args.toList())
     }
 }
@@ -1834,3 +1836,9 @@ private fun fail(message: String): Nothing {
 
 
 
+
+/** Версия клиента и протокола: `--version` больше не уходит в ping как адрес сервера. */
+private fun printVersion() {
+    println("ultracraft (майн+) — клиент Java Edition для протокола " + mcplus.net.proto.Protocol777.PROTOCOL_VERSION)
+    println("Java: " + System.getProperty("java.version") + ", " + System.getProperty("os.name"))
+}

@@ -43,6 +43,8 @@ class MobRenderer(
         val overlays: List<Layer> = emptyList(),
         /** Вспышка урона: 1 — красный, 0 — обычный цвет. */
         val hurt: Float = 0f,
+        /** Направление удара в градусах протокола (`hurt_animation`): по нему модель наклоняется. */
+        val hurtYaw: Float = 0f,
         /** Время в секундах: по нему качаются хвосты, уши и щупальца в покое. */
         val time: Float = 0f,
         /** 0 — стоит, 1 — уже упал набок (анимация смерти). */
@@ -193,7 +195,12 @@ class MobRenderer(
                 (mob.y + hover).toFloat(),
                 mob.z.toFloat(),
             ),
-            Mat4.multiply(Mat4.rotateY(yaw), Mat4.multiply(pose, modelScale(mob))),
+            // Наклон от удара: направление приходит в `hurt_animation`, раньше оно не
+            // использовалось и модель стояла ровно.
+            Mat4.multiply(
+                hurtTilt(mob, mob.yaw),
+                Mat4.multiply(Mat4.rotateY(yaw), Mat4.multiply(pose, modelScale(mob))),
+            ),
         )
 
         val headPivot = headPivotOf(mob.family)
@@ -462,6 +469,21 @@ class MobRenderer(
         it[0] = value
         it[5] = value
         it[10] = value
+    }
+
+    /**
+     * Наклон модели от удара вокруг осей X и Z.
+     *
+     * Углы считает [HurtTilt] по направлению удара из `hurt_animation`; здесь они
+     * превращаются в матрицу вокруг ног модели. Если удара нет — единичная матрица.
+     */
+    private fun hurtTilt(mob: Mob, yawDegrees: Float): FloatArray {
+        val (angleX, angleZ) = HurtTilt.axes(mob.hurtYaw, yawDegrees, mob.hurt)
+        if (angleX == 0f && angleZ == 0f) return Mat4.identity()
+        return Mat4.multiply(
+            Mat4.rotateZ(Math.toRadians(angleZ.toDouble()).toFloat()),
+            Mat4.rotateX(Math.toRadians(angleX.toDouble()).toFloat()),
+        )
     }
 
     /**

@@ -3621,6 +3621,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             overlays = mobOverlays(entity, name),
                                             overlayFamily = overlayFamilyOf(name),
                                             hurt = entity.hurtProgress(System.nanoTime()),
+                                            // Направление удара из `hurt_animation`: по нему
+                                            // модель наклоняется (HurtTilt).
+                                            hurtYaw = entity.hurtYaw,
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
                                             swell = creeperSwell(entity, name, nowNanos),
