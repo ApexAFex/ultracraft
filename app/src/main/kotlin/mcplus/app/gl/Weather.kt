@@ -55,6 +55,8 @@ object Weather {
         centerZ: Double,
         baseY: Double = 0.0,
         snow: Boolean = false,
+        /** Высота первого твёрдого блока в колонке (x, z) или null, если колонка неизвестна. */
+        groundOf: ((Int, Int) -> Int?)? = null,
     ): List<Drop> {
         val strength = level.coerceIn(0f, 1f)
         if (strength <= 0f) return emptyList()
@@ -71,13 +73,13 @@ object Weather {
             val phase = unit(index * 3.1 + 0.71 + time * fall / HEIGHT)
             // Чем ближе к концу падения, тем сильнее сносит ветром.
             val drift = ((1.0 - phase) * HEIGHT / fall * wind).toFloat()
-            result += Drop(
-                x = (centerX + ox * RADIUS).toFloat() + drift,
-                // Куб дождя вокруг игрока: от двух блоков под камерой до HEIGHT над ней.
-                y = (baseY - 2.0 + HEIGHT * phase).toFloat(),
-                z = (centerZ + oz * RADIUS).toFloat(),
-                length = streak,
-            )
+            val x = (centerX + ox * RADIUS).toFloat() + drift
+            val z = (centerZ + oz * RADIUS).toFloat()
+            // Капля не летит сквозь землю: ниже первого твёрдого блока она уже разбилась.
+            val ground = groundOf?.invoke(kotlin.math.floor(x).toInt(), kotlin.math.floor(z).toInt())
+            val y = (baseY - 2.0 + HEIGHT * phase).toFloat()
+            if (ground != null && y < ground + 1.0f) continue
+            result += Drop(x = x, y = y, z = z, length = streak)
         }
         return result
     }

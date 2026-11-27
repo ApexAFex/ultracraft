@@ -4065,10 +4065,36 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // Дождь: тонкие штрихи вокруг игрока. Сила приходит в `Set Weather`
                         // (0 — ясно, 1 — ливень), поэтому при 0 капель не считаем вовсе.
                         val rainLevel = session?.sky?.rain ?: 0f
+                        /** Высоты первых твёрдых блоков по колонкам: считается раз в кадр. */
+                        val groundCache = HashMap<Long, Int?>()
                         if (rainLevel > 0.01f) {
                             val seconds = (nowNanos / 1_000_000_000.0).toFloat()
                             val drops = Weather.drops(
                                 rainLevel, seconds, camera.x, camera.z, camera.y,
+                                // Капли не летят сквозь землю: высота первого твёрдого блока
+                                // в колонке считается один раз за кадр и запоминается.
+                                groundOf = { bx, bz ->
+                                    val key = (bx.toLong() shl 32) xor (bz.toLong() and 0xFFFFFFFFL)
+                                    if (groundCache.containsKey(key)) {
+                                        groundCache[key]
+                                    } else {
+                                        var found: Int? = null
+                                        var y = kotlin.math.floor(camera.y + 8).toInt()
+                                        val bottom = kotlin.math.floor(camera.y - 12).toInt()
+                                        while (y >= bottom) {
+                                            val state = world.blockAt(bx, y, bz)
+                                            if (state != 0 && state != mcplus.net.World.UNKNOWN &&
+                                                !blocks.isAir(state)
+                                            ) {
+                                                found = y
+                                                break
+                                            }
+                                            y--
+                                        }
+                                        groundCache[key] = found
+                                        found
+                                    }
+                                },
                             )
                             weatherRenderer.draw(
                                 camera, drops,

@@ -57,6 +57,23 @@ class WeatherTest {
     }
 
     @Test
+    fun `drops stop at the first solid block`() {
+        // Площадка на высоте 120: капель ниже 121 быть не должно.
+        val ground: (Int, Int) -> Int? = { _, _ -> 120 }
+        val drops = Weather.drops(1f, 5f, 0.0, 0.0, baseY = 122.0, groundOf = ground)
+        assertTrue(drops.isNotEmpty(), "над землёй капли остаются")
+        for (drop in drops) {
+            assertTrue(drop.y >= 121f, "капля не ниже площадки: ${drop.y}")
+        }
+        // Без карты высот капли падают как раньше — вплоть до двух блоков под камерой.
+        val free = Weather.drops(1f, 5f, 0.0, 0.0, baseY = 122.0)
+        assertTrue(free.count { it.y < 121f } > 0, "без земли капли падают ниже")
+        // Неизвестная колонка (null) не выкидывает каплю: лучше показать, чем потерять.
+        val unknown: (Int, Int) -> Int? = { _, _ -> null }
+        assertEquals(free.size, Weather.drops(1f, 5f, 0.0, 0.0, 122.0, groundOf = unknown).size)
+    }
+
+    @Test
     fun `biome temperature decides snow`() {
         // Ванильный порог: ниже 0,15 — снег. Пустыня (2,0) и пляж (0,8) — дождь.
         assertTrue(Weather.isSnow(0.0f, "snowy_plains"))
