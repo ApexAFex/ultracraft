@@ -59,6 +59,21 @@ class EntityTrackerTest {
     }
 
     @Test
+    fun `hurt flash lasts half a second like the game`() {
+        // В ванили hurtTime = 10 тиков = 0,5 с. Раньше у нас вспышка гасла за 0,3 с.
+        val uuid = UUID.fromString("9667b029-256c-3a6a-bc5f-9b65783b13f4")
+        val entity = TrackedEntity(1, uuid, 74)
+        val start = 1_000_000_000L
+        entity.hurt(start)
+        assertEquals(1f, entity.hurtProgress(start), 1e-4f)
+        assertEquals(0.5f, entity.hurtProgress(start + 250_000_000L), 1e-3f)
+        assertEquals(0f, entity.hurtProgress(start + 500_000_000L), 1e-4f)
+        assertEquals(0f, entity.hurtProgress(start + 2_000_000_000L), 1e-4f)
+        // Без удара вспышки нет.
+        assertEquals(0f, TrackedEntity(2, uuid, 74).hurtProgress(start), 1e-4f)
+    }
+
+    @Test
     fun `entity event reads the fixed-width entity id`() {
         // Живой пакет из игры: тело 00 00 0d ac 18 — это id 3500 (int) и статус 24.
         // Раньше здесь читался VarInt, и все события выглядели как «id=0 статус=0».

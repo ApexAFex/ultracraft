@@ -89,7 +89,12 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
         swingStartNanos = nowNanos
     }
 
-    /** Вспышка урона: 1 сразу после удара, 0 через 0,3 секунды. */
+    /**
+     * Вспышка урона: 1 сразу после удара, 0 через [HURT_SECONDS].
+     *
+     * В ванили `LivingEntity.hurtTime` — 10 тиков, то есть полсекунды; раньше у нас было
+     * 0,3 с, и вспышка гасла в полтора раза быстрее игры.
+     */
     @Volatile
     private var hurtAtNanos: Long = 0L
 
@@ -100,7 +105,12 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
     fun hurtProgress(nowNanos: Long): Float {
         if (hurtAtNanos == 0L) return 0f
         val age = (nowNanos - hurtAtNanos) / 1_000_000_000.0
-        return (1.0 - age / 0.3).coerceIn(0.0, 1.0).toFloat()
+        return (1.0 - age / HURT_SECONDS).coerceIn(0.0, 1.0).toFloat()
+    }
+
+    companion object {
+        /** Сколько длится красная вспышка урона: в ванили `hurtTime` = 10 тиков = 0,5 с. */
+        const val HURT_SECONDS = 0.5
     }
 
     /** 0 — покой, 1 — взмах закончен. */
