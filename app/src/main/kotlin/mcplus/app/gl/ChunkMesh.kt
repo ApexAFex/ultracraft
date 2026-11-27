@@ -881,12 +881,12 @@ object MeshBuilder {
         Face(id, dx, dy, dz, shade, kind)
 
     private val FACES = arrayOf(
-        face(FACE_UP, 0, 1, 0, 1.0f, TextureAtlas.Kind.TOP),
-        face(FACE_DOWN, 0, -1, 0, 0.45f, TextureAtlas.Kind.BOTTOM),
-        face(FACE_EAST, 1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE),
-        face(FACE_WEST, -1, 0, 0, 0.78f, TextureAtlas.Kind.SIDE),
-        face(FACE_SOUTH, 0, 0, 1, 0.62f, TextureAtlas.Kind.SIDE),
-        face(FACE_NORTH, 0, 0, -1, 0.62f, TextureAtlas.Kind.SIDE),
+        face(FACE_UP, 0, 1, 0, FaceShade.UP, TextureAtlas.Kind.TOP),
+        face(FACE_DOWN, 0, -1, 0, FaceShade.DOWN, TextureAtlas.Kind.BOTTOM),
+        face(FACE_EAST, 1, 0, 0, FaceShade.EAST, TextureAtlas.Kind.SIDE),
+        face(FACE_WEST, -1, 0, 0, FaceShade.WEST, TextureAtlas.Kind.SIDE),
+        face(FACE_SOUTH, 0, 0, 1, FaceShade.SOUTH, TextureAtlas.Kind.SIDE),
+        face(FACE_NORTH, 0, 0, -1, FaceShade.NORTH, TextureAtlas.Kind.SIDE),
     )
 
     /**
