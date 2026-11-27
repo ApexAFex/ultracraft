@@ -243,7 +243,10 @@ class TrackedEntity(val id: Int, val uuid: UUID, val type: Int) {
 }
 
 /** Keeps the set of entities the client knows about and feeds them movement packets. */
-class EntityTracker {
+class EntityTracker(
+    /** Печатать события сущностей (урон, смерть) — для живой проверки без глаз. */
+    private val logEvents: Boolean = false,
+) {
 
     /** Смерть моба: где и какой тип (`entity_event` = 3). Событие забирает рендер-поток. */
     class Death(val x: Double, val y: Double, val z: Double, val type: Int)
@@ -386,6 +389,9 @@ class EntityTracker {
                     val reader = ByteReader(packet.body)
                     val id = reader.readVarInt()
                     val status = reader.readUnsignedByte()
+                    if (logEvents) {
+                        println("Событие сущности: id=$id статус=$status известна=${entities[id] != null}")
+                    }
                     // 2 — получен урон: короткая красная вспышка на модели.
                     // 3 — смерть: в ванили на месте моба всплывают частицы «пуф», и играет
                     //     его звук смерти; рисует это рендер-поток, поэтому здесь только очередь.

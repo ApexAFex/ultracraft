@@ -361,7 +361,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             }
             println("Меши в очереди: $requested, потоков: ${pipeline.workerCount}")
 
-            val tracker = EntityTracker()
+            val tracker = EntityTracker(logEvents = debug)
             // Names come from the session: the tab list arrives during the initial chunk wait.
             val playerList = session?.players ?: mcplus.net.PlayerList()
             val sectionCount = session?.joinResult?.let { join ->
