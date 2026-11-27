@@ -63,6 +63,9 @@ object GlView {
     /** Блок, который только что стал воздухом: из него сыплются кусочки. */
     private class PendingBreak(val x: Int, val y: Int, val z: Int, val state: Int)
 
+/** Поставленный блок: сетевой поток кладёт, рендер-поток играет звук постановки. */
+private class PendingPlace(val x: Int, val y: Int, val z: Int, val state: Int)
+
 /** Чужие трещины на блоке: стадия 0..9 и время, до которого их рисуем. */
 private class RemoteCrack(val stage: Int, val untilNanos: Long)
 
@@ -388,10 +391,14 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             // The window is already open: chunks keep arriving and are meshed in the
             // background instead of blocking the start.
             val breakEvents = java.util.concurrent.ConcurrentLinkedQueue<PendingBreak>()
+            /** Поставленные блоки (чужие): звук играется в рендер-потоке. */
+            val placeEvents = java.util.concurrent.ConcurrentLinkedQueue<PendingPlace>()
             /** Сколько строк «Блок исчез» уже напечатано (отладка). */
             val breaksLogged = java.util.concurrent.atomic.AtomicInteger()
             /** Сколько строк «Обновление блока» уже напечатано (отладка). */
             val blockUpdatesLogged = java.util.concurrent.atomic.AtomicInteger()
+            /** Сколько строк «Блок поставлен» уже напечатано (отладка). */
+            val placesLogged = java.util.concurrent.atomic.AtomicInteger()
             val pendingParticles = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.ParticleSpawn>()
             val pendingSounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.SoundSpawn>()
             /** Взрывы из пакета `explode`: рендер-поток превращает их в частицы и звук. */
@@ -445,6 +452,16 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             if (debug && breaksLogged.getAndIncrement() < 5) {
                                 println(
                                     "Блок исчез: " + blocks.nameOf(before) +
+                                        " (${position.x}, ${position.y}, ${position.z})",
+                                )
+                            }
+                        } else if (BlockChange.isPlacement(before, after)) {
+                            // Поставили блок — и не мы (свою установку озвучиваем сразу при
+                            // клике). Ваниль играет `place` из группы звуков блока.
+                            placeEvents += PendingPlace(position.x, position.y, position.z, after)
+                            if (debug && placesLogged.getAndIncrement() < 5) {
+                                println(
+                                    "Блок поставлен: " + blocks.nameOf(after) +
                                         " (${position.x}, ${position.y}, ${position.z})",
                                 )
                             }
@@ -2871,6 +2888,19 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     top, bottom, side,
                                 )
                             }
+                        }
+                        // Чужая установка блока: звук `place` из группы звуков этого блока.
+                        while (true) {
+                            val placed = placeEvents.poll() ?: break
+                            val dx = placed.x + 0.5 - camera.x
+                            val dy = placed.y + 0.5 - camera.y
+                            val dz = placed.z + 0.5 - camera.z
+                            if (dx * dx + dy * dy + dz * dz > 144.0) continue
+                            val (placeSound, placeFallback) = placeEvent(blocks.nameOf(placed.state))
+                            sound.play(
+                                placeSound, placed.x + 0.5, placed.y + 0.5, placed.z + 0.5,
+                                placeFallback,
+                            )
                         }
                         val debrisDelta = input.deltaSeconds.toFloat()
                         if (debris.isNotEmpty()) {

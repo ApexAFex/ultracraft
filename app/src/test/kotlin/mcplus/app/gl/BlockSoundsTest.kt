@@ -14,6 +14,17 @@ import kotlin.test.assertTrue
 class BlockSoundsTest {
 
     @Test
+    fun `breaking and placing use the block's own sound group`() {
+        // Имя звука собирается из имени блока: `block.<имя>.break` и `block.<имя>.place`.
+        // Если такой группы в игре нет, звук берётся из запасного `block.stone.*`.
+        assertEquals("block.oak_planks.break" to "block.stone.break", breakEvent("minecraft:oak_planks"))
+        assertEquals("block.oak_planks.place" to "block.stone.place", placeEvent("oak_planks"))
+        assertEquals("block.smooth_stone.place" to "block.stone.place", placeEvent("smooth_stone"))
+        // Префикс `minecraft:` у имени блока не должен попадать в имя звука.
+        assertEquals("block.stone.break", breakEvent("minecraft:stone").first)
+    }
+
+    @Test
     fun `wooden doors, trapdoors and gates use the wooden sounds`() {
         assertEquals("block.wooden_door.open", BlockSounds.openSound("oak_door"))
         assertEquals("block.wooden_door.open", BlockSounds.openSound("spruce_door"))
