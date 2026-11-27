@@ -74,6 +74,24 @@ class WeatherTest {
     }
 
     @Test
+    fun `splashes appear only where drops hit the ground`() {
+        val ground: (Int, Int) -> Int? = { _, _ -> 120 }
+        val splashes = Weather.splashes(1f, 7f, 0.0, 0.0, baseY = 122.0, groundOf = ground)
+        assertTrue(splashes.isNotEmpty(), "над ровной землёй всплески есть")
+        assertTrue(splashes.size <= 24, "не больше лимита за кадр: ${splashes.size}")
+        for (splash in splashes) {
+            assertEquals(121.02f, splash.y, "всплеск ровно над землёй")
+        }
+        // Одна колонка — один всплеск за кадр.
+        val columns = splashes.map { it.x to it.z }
+        assertEquals(columns.size, columns.toSet().size, "колонки не повторяются")
+        // Нет земли — нет всплесков (над океаном дождю не о что биться).
+        assertTrue(Weather.splashes(1f, 7f, 0.0, 0.0, 122.0, groundOf = { _, _ -> null }).isEmpty())
+        // При ясной погоде всплесков нет вовсе.
+        assertTrue(Weather.splashes(0f, 7f, 0.0, 0.0, 122.0, groundOf = ground).isEmpty())
+    }
+
+    @Test
     fun `biome temperature decides snow`() {
         // Ванильный порог: ниже 0,15 — снег. Пустыня (2,0) и пляж (0,8) — дождь.
         assertTrue(Weather.isSnow(0.0f, "snowy_plains"))

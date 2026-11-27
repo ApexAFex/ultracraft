@@ -90,6 +90,74 @@ object Weather {
         return scaled - kotlin.math.floor(scaled)
     }
 
+    /** Точка, где капля разбилась о блок: туда ставится частица всплеска. */
+    data class Splash(val x: Float, val y: Float, val z: Float)
+
+    /**
+     * Высота первого твёрдого блока в колонке (x, z) или null, если блоков нет.
+     *
+     * Сканирование идёт от восьми блоков над камерой вниз до двенадцати под ней — этого
+     * хватает и на площадку под ногами, и на землю внизу. `World.UNKNOWN` (чанк не загружен)
+     * считается отсутствием блока: лучше нарисовать каплю, чем потерять её.
+     */
+    fun groundColumn(
+        world: mcplus.net.World,
+        blocks: mcplus.net.BlockTable,
+        bx: Int,
+        bz: Int,
+        cameraY: Double,
+    ): Int? {
+        var y = kotlin.math.floor(cameraY + 8).toInt()
+        val bottom = kotlin.math.floor(cameraY - 12).toInt()
+        while (y >= bottom) {
+            val state = world.blockAt(bx, y, bz)
+            if (state != 0 && state != mcplus.net.World.UNKNOWN && !blocks.isAir(state)) return y
+            y--
+        }
+        return null
+    }
+
+    /**
+     * Всплески дождя: капли, которые в этом кадре как раз дошли до земли.
+     *
+     * Считаются тем же детерминированным способом, что и сами капли, поэтому всплеск
+     * появляется ровно там, где капля исчезла, а не в случайной колонке, как было раньше.
+     * Одна колонка даёт не больше одного всплеска за кадр.
+     */
+    fun splashes(
+        level: Float,
+        time: Float,
+        centerX: Double,
+        centerZ: Double,
+        baseY: Double,
+        groundOf: (Int, Int) -> Int?,
+        limit: Int = 24,
+    ): List<Splash> {
+        val strength = level.coerceIn(0f, 1f)
+        if (strength <= 0f) return emptyList()
+        val count = (DROPS * strength).toInt().coerceAtLeast(1)
+        val seen = HashSet<Long>()
+        val result = ArrayList<Splash>(limit)
+        for (index in 0 until count) {
+            if (result.size >= limit) break
+            val ox = unit(index * 2.3 + 0.17) * 2.0 - 1.0
+            val oz = unit(index * 5.7 + 1.31) * 2.0 - 1.0
+            val phase = unit(index * 3.1 + 0.71 + time * FALL / HEIGHT)
+            val drift = ((1.0 - phase) * HEIGHT / FALL * WIND).toFloat()
+            val x = (centerX + ox * RADIUS).toFloat() + drift
+            val z = (centerZ + oz * RADIUS).toFloat()
+            val ground = groundOf(kotlin.math.floor(x).toInt(), kotlin.math.floor(z).toInt()) ?: continue
+            val y = (baseY - 2.0 + HEIGHT * phase).toFloat()
+            // Капля в этом кадре впервые коснулась земли: от нуля до блока над ней.
+            if (y < ground + 1.0f && y > ground - 1.0f) {
+                val key = (kotlin.math.floor(x).toLong() shl 32) xor
+                    (kotlin.math.floor(z).toLong() and 0xFFFFFFFFL)
+                if (seen.add(key)) result += Splash(x, ground + 1.02f, z)
+            }
+        }
+        return result
+    }
+
     /** Ванильный порог: при температуре биома ниже 0,15 идёт снег, иначе дождь. */
     const val SNOW_TEMPERATURE = 0.15f
 

@@ -795,6 +795,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                     val invisibleLogged = HashSet<Int>()
                     /** Сколько капель дождя было в прошлом кадре (отладка). */
                     var rainDropsLogged = 0
+                    /** Сколько всплесков дождя было в прошлом кадре (отладка). */
+                    var splashLogged = -1
                     /** Биом, про осадки в котором уже напечатано (отладка). */
                     var precipitationLogged = -1
                     val font = Font.load(directory)
@@ -3113,28 +3115,27 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                 }
                             } else {
                                 // Дождь: сами струи рисует `WeatherRenderer` (линиями, их
-                                // много и они дешёвые), а здесь остаются только всплески
-                                // на земле — их видно, только когда капля попала в блок.
-                                repeat(3) {
-                                    val splashX = kotlin.math.floor(player.x).toInt() + (Math.random() * 12 - 6).toInt()
-                                    val splashZ = kotlin.math.floor(player.z).toInt() + (Math.random() * 12 - 6).toInt()
-                                    var groundY = kotlin.math.floor(player.y).toInt() + 2
-                                    var found = false
-                                    while (groundY > kotlin.math.floor(player.y).toInt() - 5) {
-                                        val state = world.blockAt(splashX, groundY, splashZ)
-                                        if (state != 0 && state != World.UNKNOWN) {
-                                            found = true
-                                            break
-                                        }
-                                        groundY--
-                                    }
-                                    if (found) {
-                                        particles += ParticlePiece(
-                                            splashX + 0.5, groundY + 1.02, splashZ + 0.5,
-                                            0.0, 0.35, 0.0,
-                                            0.3f, "splash", 0.12f,
-                                        )
-                                    }
+                                // много и они дешёвые), а всплески ставятся ровно там, где
+                                // капля в этом кадре дошла до блока — их считает Weather,
+                                // тем же детерминированным способом, что и сами капли.
+                                val splashLevel = session?.sky?.rain ?: 0f
+                                val splashSeconds = (System.nanoTime() / 1_000_000_000.0).toFloat()
+                                val splashes = Weather.splashes(
+                                    splashLevel, splashSeconds, camera.x, camera.z, camera.y,
+                                    groundOf = { bx, bz ->
+                                        Weather.groundColumn(world, blocks, bx, bz, camera.y)
+                                    },
+                                )
+                                for (splash in splashes) {
+                                    particles += ParticlePiece(
+                                        splash.x.toDouble(), splash.y.toDouble(), splash.z.toDouble(),
+                                        0.0, 0.35, 0.0,
+                                        0.3f, "splash", 0.12f,
+                                    )
+                                }
+                                if (debug && splashLogged != splashes.size) {
+                                    splashLogged = splashes.size
+                                    println("Всплески дождя: ${splashes.size}")
                                 }
                             }
                         }
