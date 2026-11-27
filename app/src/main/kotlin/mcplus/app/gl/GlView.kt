@@ -404,6 +404,9 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
             /** Взрывы из пакета `explode`: рендер-поток превращает их в частицы и звук. */
             val pendingExplosions = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.Explosion>()
             val explodePackets = java.util.concurrent.atomic.AtomicInteger()
+            /** Всплески зелья из `level_event` (2002) и счётчик напечатанных событий мира. */
+            val pendingSplashes = java.util.concurrent.ConcurrentLinkedQueue<Triple<Double, Double, Double>>()
+            val levelEventsLogged = java.util.concurrent.atomic.AtomicInteger()
             val pendingEntitySounds = java.util.concurrent.ConcurrentLinkedQueue<mcplus.net.EntitySoundSpawn>()
             /** Чужие трещины: ключ — упакованная позиция блока. */
             val remoteCracks = java.util.concurrent.ConcurrentHashMap<Long, RemoteCrack>()
@@ -515,6 +518,29 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             entity.x, entity.y + 0.28, entity.z,
                             System.nanoTime(),
                         )
+                    }
+                    return
+                }
+                if (packet.id == Protocol777.Play.LEVEL_EVENT) {
+                    // Событие мира: 2001 — блок сломан (его уже обрабатывает обновление блока,
+                    // поэтому пропускаем), 2002 — разбилось зелье, 1000…1005 — механизмы.
+                    runCatching { mcplus.net.readLevelEvent(packet.body) }.getOrNull()?.let { event ->
+                        if (event.type == 2002) {
+                            pendingSplashes.add(
+                                Triple(
+                                    event.position.x.toDouble() + 0.5,
+                                    event.position.y.toDouble() + 0.5,
+                                    event.position.z.toDouble() + 0.5,
+                                ),
+                            )
+                        }
+                        if (debug && levelEventsLogged.getAndIncrement() < 6) {
+                            println(
+                                "Событие мира: ${event.type} в " +
+                                    "(${event.position.x}, ${event.position.y}, ${event.position.z}), " +
+                                    "данные ${event.data}",
+                            )
+                        }
                     }
                     return
                 }
@@ -2991,9 +3017,13 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     (random.nextDouble() - 0.5) * 0.4,
                                     random.nextDouble() * 0.3,
                                     (random.nextDouble() - 0.5) * 0.4,
-                                    1.2f,
+                                    // Размер зависит от типа: раньше все были по 1,2 блока,
+                                    // и дым взрыва превращался в стену белых квадратов.
+                                    ServerParticles.sizeFor(spawn.name),
                                     spawn.name,
-                                    0.18f,
+                                    // Время жизни зависит от типа: дым и взрывы живут около
+                                    // секунды, искры — меньше (раньше все жили 0,18 с).
+                                    ServerParticles.lifeSeconds(spawn.name),
                                 )
                             }
                         }
@@ -3022,6 +3052,26 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                     (1.0 + random.nextDouble() * blast.radius).toFloat(),
                                     pieces,
                                     0.5f + random.nextDouble().toFloat() * 0.6f,
+                                )
+                            }
+                        }
+                        // Разбилось зелье (`level_event` 2002): всплески вокруг точки.
+                        while (true) {
+                            val (sx, sy, sz) = pendingSplashes.poll() ?: break
+                            val dx = sx - camera.x
+                            val dy = sy - camera.y
+                            val dz = sz - camera.z
+                            if (dx * dx + dy * dy + dz * dz > 144.0) continue
+                            val random = java.util.Random()
+                            repeat(10) {
+                                particles += ParticlePiece(
+                                    sx + (random.nextDouble() - 0.5) * 0.5,
+                                    sy + (random.nextDouble() - 0.5) * 0.5,
+                                    sz + (random.nextDouble() - 0.5) * 0.5,
+                                    (random.nextDouble() - 0.5) * 1.2,
+                                    random.nextDouble() * 1.0,
+                                    (random.nextDouble() - 0.5) * 1.2,
+                                    0.4f, "splash", 0.5f,
                                 )
                             }
                         }
@@ -4008,7 +4058,7 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                         // Частицы из пакета — спрайтами из textures/particle.
                         if (particles.isNotEmpty()) {
                             val sprites = particles.map { piece ->
-                                val age = 1.2f - piece.life
+                                val age = (1.2f - piece.life).coerceAtLeast(0f)
                                 val frames = particleRenderer.frameCount(piece.name)
                                 ParticleRenderer.Sprite(
                                     piece.x, piece.y, piece.z,

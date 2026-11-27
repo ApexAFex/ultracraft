@@ -99,6 +99,14 @@ object Protocol777 {
         const val UPDATE_ENTITY_ROTATION: Int = 0x39
 
         /**
+         * `level_event` (0x2F): событие мира — тип, позиция, данные и флаг «на весь мир».
+         *
+         * Номер у сервера: `tools/protocol-ids.java` печатает
+         * `47  0x2F  minecraft:level_event`.
+         */
+        const val LEVEL_EVENT: Int = 0x2F
+
+        /**
          * `explode` (0x24): взрыв — центр, сила и число блоков.
          *
          * Номер взят у сервера: `tools/protocol-ids.java` печатает
