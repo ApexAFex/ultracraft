@@ -1646,6 +1646,7 @@ private fun printUsage() {
         mcplus — клиент Java Edition, который пока умеет разговаривать с сервером
 
         Использование:
+          mcplus --version                          версия клиента и протокола
           mcplus [host[:port]]                      список игроков (Server List Ping)
           mcplus join [host[:port]] [--online]      войти на сервер (--name для offline)
           mcplus world [host[:port]] [--chunks N]   нарисовать карту мира текстом
