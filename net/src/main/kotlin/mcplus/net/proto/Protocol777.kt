@@ -147,6 +147,14 @@ object Protocol777 {
         const val SET_ACTION_BAR_TEXT: Int = 0x59
         const val SET_TITLE_TEXT: Int = 0x74
         const val SET_SUBTITLE_TEXT: Int = 0x72
+        /**
+         * `set_titles_animation` (0x75): три VarInt — проявление, показ и угасание, в тиках.
+         *
+         * Номер у сервера: `tools/protocol-ids.java` печатает
+         * `117  0x75  minecraft:set_titles_animation`.
+         */
+        const val SET_TITLES_ANIMATION: Int = 0x75
+
         const val CLEAR_TITLES: Int = 0x0E
         /** Радиус стриминга чанков, который сервер выбрал для клиента. */
         const val SET_CHUNK_CACHE_RADIUS: Int = 0x61

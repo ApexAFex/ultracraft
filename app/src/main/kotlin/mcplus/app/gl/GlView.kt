@@ -4863,9 +4863,20 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                             }
                             val title = session?.titleText
                             if (title != null) {
-                                val age = (System.nanoTime() - (session?.titleAtNanos ?: 0L)) / 1_000_000_000.0
-                                if (age in 0.0..3.0) {
-                                    hud.drawTitle(title, session?.subtitleText, (1.0 - age / 3.0).toFloat())
+                                val age = (System.nanoTime() - (session?.titleAtNanos ?: 0L)) /
+                                    1_000_000_000.0
+                                // Тайминги из `set_titles_animation`: проявление, показ, угасание.
+                                val timing = TitleTiming.ofTicks(
+                                    session?.titleFadeInTicks ?: 10,
+                                    session?.titleStayTicks ?: 70,
+                                    session?.titleFadeOutTicks ?: 20,
+                                )
+                                if (timing.visible(age.toFloat())) {
+                                    hud.drawTitle(
+                                        title,
+                                        session?.subtitleText,
+                                        timing.alpha(age.toFloat()),
+                                    )
                                 }
                             }
                         }

@@ -56,7 +56,8 @@ class Session internal constructor(
     var tradesUnreadable: Int = 0
         private set
 
-    /** Строка над хотбаром и большой заголовок: приходят компонентами. */    @Volatile
+    /** Строка над хотбаром и большой заголовок: приходят компонентами. */
+    @Volatile
     var actionBar: String? = null
         private set
     @Volatile
@@ -67,6 +68,22 @@ class Session internal constructor(
         private set
     @Volatile
     var titleAtNanos: Long = 0L
+        private set
+
+    /**
+     * Тайминги заголовка из `set_titles_animation` (0x75), в тиках.
+     *
+     * Ванильные значения по умолчанию: 10 тиков проявление, 70 держится, 20 гаснет.
+     * Раньше мы показывали заголовок фиксированные 3 секунды и этот пакет не слушали.
+     */
+    @Volatile
+    var titleFadeInTicks: Int = 10
+        private set
+    @Volatile
+    var titleStayTicks: Int = 70
+        private set
+    @Volatile
+    var titleFadeOutTicks: Int = 20
         private set
 
     /** Когда пришла строка над хотбаром: она гаснет через пару секунд сама. */
@@ -296,6 +313,18 @@ class Session internal constructor(
                 Protocol777.Play.SET_TITLE_TEXT -> {
                     titleText = readComponentText(packet.body)
                     titleAtNanos = System.nanoTime()
+                }
+
+                Protocol777.Play.SET_TITLES_ANIMATION -> {
+                    // Три **фиксированных int**: тело из игры — `00 00 00 0a | 00 00 00 64 |
+                    // 00 00 00 14` (10, 100, 20 тиков). Раньше читали VarInt, получали нули,
+                    // и заголовок не показывался вовсе: сумма таймингов была 0.
+                    runCatching {
+                        val reader = ByteReader(packet.body)
+                        titleFadeInTicks = reader.readInt()
+                        titleStayTicks = reader.readInt()
+                        titleFadeOutTicks = reader.readInt()
+                    }
                 }
 
                 Protocol777.Play.SET_SUBTITLE_TEXT ->
