@@ -99,13 +99,48 @@ object MenuLayout {
             9 * rows + OpenContainer.PLAYER_SLOTS
         }
 
+        // Раздатчик и выбрасыватель приходят сервером как `generic_3x3` (проверено на живом
+        // сервере: «Контейнер: generic_3x3, «Dispenser», слотов 45»), а не своим именем.
+        type == "generic_3x3" -> 9 + OpenContainer.PLAYER_SLOTS
+
         // Кафедра: один слот под книгу и инвентарь игрока.
         type == "crafting" -> 10 + OpenContainer.PLAYER_SLOTS
         type == "lectern" -> 1 + OpenContainer.PLAYER_SLOTS
         type in FURNACES -> 3 + OpenContainer.PLAYER_SLOTS
         type == "inventory" -> 46
+
+        // Остальные станции: число слотов контейнера плюс инвентарь игрока.
+        // Раньше все они попадали в «неизвестный» случай и показывали неверную сетку.
+        type in TOOL_SLOTS -> TOOL_SLOTS.getValue(type) + OpenContainer.PLAYER_SLOTS
+
+        // Новые блоки с фиксированной сеткой.
+        type == "hopper" -> 5 + OpenContainer.PLAYER_SLOTS
+        type == "crafter_3x3" -> 9 + OpenContainer.PLAYER_SLOTS
+        type == "shulker_box" -> 27 + OpenContainer.PLAYER_SLOTS
+
         else -> 0
     }
+
+    /**
+     * Слоты контейнера у станций: сколько предметов кладёт игрок, столько и слотов.
+     *
+     * **Числа сняты с живого сервера** (`container --at x,y,z` открывает блок и печатает
+     * «слотов N»), а не взяты на глаз: наковальня 39, кузня 40, ткацкий станок 40, точило 39,
+     * камнерез **38** (в нём два слота — вход и результат), картография 39, варочная 41,
+     * кафедра торговли 39, чары 38, маяк 37, воронка 41, шалкер 63.
+     */
+    val TOOL_SLOTS: Map<String, Int> = mapOf(
+        "enchantment" to 2,   // предмет и лазурит
+        "beacon" to 1,        // только предмет
+        "anvil" to 3,
+        "smithing" to 4,
+        "grindstone" to 3,
+        "loom" to 4,
+        "stonecutter" to 2,   // вход и результат
+        "cartography_table" to 3,
+        "merchant" to 3,
+        "brewing_stand" to 5,
+    )
 
     /**
      * Слоты контейнера до инвентаря игрока. Если тип неизвестен, всё меню до последних
@@ -120,6 +155,11 @@ object MenuLayout {
         type == "crafting" -> 10
         type == "lectern" -> 1
         type in FURNACES -> 3
+        type == "generic_3x3" -> 9
+        type in TOOL_SLOTS -> TOOL_SLOTS.getValue(type)
+        type == "hopper" -> 5
+        type == "crafter_3x3" -> 9
+        type == "shulker_box" -> 27
         else -> (slotCount - OpenContainer.PLAYER_SLOTS).coerceAtLeast(0)
     }
 

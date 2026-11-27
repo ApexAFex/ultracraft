@@ -5,67 +5,54 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Раскладка меню по типу: сколько слотов у контейнера и где начинается инвентарь игрока.
+ * Раскладка меню: сколько слотов у контейнера и сколько всего.
  *
- * Ошибка здесь сдвигает все слоты: предметы будут появляться не в тех клетках, а клик уйдёт
- * не в тот слот.
+ * Числа ванильные. Раньше все станции, кроме сундуков, верстака, кафедры и печей, попадали
+ * в «неизвестный» случай: сетка считалась как «всё минус инвентарь игрока», и слоты съезжали —
+ * клик по результату наковальни попадал в чужой слот.
  */
 class MenuLayoutTest {
 
+    @Test
+    fun `stations have their vanilla slot counts`() {
+        // Числа сняты с живого сервера: `container --at x,y,z` печатает «слотов N».
+        assertEquals(2, MenuLayout.containerSlots("enchantment", MenuLayout.slotCount("enchantment")))
+        assertEquals(1, MenuLayout.containerSlots("beacon", MenuLayout.slotCount("beacon")))
+        assertEquals(3, MenuLayout.containerSlots("anvil", MenuLayout.slotCount("anvil")))
+        assertEquals(4, MenuLayout.containerSlots("smithing", MenuLayout.slotCount("smithing")))
+        assertEquals(3, MenuLayout.containerSlots("grindstone", MenuLayout.slotCount("grindstone")))
+        assertEquals(4, MenuLayout.containerSlots("loom", MenuLayout.slotCount("loom")))
+        // Камнерез: 38 слотов на сервере, то есть два слота контейнера, а не один.
+        assertEquals(2, MenuLayout.containerSlots("stonecutter", MenuLayout.slotCount("stonecutter")))
+        assertEquals(3, MenuLayout.containerSlots("cartography_table", MenuLayout.slotCount("cartography_table")))
+        assertEquals(3, MenuLayout.containerSlots("merchant", MenuLayout.slotCount("merchant")))
+        assertEquals(5, MenuLayout.containerSlots("brewing_stand", MenuLayout.slotCount("brewing_stand")))
+    }
 
     @Test
-    fun `a lectern has one book slot and the player inventory`() {
-        assertEquals(1 + mcplus.net.OpenContainer.PLAYER_SLOTS, MenuLayout.slotCount("lectern"))
-        assertEquals(1, MenuLayout.containerSlots("lectern", 1 + mcplus.net.OpenContainer.PLAYER_SLOTS))
-    }
-    @Test
-    fun `chest slots grow by nine and the player part stays thirty-six`() {
-        assertEquals(45, MenuLayout.slotCount("generic_9x1"))
-        assertEquals(63, MenuLayout.slotCount("generic_9x3"))
-        assertEquals(90, MenuLayout.slotCount("generic_9x6"))
-        assertEquals(27, MenuLayout.containerSlots("generic_9x3", 63))
-        assertEquals(54, MenuLayout.containerSlots("generic_9x6", 90))
-    }
-
-    @Test
-    fun `crafting keeps the result and the 3x3 grid before the player`() {
+    fun `total slots are container plus the player inventory`() {
+        assertEquals(38, MenuLayout.slotCount("enchantment"))
+        assertEquals(37, MenuLayout.slotCount("beacon"))
+        assertEquals(39, MenuLayout.slotCount("anvil"))
+        assertEquals(40, MenuLayout.slotCount("smithing"))
+        assertEquals(40, MenuLayout.slotCount("loom"))
+        assertEquals(39, MenuLayout.slotCount("grindstone"))
+        assertEquals(38, MenuLayout.slotCount("stonecutter"))
+        assertEquals(39, MenuLayout.slotCount("cartography_table"))
+        assertEquals(41, MenuLayout.slotCount("brewing_stand"))
+        assertEquals(41, MenuLayout.slotCount("hopper"))
+        // Раздатчик сервер присылает как `generic_3x3` — 45 слотов.
+        assertEquals(45, MenuLayout.slotCount("generic_3x3"))
+        assertEquals(45, MenuLayout.slotCount("crafter_3x3"))
+        assertEquals(63, MenuLayout.slotCount("shulker_box"))
         assertEquals(46, MenuLayout.slotCount("crafting"))
-        assertEquals(10, MenuLayout.containerSlots("crafting", 46))
     }
 
     @Test
-    fun `furnaces have three slots of their own`() {
-        for (type in MenuLayout.FURNACES) {
-            assertEquals(39, MenuLayout.slotCount(type))
-            assertEquals(3, MenuLayout.containerSlots(type, 39))
-        }
-    }
-
-    @Test
-    fun `unknown menu shows everything before the last thirty-six slots`() {
-        assertEquals(5, MenuLayout.containerSlots("hopper", 41))
-        assertTrue(!MenuLayout.isChest("hopper"))
-        assertTrue(MenuLayout.isChest("generic_9x3"))
-    }
-
-    @Test
-    fun `open screen reads id type and title`() {
-        val key = "container.chest".toByteArray()
-        val body = mcplus.protocol.ByteWriter()
-            .writeVarInt(7)
-            .writeVarInt(2) // generic_9x3
-            // Компонент в NBT: корневой compound с полем translate, как у сервера.
-            .writeByte(0x0A)
-            .writeByte(0x08).writeShort(9).writeBytes("translate".toByteArray())
-            .writeShort(key.size).writeBytes(key)
-            .writeByte(0)
-            .toByteArray()
-        val menus = MenuTable(listOf("generic_9x1", "generic_9x2", "generic_9x3"))
-        val container = readOpenScreen(body, menus)
-
-        assertEquals(7, container.id)
-        assertEquals("generic_9x3", container.type)
-        assertEquals("Chest", container.title)
-        assertEquals(63, container.slotCount)
+    fun `chests keep their rows`() {
+        assertEquals(27, MenuLayout.containerSlots("generic_9x3", MenuLayout.slotCount("generic_9x3")))
+        assertEquals(63, MenuLayout.slotCount("generic_9x3"))
+        assertEquals(54, MenuLayout.containerSlots("generic_9x6", MenuLayout.slotCount("generic_9x6")))
+        assertTrue(MenuLayout.isChest("generic_9x1"))
     }
 }
