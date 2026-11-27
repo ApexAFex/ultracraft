@@ -3624,6 +3624,8 @@ fun blockZOf(key: Long): Int = ((key and 0x3FFFFFFL).toInt() shl 6) shr 6
                                             // Направление удара из `hurt_animation`: по нему
                                             // модель наклоняется (HurtTilt).
                                             hurtYaw = entity.hurtYaw,
+                                            // Горит: поверх модели рисуются кадры огня, как в игре.
+                                            burning = EntityLook.isBurning(entity.metadata),
                                             time = (nowNanos / 1_000_000_000.0).toFloat(),
                                             deathProgress = deathProgress,
                                             swell = creeperSwell(entity, name, nowNanos),

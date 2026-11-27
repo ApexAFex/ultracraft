@@ -79,6 +79,13 @@ class MobRenderer(
          * второй раз чуть крупнее и почти белой — получается свечение вокруг силуэта.
          */
         val glow: Boolean = false,
+    /**
+     * Моб горит: поверх модели рисуется текстура огня, как в ванили.
+     *
+     * Раньше вокруг горящего моба летали отдельные спрайты пламени. Ваниль же накладывает
+     * на модель кадры `block/fire_0`/`fire_1` — их и рисуем вторым проходом.
+     */
+    val burning: Boolean = false,
         /**
          * Семейство меша для слоёв поверх шкуры.
          *
@@ -124,6 +131,17 @@ class MobRenderer(
         GameFiles.readPng(directory, "assets/minecraft/textures/$path")?.let { upload(it) } ?: 0
     }
 
+    /**
+     * Кадр огня для горящего моба: `block/fire_0` и `block/fire_1` чередуются.
+     *
+     * В ванили огонь на модели — анимация из двух кадров с шагом в пару тиков; время приходит
+     * из `Mob.time`, поэтому мигание синхронно у всех и не требует таймера на моба.
+     */
+    private fun fireTextureAt(time: Float): Int {
+        val frame = ((time * 10f).toInt() and 1)
+        return textureForPath(if (frame == 0) "block/fire_0.png" else "block/fire_1.png")
+    }
+
     fun draw(camera: Camera, mobs: List<Mob>) {
         if (mobs.isEmpty()) return
 
@@ -138,6 +156,20 @@ class MobRenderer(
         for (mob in mobs) {
             val mesh = meshFor(mob.family) ?: continue
             drawMob(mesh, mob, mob.texture)
+            // Огонь: как в ванили — кадры `block/fire_0`/`fire_1` поверх модели, чуть крупнее
+            // и со смешиванием. Раньше вокруг горящего моба просто летали спрайты пламени.
+            if (mob.burning) {
+                val fireTexture = fireTextureAt(mob.time)
+                if (fireTexture != 0) {
+                    GL30.glEnable(GL30.GL_BLEND)
+                    GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA)
+                    GL30.glEnable(GL30.GL_POLYGON_OFFSET_FILL)
+                    GL30.glPolygonOffset(-1f, -1f)
+                    drawMob(mesh, mob, fireTexture, 0xFFFFFF, scaleMultiplier = FIRE_SCALE)
+                    GL30.glDisable(GL30.GL_POLYGON_OFFSET_FILL)
+                    GL30.glDisable(GL30.GL_BLEND)
+                }
+            }
             if (mob.overlays.isNotEmpty()) {
                 // Слои повторяют ту же геометрию, поэтому без сдвига они спорят
                 // с базой за глубину: полигоны ровно на одном расстоянии.
@@ -161,7 +193,13 @@ class MobRenderer(
     }
 
     /** Один проход по коробкам модели с указанной текстурой и множителем цвета. */
-    private fun drawMob(mesh: FamilyMesh, mob: Mob, texture: Int, tint: Int = 0xFFFFFF) {
+    private fun drawMob(
+        mesh: FamilyMesh,
+        mob: Mob,
+        texture: Int,
+        tint: Int = 0xFFFFFF,
+        scaleMultiplier: Float = 1f,
+    ) {
         GL30.glBindTexture(GL30.GL_TEXTURE_2D, texture)
         GL30.glBindVertexArray(mesh.vao)
         val hurt = 1f - mob.hurt * 0.65f
@@ -296,6 +334,10 @@ class MobRenderer(
                     val back = Mat4.translate(-px, -py, -pz)
                     matrix = Mat4.multiply(matrix, Mat4.multiply(turn, Mat4.multiply(rotation, back)))
                 }
+            }
+            // Огонь рисуется чуть крупнее модели, чтобы кадры огня не спорили с ней за глубину.
+            if (scaleMultiplier != 1f) {
+                matrix = Mat4.multiply(matrix, scale(scaleMultiplier))
             }
             GL30.glUniformMatrix4fv(modelLocation, false, matrix)
             GL30.glDrawArrays(
@@ -704,6 +746,14 @@ class MobRenderer(
      * виден уже белый «призрак» позади моба: так я и убедился, что проход вообще рисуется.
      */
     private const val GLOW_SCALE = 1.06f
+
+/**
+ * Насколько огонь крупнее модели.
+ *
+ * 12 % — как у ванильного слоя огня: кадры `fire_0`/`fire_1` чуть выступают за силуэт,
+ * и пламя читается даже на тонких лапах.
+ */
+private const val FIRE_SCALE = 1.12f
 
         private const val VERTEX_SHADER = """
             #version 330 core
