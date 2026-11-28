@@ -120,6 +120,18 @@ class World(val minY: Int) {
 
     fun column(chunkX: Int, chunkZ: Int): ChunkColumn? = chunks[key(chunkX, chunkZ)]
 
+    /**
+     * Забывает все чанки: нужно при смене измерения.
+     *
+     * Порталы и телепорты между мирами присылают espawn с новым измерением, а старые чанки
+     * к нему не относятся — их координаты и высоты другие. Без очистки клиент рисовал бы
+     * куски старого мира поверх нового.
+     */
+    fun clear() {
+        chunks.clear()
+        rawBodies.clear()
+    }
+
     /** Выгружает чанк из памяти; возвращает его, если он был. */
     fun removeChunk(chunkX: Int, chunkZ: Int): ChunkColumn? = chunks.remove(key(chunkX, chunkZ))
 

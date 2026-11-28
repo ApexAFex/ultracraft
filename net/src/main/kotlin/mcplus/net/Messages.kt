@@ -91,6 +91,20 @@ internal fun readFeatureFlags(reader: ByteReader): List<String> {
     return List(count) { reader.readString() }
 }
 
+/**
+ * Начало CommonPlayerSpawnInfo из пакета espawn: тип измерения и имя измерения.
+ *
+ * Этого достаточно, чтобы понять, что игрок сменил мир (Нижний мир, Край, обычный):
+ * остальные поля (seed, режим игры, точка смерти) для отрисовки не нужны.
+ */
+data class SpawnInfo(val dimensionTypeId: Int, val dimensionName: String)
+
+fun readSpawnInfo(reader: ByteReader): SpawnInfo {
+    val dimensionTypeId = reader.readVarInt()
+    val dimensionName = reader.readString()
+    return SpawnInfo(dimensionTypeId, dimensionName)
+}
+
 internal fun readJoinGame(reader: ByteReader): JoinGame {
     val entityId = reader.readInt()
     val hardcore = reader.readBoolean()

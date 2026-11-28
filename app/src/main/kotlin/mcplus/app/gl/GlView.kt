@@ -374,9 +374,16 @@ private val POSE_FIELDS = listOf(
             val tracker = EntityTracker(logEvents = debug)
             // Names come from the session: the tab list arrives during the initial chunk wait.
             val playerList = session?.players ?: mcplus.net.PlayerList()
-            val sectionCount = session?.joinResult?.let { join ->
-                join.registries.dimensionType(join.joinGame.dimensionTypeId)?.sectionCount
-            } ?: 24
+            // Измерение и число секций меняются при телепорте в другой мир, поэтому они
+            // не константы: `respawn` приносит новый тип измерения (см. обработку ниже).
+            val sectionCountRef = java.util.concurrent.atomic.AtomicInteger(
+                session?.joinResult?.let { join ->
+                    join.registries.dimensionType(join.joinGame.dimensionTypeId)?.sectionCount
+                } ?: 24,
+            )
+            val dimensionRef = java.util.concurrent.atomic.AtomicReference(
+                session?.joinResult?.joinGame?.dimensionName?.substringAfterLast(':') ?: "overworld",
+            )
             var streamed = 0
             // Counted on the reader thread: shows whether the server accepts our edits or
             // quietly puts the world back.
@@ -433,6 +440,33 @@ private val POSE_FIELDS = listOf(
 
             fun handle(packet: mcplus.protocol.Packet) {
                 if (debug && seenIds.add(packet.id)) println("Пакет id=${packet.id}")
+                // Смена измерения: сервер присылает `respawn` со `CommonPlayerSpawnInfo`.
+                // Старый мир к новому измерению не относится — координаты и высоты другие,
+                // поэтому чанки забываются, а небо и туман переключаются на новое имя.
+                // Раньше пакет разбирался только как «сброс здоровья», и после телепорта
+                // в Нижний мир клиент рисовал небо и чанки обычного мира.
+                if (packet.id == Protocol777.Play.RESPAWN) {
+                    runCatching {
+                        mcplus.net.readSpawnInfo(mcplus.protocol.ByteReader(packet.body))
+                    }.getOrNull()?.let { info ->
+                        val newName = info.dimensionName.substringAfterLast(':')
+                        if (newName != dimensionRef.get()) {
+                            dimensionRef.set(newName)
+                            session?.joinResult?.registries
+                                ?.dimensionType(info.dimensionTypeId)
+                                ?.let { sectionCountRef.set(it.sectionCount) }
+                            world.clear()
+                            // Транспорт прошлого мира сервер больше не пришлёт: клиент
+                            // отпускает камеру сам, иначе она останется на старой сущности.
+                            session?.releaseRiding()
+                            println(
+                                "Измерение сменилось: ${info.dimensionName}, " +
+                                    "секций ${sectionCountRef.get()}, чанки забыты",
+                            )
+                        }
+                    }
+                    return
+                }
                 // The tab list is the only source of other players' names, so it goes first.
                 if (playerList.onPacket(packet.id, packet.body)) return
                 val linksBefore = tracker.linkPackets
@@ -615,7 +649,7 @@ private val POSE_FIELDS = listOf(
                     // A chunk that fails to parse is a hole in the world, so say so instead of
                     // swallowing the exception: silent holes are impossible to diagnose.
                     runCatching {
-                        val column = world.addChunkRaw(packet.body, sectionCount)
+                        val column = world.addChunkRaw(packet.body, sectionCountRef.get())
                         // Faces towards an unloaded chunk are drawn (see MeshBuilder), so the
                         // neighbours do not have to be re-meshed when a chunk arrives; the
                         // duplicate faces are coplanar and invisible.
@@ -883,8 +917,7 @@ private val POSE_FIELDS = listOf(
                         println("Небо: ${skyTextures.sheet.sprites.size} спрайтов")
                     }
                     val skyRenderer = SkyRenderer(skyTextures, width, height)
-                    val dimension = session?.joinResult?.joinGame?.dimensionName
-                        ?.substringAfterLast(':') ?: "overworld"
+                    val dimension = dimensionRef.get()
                     val camera = defaultCamera(world, centerChunkX, centerChunkZ)
                     if (pitchAtStart != null) {
                         camera.pitch = Math.toRadians(pitchAtStart.toDouble()).toFloat()
